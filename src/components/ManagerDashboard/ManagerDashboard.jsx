@@ -8,7 +8,7 @@ import PrintableTimesheet from './PrintableTimesheet';
 import StaffManagementTab from './StaffManagementTab';
 import ShiftSchedulesTab from './ShiftSchedulesTab';
 import { exportTimesheetToExcel } from '../../utils/excelExport';
-import { getShifts, getStats, seedDemoData, subscribeRealtimeEvents } from '../../utils/api';
+import { getShifts, getStats, subscribeRealtimeEvents } from '../../utils/api';
 import { LayoutDashboard, Users, Clock, Radio, Building2 } from 'lucide-react';
 
 export default function ManagerDashboard({ venueSettings, refreshSettings }) {
@@ -18,7 +18,6 @@ export default function ManagerDashboard({ venueSettings, refreshSettings }) {
   const [shifts, setShifts] = useState([]);
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [seeding, setSeeding] = useState(false);
 
   // Filters
   const [dateRange, setDateRange] = useState('ALL');
@@ -115,18 +114,6 @@ export default function ManagerDashboard({ venueSettings, refreshSettings }) {
     window.print();
   };
 
-  const handleSeedDemo = async () => {
-    setSeeding(true);
-    try {
-      await seedDemoData(false);
-      await loadData();
-    } catch (err) {
-      alert('Error seeding demo data: ' + err.message);
-    } finally {
-      setSeeding(false);
-    }
-  };
-
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
       <div className="no-print space-y-6">
@@ -185,8 +172,6 @@ export default function ManagerDashboard({ venueSettings, refreshSettings }) {
               onPrint={handlePrint}
               onExportCsv={handleExportCsv}
               onOpenSettings={() => setSettingsOpen(true)}
-              onSeedDemo={handleSeedDemo}
-              seeding={seeding}
             />
 
             <FilterBar

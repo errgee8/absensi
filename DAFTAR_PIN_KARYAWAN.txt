@@ -1,0 +1,60 @@
+===============================================================================================================
+                     JP KARAOKE & LUCKY CAT — OFFICIAL STAFF ROSTER & ASSIGNED SECRET PINS
+                     Generated: 08/11/2026 WITA | CONFIDENTIAL — FOR MANAGEMENT USE ONLY
+===============================================================================================================
+
+---------------------------------------------------------------------------------------------------------------
+1. JP KARAOKE STAFF ROSTER (TOTAL: 13 STAF)
+---------------------------------------------------------------------------------------------------------------
+NO.  NAMA KARYAWAN       DIVISI                        JABATAN (ROLE)     SHIFT KERJA       PIN RAHASIA
+---  ------------------  ----------------------------  -----------------  ----------------  -----------
+1    Anang               Cleaning Service              Cleaning Service   10:00 - 19:00     [ 2666 ]
+2    Emil                Cleaning Service              Cleaning Service   18:30 - 03:00     [ 1845 ]
+3    Yohan               Cleaning Service              Cleaning Service   10:00 - 19:00     [ 9267 ]
+4    Adis                Server and Cashier            Cashier            13:00 - 22:00     [ 3447 ]
+5    Ica                 Server and Cashier            Cashier            18:30 - 03:00     [ 6443 ]
+6    Alex                Server and Cashier            Server             13:00 - 22:00     [ 5144 ]
+7    Dein                Server and Cashier            Server             18:30 - 03:00     [ 3763 ]
+8    Dio                 Server and Cashier            Server             13:00 - 22:00     [ 8069 ]
+9    Made                Server and Cashier            Server             13:00 - 22:00     [ 2937 ]
+10   Rojes               Server and Cashier            Server             18:30 - 03:00     [ 4108 ]
+11   Aris                Storage Staff                 Storage Staff      10:00 - 19:00     [ 9315 ]
+12   Febry               Storage Staff                 Storage Staff      18:30 - 03:30     [ 4471 ]
+13   Galang              Storage Staff                 Storage Staff      13:00 - 22:00     [ 5449 ]
+
+---------------------------------------------------------------------------------------------------------------
+2. LUCKY CAT (LC) STAFF ROSTER (TOTAL: 21 STAF)
+---------------------------------------------------------------------------------------------------------------
+NO.  NAMA KARYAWAN       DIVISI                        JABATAN (ROLE)     SHIFT KERJA       PIN RAHASIA
+---  ------------------  ----------------------------  -----------------  ----------------  -----------
+1    Gerry               Bar, Cashier, and Server      Bar Staff          10:00 - 19:00     [ 3714 ]
+2    Jackson             Bar, Cashier, and Server      Bar Staff          18:30 - 03:30     [ 6834 ]
+3    Mada                Bar, Cashier, and Server      Bar Staff          18:30 - 03:30     [ 7297 ]
+4    Raymond             Bar, Cashier, and Server      Bar Staff          10:00 - 19:00     [ 5484 ]
+5    Manda               Bar, Cashier, and Server      Cashier            18:30 - 03:30     [ 4485 ]
+6    Santi               Bar, Cashier, and Server      Cashier            10:00 - 19:00     [ 8869 ]
+7    Widia               Bar, Cashier, and Server      Cashier            10:00 - 19:00     [ 7514 ]
+8    Andre               Bar, Cashier, and Server      Server             10:00 - 19:00     [ 3835 ]
+9    Dika                Bar, Cashier, and Server      Server             10:00 - 19:00     [ 8401 ]
+10   Ferin               Bar, Cashier, and Server      Server             18:30 - 03:30     [ 8843 ]
+11   Fontana             Bar, Cashier, and Server      Server             18:30 - 03:30     [ 2681 ]
+12   Haslam              Bar, Cashier, and Server      Server             18:30 - 03:30     [ 3858 ]
+13   Martin              Bar, Cashier, and Server      Server             18:30 - 03:30     [ 7967 ]
+14   Oky                 Bar, Cashier, and Server      Server             10:00 - 19:00     [ 2740 ]
+15   Roni                Bar, Cashier, and Server      Server             10:00 - 19:00     [ 6177 ]
+16   Anto                Kitchen                       Kitchen Staff      09:00 - 19:00     [ 7205 ]
+17   Edo                 Kitchen                       Kitchen Staff      12:00 - 22:00     [ 4421 ]
+18   Harun               Kitchen                       Kitchen Staff      18:00 - 03:00     [ 8867 ]
+19   Martha              Kitchen                       Kitchen Staff      18:00 - 03:00     [ 7672 ]
+20   Nurjanah            Kitchen                       Kitchen Staff      14:00 - 00:00     [ 4290 ]
+21   Ulul                Kitchen                       Kitchen Staff      09:00 - 19:00     [ 9466 ]
+
+===============================================================================================================
+PANDUAN OPERASIONAL CEPAT:
+1. Berikan masing-masing 4-digit PIN rahasia kepada staf yang bersangkutan.
+2. Staf membuka link website: https://absensi-jplc.vercel.app
+3. Staf langsung mengetik 4 digit PIN mereka pada tombol angka (tidak perlu memilih nama).
+4. Tekan tombol hijau [AMBIL FOTO & CHECK-IN] saat datang, atau tombol merah [AMBIL FOTO & CHECK-OUT] saat pulang.
+5. Foto selfie diambil (otomatis tertera watermark jam WITA, nama, dan status) -> selesai otomatis dalam 3 detik.
+6. Khusus staf Lucky Cat, tombol istirahat 1 jam otomatis tersedia saat sedang bertugas.
+===============================================================================================================

@@ -5,7 +5,7 @@ import { db, getSetting, setSetting, uploadsDir } from './db.js';
 import { calculateDistanceMeters, isWithinGeofence } from './geofence.js';
 import { getClientIp, validateClientNetwork } from './network.js';
 import { evaluateCheckinFlags, evaluateCheckoutFlags, evaluateBreakFlags, auditOpenShifts, FLAG_TYPES } from './flags.js';
-import { isSupabaseConfigured, uploadPhotoToSupabase, cloudDb } from './supabase.js';
+import { isSupabaseConfigured, uploadPhotoToSupabase, cloudDb, supabase } from './supabase.js';
 
 const router = express.Router();
 
@@ -137,7 +137,7 @@ router.put('/schedules/:id', (req, res) => {
 });
 
 // 4. Staff Endpoints (Public Roster for Kiosk)
-router.get('/staff', (req, res) => {
+router.get('/staff', async (req, res) => {
   const { venue } = req.query;
   let query = 'SELECT id, name, venue, division, role, department, shift_start, shift_end, standard_hours, is_active FROM staff WHERE is_active = 1';
   const params = [];
@@ -148,19 +148,57 @@ router.get('/staff', (req, res) => {
   }
 
   query += ' ORDER BY venue ASC, division ASC, name ASC';
-  const staff = db.prepare(query).all(...params);
+  let staff = db.prepare(query).all(...params);
+
+  // Fallback to Supabase if SQLite has no records (e.g. serverless cold start)
+  if ((!staff || staff.length === 0) && isSupabaseConfigured) {
+    try {
+      let supaQuery = supabase
+        .from('staff')
+        .select('id, legacy_code, name, venue, division, role, department, shift_start, shift_end, standard_hours, is_active')
+        .eq('is_active', true);
+      if (venue && venue !== 'ALL') {
+        supaQuery = supaQuery.ilike('venue', `%${venue.replace('JP Karaoke', 'JP')}%`);
+      }
+      const { data } = await supaQuery.order('venue', { ascending: true }).order('name', { ascending: true });
+      if (data && data.length > 0) {
+        staff = data.map(s => ({ ...s, id: s.legacy_code || s.id }));
+      }
+    } catch (e) {
+      console.warn('Supabase staff fallback note:', e.message);
+    }
+  }
+
   res.json(staff);
 });
 
 // 5. Manager Admin Staff Roster
-router.get('/staff/admin', (req, res) => {
-  const staff = db.prepare(`
+router.get('/staff/admin', async (req, res) => {
+  let staff = db.prepare(`
     SELECT 
       st.*,
       (SELECT MAX(s.checkin_time) FROM shifts s WHERE s.staff_id = st.id) as last_shift_time
     FROM staff st 
     ORDER BY st.venue ASC, st.is_active DESC, st.name ASC
   `).all();
+
+  // Fallback to Supabase if SQLite has no records (e.g. serverless cold start)
+  if ((!staff || staff.length === 0) && isSupabaseConfigured) {
+    try {
+      const { data } = await supabase
+        .from('staff')
+        .select('*')
+        .order('venue', { ascending: true })
+        .order('is_active', { ascending: false })
+        .order('name', { ascending: true });
+      if (data && data.length > 0) {
+        staff = data.map(s => ({ ...s, id: s.legacy_code || s.id }));
+      }
+    } catch (e) {
+      console.warn('Supabase admin staff fallback note:', e.message);
+    }
+  }
+
   res.json(staff);
 });
 
@@ -280,7 +318,7 @@ router.post('/staff/verify-pin', async (req, res) => {
 });
 
 // 7. Manager Admin: Add New Staff Member
-router.post('/staff', (req, res) => {
+router.post('/staff', async (req, res) => {
   const { name, venue, division, role, department, pin, is_active, shift_start, shift_end, standard_hours } = req.body;
   if (!name || !role) {
     return res.status(400).json({ error: 'Name and Role are required' });
@@ -318,6 +356,27 @@ router.post('/staff', (req, res) => {
       activeStatus
     );
 
+    // Sync to Supabase Cloud
+    if (isSupabaseConfigured) {
+      try {
+        await supabase.from('staff').insert({
+          legacy_code: assignedId,
+          name: name.trim(),
+          venue: venue || 'JP Karaoke',
+          division: division || 'Server and Cashier',
+          role: role.trim(),
+          department: department || 'General',
+          pin: assignedPin,
+          shift_start: shift_start || '13:00',
+          shift_end: shift_end || '22:00',
+          standard_hours: parseFloat(standard_hours) || 8.0,
+          is_active: activeStatus === 1
+        });
+      } catch (e) {
+        console.warn('Supabase staff insert note:', e.message);
+      }
+    }
+
     broadcastEvent('STAFF_UPDATE', { action: 'CREATED', staffId: assignedId });
     res.json({ success: true, message: 'Staff member provisioned successfully', id: assignedId, pin: assignedPin });
   } catch (err) {
@@ -326,7 +385,7 @@ router.post('/staff', (req, res) => {
 });
 
 // 8. Manager Admin: Reset Staff PIN
-router.put('/staff/:id/pin', (req, res) => {
+router.put('/staff/:id/pin', async (req, res) => {
   const { id } = req.params;
   const { pin } = req.body;
 
@@ -335,8 +394,18 @@ router.put('/staff/:id/pin', (req, res) => {
   }
 
   const result = db.prepare('UPDATE staff SET pin = ? WHERE id = ?').run(pin.trim(), id);
-  if (result.changes === 0) {
-    return res.status(404).json({ error: 'Staff member not found.' });
+
+  if (isSupabaseConfigured) {
+    try {
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+      if (isUuid) {
+        await supabase.from('staff').update({ pin: pin.trim() }).eq('id', id);
+      } else {
+        await supabase.from('staff').update({ pin: pin.trim() }).eq('legacy_code', id);
+      }
+    } catch (e) {
+      console.warn('Supabase pin update note:', e.message);
+    }
   }
 
   broadcastEvent('STAFF_UPDATE', { action: 'PIN_RESET', staffId: id });
@@ -344,14 +413,24 @@ router.put('/staff/:id/pin', (req, res) => {
 });
 
 // 9. Manager Admin: Toggle Staff Active/Suspended Status
-router.put('/staff/:id/status', (req, res) => {
+router.put('/staff/:id/status', async (req, res) => {
   const { id } = req.params;
   const { is_active } = req.body;
 
   const statusVal = is_active ? 1 : 0;
   const result = db.prepare('UPDATE staff SET is_active = ? WHERE id = ?').run(statusVal, id);
-  if (result.changes === 0) {
-    return res.status(404).json({ error: 'Staff member not found.' });
+
+  if (isSupabaseConfigured) {
+    try {
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+      if (isUuid) {
+        await supabase.from('staff').update({ is_active: statusVal === 1 }).eq('id', id);
+      } else {
+        await supabase.from('staff').update({ is_active: statusVal === 1 }).eq('legacy_code', id);
+      }
+    } catch (e) {
+      console.warn('Supabase status update note:', e.message);
+    }
   }
 
   broadcastEvent('STAFF_UPDATE', { action: 'STATUS_TOGGLED', staffId: id, is_active: statusVal });
