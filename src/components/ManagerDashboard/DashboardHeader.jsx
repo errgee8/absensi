@@ -1,5 +1,5 @@
 import React from 'react';
-import { Users, Clock, AlertTriangle, ShieldCheck, Printer, Download, Settings, Database } from 'lucide-react';
+import { Users, Clock, AlertTriangle, ShieldCheck, Printer, Download, Settings, Database, FileSpreadsheet } from 'lucide-react';
 
 export default function DashboardHeader({
   stats,
@@ -65,13 +65,14 @@ export default function DashboardHeader({
             <span>{seeding ? 'Generating...' : 'Seed Demo Data'}</span>
           </button>
 
-          {/* Export CSV */}
+          {/* Export Excel (.xlsx) */}
           <button
             onClick={onExportCsv}
-            className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold border border-slate-700 flex items-center space-x-1.5 transition"
+            className="px-3.5 py-2 bg-emerald-950/60 hover:bg-emerald-900/60 text-emerald-300 rounded-xl text-xs font-bold border border-emerald-700/60 flex items-center space-x-1.5 transition shadow"
+            title="Export color-coded executive Excel (.xlsx) file"
           >
-            <Download className="w-3.5 h-3.5" />
-            <span>Export CSV</span>
+            <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
+            <span>Export Excel (.xlsx)</span>
           </button>
 
           {/* Print / Export PDF */}

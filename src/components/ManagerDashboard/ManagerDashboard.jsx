@@ -7,6 +7,7 @@ import VenueSettingsModal from './VenueSettingsModal';
 import PrintableTimesheet from './PrintableTimesheet';
 import StaffManagementTab from './StaffManagementTab';
 import ShiftSchedulesTab from './ShiftSchedulesTab';
+import { exportTimesheetToExcel } from '../../utils/excelExport';
 import { getShifts, getStats, seedDemoData, subscribeRealtimeEvents } from '../../utils/api';
 import { LayoutDashboard, Users, Clock, Radio, Building2 } from 'lucide-react';
 
@@ -97,51 +98,17 @@ export default function ManagerDashboard({ venueSettings, refreshSettings }) {
     };
   }, []);
 
-  const handleExportCsv = () => {
+  const handleExportCsv = async () => {
     if (shifts.length === 0) return alert('No records to export');
-
-    const headers = [
-      'Shift ID',
-      'Date',
-      'Venue',
-      'Division',
-      'Staff ID',
-      'Staff Name',
-      'Check-In Time',
-      'Break Start',
-      'Break End',
-      'Break Mins',
-      'Check-Out Time',
-      'Duration (mins)',
-      'Status',
-      'Flags'
-    ];
-
-    const rows = shifts.map((s) => [
-      s.id,
-      s.date,
-      `"${s.staff_venue || ''}"`,
-      `"${s.staff_division || ''}"`,
-      s.staff_id,
-      `"${s.staff_name}"`,
-      s.checkin_time,
-      s.break_start_time || '',
-      s.break_end_time || '',
-      s.break_duration_minutes || '',
-      s.checkout_time || '',
-      s.duration_minutes ?? '',
-      s.status,
-      `"${(s.flags || []).join('; ')}"`
-    ]);
-
-    const csvContent = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `shift_timesheet_${new Date().toISOString().split('T')[0]}.csv`;
-    link.click();
-    URL.revokeObjectURL(url);
+    try {
+      await exportTimesheetToExcel({
+        shifts,
+        venueName: venueSettings?.venue_name || 'JP Karaoke & LuckyCat Outlets'
+      });
+    } catch (err) {
+      console.error('Failed to export Excel:', err);
+      alert('Gagal mengekspor file Excel: ' + err.message);
+    }
   };
 
   const handlePrint = () => {
