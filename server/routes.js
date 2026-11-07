@@ -1,0 +1,840 @@
+import express from 'express';
+import fs from 'fs';
+import path from 'path';
+import { db, getSetting, setSetting, uploadsDir } from './db.js';
+import { calculateDistanceMeters, isWithinGeofence } from './geofence.js';
+import { getClientIp, validateClientNetwork } from './network.js';
+import { evaluateCheckinFlags, evaluateCheckoutFlags, evaluateBreakFlags, auditOpenShifts, FLAG_TYPES } from './flags.js';
+import { isSupabaseConfigured, uploadPhotoToSupabase, cloudDb } from './supabase.js';
+
+const router = express.Router();
+
+// Real-Time Server-Sent Events (SSE) Client Pool
+const sseClients = new Set();
+
+export function broadcastEvent(eventType, data = {}) {
+  const message = `event: ${eventType}\ndata: ${JSON.stringify({ ...data, timestamp: Date.now() })}\n\n`;
+  for (const client of sseClients) {
+    try {
+      client.write(message);
+    } catch {
+      sseClients.delete(client);
+    }
+  }
+}
+
+// SSE Connection Endpoint
+router.get('/events', (req, res) => {
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    'Connection': 'keep-alive'
+  });
+
+  res.write(`event: connected\ndata: ${JSON.stringify({ message: 'Live Sync Active' })}\n\n`);
+  sseClients.add(res);
+
+  const keepAlive = setInterval(() => {
+    res.write(': keepalive\n\n');
+  }, 25000);
+
+  req.on('close', () => {
+    clearInterval(keepAlive);
+    sseClients.delete(res);
+  });
+});
+
+// Helper to save base64 photo to disk
+function saveBase64Photo(dataUrl, prefix = 'photo') {
+  if (!dataUrl || !dataUrl.startsWith('data:image')) {
+    return null;
+  }
+  const matches = dataUrl.match(/^data:image\/([a-zA-Z0-9]+);base64,(.+)$/);
+  if (!matches || matches.length !== 3) {
+    return null;
+  }
+  const ext = matches[1] === 'jpeg' ? 'jpg' : matches[1];
+  const buffer = Buffer.from(matches[2], 'base64');
+  const filename = `${prefix}_${Date.now()}_${Math.random().toString(36).substring(2, 7)}.${ext}`;
+  const filepath = path.join(uploadsDir, filename);
+  fs.writeFileSync(filepath, buffer);
+  return `/uploads/${filename}`;
+}
+
+// Unified photo saver: uploads directly to Supabase Storage if configured, or falls back to local disk
+async function savePhoto(dataUrl, prefix = 'photo') {
+  if (isSupabaseConfigured) {
+    try {
+      const cloudUrl = await uploadPhotoToSupabase(dataUrl, prefix);
+      if (cloudUrl) return cloudUrl;
+    } catch (err) {
+      console.warn('Supabase storage upload fallback to local disk:', err.message);
+    }
+  }
+  return saveBase64Photo(dataUrl, prefix);
+}
+
+// 1. Admin PIN Verification Endpoint (PIN: 8080)
+router.post('/admin/verify', (req, res) => {
+  const { pin } = req.body;
+  const adminPin = getSetting('admin_pin') || '8080';
+
+  if (!pin || pin.trim() !== adminPin.trim()) {
+    return res.status(401).json({ error: 'Invalid Manager PIN' });
+  }
+
+  res.json({
+    success: true,
+    message: 'Manager authenticated successfully',
+    token: 'admin-authorized-session-token'
+  });
+});
+
+// 2. Network Status Check
+router.get('/network-status', (req, res) => {
+  const clientIp = getClientIp(req);
+  const allowedSubnets = getSetting('allowed_subnets') || [];
+  const enforceWifi = getSetting('enforce_wifi') || 0;
+  const validation = validateClientNetwork(clientIp, allowedSubnets);
+
+  res.json({
+    clientIp,
+    isMatch: validation.isMatch,
+    matchedSubnet: validation.matchedSubnet,
+    enforceWifi: Boolean(enforceWifi),
+    venueName: getSetting('venue_name'),
+    allowedSubnets
+  });
+});
+
+// 3. Shift Schedules Management (Timing Editor)
+router.get('/schedules', (req, res) => {
+  const schedules = db.prepare('SELECT * FROM shift_schedules ORDER BY venue ASC, division ASC, shift_number ASC').all();
+  res.json(schedules);
+});
+
+router.put('/schedules/:id', (req, res) => {
+  const { id } = req.params;
+  const { start_time, end_time, is_flexible_checkout, allows_break, max_break_end } = req.body;
+
+  try {
+    db.prepare(`
+      UPDATE shift_schedules SET
+        start_time = COALESCE(?, start_time),
+        end_time = COALESCE(?, end_time),
+        is_flexible_checkout = COALESCE(?, is_flexible_checkout),
+        allows_break = COALESCE(?, allows_break),
+        max_break_end = COALESCE(?, max_break_end),
+        updated_at = datetime('now')
+      WHERE id = ?
+    `).run(start_time, end_time, is_flexible_checkout, allows_break, max_break_end, id);
+
+    broadcastEvent('SCHEDULES_UPDATE', { id });
+    res.json({ success: true, message: 'Shift schedule timing updated' });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// 4. Staff Endpoints (Public Roster for Kiosk)
+router.get('/staff', (req, res) => {
+  const { venue } = req.query;
+  let query = 'SELECT id, name, venue, division, role, department, shift_start, shift_end, standard_hours, is_active FROM staff WHERE is_active = 1';
+  const params = [];
+
+  if (venue && venue !== 'ALL') {
+    query += ' AND venue = ?';
+    params.push(venue);
+  }
+
+  query += ' ORDER BY venue ASC, division ASC, name ASC';
+  const staff = db.prepare(query).all(...params);
+  res.json(staff);
+});
+
+// 5. Manager Admin Staff Roster
+router.get('/staff/admin', (req, res) => {
+  const staff = db.prepare(`
+    SELECT 
+      st.*,
+      (SELECT MAX(s.checkin_time) FROM shifts s WHERE s.staff_id = st.id) as last_shift_time
+    FROM staff st 
+    ORDER BY st.venue ASC, st.is_active DESC, st.name ASC
+  `).all();
+  res.json(staff);
+});
+
+// 6. Kiosk PIN Verification
+router.post('/staff/verify-pin', (req, res) => {
+  const { staffId, pin } = req.body;
+
+  if (!staffId || !pin) {
+    return res.status(400).json({ error: 'Nama karyawan dan PIN wajib diisi.' });
+  }
+
+  const staff = db.prepare('SELECT * FROM staff WHERE id = ?').get(staffId);
+  if (!staff) {
+    return res.status(404).json({ error: 'Karyawan tidak ditemukan.' });
+  }
+
+  if (!staff.is_active) {
+    return res.status(403).json({
+      error: 'Akun Anda dinonaktifkan oleh Manajer. Hubungi HR / Manajer Operasional.'
+    });
+  }
+
+  if (staff.pin !== pin.trim()) {
+    return res.status(401).json({ error: 'PIN Rahasia salah. Silakan coba lagi.' });
+  }
+
+  // Get active shift
+  const activeShift = db.prepare(`
+    SELECT s.*, st.name as staff_name, st.venue, st.division, st.role, st.department, st.standard_hours
+    FROM shifts s
+    JOIN staff st ON s.staff_id = st.id
+    WHERE s.staff_id = ? AND s.status != 'COMPLETED'
+    ORDER BY s.id DESC
+    LIMIT 1
+  `).get(staffId);
+
+  if (activeShift) {
+    activeShift.flags = JSON.parse(activeShift.flags || '[]');
+  }
+
+  // Check schedule permissions for break
+  const schedule = db.prepare(`
+    SELECT * FROM shift_schedules 
+    WHERE venue = ? AND division = ? AND (start_time = ? OR shift_number = 1)
+    LIMIT 1
+  `).get(staff.venue, staff.division, staff.shift_start);
+
+  res.json({
+    success: true,
+    staff: {
+      id: staff.id,
+      name: staff.name,
+      venue: staff.venue,
+      division: staff.division,
+      role: staff.role,
+      department: staff.department,
+      shift_start: staff.shift_start,
+      shift_end: staff.shift_end,
+      standard_hours: staff.standard_hours,
+      allows_break: staff.venue === 'LuckyCat' ? 1 : 0,
+      max_break_end: schedule?.max_break_end || (staff.shift_start?.startsWith('18') ? '01:00' : '16:00')
+    },
+    activeShift: activeShift || null
+  });
+});
+
+// 7. Manager Admin: Add New Staff Member
+router.post('/staff', (req, res) => {
+  const { name, venue, division, role, department, pin, is_active, shift_start, shift_end, standard_hours } = req.body;
+  if (!name || !role) {
+    return res.status(400).json({ error: 'Name and Role are required' });
+  }
+
+  try {
+    let assignedId = req.body.id;
+    if (!assignedId) {
+      const maxRow = db.prepare("SELECT id FROM staff WHERE id LIKE 'STF-%' ORDER BY id DESC LIMIT 1").get();
+      let nextNum = 1;
+      if (maxRow && maxRow.id) {
+        const match = maxRow.id.match(/\d+/);
+        if (match) nextNum = parseInt(match[0], 10) + 1;
+      }
+      assignedId = `STF-${String(nextNum).padStart(3, '0')}`;
+    }
+
+    const assignedPin = pin ? pin.trim() : Math.floor(1000 + Math.random() * 9000).toString();
+    const activeStatus = is_active !== undefined ? (is_active ? 1 : 0) : 1;
+
+    db.prepare(`
+      INSERT INTO staff (id, name, venue, division, role, department, pin, shift_start, shift_end, standard_hours, is_active)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      assignedId,
+      name.trim(),
+      venue || 'JP Karaoke',
+      division || 'Server and Cashier',
+      role.trim(),
+      department || 'General',
+      assignedPin,
+      shift_start || '13:00',
+      shift_end || '22:00',
+      parseFloat(standard_hours) || 8.0,
+      activeStatus
+    );
+
+    broadcastEvent('STAFF_UPDATE', { action: 'CREATED', staffId: assignedId });
+    res.json({ success: true, message: 'Staff member provisioned successfully', id: assignedId, pin: assignedPin });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// 8. Manager Admin: Reset Staff PIN
+router.put('/staff/:id/pin', (req, res) => {
+  const { id } = req.params;
+  const { pin } = req.body;
+
+  if (!pin || pin.trim().length < 4) {
+    return res.status(400).json({ error: 'PIN must be at least 4 digits.' });
+  }
+
+  const result = db.prepare('UPDATE staff SET pin = ? WHERE id = ?').run(pin.trim(), id);
+  if (result.changes === 0) {
+    return res.status(404).json({ error: 'Staff member not found.' });
+  }
+
+  broadcastEvent('STAFF_UPDATE', { action: 'PIN_RESET', staffId: id });
+  res.json({ success: true, message: 'PIN updated successfully.' });
+});
+
+// 9. Manager Admin: Toggle Staff Active/Suspended Status
+router.put('/staff/:id/status', (req, res) => {
+  const { id } = req.params;
+  const { is_active } = req.body;
+
+  const statusVal = is_active ? 1 : 0;
+  const result = db.prepare('UPDATE staff SET is_active = ? WHERE id = ?').run(statusVal, id);
+  if (result.changes === 0) {
+    return res.status(404).json({ error: 'Staff member not found.' });
+  }
+
+  broadcastEvent('STAFF_UPDATE', { action: 'STATUS_TOGGLED', staffId: id, is_active: statusVal });
+  res.json({ success: true, message: `Staff status changed to ${statusVal ? 'Active' : 'Suspended'}.` });
+});
+
+// 10. Staff Check-In
+router.post('/checkin', async (req, res) => {
+  const { staffId, pin, lat, lng, accuracy, photoBase64, timestamp } = req.body;
+
+  if (!staffId) return res.status(400).json({ error: 'Karyawan wajib dipilih.' });
+  if (!photoBase64) return res.status(400).json({ error: 'Foto selfie langsung wajib diambil.' });
+
+  const staff = db.prepare('SELECT * FROM staff WHERE id = ?').get(staffId);
+  if (!staff) return res.status(404).json({ error: 'Karyawan tidak ditemukan.' });
+  if (!staff.is_active) return res.status(403).json({ error: 'Akun dinonaktifkan. Hubungi Manajer / HR.' });
+  if (pin && staff.pin && staff.pin !== pin.trim()) return res.status(401).json({ error: 'PIN Rahasia salah.' });
+
+  const existingActive = db.prepare("SELECT id FROM shifts WHERE staff_id = ? AND status != 'COMPLETED'").get(staffId);
+  if (existingActive) {
+    return res.status(400).json({ error: 'Anda sudah memiliki shift yang sedang aktif. Silakan lakukan Check-Out terlebih dahulu.' });
+  }
+
+  // Network Gatekeeper Check
+  const clientIp = getClientIp(req);
+  const allowedSubnets = getSetting('allowed_subnets') || [];
+  const enforceWifi = getSetting('enforce_wifi') || 0;
+  const wifiValidation = validateClientNetwork(clientIp, allowedSubnets);
+
+  if (enforceWifi && !wifiValidation.isMatch) {
+    return res.status(403).json({
+      error: 'Check-In Ditolak: Perangkat harus terhubung ke Wi-Fi internal outlet.',
+      clientIp
+    });
+  }
+
+  // Geofence Check
+  const venueLat = getSetting('venue_lat');
+  const venueLng = getSetting('venue_lng');
+  const geofenceRadius = getSetting('geofence_radius') || 150;
+  const userLat = lat != null ? parseFloat(lat) : null;
+  const userLng = lng != null ? parseFloat(lng) : null;
+  const distance = calculateDistanceMeters(userLat, userLng, venueLat, venueLng);
+
+  const photoUrl = await savePhoto(photoBase64, `in_${staffId}`);
+  const now = new Date();
+  const dateStr = now.toISOString().split('T')[0];
+  const checkinTime = timestamp || now.toISOString();
+
+  const flags = evaluateCheckinFlags({
+    clientIp,
+    lat: userLat,
+    lng: userLng,
+    distance,
+    wifiPass: wifiValidation.isMatch,
+    geofenceRadius,
+    scheduledStart: staff.shift_start,
+    checkinTime
+  });
+
+  const result = db.prepare(`
+    INSERT INTO shifts (
+      staff_id, date, scheduled_start, scheduled_end,
+      checkin_time, checkin_lat, checkin_lng, checkin_accuracy,
+      checkin_distance, checkin_photo, checkin_ip, checkin_wifi_pass,
+      status, flags
+    ) VALUES (
+      ?, ?, ?, ?,
+      ?, ?, ?, ?,
+      ?, ?, ?, ?,
+      'IN_PROGRESS', ?
+    )
+  `).run(
+    staffId,
+    dateStr,
+    staff.shift_start,
+    staff.shift_end,
+    checkinTime,
+    userLat,
+    userLng,
+    accuracy || null,
+    distance,
+    photoUrl,
+    clientIp,
+    wifiValidation.isMatch ? 1 : 0,
+    JSON.stringify(flags)
+  );
+
+  // Sync to Supabase Cloud if connected
+  if (isSupabaseConfigured) {
+    try {
+      await cloudDb.recordCheckin({
+        staffId,
+        userLat,
+        userLng,
+        accuracy,
+        distance,
+        photoUrl,
+        clientIp,
+        wifiPass: wifiValidation.isMatch,
+        flags
+      });
+    } catch (e) {
+      console.warn('Supabase Checkin Cloud Sync Note:', e.message);
+    }
+  }
+
+  const newShift = db.prepare(`
+    SELECT s.*, st.name as staff_name, st.venue, st.division, st.role, st.department
+    FROM shifts s
+    JOIN staff st ON s.staff_id = st.id
+    WHERE s.id = ?
+  `).get(result.lastInsertRowid);
+  newShift.flags = flags;
+
+  broadcastEvent('SHIFT_UPDATE', { action: 'CHECKIN', shift: newShift });
+
+  res.json({
+    success: true,
+    message: 'Absensi Masuk Berhasil Dicatat!',
+    shift: newShift,
+    flags
+  });
+});
+
+// 11. Staff Start Break (LuckyCat Only)
+router.post('/break/start', async (req, res) => {
+  const { shiftId, staffId, pin, photoBase64, timestamp, lat, lng } = req.body;
+
+  const staff = db.prepare('SELECT * FROM staff WHERE id = ?').get(staffId);
+  if (!staff) return res.status(404).json({ error: 'Karyawan tidak ditemukan.' });
+
+  // STRICT RULE: No break for JP Karaoke staff
+  if (staff.venue === 'JP Karaoke') {
+    return res.status(403).json({ error: 'Karyawan JP Karaoke tidak memiliki waktu istirahat.' });
+  }
+
+  let shift;
+  if (shiftId) {
+    shift = db.prepare('SELECT * FROM shifts WHERE id = ?').get(shiftId);
+  } else {
+    shift = db.prepare("SELECT * FROM shifts WHERE staff_id = ? AND status != 'COMPLETED' ORDER BY id DESC LIMIT 1").get(staffId);
+  }
+
+  if (!shift) return res.status(404).json({ error: 'Shift aktif tidak ditemukan.' });
+
+  // STRICT RULE: Break only allowed once per shift
+  if (shift.break_count >= 1 || shift.break_start_time) {
+    return res.status(400).json({ error: 'Istirahat hanya diperbolehkan 1 kali per shift dan sudah pernah diambil.' });
+  }
+
+  if (!photoBase64) return res.status(400).json({ error: 'Foto selfie mulai istirahat wajib diambil.' });
+
+  const photoUrl = await savePhoto(photoBase64, `break_start_${staffId}`);
+  const startTime = timestamp || new Date().toISOString();
+
+  db.prepare(`
+    UPDATE shifts SET
+      break_status = 'ON_BREAK',
+      break_start_time = ?,
+      break_start_photo = ?,
+      updated_at = datetime('now')
+    WHERE id = ?
+  `).run(startTime, photoUrl, shift.id);
+
+  if (isSupabaseConfigured) {
+    try {
+      await cloudDb.recordBreakStart({ attendanceId: shift.id, staffId, photoUrl });
+    } catch (e) {
+      console.warn('Supabase Break Start Cloud Sync Note:', e.message);
+    }
+  }
+
+  const updatedShift = db.prepare('SELECT s.*, st.name as staff_name, st.venue, st.division FROM shifts s JOIN staff st ON s.staff_id = st.id WHERE s.id = ?').get(shift.id);
+  updatedShift.flags = JSON.parse(updatedShift.flags || '[]');
+
+  broadcastEvent('SHIFT_UPDATE', { action: 'BREAK_START', shift: updatedShift });
+
+  res.json({
+    success: true,
+    message: 'Waktu Istirahat Dimulai! Maksimal 1 jam.',
+    shift: updatedShift
+  });
+});
+
+// 12. Staff End Break (LuckyCat Only)
+router.post('/break/end', async (req, res) => {
+  const { shiftId, staffId, pin, photoBase64, timestamp, lat, lng } = req.body;
+
+  let shift;
+  if (shiftId) {
+    shift = db.prepare('SELECT s.*, st.venue, st.division, st.shift_start FROM shifts s JOIN staff st ON s.staff_id = st.id WHERE s.id = ?').get(shiftId);
+  } else {
+    shift = db.prepare("SELECT s.*, st.venue, st.division, st.shift_start FROM shifts s JOIN staff st ON s.staff_id = st.id WHERE s.staff_id = ? AND s.status != 'COMPLETED' ORDER BY s.id DESC LIMIT 1").get(staffId);
+  }
+
+  if (!shift) return res.status(404).json({ error: 'Shift aktif tidak ditemukan.' });
+  if (shift.break_status !== 'ON_BREAK' || !shift.break_start_time) {
+    return res.status(400).json({ error: 'Anda belum memulai waktu istirahat.' });
+  }
+  if (!photoBase64) return res.status(400).json({ error: 'Foto selfie selesai istirahat wajib diambil.' });
+
+  const photoUrl = await savePhoto(photoBase64, `break_end_${shift.staff_id}`);
+  const endTime = timestamp || new Date().toISOString();
+  const startTime = new Date(shift.break_start_time).getTime();
+  const durationMinutes = Math.max(0, Math.round((new Date(endTime).getTime() - startTime) / (1000 * 60)));
+
+  // Determine max break end for this shift (16:00 for shift 1, 01:00 for shift 2)
+  const isShift2 = shift.shift_start && shift.shift_start.startsWith('18');
+  const maxBreakEnd = isShift2 ? '01:00' : '16:00';
+
+  let flags = [];
+  try {
+    flags = JSON.parse(shift.flags || '[]');
+  } catch {
+    flags = [];
+  }
+
+  const updatedFlags = evaluateBreakFlags({
+    durationMinutes,
+    maxBreakEnd,
+    breakEndTime: endTime,
+    existingFlags: flags
+  });
+
+  db.prepare(`
+    UPDATE shifts SET
+      break_status = 'COMPLETED',
+      break_end_time = ?,
+      break_end_photo = ?,
+      break_duration_minutes = ?,
+      break_count = 1,
+      flags = ?,
+      updated_at = datetime('now')
+    WHERE id = ?
+  `).run(endTime, photoUrl, durationMinutes, JSON.stringify(updatedFlags), shift.id);
+
+  if (isSupabaseConfigured) {
+    try {
+      await cloudDb.recordBreakEnd({ attendanceId: shift.id, photoUrl, durationMinutes });
+    } catch (e) {
+      console.warn('Supabase Break End Cloud Sync Note:', e.message);
+    }
+  }
+
+  const updatedShift = db.prepare('SELECT s.*, st.name as staff_name, st.venue, st.division FROM shifts s JOIN staff st ON s.staff_id = st.id WHERE s.id = ?').get(shift.id);
+  updatedShift.flags = updatedFlags;
+
+  broadcastEvent('SHIFT_UPDATE', { action: 'BREAK_END', shift: updatedShift });
+
+  res.json({
+    success: true,
+    message: `Istirahat Selesai! Durasi: ${durationMinutes} menit. Selamat kembali bertugas!`,
+    shift: updatedShift,
+    durationMinutes
+  });
+});
+
+// 13. Staff Check-Out
+router.post('/checkout', async (req, res) => {
+  const { shiftId, staffId, pin, lat, lng, accuracy, photoBase64, timestamp, notes } = req.body;
+
+  let shift;
+  if (shiftId) {
+    shift = db.prepare('SELECT s.*, st.standard_hours, st.pin, st.is_active, st.venue, st.division FROM shifts s JOIN staff st ON s.staff_id = st.id WHERE s.id = ?').get(shiftId);
+  } else if (staffId) {
+    shift = db.prepare("SELECT s.*, st.standard_hours, st.pin, st.is_active, st.venue, st.division FROM shifts s JOIN staff st ON s.staff_id = st.id WHERE s.staff_id = ? AND s.status != 'COMPLETED' ORDER BY s.id DESC LIMIT 1").get(staffId);
+  }
+
+  if (!shift) return res.status(404).json({ error: 'Tidak ditemukan shift aktif untuk Check-Out.' });
+  if (pin && shift.pin && shift.pin !== pin.trim()) return res.status(401).json({ error: 'PIN Rahasia salah.' });
+  if (!photoBase64) return res.status(400).json({ error: 'Foto selfie keluar wajib diambil.' });
+
+  // Network Gatekeeper Check
+  const clientIp = getClientIp(req);
+  const allowedSubnets = getSetting('allowed_subnets') || [];
+  const enforceWifi = getSetting('enforce_wifi') || 0;
+  const wifiValidation = validateClientNetwork(clientIp, allowedSubnets);
+
+  if (enforceWifi && !wifiValidation.isMatch) {
+    return res.status(403).json({
+      error: 'Check-Out Ditolak: Perangkat harus terhubung ke Wi-Fi internal outlet.',
+      clientIp
+    });
+  }
+
+  // Geofence Check
+  const venueLat = getSetting('venue_lat');
+  const venueLng = getSetting('venue_lng');
+  const geofenceRadius = getSetting('geofence_radius') || 150;
+  const userLat = lat != null ? parseFloat(lat) : null;
+  const userLng = lng != null ? parseFloat(lng) : null;
+  const distance = calculateDistanceMeters(userLat, userLng, venueLat, venueLng);
+
+  // Time & Duration
+  const checkoutTime = timestamp || new Date().toISOString();
+  const startTime = new Date(shift.checkin_time).getTime();
+  const endTime = new Date(checkoutTime).getTime();
+  const durationMinutes = Math.max(0, Math.round((endTime - startTime) / (1000 * 60)));
+
+  let existingFlags = [];
+  try {
+    existingFlags = JSON.parse(shift.flags || '[]');
+  } catch {
+    existingFlags = [];
+  }
+
+  // Check if shift is flexible checkout
+  const schedule = db.prepare(`
+    SELECT is_flexible_checkout FROM shift_schedules 
+    WHERE venue = ? AND division = ? AND start_time = ?
+    LIMIT 1
+  `).get(shift.venue, shift.division, shift.scheduled_start);
+
+  const isFlexible = schedule?.is_flexible_checkout || (shift.scheduled_end === '03:00' ? 1 : 0);
+
+  const finalFlags = evaluateCheckoutFlags({
+    checkinTime: shift.checkin_time,
+    checkoutTime,
+    scheduledHours: shift.standard_hours,
+    isFlexibleCheckout: isFlexible,
+    clientIp,
+    lat: userLat,
+    lng: userLng,
+    distance,
+    wifiPass: wifiValidation.isMatch,
+    geofenceRadius,
+    existingFlags
+  });
+
+  const photoUrl = await savePhoto(photoBase64, `out_${shift.staff_id}`);
+
+  db.prepare(`
+    UPDATE shifts SET
+      checkout_time = ?,
+      checkout_lat = ?,
+      checkout_lng = ?,
+      checkout_accuracy = ?,
+      checkout_distance = ?,
+      checkout_photo = ?,
+      checkout_ip = ?,
+      checkout_wifi_pass = ?,
+      duration_minutes = ?,
+      status = 'COMPLETED',
+      flags = ?,
+      notes = ?,
+      updated_at = datetime('now')
+    WHERE id = ?
+  `).run(
+    checkoutTime,
+    userLat,
+    userLng,
+    accuracy || null,
+    distance,
+    photoUrl,
+    clientIp,
+    wifiValidation.isMatch ? 1 : 0,
+    durationMinutes,
+    JSON.stringify(finalFlags),
+    notes || null,
+    shift.id
+  );
+
+  if (isSupabaseConfigured) {
+    try {
+      await cloudDb.recordCheckout({
+        attendanceId: shift.id,
+        userLat,
+        userLng,
+        accuracy,
+        distance,
+        photoUrl,
+        clientIp,
+        wifiPass: wifiValidation.isMatch,
+        durationMinutes,
+        flags: finalFlags,
+        notes
+      });
+    } catch (e) {
+      console.warn('Supabase Checkout Cloud Sync Note:', e.message);
+    }
+  }
+
+  const updatedShift = db.prepare(`
+    SELECT s.*, st.name as staff_name, st.venue, st.division, st.role, st.department
+    FROM shifts s
+    JOIN staff st ON s.staff_id = st.id
+    WHERE s.id = ?
+  `).get(shift.id);
+  updatedShift.flags = finalFlags;
+
+  broadcastEvent('SHIFT_UPDATE', { action: 'CHECKOUT', shift: updatedShift });
+
+  res.json({
+    success: true,
+    message: 'Absensi Keluar Berhasil Dicatat! Shift selesai.',
+    shift: updatedShift,
+    flags: finalFlags
+  });
+});
+
+// 14. Manager Shifts List with Advanced Filters
+router.get('/shifts', (req, res) => {
+  auditOpenShifts();
+
+  const { startDate, endDate, venue, department, flagFilter, search } = req.query;
+
+  let query = `
+    SELECT 
+      s.*, 
+      st.name as staff_name, 
+      st.venue as staff_venue,
+      st.division as staff_division,
+      st.role as staff_role, 
+      st.department as staff_department,
+      st.standard_hours
+    FROM shifts s
+    JOIN staff st ON s.staff_id = st.id
+    WHERE 1=1
+  `;
+  const params = [];
+
+  if (startDate) {
+    query += ` AND s.date >= ?`;
+    params.push(startDate);
+  }
+  if (endDate) {
+    query += ` AND s.date <= ?`;
+    params.push(endDate);
+  }
+  if (venue && venue !== 'ALL') {
+    query += ` AND st.venue = ?`;
+    params.push(venue);
+  }
+  if (department && department !== 'ALL') {
+    query += ` AND (st.department = ? OR st.division = ?)`;
+    params.push(department, department);
+  }
+  if (search) {
+    query += ` AND (st.name LIKE ? OR s.staff_id LIKE ? OR st.role LIKE ?)`;
+    params.push(`%${search}%`, `%${search}%`, `%${search}%`);
+  }
+
+  query += ` ORDER BY s.id DESC`;
+
+  const rows = db.prepare(query).all(...params);
+
+  let processed = rows.map(r => ({
+    ...r,
+    flags: JSON.parse(r.flags || '[]')
+  }));
+
+  if (flagFilter === 'FLAGS_ONLY') {
+    processed = processed.filter(r => r.flags.length > 0);
+  } else if (flagFilter === 'NORMAL_ONLY') {
+    processed = processed.filter(r => r.flags.length === 0);
+  }
+
+  res.json(processed);
+});
+
+// 15. Manager KPI Stats
+router.get('/stats', (req, res) => {
+  auditOpenShifts();
+
+  const todayStr = new Date().toISOString().split('T')[0];
+
+  const todayShifts = db.prepare(`
+    SELECT s.*, st.venue, st.department 
+    FROM shifts s 
+    JOIN staff st ON s.staff_id = st.id 
+    WHERE s.date = ?
+  `).all(todayStr);
+
+  const activeCount = todayShifts.filter(s => s.status !== 'COMPLETED').length;
+  const onBreakCount = todayShifts.filter(s => s.break_status === 'ON_BREAK').length;
+  const completedCount = todayShifts.filter(s => s.status === 'COMPLETED').length;
+
+  let totalFlags = 0;
+  let wifiMatchPasses = 0;
+  let totalEvents = 0;
+
+  for (const s of todayShifts) {
+    const flags = JSON.parse(s.flags || '[]');
+    totalFlags += flags.length;
+
+    if (s.checkin_wifi_pass != null) {
+      totalEvents++;
+      if (s.checkin_wifi_pass === 1) wifiMatchPasses++;
+    }
+    if (s.checkout_wifi_pass != null) {
+      totalEvents++;
+      if (s.checkout_wifi_pass === 1) wifiMatchPasses++;
+    }
+  }
+
+  const wifiComplianceRate = totalEvents > 0 ? Math.round((wifiMatchPasses / totalEvents) * 100) : 100;
+
+  res.json({
+    todayDate: todayStr,
+    totalToday: todayShifts.length,
+    activeShifts: activeCount,
+    onBreakShifts: onBreakCount,
+    completedShifts: completedCount,
+    flaggedAnomalies: totalFlags,
+    wifiComplianceRate,
+    venueName: getSetting('venue_name')
+  });
+});
+
+// 16. Venue Settings GET / PUT
+router.get('/settings', (req, res) => {
+  res.json({
+    venue_name: getSetting('venue_name'),
+    venue_lat: getSetting('venue_lat'),
+    venue_lng: getSetting('venue_lng'),
+    geofence_radius: getSetting('geofence_radius'),
+    allowed_subnets: getSetting('allowed_subnets'),
+    enforce_wifi: getSetting('enforce_wifi'),
+    timezone: getSetting('timezone')
+  });
+});
+
+router.put('/settings', (req, res) => {
+  const { venue_name, venue_lat, venue_lng, geofence_radius, allowed_subnets, enforce_wifi } = req.body;
+
+  if (venue_name !== undefined) setSetting('venue_name', venue_name);
+  if (venue_lat !== undefined) setSetting('venue_lat', parseFloat(venue_lat));
+  if (venue_lng !== undefined) setSetting('venue_lng', parseFloat(venue_lng));
+  if (geofence_radius !== undefined) setSetting('geofence_radius', parseInt(geofence_radius, 10));
+  if (allowed_subnets !== undefined) setSetting('allowed_subnets', allowed_subnets);
+  if (enforce_wifi !== undefined) setSetting('enforce_wifi', enforce_wifi ? 1 : 0);
+
+  broadcastEvent('SETTINGS_UPDATE', { message: 'Settings modified' });
+  res.json({ success: true, message: 'Venue settings updated' });
+});
+
+export default router;
