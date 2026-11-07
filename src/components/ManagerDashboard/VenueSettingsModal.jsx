@@ -4,9 +4,9 @@ import { updateSettings } from '../../utils/api';
 
 export default function VenueSettingsModal({ settings, onClose, onSaved }) {
   const [venueName, setVenueName] = useState(settings?.venue_name || '');
-  const [lat, setLat] = useState(settings?.venue_lat ?? -8.6885);
-  const [lng, setLng] = useState(settings?.venue_lng ?? 115.1558);
-  const [radius, setRadius] = useState(settings?.geofence_radius ?? 150);
+  const [lat, setLat] = useState(settings?.venue_lat ?? -8.780981);
+  const [lng, setLng] = useState(settings?.venue_lng ?? 115.176863);
+  const [radius, setRadius] = useState(settings?.geofence_radius ?? 500);
   const [subnets, setSubnets] = useState(
     Array.isArray(settings?.allowed_subnets) ? settings.allowed_subnets.join('\n') : ''
   );

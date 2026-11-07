@@ -148,8 +148,8 @@ export default function KioskCameraModal({
     setSubmitError(null);
 
     try {
-      const venueLat = venueSettings?.venue_lat ?? -8.6704;
-      const venueLng = venueSettings?.venue_lng ?? 115.2126;
+      const venueLat = venueSettings?.venue_lat ?? -8.780981;
+      const venueLng = venueSettings?.venue_lng ?? 115.176863;
       const currentLat = userLocation?.lat ?? venueLat;
       const currentLng = userLocation?.lng ?? venueLng;
 
@@ -214,9 +214,9 @@ export default function KioskCameraModal({
     setFlashing(true);
 
     try {
-      const venueLat = venueSettings?.venue_lat ?? -8.6704;
-      const venueLng = venueSettings?.venue_lng ?? 115.2126;
-      const radius = venueSettings?.geofence_radius ?? 200;
+      const venueLat = venueSettings?.venue_lat ?? -8.780981;
+      const venueLng = venueSettings?.venue_lng ?? 115.176863;
+      const radius = venueSettings?.geofence_radius ?? 500;
 
       const currentLat = userLocation?.lat ?? venueLat;
       const currentLng = userLocation?.lng ?? venueLng;
@@ -252,9 +252,9 @@ export default function KioskCameraModal({
     setSubmitError(null);
 
     try {
-      const venueLat = venueSettings?.venue_lat ?? -8.6704;
-      const venueLng = venueSettings?.venue_lng ?? 115.2126;
-      const radius = venueSettings?.geofence_radius ?? 200;
+      const venueLat = venueSettings?.venue_lat ?? -8.780981;
+      const venueLng = venueSettings?.venue_lng ?? 115.176863;
+      const radius = venueSettings?.geofence_radius ?? 500;
       const currentLat = userLocation?.lat ?? venueLat;
       const currentLng = userLocation?.lng ?? venueLng;
       const geoCheck = isWithinGeofence(currentLat, currentLng, venueLat, venueLng, radius);

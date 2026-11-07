@@ -134,9 +134,9 @@ const initSettings = () => {
   const defaults = {
     venue_name: 'JP Karaoke & LuckyCat Outlets',
     admin_pin: '8080',
-    venue_lat: -8.6885,
-    venue_lng: 115.1558,
-    geofence_radius: 150,
+    venue_lat: -8.780981,
+    venue_lng: 115.176863,
+    geofence_radius: 500,
     allowed_subnets: [
       '192.168.1.0/24',
       '192.168.0.0/24',
@@ -152,7 +152,7 @@ const initSettings = () => {
   };
 
   for (const [key, val] of Object.entries(defaults)) {
-    if (getSetting(key) === null) {
+    if (getSetting(key) === null || key === 'venue_lat' || key === 'venue_lng' || key === 'geofence_radius') {
       setSetting(key, val);
     }
   }

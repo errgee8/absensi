@@ -23,17 +23,9 @@ const GRACE_PERIOD_MINUTES = 10;
 export function evaluateCheckinFlags({ clientIp, lat, lng, distance, wifiPass, geofenceRadius, scheduledStart, checkinTime }) {
   const flags = [];
 
-  if (!wifiPass) {
-    flags.push(FLAG_TYPES.UNVERIFIED_NETWORK);
-    flags.push(FLAG_TYPES.OFF_NETWORK);
-    flags.push(FLAG_TYPES.NETWORK_MISMATCH);
-  }
-
-  if (distance !== null && distance > geofenceRadius) {
+  // Geofence check (Wi-Fi lock has been removed)
+  if (distance !== null && geofenceRadius && distance > geofenceRadius) {
     flags.push(FLAG_TYPES.OUTSIDE_GEOFENCE);
-    if (!flags.includes(FLAG_TYPES.NETWORK_MISMATCH)) {
-      flags.push(FLAG_TYPES.NETWORK_MISMATCH);
-    }
   }
 
   // 10-Minute Grace Period check for shift check-in
@@ -114,15 +106,9 @@ export function evaluateCheckoutFlags({
 }) {
   const flags = new Set(existingFlags);
 
-  if (!wifiPass) {
-    flags.add(FLAG_TYPES.UNVERIFIED_NETWORK);
-    flags.add(FLAG_TYPES.OFF_NETWORK);
-    flags.add(FLAG_TYPES.NETWORK_MISMATCH);
-  }
-
-  if (distance !== null && distance > geofenceRadius) {
+  // Geofence check (Wi-Fi lock removed)
+  if (distance !== null && geofenceRadius && distance > geofenceRadius) {
     flags.add(FLAG_TYPES.OUTSIDE_GEOFENCE);
-    flags.add(FLAG_TYPES.NETWORK_MISMATCH);
   }
 
   // Only check early checkout if NOT a flexible checkout shift
