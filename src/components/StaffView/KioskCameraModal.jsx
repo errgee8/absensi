@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { Camera, X, CheckCircle2, AlertCircle, RefreshCw, Smartphone, Loader2 } from 'lucide-react';
+import { Camera, X, CheckCircle2, AlertCircle, RefreshCw, Smartphone, Loader2, SwitchCamera } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { captureAndWatermark, watermarkFile } from '../../utils/watermark';
 import { checkIn, checkOut, startBreak, endBreak } from '../../utils/api';
@@ -20,6 +20,7 @@ export default function KioskCameraModal({
   const [cameraActive, setCameraActive] = useState(false);
   const [cameraLoading, setCameraLoading] = useState(true);
   const [cameraError, setCameraError] = useState(null);
+  const [facingMode, setFacingMode] = useState('user'); // Default to front-facing camera ('user' = front, 'environment' = back)
   const [flashing, setFlashing] = useState(false);
   const [capturedPreview, setCapturedPreview] = useState(null);
   const [submitting, setSubmitting] = useState(false);
@@ -47,8 +48,8 @@ export default function KioskCameraModal({
     }
   }, []);
 
-  // Start front camera with robust multi-stage fallback
-  const startCamera = async () => {
+  // Start camera with exact facingMode preference and robust fallback
+  const startCamera = async (targetFacing = facingMode) => {
     setCameraLoading(true);
     setCameraError(null);
 
@@ -68,13 +69,13 @@ export default function KioskCameraModal({
     }
 
     try {
-      // 1. Try front camera
+      // 1. Try requested facingMode ('user' for front selfie, 'environment' for rear/back camera)
       stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'user' },
+        video: { facingMode: { ideal: targetFacing } },
         audio: false
       });
     } catch (err1) {
-      console.warn('FacingMode user failed, trying fallback stream:', err1);
+      console.warn(`FacingMode ${targetFacing} failed, trying fallback stream:`, err1);
       try {
         // 2. Fallback to basic video stream (any available camera)
         stream = await navigator.mediaDevices.getUserMedia({
@@ -111,6 +112,14 @@ export default function KioskCameraModal({
     }
   };
 
+  // Switch between front and back camera
+  const handleToggleCamera = async () => {
+    if (flashing || submitting || cameraLoading) return;
+    const nextMode = facingMode === 'user' ? 'environment' : 'user';
+    setFacingMode(nextMode);
+    await startCamera(nextMode);
+  };
+
   const stopCamera = () => {
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((t) => t.stop());
@@ -120,7 +129,7 @@ export default function KioskCameraModal({
   };
 
   useEffect(() => {
-    startCamera();
+    startCamera('user');
     return () => stopCamera();
   }, []);
 
@@ -364,16 +373,32 @@ export default function KioskCameraModal({
                       autoPlay
                       playsInline
                       muted
-                      className={`w-full h-full object-cover transform scale-x-[-1] ${
-                        cameraActive ? 'block' : 'hidden'
-                      }`}
+                      className={`w-full h-full object-cover ${
+                        facingMode === 'user' ? 'transform scale-x-[-1]' : ''
+                      } ${cameraActive ? 'block' : 'hidden'}`}
                     />
+
+                    {/* Quick Rotate Camera Floating Overlay */}
+                    {cameraActive && !capturedPreview && !submitting && (
+                      <button
+                        type="button"
+                        onClick={handleToggleCamera}
+                        disabled={cameraLoading}
+                        className="absolute top-3 right-3 z-20 flex items-center space-x-1.5 px-3 py-1.5 rounded-full bg-slate-950/85 hover:bg-slate-900 active:scale-95 text-slate-200 border border-slate-700/80 backdrop-blur-md shadow-lg transition text-[11px] font-bold"
+                        title="Putar Kamera (Depan / Belakang)"
+                      >
+                        <SwitchCamera className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
+                        <span>{facingMode === 'user' ? 'Kamera Depan' : 'Kamera Belakang'}</span>
+                      </button>
+                    )}
 
                     {/* Loading State */}
                     {cameraLoading && !cameraError && (
                       <div className="text-center p-4 space-y-2">
                         <Loader2 className="w-8 h-8 text-emerald-400 animate-spin mx-auto" />
-                        <span className="text-xs text-slate-400 block font-medium">Membuka kamera selfie...</span>
+                        <span className="text-xs text-slate-400 block font-medium">
+                          {facingMode === 'user' ? 'Membuka kamera depan (selfie)...' : 'Membuka kamera belakang...'}
+                        </span>
                       </div>
                     )}
 
@@ -424,9 +449,20 @@ export default function KioskCameraModal({
                       className="w-full py-4 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-sm uppercase tracking-wider flex items-center justify-center space-x-2 shadow-xl shadow-emerald-500/25 active:scale-95 transition"
                     >
                       <Camera className="w-5 h-5 text-slate-950" />
-                      <span>BUKA KAMERA SELFIE</span>
+                      <span>BUKA KAMERA</span>
                     </button>
                   )}
+
+                  {/* Rotate Camera Button (Front / Back) */}
+                  <button
+                    type="button"
+                    onClick={handleToggleCamera}
+                    disabled={flashing || submitting || cameraLoading}
+                    className="w-full py-2.5 px-3 bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-200 rounded-xl text-xs font-bold border border-slate-700 flex items-center justify-center space-x-2 transition shadow-sm"
+                  >
+                    <SwitchCamera className="w-4 h-4 text-emerald-400" />
+                    <span>{facingMode === 'user' ? 'Putar ke Kamera Belakang' : 'Putar ke Kamera Depan'}</span>
+                  </button>
 
                   {/* Alternative button: Native Camera Capture */}
                   <button
@@ -438,12 +474,12 @@ export default function KioskCameraModal({
                     <span>Gunakan Kamera Bawaan HP</span>
                   </button>
 
-                  {/* Hidden Native File Input with capture="user" */}
+                  {/* Hidden Native File Input with dynamic capture */}
                   <input
                     type="file"
                     ref={fileInputRef}
                     accept="image/*"
-                    capture="user"
+                    capture={facingMode === 'user' ? 'user' : 'environment'}
                     onChange={handleNativeFileChange}
                     className="hidden"
                   />
