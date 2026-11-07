@@ -5,16 +5,12 @@ import KioskCameraModal from './KioskCameraModal';
 import { verifyStaffPin } from '../../utils/api';
 
 export default function StaffView({
-  staffList,
-  networkStatus,
-  refreshNetwork,
   venueSettings
 }) {
   // Navigation step in Shared Kiosk: 'LOGIN' | 'ACTION'
   const [step, setStep] = useState('LOGIN');
 
   // Staff & PIN state
-  const [selectedStaff, setSelectedStaff] = useState(null);
   const [pin, setPin] = useState('');
   const [loggedInStaff, setLoggedInStaff] = useState(null);
   const [activeShift, setActiveShift] = useState(null);
@@ -28,22 +24,22 @@ export default function StaffView({
   const [cameraActionType, setCameraActionType] = useState('checkin');
 
   // Handle PIN submission on Screen 1
-  const handleLogin = async () => {
-    if (!selectedStaff || !pin) return;
+  const handleLogin = async (overridePin) => {
+    const pinToVerify = (overridePin || pin).trim();
+    if (!pinToVerify || pinToVerify.length < 4) return;
     setLoading(true);
     setError(null);
 
     try {
       const data = await verifyStaffPin({
-        staffId: selectedStaff.id,
-        pin: pin.trim()
+        pin: pinToVerify
       });
 
       setLoggedInStaff(data.staff);
       setActiveShift(data.activeShift);
       setStep('ACTION');
     } catch (err) {
-      setError(err.message || 'PIN salah atau akun tidak aktif.');
+      setError(err.message || 'PIN tidak terdaftar. Periksa kembali PIN Anda.');
       setPin('');
     } finally {
       setLoading(false);
@@ -55,28 +51,23 @@ export default function StaffView({
     setCameraModalOpen(false);
     setStep('LOGIN');
     setLoggedInStaff(null);
-    setSelectedStaff(null);
     setPin('');
     setActiveShift(null);
     setError(null);
   };
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-6">
+    <div className="max-w-2xl mx-auto px-4 py-4">
       {step === 'LOGIN' ? (
         <KioskLoginScreen
-          staffList={staffList}
-          selectedStaff={selectedStaff}
-          onSelectStaff={(staff) => {
-            setSelectedStaff(staff);
-            setError(null);
-          }}
           pin={pin}
-          setPin={setPin}
+          setPin={(val) => {
+            setPin(val);
+            if (error) setError(null);
+          }}
           onLogin={handleLogin}
           loading={loading}
           error={error}
-          networkStatus={networkStatus}
         />
       ) : (
         <KioskActionScreen
@@ -90,7 +81,7 @@ export default function StaffView({
         />
       )}
 
-      {/* Screen 3: Camera Modal with 1.5s flash & 3s auto-logout */}
+      {/* Camera Modal with 1.5s flash & 3s auto-logout */}
       {cameraModalOpen && loggedInStaff && (
         <KioskCameraModal
           staff={loggedInStaff}

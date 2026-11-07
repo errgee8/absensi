@@ -164,17 +164,48 @@ router.get('/staff/admin', (req, res) => {
   res.json(staff);
 });
 
-// 6. Kiosk PIN Verification
-router.post('/staff/verify-pin', (req, res) => {
+// 6. Kiosk PIN Verification (PIN Only or StaffId + PIN)
+router.post('/staff/verify-pin', async (req, res) => {
   const { staffId, pin } = req.body;
 
-  if (!staffId || !pin) {
-    return res.status(400).json({ error: 'Nama karyawan dan PIN wajib diisi.' });
+  if (!pin || !pin.trim()) {
+    return res.status(400).json({ error: 'PIN wajib diisi.' });
   }
 
-  const staff = db.prepare('SELECT * FROM staff WHERE id = ?').get(staffId);
+  const cleanPin = pin.trim();
+  let staff;
+
+  if (staffId) {
+    staff = db.prepare('SELECT * FROM staff WHERE id = ?').get(staffId);
+  } else {
+    // Direct lookup by PIN across active staff
+    staff = db.prepare('SELECT * FROM staff WHERE pin = ? AND is_active = 1').get(cleanPin);
+  }
+
+  // Fallback to Supabase Cloud if not found in SQLite
+  if (!staff && isSupabaseConfigured) {
+    try {
+      const { data: supaStaff } = await supabase
+        .from('staff')
+        .select('*')
+        .eq('pin', cleanPin)
+        .eq('is_active', true)
+        .maybeSingle();
+
+      if (supaStaff) {
+        staff = {
+          ...supaStaff,
+          id: supaStaff.legacy_code || supaStaff.id,
+          uuid: supaStaff.id
+        };
+      }
+    } catch (e) {
+      console.warn('Supabase pin query error:', e.message);
+    }
+  }
+
   if (!staff) {
-    return res.status(404).json({ error: 'Karyawan tidak ditemukan.' });
+    return res.status(401).json({ error: 'PIN tidak terdaftar. Pastikan 4 digit PIN Anda benar.' });
   }
 
   if (!staff.is_active) {
@@ -183,25 +214,46 @@ router.post('/staff/verify-pin', (req, res) => {
     });
   }
 
-  if (staff.pin !== pin.trim()) {
-    return res.status(401).json({ error: 'PIN Rahasia salah. Silakan coba lagi.' });
+  if (staff.pin !== cleanPin) {
+    return res.status(401).json({ error: 'PIN salah. Silakan coba lagi.' });
   }
 
   // Get active shift
-  const activeShift = db.prepare(`
+  let activeShift = db.prepare(`
     SELECT s.*, st.name as staff_name, st.venue, st.division, st.role, st.department, st.standard_hours
     FROM shifts s
     JOIN staff st ON s.staff_id = st.id
     WHERE s.staff_id = ? AND s.status != 'COMPLETED'
     ORDER BY s.id DESC
     LIMIT 1
-  `).get(staffId);
+  `).get(staff.id);
 
   if (activeShift) {
     activeShift.flags = JSON.parse(activeShift.flags || '[]');
+  } else if (isSupabaseConfigured) {
+    try {
+      const { data: supaShift } = await supabase
+        .from('attendance_logs')
+        .select('*')
+        .eq('staff_id', staff.uuid || staff.id)
+        .neq('status', 'COMPLETED')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (supaShift) {
+        activeShift = {
+          ...supaShift,
+          checkin_time: supaShift.check_in_time,
+          checkin_photo: supaShift.check_in_photo_url,
+          flags: supaShift.flags || []
+        };
+      }
+    } catch (e) {}
   }
 
   // Check schedule permissions for break
+  const isLuckyCat = Boolean(staff.venue && staff.venue.toLowerCase().includes('lucky'));
   const schedule = db.prepare(`
     SELECT * FROM shift_schedules 
     WHERE venue = ? AND division = ? AND (start_time = ? OR shift_number = 1)
@@ -220,7 +272,7 @@ router.post('/staff/verify-pin', (req, res) => {
       shift_start: staff.shift_start,
       shift_end: staff.shift_end,
       standard_hours: staff.standard_hours,
-      allows_break: staff.venue === 'LuckyCat' ? 1 : 0,
+      allows_break: isLuckyCat ? 1 : 0,
       max_break_end: schedule?.max_break_end || (staff.shift_start?.startsWith('18') ? '01:00' : '16:00')
     },
     activeShift: activeShift || null
@@ -323,18 +375,9 @@ router.post('/checkin', async (req, res) => {
     return res.status(400).json({ error: 'Anda sudah memiliki shift yang sedang aktif. Silakan lakukan Check-Out terlebih dahulu.' });
   }
 
-  // Network Gatekeeper Check
+  // Network info (Informational only - Wi-Fi lock disabled as requested)
   const clientIp = getClientIp(req);
-  const allowedSubnets = getSetting('allowed_subnets') || [];
-  const enforceWifi = getSetting('enforce_wifi') || 0;
-  const wifiValidation = validateClientNetwork(clientIp, allowedSubnets);
-
-  if (enforceWifi && !wifiValidation.isMatch) {
-    return res.status(403).json({
-      error: 'Check-In Ditolak: Perangkat harus terhubung ke Wi-Fi internal outlet.',
-      clientIp
-    });
-  }
+  const wifiValidation = { isMatch: true, matchedSubnet: 'ALL_NETWORKS' };
 
   // Geofence Check
   const venueLat = getSetting('venue_lat');
@@ -573,18 +616,9 @@ router.post('/checkout', async (req, res) => {
   if (pin && shift.pin && shift.pin !== pin.trim()) return res.status(401).json({ error: 'PIN Rahasia salah.' });
   if (!photoBase64) return res.status(400).json({ error: 'Foto selfie keluar wajib diambil.' });
 
-  // Network Gatekeeper Check
+  // Network info (Informational only - Wi-Fi lock disabled as requested)
   const clientIp = getClientIp(req);
-  const allowedSubnets = getSetting('allowed_subnets') || [];
-  const enforceWifi = getSetting('enforce_wifi') || 0;
-  const wifiValidation = validateClientNetwork(clientIp, allowedSubnets);
-
-  if (enforceWifi && !wifiValidation.isMatch) {
-    return res.status(403).json({
-      error: 'Check-Out Ditolak: Perangkat harus terhubung ke Wi-Fi internal outlet.',
-      clientIp
-    });
-  }
+  const wifiValidation = { isMatch: true, matchedSubnet: 'ALL_NETWORKS' };
 
   // Geofence Check
   const venueLat = getSetting('venue_lat');

@@ -1,7 +1,7 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { Camera, X, CheckCircle2, AlertCircle, RefreshCw, Sparkles, Coffee } from 'lucide-react';
+import { Camera, X, CheckCircle2, AlertCircle, RefreshCw, Smartphone, Loader2 } from 'lucide-react';
 import confetti from 'canvas-confetti';
-import { captureAndWatermark } from '../../utils/watermark';
+import { captureAndWatermark, watermarkFile } from '../../utils/watermark';
 import { checkIn, checkOut, startBreak, endBreak } from '../../utils/api';
 import { isWithinGeofence } from '../../utils/distance';
 
@@ -15,8 +15,10 @@ export default function KioskCameraModal({
 }) {
   const videoRef = useRef(null);
   const streamRef = useRef(null);
+  const fileInputRef = useRef(null);
 
   const [cameraActive, setCameraActive] = useState(false);
+  const [cameraLoading, setCameraLoading] = useState(true);
   const [cameraError, setCameraError] = useState(null);
   const [flashing, setFlashing] = useState(false);
   const [capturedPreview, setCapturedPreview] = useState(null);
@@ -45,36 +47,67 @@ export default function KioskCameraModal({
     }
   }, []);
 
-  // Start front camera
+  // Start front camera with robust multi-stage fallback
   const startCamera = async () => {
+    setCameraLoading(true);
     setCameraError(null);
-    try {
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach((t) => t.stop());
-      }
 
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: 'user',
-          width: { ideal: 1280 },
-          height: { ideal: 720 }
-        },
+    // Stop any existing tracks
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+    }
+
+    let stream = null;
+
+    // Check if mediaDevices is supported
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      setCameraError('Browser ini tidak mendukung akses kamera langsung. Silakan gunakan tombol Buka Kamera HP.');
+      setCameraLoading(false);
+      return;
+    }
+
+    try {
+      // 1. Try front camera
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'user' },
         audio: false
       });
+    } catch (err1) {
+      console.warn('FacingMode user failed, trying fallback stream:', err1);
+      try {
+        // 2. Fallback to basic video stream (any available camera)
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: true,
+          audio: false
+        });
+      } catch (err2) {
+        console.error('All camera attempts failed:', err2);
+        let msg = 'Kamera tidak dapat diakses.';
+        if (err2.name === 'NotAllowedError' || err1.name === 'NotAllowedError') {
+          msg = 'Izin kamera ditolak. Berikan izin kamera di browser Anda atau gunakan tombol Buka Kamera HP.';
+        } else if (err2.name === 'NotFoundError') {
+          msg = 'Kamera tidak terdeteksi. Gunakan tombol Buka Kamera HP di bawah.';
+        }
+        setCameraError(msg);
+        setCameraLoading(false);
+        setCameraActive(false);
+        return;
+      }
+    }
 
+    if (stream) {
       streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        videoRef.current.play();
+        try {
+          await videoRef.current.play();
+        } catch (e) {
+          console.warn('Video play interrupted:', e);
+        }
       }
       setCameraActive(true);
-    } catch (err) {
-      console.error('Camera error:', err);
-      let msg = 'Kamera tidak dapat diakses.';
-      if (err.name === 'NotAllowedError') msg = 'Izin kamera ditolak. Berikan izin kamera di browser.';
-      if (err.name === 'NotFoundError') msg = 'Perangkat kamera tidak ditemukan.';
-      setCameraError(msg);
-      setCameraActive(false);
+      setCameraLoading(false);
     }
   };
 
@@ -107,37 +140,18 @@ export default function KioskCameraModal({
 
   const config = getActionConfig();
 
-  // Shutter capture & submit
-  const handleShutter = async () => {
-    if (!videoRef.current || flashing || submitting) return;
-
-    setFlashing(true);
+  // Helper to submit finalized base64 image
+  const submitAttendancePayload = async (watermarkedBase64) => {
+    setCapturedPreview(watermarkedBase64);
+    stopCamera();
+    setSubmitting(true);
+    setSubmitError(null);
 
     try {
-      const venueLat = venueSettings?.venue_lat ?? -8.6885;
-      const venueLng = venueSettings?.venue_lng ?? 115.1558;
-      const radius = venueSettings?.geofence_radius ?? 150;
-
+      const venueLat = venueSettings?.venue_lat ?? -8.6704;
+      const venueLng = venueSettings?.venue_lng ?? 115.2126;
       const currentLat = userLocation?.lat ?? venueLat;
       const currentLng = userLocation?.lng ?? venueLng;
-
-      const geoCheck = isWithinGeofence(currentLat, currentLng, venueLat, venueLng, radius);
-
-      // Burn hardcoded pixel watermark
-      const watermarkedBase64 = await captureAndWatermark({
-        videoElement: videoRef.current,
-        staffName: staff.name,
-        lat: currentLat,
-        lng: currentLng,
-        status: config.watermarkStatus,
-        isGpsValid: geoCheck.inside,
-        maxWidth: 960,
-        quality: 0.68
-      });
-
-      setCapturedPreview(watermarkedBase64);
-      stopCamera();
-      setSubmitting(true);
 
       const payload = {
         staffId: staff.id,
@@ -184,12 +198,83 @@ export default function KioskCameraModal({
             onCompleteAndAutoLogout();
           }
         }, 1000);
-      }, 1500);
+      }, 1200);
 
     } catch (err) {
       setFlashing(false);
       setSubmitting(false);
       setSubmitError(err.message || 'Gagal memproses absensi.');
+    }
+  };
+
+  // 1. Shutter capture via live WebRTC video
+  const handleShutter = async () => {
+    if (!videoRef.current || flashing || submitting) return;
+
+    setFlashing(true);
+
+    try {
+      const venueLat = venueSettings?.venue_lat ?? -8.6704;
+      const venueLng = venueSettings?.venue_lng ?? 115.2126;
+      const radius = venueSettings?.geofence_radius ?? 200;
+
+      const currentLat = userLocation?.lat ?? venueLat;
+      const currentLng = userLocation?.lng ?? venueLng;
+      const geoCheck = isWithinGeofence(currentLat, currentLng, venueLat, venueLng, radius);
+
+      // Burn hardcoded watermark
+      const watermarkedBase64 = await captureAndWatermark({
+        videoElement: videoRef.current,
+        staffName: staff.name,
+        lat: currentLat,
+        lng: currentLng,
+        status: config.watermarkStatus,
+        isGpsValid: geoCheck.inside,
+        maxWidth: 960,
+        quality: 0.70
+      });
+
+      await submitAttendancePayload(watermarkedBase64);
+
+    } catch (err) {
+      setFlashing(false);
+      setSubmitError(err.message || 'Gagal mengambil gambar dari kamera.');
+    }
+  };
+
+  // 2. Native File Input Fallback (Works on 100% of mobile phones)
+  const handleNativeFileChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setFlashing(true);
+    setSubmitting(true);
+    setSubmitError(null);
+
+    try {
+      const venueLat = venueSettings?.venue_lat ?? -8.6704;
+      const venueLng = venueSettings?.venue_lng ?? 115.2126;
+      const radius = venueSettings?.geofence_radius ?? 200;
+      const currentLat = userLocation?.lat ?? venueLat;
+      const currentLng = userLocation?.lng ?? venueLng;
+      const geoCheck = isWithinGeofence(currentLat, currentLng, venueLat, venueLng, radius);
+
+      const watermarkedBase64 = await watermarkFile(file, {
+        staffName: staff.name,
+        lat: currentLat,
+        lng: currentLng,
+        status: config.watermarkStatus,
+        isGpsValid: geoCheck.inside,
+        maxWidth: 960,
+        quality: 0.70
+      });
+
+      await submitAttendancePayload(watermarkedBase64);
+
+    } catch (err) {
+      setFlashing(false);
+      setSubmitting(false);
+      setSubmitError(err.message || 'Gagal memproses foto dari kamera HP.');
     }
   };
 
@@ -200,7 +285,7 @@ export default function KioskCameraModal({
         <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-950/70">
           <div>
             <h3 className="text-sm font-extrabold text-white">{config.title}</h3>
-            <p className="text-[11px] text-slate-400">{staff.name}</p>
+            <p className="text-[11px] text-slate-400 font-medium">{staff.name} • {staff.venue}</p>
           </div>
           {!submitting && !submitSuccess && (
             <button
@@ -228,7 +313,7 @@ export default function KioskCameraModal({
               {/* 3-Second Countdown Progress Bar */}
               <div className="bg-slate-950 border border-slate-800 rounded-2xl p-3 text-xs">
                 <span className="text-slate-400 block mb-1 font-medium">
-                  Keluar otomatis untuk karyawan berikutnya dalam:
+                  Kembali ke layar PIN dalam:
                 </span>
                 <span className="text-2xl font-black text-emerald-400 font-mono">
                   {countdown} detik
@@ -243,76 +328,125 @@ export default function KioskCameraModal({
 
               <button
                 onClick={onCompleteAndAutoLogout}
-                className="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold transition"
+                className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold transition"
               >
                 Selesai Sekarang
               </button>
             </div>
           ) : (
             <div className="space-y-3">
+              {/* Camera Frame */}
               <div className="relative aspect-[4/3] w-full bg-slate-950 rounded-2xl overflow-hidden border border-slate-800 flex items-center justify-center">
                 {flashing && (
                   <div className="absolute inset-0 bg-white z-30 animate-ping opacity-75 pointer-events-none" />
                 )}
 
+                {/* Submitting Overlay */}
+                {submitting && (
+                  <div className="absolute inset-0 bg-slate-950/80 z-20 flex flex-col items-center justify-center space-y-2 backdrop-blur-sm">
+                    <Loader2 className="w-8 h-8 text-emerald-400 animate-spin" />
+                    <span className="text-xs font-bold text-white tracking-wide">Menyimpan Absensi...</span>
+                  </div>
+                )}
+
+                {/* Captured Preview */}
                 {capturedPreview ? (
                   <img
                     src={capturedPreview}
                     alt="Preview"
                     className="w-full h-full object-cover"
                   />
-                ) : cameraActive ? (
+                ) : (
                   <>
+                    {/* Always mounted video element for immediate srcObject binding */}
                     <video
                       ref={videoRef}
+                      autoPlay
                       playsInline
                       muted
-                      className="w-full h-full object-cover transform scale-x-[-1]"
+                      className={`w-full h-full object-cover transform scale-x-[-1] ${
+                        cameraActive ? 'block' : 'hidden'
+                      }`}
                     />
-                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                      <div className="w-44 h-52 border-2 border-dashed border-emerald-400/60 rounded-3xl flex items-end justify-center pb-2">
-                        <span className="text-[10px] bg-slate-900/80 text-emerald-300 px-2 py-0.5 rounded font-semibold">
-                          Arahkan Wajah & Seragam
-                        </span>
-                      </div>
-                    </div>
-                  </>
-                ) : (
-                  <div className="text-center p-4">
-                    {cameraError ? (
-                      <div className="text-xs text-rose-400">{cameraError}</div>
-                    ) : (
-                      <div className="text-xs text-slate-400 flex items-center space-x-2">
-                        <RefreshCw className="w-4 h-4 animate-spin text-emerald-400" />
-                        <span>Membuka kamera...</span>
+
+                    {/* Loading State */}
+                    {cameraLoading && !cameraError && (
+                      <div className="text-center p-4 space-y-2">
+                        <Loader2 className="w-8 h-8 text-emerald-400 animate-spin mx-auto" />
+                        <span className="text-xs text-slate-400 block font-medium">Membuka kamera selfie...</span>
                       </div>
                     )}
-                  </div>
+
+                    {/* Camera Error State */}
+                    {cameraError && (
+                      <div className="p-4 text-center space-y-3 max-w-[260px]">
+                        <AlertCircle className="w-8 h-8 text-amber-400 mx-auto" />
+                        <p className="text-xs text-slate-300 leading-relaxed">{cameraError}</p>
+                        <button
+                          type="button"
+                          onClick={() => fileInputRef.current?.click()}
+                          className="w-full py-2.5 px-3 bg-emerald-500 hover:bg-emerald-400 text-slate-950 rounded-xl text-xs font-bold transition flex items-center justify-center space-x-2 shadow"
+                        >
+                          <Smartphone className="w-4 h-4" />
+                          <span>Buka Kamera HP Langsung</span>
+                        </button>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
 
+              {/* Error Message */}
               {submitError && (
-                <div className="p-3 bg-rose-950/40 border border-rose-500/40 rounded-xl text-xs text-rose-300 flex items-center space-x-2">
+                <div className="bg-rose-500/10 border border-rose-500/30 rounded-xl p-2.5 text-rose-300 text-xs flex items-center space-x-2">
                   <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
                   <span>{submitError}</span>
                 </div>
               )}
 
-              {cameraActive && !flashing && !submitting && (
-                <button
-                  type="button"
-                  onClick={handleShutter}
-                  className="w-full py-4 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black rounded-2xl text-base shadow-lg shadow-emerald-500/25 flex items-center justify-center space-x-2 active:scale-95 transition"
-                >
-                  <Camera className="w-5 h-5" />
-                  <span>TEKAN UNTUK AMBIL FOTO</span>
-                </button>
-              )}
+              {/* Shutter Button and Controls */}
+              {!capturedPreview && (
+                <div className="pt-2 space-y-2">
+                  {cameraActive ? (
+                    <button
+                      type="button"
+                      disabled={flashing || submitting}
+                      onClick={handleShutter}
+                      className="w-full py-4 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-sm uppercase tracking-wider flex items-center justify-center space-x-2 shadow-xl shadow-emerald-500/25 active:scale-95 transition"
+                    >
+                      <Camera className="w-5 h-5 text-slate-950" />
+                      <span>AMBIL FOTO SEKARANG</span>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="w-full py-4 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-sm uppercase tracking-wider flex items-center justify-center space-x-2 shadow-xl shadow-emerald-500/25 active:scale-95 transition"
+                    >
+                      <Camera className="w-5 h-5 text-slate-950" />
+                      <span>BUKA KAMERA SELFIE</span>
+                    </button>
+                  )}
 
-              {submitting && (
-                <div className="py-3 text-center text-xs font-bold text-emerald-400 flex items-center justify-center space-x-2">
-                  <RefreshCw className="w-4 h-4 animate-spin" />
-                  <span>Memverifikasi GPS & Mengunggah...</span>
+                  {/* Alternative button: Native Camera Capture */}
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="w-full py-2 text-slate-400 hover:text-white text-[11px] font-medium flex items-center justify-center space-x-1.5 transition"
+                  >
+                    <Smartphone className="w-3.5 h-3.5" />
+                    <span>Gunakan Kamera Bawaan HP</span>
+                  </button>
+
+                  {/* Hidden Native File Input with capture="user" */}
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    accept="image/*"
+                    capture="user"
+                    onChange={handleNativeFileChange}
+                    className="hidden"
+                  />
                 </div>
               )}
             </div>

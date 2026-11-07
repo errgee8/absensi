@@ -45,31 +45,9 @@ export default function Navigation({
           {/* Right Controls: Realtime Clock, Wi-Fi Badge & Secure Access */}
           <div className="flex items-center space-x-2 sm:space-x-3">
             {/* WITA Live Clock */}
-            <div className="hidden md:flex items-center space-x-1.5 px-3 py-1.5 bg-slate-800/80 rounded-lg border border-slate-700/60 text-xs font-mono text-emerald-400">
+            <div className="flex items-center space-x-1.5 px-3 py-1.5 bg-slate-800/80 rounded-lg border border-slate-700/60 text-xs font-mono text-emerald-400">
               <Clock className="w-3.5 h-3.5 text-slate-400" />
               <span>{timeStr || 'Loading...'}</span>
-            </div>
-
-            {/* Wi-Fi Gatekeeper Pill */}
-            <div
-              className={`flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border ${
-                networkStatus?.isMatch
-                  ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/25'
-                  : 'bg-rose-500/10 text-rose-400 border-rose-500/25'
-              }`}
-              title={`Client IP: ${networkStatus?.clientIp || 'Unknown'}`}
-            >
-              {networkStatus?.isMatch ? (
-                <>
-                  <Wifi className="w-3.5 h-3.5 animate-pulse" />
-                  <span className="hidden sm:inline">Outlet Wi-Fi</span>
-                </>
-              ) : (
-                <>
-                  <WifiOff className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">Off-Network</span>
-                </>
-              )}
             </div>
 
             {/* In Manager View: Show Switcher to Return to Kiosk or Lock */}

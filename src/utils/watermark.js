@@ -1,14 +1,15 @@
 import { formatWitaDateTime } from './time.js';
 
 /**
- * Captures frame from HTMLVideoElement, burns hardcoded operational watermark,
+ * Captures frame from HTMLVideoElement or HTMLImageElement, burns hardcoded operational watermark,
  * and compresses client-side to lightweight JPEG (~60-80 KB).
  *
- * Watermark requirement:
+ * Watermark format:
  * [Nama] | [WITA Time] | [Check-In/Out/Break] | [GPS Valid]
  */
 export async function captureAndWatermark({
   videoElement,
+  imageElement,
   staffName,
   lat,
   lng,
@@ -17,12 +18,17 @@ export async function captureAndWatermark({
   maxWidth = 960,
   quality = 0.68
 }) {
-  if (!videoElement || videoElement.videoWidth === 0) {
-    throw new Error('Kamera belum siap atau tidak aktif.');
+  const source = videoElement || imageElement;
+  if (!source) {
+    throw new Error('Sumber kamera tidak tersedia.');
   }
 
-  const vWidth = videoElement.videoWidth;
-  const vHeight = videoElement.videoHeight;
+  const vWidth = source.videoWidth || source.naturalWidth || source.width || 0;
+  const vHeight = source.videoHeight || source.naturalHeight || source.height || 0;
+
+  if (vWidth === 0 || vHeight === 0) {
+    throw new Error('Gambar/kamera belum siap. Pastikan kamera sudah aktif.');
+  }
 
   let targetWidth = vWidth;
   let targetHeight = vHeight;
@@ -41,9 +47,9 @@ export async function captureAndWatermark({
     throw new Error('Canvas 2D context tidak tersedia.');
   }
 
-  // Draw video frame
+  // Draw frame (mirror if it's a live front video)
   ctx.save();
-  ctx.drawImage(videoElement, 0, 0, targetWidth, targetHeight);
+  ctx.drawImage(source, 0, 0, targetWidth, targetHeight);
   ctx.restore();
 
   const nowWita = formatWitaDateTime(new Date().toISOString());
@@ -88,31 +94,47 @@ export async function captureAndWatermark({
   const textWidth = ctx.measureText(watermarkText).width;
   if (textWidth > targetWidth - (paddingX * 2)) {
     const line1 = `[${staffName || 'Staff'}] • [${status}]`;
-    const coordsShort = (lat != null && lng != null) ? `Lat: ${Number(lat).toFixed(4)}, Lng: ${Number(lng).toFixed(4)}` : '';
-    const line2 = `[${nowWita}] • [${gpsStatusText} ${coordsShort}]`;
-    
-    ctx.fillText(line1, paddingX, bannerY + (bannerHeight * 0.38));
-    ctx.font = `500 ${Math.round(fontSize * 0.85)}px monospace`;
-    ctx.fillStyle = '#cbd5e1';
-    ctx.fillText(line2, paddingX, bannerY + (bannerHeight * 0.78));
+    const line2 = `[${nowWita}] • [${gpsStatusText}]`;
+    const subFontSize = Math.max(11, fontSize - 2);
+    ctx.font = `600 ${subFontSize}px sans-serif`;
+    ctx.fillText(line1, paddingX, bannerY + Math.round(bannerHeight * 0.4));
+    ctx.fillText(line2, paddingX, bannerY + Math.round(bannerHeight * 0.8));
   } else {
     ctx.fillText(watermarkText, paddingX, textY);
   }
 
-  // Security badge pill in top right corner
-  ctx.shadowBlur = 0;
-  ctx.shadowOffsetX = 0;
-  ctx.shadowOffsetY = 0;
-  const pillText = `VERIFIED • ${gpsStatusText.toUpperCase()}`;
-  ctx.font = 'bold 10px monospace';
-  const pillWidth = ctx.measureText(pillText).width + 16;
-  ctx.fillStyle = 'rgba(15, 23, 42, 0.8)';
-  ctx.fillRect(targetWidth - pillWidth - 14, 14, pillWidth, 22);
-  ctx.strokeStyle = isGpsValid ? '#10b981' : '#f59e0b';
-  ctx.lineWidth = 1.5;
-  ctx.strokeRect(targetWidth - pillWidth - 14, 14, pillWidth, 22);
-  ctx.fillStyle = isGpsValid ? '#34d399' : '#fbbf24';
-  ctx.fillText(pillText, targetWidth - pillWidth - 6, 29);
+  // Draw venue & location coords in small text at top-right
+  if (lat && lng) {
+    const coordsText = `${parseFloat(lat).toFixed(5)}, ${parseFloat(lng).toFixed(5)}`;
+    ctx.font = '500 11px monospace';
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.75)';
+    const coordsWidth = ctx.measureText(coordsText).width;
+    ctx.fillText(coordsText, targetWidth - coordsWidth - 12, bannerY - 8);
+  }
 
   return canvas.toDataURL('image/jpeg', quality);
+}
+
+/**
+ * Watermarks a File / Blob directly from native file input capture
+ */
+export async function watermarkFile(file, options) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = async () => {
+        try {
+          const result = await captureAndWatermark({ ...options, imageElement: img });
+          resolve(result);
+        } catch (err) {
+          reject(err);
+        }
+      };
+      img.onerror = () => reject(new Error('Gagal memuat gambar dari kamera HP.'));
+      img.src = e.target.result;
+    };
+    reader.onerror = () => reject(new Error('Gagal membaca file foto.'));
+    reader.readAsDataURL(file);
+  });
 }
