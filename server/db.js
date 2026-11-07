@@ -6,17 +6,19 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const dataDir = path.join(__dirname, '..', 'data');
+const isServerless = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.NETLIFY);
+const dataDir = isServerless ? path.join('/tmp', 'data') : path.join(__dirname, '..', 'data');
 if (!fs.existsSync(dataDir)) {
   fs.mkdirSync(dataDir, { recursive: true });
 }
 
-const uploadsDir = path.join(dataDir, 'uploads');
+const uploadsDir = isServerless ? path.join('/tmp', 'uploads') : path.join(dataDir, 'uploads');
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
 
-const db = new Database(path.join(dataDir, 'checkin.db'));
+const dbPath = path.join(dataDir, 'checkin.db');
+const db = new Database(dbPath);
 db.pragma('journal_mode = WAL');
 
 // Initialize schema
