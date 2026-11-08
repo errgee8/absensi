@@ -41,6 +41,10 @@ export async function uploadPhotoToSupabase(base64Data, filenamePrefix = 'selfie
 
   const ext = matches[1] === 'jpeg' ? 'jpg' : matches[1];
   const buffer = Buffer.from(matches[2], 'base64');
+  if (buffer.length < 500) {
+    console.warn('Image buffer too small to be valid image:', buffer.length);
+    return null;
+  }
   const filename = `${filenamePrefix}_${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${ext}`;
   const filePath = `uploads/${filename}`;
 

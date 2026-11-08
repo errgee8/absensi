@@ -56,6 +56,10 @@ function saveBase64Photo(dataUrl, prefix = 'photo') {
   }
   const ext = matches[1] === 'jpeg' ? 'jpg' : matches[1];
   const buffer = Buffer.from(matches[2], 'base64');
+  if (buffer.length < 500) {
+    console.warn('Local photo buffer too small to be valid image:', buffer.length);
+    return null;
+  }
   const filename = `${prefix}_${Date.now()}_${Math.random().toString(36).substring(2, 7)}.${ext}`;
   const filepath = path.join(uploadsDir, filename);
   fs.writeFileSync(filepath, buffer);

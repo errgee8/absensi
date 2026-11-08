@@ -128,6 +128,7 @@ export default function ShiftTable({ shifts = [], onInspectPhoto }) {
                         <img
                           src={shift.checkin_photo}
                           alt="Check-in Selfie"
+                          onError={(e) => { e.currentTarget.style.display = 'none'; }}
                           className="w-10 h-10 object-cover group-hover:scale-110 transition duration-200"
                         />
                         <div className="absolute inset-0 bg-blue-950/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition">
@@ -190,6 +191,7 @@ export default function ShiftTable({ shifts = [], onInspectPhoto }) {
                         <img
                           src={shift.checkout_photo}
                           alt="Checkout Selfie"
+                          onError={(e) => { e.currentTarget.style.display = 'none'; }}
                           className="w-10 h-10 object-cover group-hover:scale-110 transition duration-200"
                         />
                         <div className="absolute inset-0 bg-blue-950/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition">

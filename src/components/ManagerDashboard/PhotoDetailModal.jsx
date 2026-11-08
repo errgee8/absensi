@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, MapPin, Wifi, ShieldAlert, CheckCircle, Calendar, Clock, User, Coffee, LogIn, LogOut, Camera } from 'lucide-react';
 import { formatWitaDateTime, formatDuration } from '../../utils/time';
 
@@ -6,6 +6,11 @@ export default function PhotoDetailModal({ shift, type = 'in', onClose }) {
   if (!shift) return null;
 
   const [activeTab, setActiveTab] = useState(type || 'in'); // 'in' | 'break' | 'out'
+  const [imgError, setImgError] = useState(false);
+
+  useEffect(() => {
+    setImgError(false);
+  }, [activeTab]);
 
   const isCheckin = activeTab === 'in';
   const isBreak = activeTab === 'break';
@@ -127,20 +132,29 @@ export default function PhotoDetailModal({ shift, type = 'in', onClose }) {
         <div className="p-5 overflow-y-auto space-y-5 text-xs">
           {/* Watermarked Photo Preview */}
           <div className="relative rounded-2xl overflow-hidden border-2 border-slate-300 bg-slate-950 shadow-inner">
-            {photo ? (
+            {photo && !imgError ? (
               <img
                 src={photo}
                 alt="Audit Biometric Selfie"
+                onError={() => setImgError(true)}
                 className="w-full h-auto max-h-96 object-contain mx-auto"
               />
             ) : (
               <div className="p-12 text-center text-slate-300 text-xs font-bold space-y-2">
                 <Camera className="w-8 h-8 text-slate-500 mx-auto" />
                 <p className="text-sm font-black text-white">
-                  {isCheckout ? 'Belum Ada Foto Check-Out Pulang' : isBreak ? 'Belum Ada Foto Istirahat' : 'Tidak Ada Foto Masuk'}
+                  {imgError
+                    ? 'Foto Tidak Dapat Dimuat'
+                    : isCheckout
+                    ? 'Belum Ada Foto Check-Out Pulang'
+                    : isBreak
+                    ? 'Belum Ada Foto Istirahat'
+                    : 'Tidak Ada Foto Masuk'}
                 </p>
                 <p className="text-slate-400 text-xs">
-                  {isCheckout
+                  {imgError
+                    ? 'File foto selfie tidak ditemukan di penyimpanan server atau rusak.'
+                    : isCheckout
                     ? 'Karyawan masih aktif bertugas (On Duty) atau belum mengunggah foto selfie saat pulang.'
                     : 'Tidak ada rekaman foto tersimpan untuk aktivitas ini.'}
                 </p>
