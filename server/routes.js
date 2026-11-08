@@ -349,6 +349,34 @@ router.delete('/schedules/:id', async (req, res) => {
 // 4. Staff Endpoints (Public Roster for Kiosk)
 router.get('/staff', async (req, res) => {
   const { venue } = req.query;
+
+  // Authoritative Cloud Source if Supabase is configured
+  if (isSupabaseConfigured) {
+    try {
+      let supaQuery = supabase
+        .from('staff')
+        .select('id, legacy_code, name, venue, division, role, department, shift_start, shift_end, standard_hours, is_active')
+        .eq('is_active', true);
+
+      if (venue && venue !== 'ALL') {
+        supaQuery = supaQuery.ilike('venue', `%${venue.replace('JP Karaoke', 'JP')}%`);
+      }
+
+      const { data, error } = await supaQuery.order('venue', { ascending: true }).order('name', { ascending: true });
+      if (!error && data && data.length > 0) {
+        return res.json(data.map(s => ({
+          ...s,
+          id: s.legacy_code || s.id,
+          uuid: s.id,
+          is_active: 1
+        })));
+      }
+    } catch (e) {
+      console.warn('Supabase staff query error, falling back to SQLite:', e.message);
+    }
+  }
+
+  // SQLite fallback
   let query = 'SELECT id, name, venue, division, role, department, shift_start, shift_end, standard_hours, is_active FROM staff WHERE is_active = 1';
   const params = [];
 
@@ -358,56 +386,80 @@ router.get('/staff', async (req, res) => {
   }
 
   query += ' ORDER BY venue ASC, division ASC, name ASC';
-  let staff = db.prepare(query).all(...params);
-
-  // Fallback to Supabase if SQLite has no records (e.g. serverless cold start)
-  if ((!staff || staff.length === 0) && isSupabaseConfigured) {
-    try {
-      let supaQuery = supabase
-        .from('staff')
-        .select('id, legacy_code, name, venue, division, role, department, shift_start, shift_end, standard_hours, is_active')
-        .eq('is_active', true);
-      if (venue && venue !== 'ALL') {
-        supaQuery = supaQuery.ilike('venue', `%${venue.replace('JP Karaoke', 'JP')}%`);
-      }
-      const { data } = await supaQuery.order('venue', { ascending: true }).order('name', { ascending: true });
-      if (data && data.length > 0) {
-        staff = data.map(s => ({ ...s, id: s.legacy_code || s.id }));
-      }
-    } catch (e) {
-      console.warn('Supabase staff fallback note:', e.message);
-    }
-  }
-
+  const staff = db.prepare(query).all(...params);
   res.json(staff);
 });
 
 // 5. Manager Admin Staff Roster
 router.get('/staff/admin', async (req, res) => {
-  let staff = db.prepare(`
+  // Authoritative Cloud Source if Supabase is configured
+  if (isSupabaseConfigured) {
+    try {
+      const { data, error } = await supabase
+        .from('staff')
+        .select('*')
+        .order('venue', { ascending: true })
+        .order('is_active', { ascending: false })
+        .order('name', { ascending: true });
+
+      if (!error && data && data.length > 0) {
+        // Upsert all into local SQLite so that foreign keys or local queries also know about all staff
+        for (const s of data) {
+          const staffId = s.legacy_code || s.id;
+          try {
+            db.prepare(`
+              INSERT OR REPLACE INTO staff (id, name, venue, division, role, department, pin, shift_start, shift_end, standard_hours, is_active)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `).run(
+              staffId,
+              s.name,
+              s.venue,
+              s.division,
+              s.role,
+              s.department || s.division,
+              s.pin,
+              s.shift_start || '10:00',
+              s.shift_end || '19:00',
+              s.standard_hours || 9,
+              s.is_active ? 1 : 0
+            );
+          } catch (e) {
+            // ignore sqlite sync error
+          }
+        }
+
+        // Return staff with last_shift_time
+        const formatted = data.map(s => {
+          const staffId = s.legacy_code || s.id;
+          let lastShiftTime = null;
+          try {
+            const row = db.prepare('SELECT MAX(checkin_time) as last_shift_time FROM shifts WHERE staff_id = ?').get(staffId);
+            lastShiftTime = row?.last_shift_time || null;
+          } catch {}
+          return {
+            ...s,
+            id: staffId,
+            uuid: s.id,
+            is_active: s.is_active ? 1 : 0,
+            last_shift_time: lastShiftTime
+          };
+        });
+
+        return res.json(formatted);
+      }
+    } catch (e) {
+      console.warn('Supabase admin staff query error, falling back to SQLite:', e.message);
+    }
+  }
+
+  // SQLite fallback
+  const staff = db.prepare(`
     SELECT 
       st.*,
       (SELECT MAX(s.checkin_time) FROM shifts s WHERE s.staff_id = st.id) as last_shift_time
     FROM staff st 
     ORDER BY st.venue ASC, st.is_active DESC, st.name ASC
   `).all();
-
-  // Fallback to Supabase if SQLite has no records (e.g. serverless cold start)
-  if ((!staff || staff.length === 0) && isSupabaseConfigured) {
-    try {
-      const { data } = await supabase
-        .from('staff')
-        .select('*')
-        .order('venue', { ascending: true })
-        .order('is_active', { ascending: false })
-        .order('name', { ascending: true });
-      if (data && data.length > 0) {
-        staff = data.map(s => ({ ...s, id: s.legacy_code || s.id }));
-      }
-    } catch (e) {
-      console.warn('Supabase admin staff fallback note:', e.message);
-    }
-  }
 
   res.json(staff);
 });
@@ -579,17 +631,6 @@ router.post('/staff', async (req, res) => {
   }
 
   try {
-    let assignedId = req.body.id;
-    if (!assignedId) {
-      const maxRow = db.prepare("SELECT id FROM staff WHERE id LIKE 'STF-%' ORDER BY id DESC LIMIT 1").get();
-      let nextNum = 1;
-      if (maxRow && maxRow.id) {
-        const match = maxRow.id.match(/\d+/);
-        if (match) nextNum = parseInt(match[0], 10) + 1;
-      }
-      assignedId = `STF-${String(nextNum).padStart(3, '0')}`;
-    }
-
     const assignedVenue = venue || 'JP Karaoke';
     const assignedDivision = division || 'Server and Cashier';
     const assignedRole = (role || assignedDivision).trim();
@@ -616,8 +657,41 @@ router.post('/staff', async (req, res) => {
     const assignedPin = pin ? pin.trim() : Math.floor(1000 + Math.random() * 9000).toString();
     const activeStatus = is_active !== undefined ? (is_active ? 1 : 0) : 1;
 
+    // Generate unique collision-free ID for legacy_code
+    let assignedId = req.body.id;
+    if (!assignedId) {
+      const prefix = (assignedVenue === 'LuckyCat' ? 'LC' : 'JP') + '-' + (assignedRole.slice(0, 3).toUpperCase());
+      const randNum = Math.floor(100 + Math.random() * 900);
+      assignedId = `${prefix}-${Date.now().toString().slice(-4)}${randNum}`;
+    }
+
+    // Insert to Supabase Cloud as authoritative store
+    let supaRecord = null;
+    if (isSupabaseConfigured) {
+      const { data, error } = await supabase.from('staff').insert({
+        legacy_code: assignedId,
+        name: name.trim(),
+        venue: assignedVenue,
+        division: assignedDivision,
+        role: assignedRole,
+        department: department || assignedDivision,
+        pin: assignedPin,
+        shift_start: sStart,
+        shift_end: sEnd,
+        standard_hours: parseFloat(sHours),
+        is_active: activeStatus === 1
+      }).select().single();
+
+      if (error) {
+        console.error('Supabase staff insert error:', error);
+        throw new Error(`Gagal menyimpan ke database cloud: ${error.message}`);
+      }
+      supaRecord = data;
+    }
+
+    // Also cache/insert in local SQLite
     db.prepare(`
-      INSERT INTO staff (id, name, venue, division, role, department, pin, shift_start, shift_end, standard_hours, is_active)
+      INSERT OR REPLACE INTO staff (id, name, venue, division, role, department, pin, shift_start, shift_end, standard_hours, is_active)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       assignedId,
@@ -633,30 +707,16 @@ router.post('/staff', async (req, res) => {
       activeStatus
     );
 
-    // Sync to Supabase Cloud
-    if (isSupabaseConfigured) {
-      try {
-        await supabase.from('staff').insert({
-          legacy_code: assignedId,
-          name: name.trim(),
-          venue: assignedVenue,
-          division: assignedDivision,
-          role: assignedRole,
-          department: department || assignedDivision,
-          pin: assignedPin,
-          shift_start: sStart,
-          shift_end: sEnd,
-          standard_hours: parseFloat(sHours),
-          is_active: activeStatus === 1
-        });
-      } catch (e) {
-        console.warn('Supabase staff insert note:', e.message);
-      }
-    }
-
     broadcastEvent('STAFF_UPDATE', { action: 'CREATED', staffId: assignedId });
-    res.json({ success: true, message: 'Staff member provisioned successfully', id: assignedId, pin: assignedPin });
+    res.json({
+      success: true,
+      message: 'Staff member provisioned successfully',
+      id: assignedId,
+      uuid: supaRecord?.id || assignedId,
+      pin: assignedPin
+    });
   } catch (err) {
+    console.error('Error adding staff:', err);
     res.status(400).json({ error: err.message });
   }
 });
@@ -670,16 +730,15 @@ router.put('/staff/:id/pin', async (req, res) => {
     return res.status(400).json({ error: 'PIN must be at least 4 digits.' });
   }
 
-  const result = db.prepare('UPDATE staff SET pin = ? WHERE id = ?').run(pin.trim(), id);
+  db.prepare('UPDATE staff SET pin = ? WHERE id = ?').run(pin.trim(), id);
 
   if (isSupabaseConfigured) {
     try {
       const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
-      if (isUuid) {
-        await supabase.from('staff').update({ pin: pin.trim() }).eq('id', id);
-      } else {
-        await supabase.from('staff').update({ pin: pin.trim() }).eq('legacy_code', id);
-      }
+      let query = supabase.from('staff').update({ pin: pin.trim(), updated_at: new Date().toISOString() });
+      query = isUuid ? query.eq('id', id) : query.eq('legacy_code', id);
+      const { error } = await query;
+      if (error) throw error;
     } catch (e) {
       console.warn('Supabase pin update note:', e.message);
     }
@@ -695,16 +754,15 @@ router.put('/staff/:id/status', async (req, res) => {
   const { is_active } = req.body;
 
   const statusVal = is_active ? 1 : 0;
-  const result = db.prepare('UPDATE staff SET is_active = ? WHERE id = ?').run(statusVal, id);
+  db.prepare('UPDATE staff SET is_active = ? WHERE id = ?').run(statusVal, id);
 
   if (isSupabaseConfigured) {
     try {
       const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
-      if (isUuid) {
-        await supabase.from('staff').update({ is_active: statusVal === 1 }).eq('id', id);
-      } else {
-        await supabase.from('staff').update({ is_active: statusVal === 1 }).eq('legacy_code', id);
-      }
+      let query = supabase.from('staff').update({ is_active: statusVal === 1, updated_at: new Date().toISOString() });
+      query = isUuid ? query.eq('id', id) : query.eq('legacy_code', id);
+      const { error } = await query;
+      if (error) throw error;
     } catch (e) {
       console.warn('Supabase status update note:', e.message);
     }
@@ -712,6 +770,28 @@ router.put('/staff/:id/status', async (req, res) => {
 
   broadcastEvent('STAFF_UPDATE', { action: 'STATUS_TOGGLED', staffId: id, is_active: statusVal });
   res.json({ success: true, message: `Staff status changed to ${statusVal ? 'Active' : 'Suspended'}.` });
+});
+
+// 9b. Manager Admin: Delete Staff Member
+router.delete('/staff/:id', async (req, res) => {
+  const { id } = req.params;
+
+  if (isSupabaseConfigured) {
+    try {
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+      let query = supabase.from('staff').delete();
+      query = isUuid ? query.eq('id', id) : query.eq('legacy_code', id);
+      const { error } = await query;
+      if (error) throw error;
+    } catch (e) {
+      console.warn('Supabase staff delete note:', e.message);
+    }
+  }
+
+  db.prepare('DELETE FROM staff WHERE id = ?').run(id);
+
+  broadcastEvent('STAFF_UPDATE', { action: 'DELETED', staffId: id });
+  res.json({ success: true, message: 'Karyawan berhasil dihapus dari sistem.' });
 });
 
 // 10. Staff Check-In

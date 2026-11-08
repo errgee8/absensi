@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { UserPlus, Key, ShieldAlert, CheckCircle2, XCircle, Search, Eye, EyeOff, RefreshCw, Sparkles, UserCheck, Building2 } from 'lucide-react';
-import { getAdminStaffList, createStaff, resetStaffPin, toggleStaffStatus } from '../../utils/api';
+import { UserPlus, Key, ShieldAlert, CheckCircle2, XCircle, Search, Eye, EyeOff, RefreshCw, Sparkles, UserCheck, Building2, Trash2 } from 'lucide-react';
+import { getAdminStaffList, createStaff, resetStaffPin, toggleStaffStatus, deleteStaff } from '../../utils/api';
 
 export default function StaffManagementTab({ onStaffUpdated }) {
   const [staffRoster, setStaffRoster] = useState([]);
@@ -189,6 +189,19 @@ export default function StaffManagementTab({ onStaffUpdated }) {
     }
   };
 
+  const handleDeleteStaff = async (staff) => {
+    if (!window.confirm(`Yakin ingin menghapus karyawan "${staff.name}" (${staff.id})? Tindakan ini tidak dapat dibatalkan.`)) {
+      return;
+    }
+    try {
+      await deleteStaff(staff.id);
+      await loadRoster();
+      if (onStaffUpdated) onStaffUpdated();
+    } catch (err) {
+      alert('Gagal menghapus staff: ' + err.message);
+    }
+  };
+
   const handleSaveResetPin = async (e) => {
     e.preventDefault();
     if (!pinModalStaff || resetPinValue.length < 4) return;
@@ -207,35 +220,40 @@ export default function StaffManagementTab({ onStaffUpdated }) {
     }
   };
 
-  const filteredStaff = staffRoster.filter((s) => {
-    const matchesVenue = venueFilter === 'ALL' || s.venue === venueFilter;
+  const filteredStaff = staffRoster.filter((staff) => {
     const matchesSearch =
-      s.name.toLowerCase().includes(search.toLowerCase()) ||
-      s.id.toLowerCase().includes(search.toLowerCase()) ||
-      (s.division && s.division.toLowerCase().includes(search.toLowerCase())) ||
-      s.role.toLowerCase().includes(search.toLowerCase());
-    return matchesVenue && matchesSearch;
+      staff.name.toLowerCase().includes(search.toLowerCase()) ||
+      staff.role.toLowerCase().includes(search.toLowerCase()) ||
+      staff.id.toLowerCase().includes(search.toLowerCase()) ||
+      (staff.division && staff.division.toLowerCase().includes(search.toLowerCase()));
+
+    const matchesVenue = venueFilter === 'ALL' || staff.venue === venueFilter;
+    return matchesSearch && matchesVenue;
   });
 
   return (
-    <div className="space-y-5">
-      {/* Header Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-900/80 p-4 rounded-2xl border border-slate-800">
+    <div className="space-y-6 animate-fade-in">
+      {/* Top Banner Card - White & Blue */}
+      <div className="bg-white rounded-3xl p-5 border-2 border-slate-200 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h3 className="text-base font-extrabold text-white flex items-center space-x-2">
-            <UserCheck className="w-5 h-5 text-emerald-400" />
-            <span>Staff Administration & PIN Provisioning</span>
+          <div className="flex items-center space-x-2">
+            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-blue-100 text-blue-900 border border-blue-300">
+              Staff &amp; PIN Management
+            </span>
+          </div>
+          <h3 className="text-xl font-black text-slate-950 mt-1">
+            Pengaturan Karyawan &amp; Hak Akses PIN
           </h3>
-          <p className="text-xs text-slate-400 mt-0.5">
-            Admin-only management for JP Karaoke & LuckyCat. Staff cannot self-register.
+          <p className="text-xs text-slate-700 mt-0.5 font-bold">
+            Manajemen staf terpusat JP Karaoke &amp; LuckyCat Billiard. Data tersimpan permanen di cloud.
           </p>
         </div>
 
         <button
           onClick={handleOpenAddModal}
-          className="px-4 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-bold rounded-xl text-xs flex items-center justify-center space-x-1.5 shadow-md shadow-emerald-500/20 transition shrink-0"
+          className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-xl text-xs flex items-center justify-center space-x-1.5 shadow-md shadow-blue-600/30 transition shrink-0"
         >
-          <UserPlus className="w-4 h-4" />
+          <UserPlus className="w-4 h-4 stroke-[2.5]" />
           <span>+ Tambah Karyawan Baru</span>
         </button>
       </div>
@@ -249,48 +267,56 @@ export default function StaffManagementTab({ onStaffUpdated }) {
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search staff by name or role..."
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+              placeholder="Cari nama, role, atau ID staff..."
+              className="w-full bg-white border-2 border-slate-300 rounded-xl pl-9 pr-3 py-2 text-xs text-slate-950 font-bold placeholder-slate-400 focus:outline-none focus:border-blue-600"
             />
           </div>
 
           <select
             value={venueFilter}
             onChange={(e) => setVenueFilter(e.target.value)}
-            className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500 font-semibold cursor-pointer"
+            className="bg-white border-2 border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-950 font-black focus:outline-none focus:border-blue-600 cursor-pointer"
           >
-            <option value="ALL">All Outlets</option>
+            <option value="ALL">Semua Outlet</option>
             <option value="JP Karaoke">JP Karaoke</option>
             <option value="LuckyCat">LuckyCat</option>
           </select>
         </div>
 
-        <div className="text-xs text-slate-400 font-medium">
-          Total: <strong className="text-white">{filteredStaff.length}</strong> staff (
-          <span className="text-emerald-400 font-bold">
-            {filteredStaff.filter((s) => s.is_active === 1).length} active
+        <div className="text-xs text-slate-700 font-bold flex items-center space-x-2">
+          <span>Total: <strong className="text-slate-950 font-black">{filteredStaff.length}</strong> staff</span>
+          <span>•</span>
+          <span className="text-emerald-700 font-black">
+            {filteredStaff.filter((s) => s.is_active === 1).length} aktif
           </span>
-          )
+          <button
+            onClick={loadRoster}
+            disabled={loading}
+            className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 transition ml-2"
+            title="Refresh Data"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+          </button>
         </div>
       </div>
 
-      {/* Roster Table */}
-      <div className="bg-slate-900/80 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+      {/* Roster Table - High Contrast */}
+      <div className="bg-white border-2 border-slate-200 rounded-2xl overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs text-slate-300">
-            <thead className="bg-slate-950/80 text-slate-400 uppercase text-[10px] tracking-wider font-bold border-b border-slate-800">
+          <table className="w-full text-left text-xs text-slate-700">
+            <thead className="bg-slate-100 text-slate-950 uppercase text-[10px] tracking-wider font-black border-b-2 border-slate-200">
               <tr>
                 <th className="py-3.5 px-3">Staff ID</th>
-                <th className="py-3.5 px-3">Outlet & Division</th>
-                <th className="py-3.5 px-3">Full Name</th>
-                <th className="py-3.5 px-3">Role</th>
-                <th className="py-3.5 px-3">Assigned PIN</th>
+                <th className="py-3.5 px-3">Outlet &amp; Divisi</th>
+                <th className="py-3.5 px-3">Nama Lengkap</th>
+                <th className="py-3.5 px-3">Posisi (Role)</th>
+                <th className="py-3.5 px-3">PIN Staf</th>
                 <th className="py-3.5 px-3">Status</th>
-                <th className="py-3.5 px-3">Shift Schedule</th>
-                <th className="py-3.5 px-3 text-right">Actions</th>
+                <th className="py-3.5 px-3">Shift Jam Kerja</th>
+                <th className="py-3.5 px-3 text-right">Aksi</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800/60 font-medium">
+            <tbody className="divide-y divide-slate-100 font-medium">
               {filteredStaff.map((staff) => {
                 const isActive = staff.is_active === 1;
                 const pinRevealed = showPins[staff.id];
@@ -298,29 +324,29 @@ export default function StaffManagementTab({ onStaffUpdated }) {
                 return (
                   <tr
                     key={staff.id}
-                    className={`hover:bg-slate-800/40 transition-colors ${
-                      !isActive ? 'bg-rose-950/10 opacity-70' : ''
+                    className={`hover:bg-blue-50/40 transition-colors ${
+                      !isActive ? 'bg-rose-50/40 opacity-75' : ''
                     }`}
                   >
-                    <td className="py-3 px-3 font-mono font-bold text-slate-400">{staff.id}</td>
+                    <td className="py-3 px-3 font-mono font-bold text-slate-500">{staff.id}</td>
 
                     <td className="py-3 px-3">
-                      <span className="font-bold text-slate-200">
+                      <span className="font-black text-slate-950 block">
                         {staff.venue === 'JP Karaoke' ? '🎤 JP Karaoke' : '🐱 LuckyCat'}
                       </span>
-                      <div className="text-[10px] text-cyan-400 font-medium">
+                      <div className="text-[11px] text-blue-700 font-bold">
                         {staff.division}
                       </div>
                     </td>
 
-                    <td className="py-3 px-3 font-bold text-white">{staff.name}</td>
-                    <td className="py-3 px-3 text-slate-300">{staff.role}</td>
+                    <td className="py-3 px-3 font-black text-slate-950 text-sm">{staff.name}</td>
+                    <td className="py-3 px-3 text-slate-800 font-bold">{staff.role}</td>
 
                     {/* Assigned PIN */}
                     <td className="py-3 px-3">
-                      <div className="inline-flex items-center space-x-1.5 bg-slate-950 px-2 py-1 rounded-lg border border-slate-800 font-mono">
-                        <Key className="w-3 h-3 text-slate-400" />
-                        <span className="font-bold text-amber-300 tracking-wider">
+                      <div className="inline-flex items-center space-x-1.5 bg-slate-50 px-2.5 py-1 rounded-xl border-2 border-slate-200 font-mono">
+                        <Key className="w-3.5 h-3.5 text-blue-600 stroke-[2.5]" />
+                        <span className="font-black text-slate-950 tracking-wider">
                           {pinRevealed ? staff.pin : '••••'}
                         </span>
                         <button
@@ -328,9 +354,10 @@ export default function StaffManagementTab({ onStaffUpdated }) {
                           onClick={() =>
                             setShowPins((prev) => ({ ...prev, [staff.id]: !prev[staff.id] }))
                           }
-                          className="text-slate-400 hover:text-white ml-1"
+                          className="text-slate-500 hover:text-slate-950 ml-1"
+                          title={pinRevealed ? 'Sembunyikan' : 'Lihat PIN'}
                         >
-                          {pinRevealed ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                          {pinRevealed ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                         </button>
                       </div>
                     </td>
@@ -338,20 +365,20 @@ export default function StaffManagementTab({ onStaffUpdated }) {
                     {/* Status Badge */}
                     <td className="py-3 px-3">
                       <span
-                        className={`inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                        className={`inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[10px] font-black border ${
                           isActive
-                            ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
-                            : 'bg-rose-500/15 text-rose-400 border-rose-500/30'
+                            ? 'bg-emerald-100 text-emerald-950 border-emerald-300'
+                            : 'bg-rose-100 text-rose-950 border-rose-300'
                         }`}
                       >
                         {isActive ? (
                           <>
-                            <CheckCircle2 className="w-3 h-3" />
-                            <span>Active</span>
+                            <CheckCircle2 className="w-3 h-3 stroke-[3]" />
+                            <span>Aktif</span>
                           </>
                         ) : (
                           <>
-                            <XCircle className="w-3 h-3" />
+                            <XCircle className="w-3 h-3 stroke-[3]" />
                             <span>Suspended</span>
                           </>
                         )}
@@ -360,8 +387,8 @@ export default function StaffManagementTab({ onStaffUpdated }) {
 
                     {/* Shift Pattern */}
                     <td className="py-3 px-3 text-[11px] font-mono">
-                      <span className="text-cyan-300 bg-cyan-950/60 border border-cyan-800/50 px-2 py-0.5 rounded-md font-bold">
-                        Auto-Detect (Fleksibel)
+                      <span className="text-blue-950 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-md font-bold">
+                        Auto-Detect Shift
                       </span>
                     </td>
 
@@ -372,20 +399,29 @@ export default function StaffManagementTab({ onStaffUpdated }) {
                           setPinModalStaff(staff);
                           setResetPinValue('');
                         }}
-                        className="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-semibold border border-slate-700 transition"
+                        className="px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-[11px] font-black border border-slate-300 transition"
                       >
                         Reset PIN
                       </button>
 
                       <button
                         onClick={() => handleToggleStatus(staff)}
-                        className={`px-2 py-1 rounded-lg text-[11px] font-bold border transition ${
+                        className={`px-2.5 py-1.5 rounded-xl text-[11px] font-black border transition ${
                           isActive
-                            ? 'bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 border-rose-800/60'
-                            : 'bg-emerald-950/40 hover:bg-emerald-900/60 text-emerald-300 border-emerald-800/60'
+                            ? 'bg-amber-50 hover:bg-amber-100 text-amber-900 border-amber-300'
+                            : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border-emerald-300'
                         }`}
                       >
-                        {isActive ? 'Suspend' : 'Activate'}
+                        {isActive ? 'Nonaktifkan' : 'Aktifkan'}
+                      </button>
+
+                      <button
+                        onClick={() => handleDeleteStaff(staff)}
+                        className="px-2.5 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 text-[11px] font-black border border-rose-300 transition inline-flex items-center space-x-1"
+                        title="Hapus Karyawan"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                        <span>Hapus</span>
                       </button>
                     </td>
                   </tr>
@@ -398,18 +434,20 @@ export default function StaffManagementTab({ onStaffUpdated }) {
 
       {/* Modal: Add New Staff (Simplified Template-based) */}
       {modalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fade-in">
-          <div className="bg-slate-900 border border-slate-700 rounded-3xl max-w-md w-full overflow-hidden shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white border-2 border-slate-300 rounded-3xl max-w-md w-full overflow-hidden shadow-2xl">
             <form onSubmit={handleCreateStaff}>
-              <div className="p-4 sm:p-5 border-b border-slate-800 bg-slate-950 flex items-center justify-between">
+              <div className="p-4 sm:p-5 border-b-2 border-slate-200 bg-slate-50 flex items-center justify-between">
                 <div className="flex items-center space-x-2">
-                  <UserPlus className="w-5 h-5 text-emerald-400" />
-                  <h3 className="text-base font-bold text-white">Tambah Karyawan Baru</h3>
+                  <div className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center">
+                    <UserPlus className="w-4 h-4 stroke-[2.5]" />
+                  </div>
+                  <h3 className="text-base font-black text-slate-950">Tambah Karyawan Baru</h3>
                 </div>
                 <button
                   type="button"
                   onClick={() => setModalOpen(false)}
-                  className="p-1 text-slate-400 hover:text-white"
+                  className="p-1.5 text-slate-500 hover:text-slate-950 rounded-lg hover:bg-slate-200 transition"
                 >
                   ✕
                 </button>
@@ -418,11 +456,11 @@ export default function StaffManagementTab({ onStaffUpdated }) {
               <div className="p-5 space-y-4 text-xs">
                 {/* Outlet Venue Selection */}
                 <div>
-                  <label className="text-slate-300 font-semibold block mb-1">Outlet / Lokasi</label>
+                  <label className="text-slate-950 font-black block mb-1">Outlet / Lokasi</label>
                   <select
                     value={newVenue}
                     onChange={(e) => handleVenueChange(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-bold focus:outline-none focus:border-emerald-500"
+                    className="w-full bg-slate-50 border-2 border-slate-300 rounded-xl px-3 py-2 text-slate-950 font-bold focus:outline-none focus:border-blue-600"
                   >
                     <option value="LuckyCat">LuckyCat (LC)</option>
                     <option value="JP Karaoke">JP Karaoke</option>
@@ -431,11 +469,11 @@ export default function StaffManagementTab({ onStaffUpdated }) {
 
                 {/* Division & Role Selection */}
                 <div>
-                  <label className="text-slate-300 font-semibold block mb-1">Divisi & Posisi Kerja</label>
+                  <label className="text-slate-950 font-black block mb-1">Divisi &amp; Posisi Kerja</label>
                   <select
                     value={selectedRoleOption}
                     onChange={(e) => setSelectedRoleOption(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-semibold focus:outline-none focus:border-emerald-500"
+                    className="w-full bg-slate-50 border-2 border-slate-300 rounded-xl px-3 py-2 text-slate-950 font-bold focus:outline-none focus:border-blue-600"
                   >
                     {currentTemplateOptions.map((opt) => (
                       <option key={opt.role} value={opt.role}>
@@ -447,28 +485,28 @@ export default function StaffManagementTab({ onStaffUpdated }) {
 
                 {/* Name */}
                 <div>
-                  <label className="text-slate-300 font-semibold block mb-1">Nama Karyawan</label>
+                  <label className="text-slate-950 font-black block mb-1">Nama Karyawan</label>
                   <input
                     type="text"
                     required
                     value={newName}
                     onChange={(e) => setNewName(e.target.value)}
                     placeholder="Contoh: Iwan"
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-white text-sm font-semibold focus:outline-none focus:border-emerald-500"
+                    className="w-full bg-slate-50 border-2 border-slate-300 rounded-xl px-3 py-2.5 text-slate-950 text-sm font-black focus:outline-none focus:border-blue-600"
                   />
                 </div>
 
                 {/* Template Shift Info Card (Auto Inherited) */}
                 {currentTemplate && (
-                  <div className="p-3.5 bg-indigo-950/30 border border-indigo-700/40 rounded-2xl space-y-1.5">
-                    <div className="flex items-center space-x-1.5 text-indigo-400 font-bold text-[11px]">
-                      <Sparkles className="w-3.5 h-3.5" />
-                      <span>Template Jam Kerja Otomatis:</span>
+                  <div className="p-3.5 bg-blue-50 border-2 border-blue-200 rounded-2xl space-y-1.5">
+                    <div className="flex items-center space-x-1.5 text-blue-900 font-black text-xs">
+                      <Sparkles className="w-3.5 h-3.5 text-blue-600 stroke-[2.5]" />
+                      <span>Template Jam Kerja Terikat:</span>
                     </div>
-                    <div className="text-[11px] font-mono text-cyan-300 font-medium">
+                    <div className="text-xs font-mono text-blue-950 font-black">
                       {currentTemplate.description}
                     </div>
-                    <div className="text-[10px] text-slate-400">
+                    <div className="text-[11px] text-slate-700 font-bold">
                       ✓ Jam shift terikat otomatis sesuai template divisi. Anda tidak perlu memasukkan jam manual.
                     </div>
                   </div>
@@ -477,11 +515,11 @@ export default function StaffManagementTab({ onStaffUpdated }) {
                 {/* PIN */}
                 <div>
                   <div className="flex justify-between items-center mb-1">
-                    <label className="text-slate-300 font-semibold">PIN Karyawan (4-Digit)</label>
+                    <label className="text-slate-950 font-black">PIN Karyawan (4-Digit)</label>
                     <button
                       type="button"
                       onClick={handleGeneratePin}
-                      className="text-[11px] text-emerald-400 hover:underline flex items-center space-x-1"
+                      className="text-xs text-blue-700 hover:underline flex items-center space-x-1 font-bold"
                     >
                       <Sparkles className="w-3 h-3" />
                       <span>Acak Ulang PIN</span>
@@ -494,15 +532,15 @@ export default function StaffManagementTab({ onStaffUpdated }) {
                     value={newPin}
                     onChange={(e) => setNewPin(e.target.value)}
                     placeholder="Contoh: 4829"
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-emerald-400 font-mono text-base font-bold tracking-widest focus:outline-none focus:border-emerald-500"
+                    className="w-full bg-slate-50 border-2 border-slate-300 rounded-xl px-3 py-2 text-blue-700 font-mono text-lg font-black tracking-widest focus:outline-none focus:border-blue-600 text-center"
                   />
                 </div>
 
                 {/* Initial Status */}
-                <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 flex items-center justify-between">
+                <div className="p-3 bg-slate-50 rounded-xl border-2 border-slate-200 flex items-center justify-between">
                   <div>
-                    <span className="font-semibold text-white block">Status Karyawan</span>
-                    <span className="text-[10px] text-slate-400">
+                    <span className="font-black text-slate-950 block">Status Karyawan</span>
+                    <span className="text-[11px] text-slate-600 font-bold">
                       {newStatus ? 'Aktif (Karyawan langsung bisa login via PIN)' : 'Nonaktif / Suspended'}
                     </span>
                   </div>
@@ -510,23 +548,23 @@ export default function StaffManagementTab({ onStaffUpdated }) {
                     type="checkbox"
                     checked={newStatus}
                     onChange={(e) => setNewStatus(e.target.checked)}
-                    className="w-4 h-4 accent-emerald-500 rounded cursor-pointer"
+                    className="w-5 h-5 accent-blue-600 rounded cursor-pointer"
                   />
                 </div>
               </div>
 
-              <div className="p-4 border-t border-slate-800 bg-slate-950 flex justify-end space-x-2">
+              <div className="p-4 border-t-2 border-slate-200 bg-slate-50 flex justify-end space-x-2">
                 <button
                   type="button"
                   onClick={() => setModalOpen(false)}
-                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold"
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-black transition"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="px-5 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold rounded-xl text-xs shadow-md shadow-emerald-500/20"
+                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-xl text-xs shadow-md shadow-blue-600/30 transition"
                 >
                   {submitting ? 'Menyimpan...' : 'Simpan & Daftarkan Staff'}
                 </button>
@@ -538,65 +576,58 @@ export default function StaffManagementTab({ onStaffUpdated }) {
 
       {/* Modal: Reset Staff PIN */}
       {pinModalStaff && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fade-in">
-          <div className="bg-slate-900 border border-slate-700 rounded-3xl max-w-sm w-full overflow-hidden shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white border-2 border-slate-300 rounded-3xl max-w-sm w-full overflow-hidden shadow-2xl">
             <form onSubmit={handleSaveResetPin}>
-              <div className="p-4 border-b border-slate-800 bg-slate-950 flex items-center justify-between">
+              <div className="p-4 border-b-2 border-slate-200 bg-slate-50 flex items-center justify-between">
                 <div className="flex items-center space-x-2">
-                  <Key className="w-4 h-4 text-amber-400" />
-                  <h3 className="text-sm font-bold text-white">Reset Staff PIN</h3>
+                  <div className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center">
+                    <Key className="w-4 h-4 stroke-[2.5]" />
+                  </div>
+                  <h3 className="text-sm font-black text-slate-950">Reset PIN Staff</h3>
                 </div>
                 <button
                   type="button"
                   onClick={() => setPinModalStaff(null)}
-                  className="p-1 text-slate-400 hover:text-white"
+                  className="p-1.5 text-slate-500 hover:text-slate-950 rounded-lg hover:bg-slate-200 transition"
                 >
                   ✕
                 </button>
               </div>
 
-              <div className="p-4 space-y-3 text-xs">
-                <p className="text-slate-300">
-                  Assign a new 4-digit PIN for <strong>{pinModalStaff.name}</strong> ({pinModalStaff.id}):
+              <div className="p-5 space-y-3 text-xs">
+                <p className="text-slate-800 font-bold">
+                  Masukkan 4 digit PIN baru untuk <strong className="text-slate-950">{pinModalStaff.name}</strong> ({pinModalStaff.id}):
                 </p>
 
-                <div className="flex space-x-2">
+                <div>
                   <input
-                    type="text"
+                    type="password"
                     maxLength={6}
                     required
                     value={resetPinValue}
                     onChange={(e) => setResetPinValue(e.target.value)}
-                    placeholder="New 4-digit PIN"
-                    className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-emerald-400 font-mono font-bold text-sm focus:outline-none focus:border-emerald-500"
+                    placeholder="••••"
+                    className="w-full bg-slate-50 border-2 border-slate-300 rounded-xl px-3 py-2 text-slate-950 font-mono text-xl font-black text-center tracking-widest focus:outline-none focus:border-blue-600"
                     autoFocus
                   />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setResetPinValue(Math.floor(1000 + Math.random() * 9000).toString());
-                    }}
-                    className="px-3 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-semibold text-[11px]"
-                  >
-                    Random
-                  </button>
                 </div>
               </div>
 
-              <div className="p-3 border-t border-slate-800 bg-slate-950 flex justify-end space-x-2">
+              <div className="p-4 border-t-2 border-slate-200 bg-slate-50 flex justify-end space-x-2">
                 <button
                   type="button"
                   onClick={() => setPinModalStaff(null)}
-                  className="px-3 py-1.5 bg-slate-800 text-slate-300 rounded-xl text-xs font-semibold"
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-black transition"
                 >
-                  Cancel
+                  Batal
                 </button>
                 <button
                   type="submit"
                   disabled={pinSubmitting || resetPinValue.length < 4}
-                  className="px-4 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-xl text-xs shadow-md"
+                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-black shadow-md shadow-blue-600/30 transition disabled:opacity-50"
                 >
-                  {pinSubmitting ? 'Updating...' : 'Save New PIN'}
+                  {pinSubmitting ? 'Menyimpan...' : 'Perbarui PIN'}
                 </button>
               </div>
             </form>

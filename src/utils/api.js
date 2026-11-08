@@ -111,6 +111,15 @@ export async function toggleStaffStatus(staffId, isActive) {
   return data;
 }
 
+export async function deleteStaff(staffId) {
+  const res = await fetch(`${API_BASE}/staff/${staffId}`, {
+    method: 'DELETE'
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to delete staff');
+  return data;
+}
+
 export async function getActiveShift(staffId) {
   const res = await fetch(`${API_BASE}/shifts/active/${staffId}`);
   if (!res.ok) throw new Error('Gagal memeriksa shift aktif');
