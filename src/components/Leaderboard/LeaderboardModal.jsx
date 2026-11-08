@@ -95,12 +95,13 @@ function LeaderboardColumn({
   list = [],
   type = 'attendance' // 'attendance' | 'toilet'
 }) {
-  const top1 = list[0];
-  const top2 = list[1];
-  const top3 = list[2];
-  const restList = list.slice(3, 5); // Rank 4 & 5
-
   const isAttendance = type === 'attendance';
+  const activeParticipants = isAttendance ? list.filter(item => item.total_days > 0) : list;
+
+  const top1 = activeParticipants[0];
+  const top2 = activeParticipants[1];
+  const top3 = activeParticipants[2];
+  const restList = activeParticipants.slice(3, 5); // Rank 4 & 5
 
   // Distinct rich luxury gradient backgrounds (different from Zombie zone)
   const columnBg = isAttendance
@@ -157,9 +158,10 @@ function LeaderboardColumn({
           </span>
         </div>
 
-        {list.length === 0 ? (
-          <div className="py-16 text-center text-slate-400 text-xs">
-            Belum ada data tercatat untuk kolom ini.
+        {activeParticipants.length === 0 ? (
+          <div className="py-16 text-center text-slate-400 text-xs font-bold space-y-1">
+            <p className="text-white text-sm font-black">Belum Ada Riwayat Tercatat</p>
+            <p className="text-slate-400">Peringkat akan terisi otomatis saat staf mulai melakukan absensi / inspeksi.</p>
           </div>
         ) : (
           <>

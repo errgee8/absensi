@@ -330,18 +330,19 @@ export async function computeLeaderboard(targetMonthStr) {
   });
 
   // Single Candidate Spotlight: Staf Paling Butuh Semangat / Improvement (Hall of Wake-Up Call)
-  // Kriteria: Hari kerja paling sedikit, telat paling banyak, pulang lebih awal terbanyak
+  // Hanya aktif jika sudah ada data shift yang berjalan di bulan ini
   const attendeesPool = attendanceRanked.filter(a => a.total_days > 0);
-  const pool = attendeesPool.length > 0 ? attendeesPool : attendanceRanked;
+  let needsImprovement = null;
 
-  const sortedImprovement = [...pool].sort((a, b) => {
-    if (b.total_late_seconds !== a.total_late_seconds) return b.total_late_seconds - a.total_late_seconds;
-    if (b.early_checkout_count !== a.early_checkout_count) return b.early_checkout_count - a.early_checkout_count;
-    if (a.total_days !== b.total_days) return a.total_days - b.total_days;
-    return a.score - b.score;
-  });
-
-  const needsImprovement = sortedImprovement[0] || null;
+  if (attendeesPool.length > 0) {
+    const sortedImprovement = [...attendeesPool].sort((a, b) => {
+      if (b.total_late_seconds !== a.total_late_seconds) return b.total_late_seconds - a.total_late_seconds;
+      if (b.early_checkout_count !== a.early_checkout_count) return b.early_checkout_count - a.early_checkout_count;
+      if (a.total_days !== b.total_days) return a.total_days - b.total_days;
+      return a.score - b.score;
+    });
+    needsImprovement = sortedImprovement[0] || null;
+  }
 
   return {
     period: {
