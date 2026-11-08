@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ShieldCheck, Clock, Lock, LogOut, Eye, ShieldAlert, Trophy } from 'lucide-react';
+import { ShieldCheck, Clock, Lock, LogOut, Eye, ShieldAlert } from 'lucide-react';
 import { formatWitaTimeOnly } from '../utils/time';
 
 export default function Navigation({
@@ -8,8 +8,7 @@ export default function Navigation({
   networkStatus,
   adminAuth,
   onOpenAdminAuth,
-  onAdminLogout,
-  onOpenLeaderboard
+  onAdminLogout
 }) {
   const [timeStr, setTimeStr] = useState('');
 
@@ -51,19 +50,6 @@ export default function Navigation({
               <Clock className="w-3.5 h-3.5 text-blue-700 stroke-[2.5]" />
               <span>{timeStr || 'Memuat...'}</span>
             </div>
-
-            {/* Realtime Monthly Leaderboard Trigger */}
-            {onOpenLeaderboard && (
-              <button
-                type="button"
-                onClick={onOpenLeaderboard}
-                className="flex items-center space-x-1.5 px-3 py-1.5 bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-500 hover:from-amber-300 hover:to-yellow-400 text-slate-950 rounded-xl font-black text-xs shadow-md shadow-amber-500/25 border-2 border-amber-300 transition active:scale-95 shrink-0"
-                title="Buka Leaderboard Staf Terajin (Bonus Bulanan)"
-              >
-                <Trophy className="w-3.5 h-3.5 text-slate-950 stroke-[2.5]" />
-                <span className="hidden md:inline">Leaderboard</span>
-              </button>
-            )}
 
             {/* In Manager View: Show Switcher to Return to Kiosk or Lock */}
             {currentView === 'manager' ? (

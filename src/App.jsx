@@ -124,7 +124,6 @@ export default function App() {
         adminAuth={adminAuth}
         onOpenAdminAuth={() => setAdminModalOpen(true)}
         onAdminLogout={handleAdminLogout}
-        onOpenLeaderboard={() => setLeaderboardOpen(true)}
       />
 
       {/* Main Content View */}
