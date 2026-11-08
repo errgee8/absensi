@@ -37,13 +37,15 @@ export default function KioskActionScreen({
     ? (availableSchedules.find((s) => s.start_time === activeShift.scheduled_start)?.name || 'Shift Aktif')
     : (selectedShift?.name || 'Shift 1');
 
+  const isManagement = staff?.division === 'Management' || (selectedShift?.start_time === '00:00' && selectedShift?.end_time === '23:59');
+
   // Break policy rules
   const breakCutoffTime = staff?.breakCutoffTime || staff?.max_break_end || '20:00';
   const breakStartTime = staff?.break_start_time || null;
   const breakAllowed = staff?.breakAllowed ?? false;
-  const shiftAllowsBreak = staff?.allows_break !== 0 && staff?.allows_break !== false;
+  const shiftAllowsBreak = !isManagement && staff?.allows_break !== 0 && staff?.allows_break !== false;
   const isWithin2HoursOfEnd = staff?.isWithin2HoursOfEnd ?? false;
-  const canTakeBreak = isCheckedIn && !isOnBreak && !hasTakenBreak && breakAllowed;
+  const canTakeBreak = !isManagement && isCheckedIn && !isOnBreak && !hasTakenBreak && breakAllowed;
 
   // Live timer for active shift
   useEffect(() => {
@@ -120,7 +122,7 @@ export default function KioskActionScreen({
           <div className="flex flex-wrap items-center gap-2 mt-2">
             <span className="text-xs text-blue-950 font-black bg-blue-100 border-2 border-blue-300 px-3 py-1 rounded-xl flex items-center space-x-1.5 shadow-sm">
               <span className="w-2.5 h-2.5 rounded-full bg-blue-600 animate-pulse"></span>
-              <span>{currentShiftName} ({shiftStart} - {shiftEnd} WITA)</span>
+              <span>{isManagement ? 'Shift Fleksibel (Management)' : `${currentShiftName} (${shiftStart} - ${shiftEnd} WITA)`}</span>
             </span>
           </div>
         </div>
@@ -256,7 +258,13 @@ export default function KioskActionScreen({
             /* STATE 3: HAVEN'T CHECKED IN -> ONLY 1 BUTTON: CHECK IN */
             <div className="space-y-3">
               <button
-                onClick={() => setConfirmModalOpen(true)}
+                onClick={() => {
+                  if (isManagement) {
+                    onTriggerCamera('checkin', selectedShift);
+                  } else {
+                    setConfirmModalOpen(true);
+                  }
+                }}
                 className="w-full py-5 px-6 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-lg rounded-2xl shadow-xl shadow-emerald-600/35 active:scale-[0.98] transition flex items-center justify-center space-x-3"
               >
                 <Camera className="w-6 h-6 stroke-[2.5]" />
@@ -277,9 +285,11 @@ export default function KioskActionScreen({
         <div className="mt-6 pt-4 border-t-2 border-slate-200 text-xs text-slate-900 flex flex-col sm:flex-row sm:items-center justify-between gap-1 font-black">
           <span className="flex items-center space-x-1.5">
             <span className="inline-block w-2.5 h-2.5 rounded-full bg-blue-600"></span>
-            <span>Jadwal: <strong className="text-slate-950 font-black">{currentShiftName} ({shiftStart} - {shiftEnd})</strong></span>
+            <span>Jadwal: <strong className="text-slate-950 font-black">{isManagement ? 'Fleksibel Penuh (Management)' : `${currentShiftName} (${shiftStart} - ${shiftEnd})`}</strong></span>
           </span>
-          <span className="text-emerald-700 font-black">Toleransi Grace Period: 10 Menit</span>
+          <span className={isManagement ? "text-blue-700 font-black" : "text-emerald-700 font-black"}>
+            {isManagement ? "Jam Kerja Fleksibel" : "Toleransi Grace Period: 10 Menit"}
+          </span>
         </div>
       </div>
 

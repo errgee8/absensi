@@ -20,12 +20,18 @@ const GRACE_PERIOD_MINUTES = 10;
 /**
  * Evaluates flags for a check-in event including 10-minute grace period
  */
-export function evaluateCheckinFlags({ clientIp, lat, lng, distance, wifiPass, geofenceRadius, scheduledStart, checkinTime }) {
+export function evaluateCheckinFlags({ clientIp, lat, lng, distance, wifiPass, geofenceRadius, scheduledStart, checkinTime, division }) {
   const flags = [];
 
   // Geofence check (Wi-Fi lock has been removed)
   if (distance !== null && geofenceRadius && distance > geofenceRadius) {
     flags.push(FLAG_TYPES.OUTSIDE_GEOFENCE);
+  }
+
+  // Full Flexible shifts (Management or 00:00 start): No late flag evaluated
+  const isManagement = division === 'Management' || scheduledStart === '00:00' || scheduledStart === 'FLEXIBLE';
+  if (isManagement) {
+    return Array.from(new Set(flags));
   }
 
   // 10-Minute Grace Period check for shift check-in (WITA timezone UTC+8)
@@ -112,7 +118,8 @@ export function evaluateCheckoutFlags({
   distance,
   wifiPass,
   geofenceRadius,
-  existingFlags = []
+  existingFlags = [],
+  division
 }) {
   const flags = new Set(existingFlags);
 
@@ -121,8 +128,8 @@ export function evaluateCheckoutFlags({
     flags.add(FLAG_TYPES.OUTSIDE_GEOFENCE);
   }
 
-  // Only check early checkout if NOT a flexible checkout shift
-  if (!isFlexibleCheckout) {
+  // Only check early checkout if NOT a flexible checkout shift and NOT Management
+  if (!isFlexibleCheckout && division !== 'Management') {
     const start = new Date(checkinTime).getTime();
     const end = new Date(checkoutTime).getTime();
     const diffHours = (end - start) / (1000 * 60 * 60);

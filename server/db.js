@@ -184,6 +184,9 @@ export const initShiftSchedules = (force = false) => {
     { venue: 'JP Karaoke', division: 'Storage Staff', shift_number: 2, name: 'Shift 2 (Middle)', start_time: '13:00', end_time: '22:00', is_flexible_checkout: 0, allows_break: 0, max_break_end: null },
     { venue: 'JP Karaoke', division: 'Storage Staff', shift_number: 3, name: 'Shift 3 (Malam)', start_time: '18:30', end_time: '03:30', is_flexible_checkout: 1, allows_break: 0, max_break_end: null },
 
+    // 4. Management (Full Flexible - JP Karaoke)
+    { venue: 'JP Karaoke', division: 'Management', shift_number: 1, name: 'Fleksibel (Management)', start_time: '00:00', end_time: '23:59', is_flexible_checkout: 1, allows_break: 0, max_break_end: null },
+
     // --- LuckyCat (Allows 1 hr break, max break end 16:00 for Shift 1, 01:00 for Shift 2) ---
     // 1. Bar, Cashier, and Server
     { venue: 'LuckyCat', division: 'Bar, Cashier, and Server', shift_number: 1, name: 'Shift 1', start_time: '10:00', end_time: '19:00', is_flexible_checkout: 0, allows_break: 1, max_break_end: '16:00' },
@@ -197,7 +200,10 @@ export const initShiftSchedules = (force = false) => {
     // Middle 1: 12:00 - 22:00
     { venue: 'LuckyCat', division: 'Kitchen', shift_number: 3, name: 'Middle 1', start_time: '12:00', end_time: '22:00', is_flexible_checkout: 0, allows_break: 1, max_break_end: '18:00' },
     // Middle 2: 14:00 - 00:00
-    { venue: 'LuckyCat', division: 'Kitchen', shift_number: 4, name: 'Middle 2', start_time: '14:00', end_time: '00:00', is_flexible_checkout: 0, allows_break: 1, max_break_end: '20:00' }
+    { venue: 'LuckyCat', division: 'Kitchen', shift_number: 4, name: 'Middle 2', start_time: '14:00', end_time: '00:00', is_flexible_checkout: 0, allows_break: 1, max_break_end: '20:00' },
+
+    // 3. Management (Full Flexible - LuckyCat)
+    { venue: 'LuckyCat', division: 'Management', shift_number: 1, name: 'Fleksibel (Management)', start_time: '00:00', end_time: '23:59', is_flexible_checkout: 1, allows_break: 0, max_break_end: null }
   ];
 
   const insert = db.prepare(`

@@ -36,7 +36,8 @@ export default function ManagerDashboard({ venueSettings, refreshSettings }) {
     'Cleaning Service',
     'Storage Staff',
     'Bar, Cashier, and Server',
-    'Kitchen'
+    'Kitchen',
+    'Management'
   ];
 
   const loadData = async () => {

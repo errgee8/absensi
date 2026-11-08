@@ -914,7 +914,8 @@ router.post('/checkin', async (req, res) => {
     wifiPass: wifiValidation.isMatch,
     geofenceRadius,
     scheduledStart,
-    checkinTime
+    checkinTime,
+    division: staff.division
   });
 
   // Sync to Supabase Cloud if connected
@@ -1322,14 +1323,14 @@ router.post('/checkout', async (req, res) => {
     existingFlags = [];
   }
 
-  let isFlexible = 0;
+  let isFlexible = shift.division === 'Management' ? 1 : 0;
   try {
     const schedule = db.prepare(`
       SELECT is_flexible_checkout FROM shift_schedules 
       WHERE venue = ? AND division = ? AND start_time = ?
       LIMIT 1
     `).get(shift.venue, shift.division, shift.scheduled_start);
-    isFlexible = schedule?.is_flexible_checkout || (shift.scheduled_end === '03:00' ? 1 : 0);
+    isFlexible = schedule?.is_flexible_checkout || (shift.scheduled_end === '03:00' ? 1 : isFlexible);
   } catch {}
 
   const finalFlags = evaluateCheckoutFlags({
@@ -1343,7 +1344,8 @@ router.post('/checkout', async (req, res) => {
     distance,
     wifiPass: wifiValidation.isMatch,
     geofenceRadius,
-    existingFlags
+    existingFlags,
+    division: shift.division
   });
 
   const photoUrl = await savePhoto(photoBase64, `out_${shift.staff_id}`);

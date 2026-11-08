@@ -123,6 +123,17 @@ export function detectShiftSchedule(schedules, checkinTime = new Date()) {
     };
   }
 
+  // Management / Full Flexible shift detection
+  const mgmtSched = schedules.find(s => s.division === 'Management' || (s.start_time === '00:00' && s.end_time === '23:59'));
+  if (mgmtSched) {
+    return {
+      ...mgmtSched,
+      autoDetected: true,
+      diffMinutes: 0,
+      max_break_end: null
+    };
+  }
+
   const curTimeStr = getWitaTimeString(checkinTime);
   const curM = toMinutes(curTimeStr);
 

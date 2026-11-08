@@ -141,7 +141,9 @@ export default function ShiftTable({ shifts = [], onInspectPhoto }) {
 
                   {/* Break Status / Duration */}
                   <td className="py-3 px-3 whitespace-nowrap">
-                    {shift.staff_venue === 'JP Karaoke' ? (
+                    {shift.staff_division === 'Management' ? (
+                      <span className="text-[10px] text-blue-800 font-mono font-black">Fleksibel (Mgmt)</span>
+                    ) : shift.staff_venue === 'JP Karaoke' ? (
                       <span className="text-[10px] text-slate-500 font-mono font-bold">No Break (JP)</span>
                     ) : shift.break_status === 'ON_BREAK' ? (
                       <span className="px-2 py-0.5 rounded-lg text-[10px] font-black bg-sky-100 text-sky-950 border border-sky-300 animate-pulse">

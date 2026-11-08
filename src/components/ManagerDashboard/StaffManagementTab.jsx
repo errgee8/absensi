@@ -62,6 +62,24 @@ export default function StaffManagementTab({ onStaffUpdated }) {
         start_time: '09:00',
         end_time: '19:00',
         standard_hours: 9
+      },
+      {
+        role: 'Assistant Manager',
+        division: 'Management',
+        label: 'Assistant Manager (Management)',
+        description: 'Shift Fleksibel (Tanpa jam shift kaku, checkout bebas, tanpa batas istirahat)',
+        start_time: '00:00',
+        end_time: '23:59',
+        standard_hours: 8
+      },
+      {
+        role: 'Management',
+        division: 'Management',
+        label: 'Management (General)',
+        description: 'Shift Fleksibel (Full Bebas & Tanpa Anomali Jam Masuk/Pulang)',
+        start_time: '00:00',
+        end_time: '23:59',
+        standard_hours: 8
       }
     ],
     'JP Karaoke': [
@@ -100,6 +118,24 @@ export default function StaffManagementTab({ onStaffUpdated }) {
         start_time: '10:00',
         end_time: '19:00',
         standard_hours: 9
+      },
+      {
+        role: 'Assistant Manager',
+        division: 'Management',
+        label: 'Assistant Manager (Management)',
+        description: 'Shift Fleksibel (Tanpa jam shift kaku, checkout bebas, tanpa batas istirahat)',
+        start_time: '00:00',
+        end_time: '23:59',
+        standard_hours: 8
+      },
+      {
+        role: 'Management',
+        division: 'Management',
+        label: 'Management (General)',
+        description: 'Shift Fleksibel (Full Bebas & Tanpa Anomali Jam Masuk/Pulang)',
+        start_time: '00:00',
+        end_time: '23:59',
+        standard_hours: 8
       }
     ]
   };

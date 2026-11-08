@@ -38,12 +38,14 @@ export default function ShiftSchedulesTab() {
     'LuckyCat': [
       'Bar, Cashier, and Server',
       'Kitchen',
+      'Management',
       'Lainnya (Ketik Manual)'
     ],
     'JP Karaoke': [
       'Server and Cashier',
       'Cleaning Service',
       'Storage Staff',
+      'Management',
       'Lainnya (Ketik Manual)'
     ]
   };
