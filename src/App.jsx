@@ -123,7 +123,7 @@ export default function App() {
       </main>
 
       {/* Footer Branding */}
-      <footer className="no-print border-t-2 border-slate-200 py-4 text-center text-xs text-slate-700 bg-white font-bold">
+      <footer className="no-print border-t-2 border-slate-200 py-4 text-center text-xs text-slate-900 bg-white font-black">
         <p>
           Staff Portal by Ryan Gerrit • Lucky Cat &amp; JP Executive Karaoke
         </p>

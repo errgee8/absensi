@@ -44,7 +44,7 @@ export default function KioskLoginScreen({
         <p className="text-sm sm:text-base text-blue-700 font-extrabold mt-1">
           for : Lucky Cat and JPE Karaoke
         </p>
-        <p className="text-xs text-slate-700 font-bold mt-1">
+        <p className="text-xs text-slate-900 font-extrabold mt-1">
           One Gate System: Absensi Kerja &amp; Checklist QR Toilet
         </p>
       </div>
@@ -74,7 +74,7 @@ export default function KioskLoginScreen({
           </div>
 
           <div className="h-4">
-            <span className="text-xs text-slate-700 font-mono font-bold tracking-widest">
+            <span className="text-xs text-slate-900 font-mono font-black tracking-widest">
               {pin ? '●'.repeat(pin.length) : 'Ketik 4 digit PIN Anda di tombol bawah'}
             </span>
           </div>

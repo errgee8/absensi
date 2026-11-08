@@ -61,7 +61,7 @@ export default function KioskPortalScreen({
             <Clock className="w-6 h-6 text-amber-700 shrink-0" />
           )}
           <div>
-            <span className="text-[11px] font-black uppercase tracking-wider block opacity-90">
+            <span className="text-[11px] font-black uppercase tracking-wider block text-slate-950">
               Status Kehadiran Hari Ini:
             </span>
             <span className="text-sm sm:text-base font-black">
@@ -141,7 +141,7 @@ export default function KioskPortalScreen({
       </div>
 
       <div className="text-center pt-2">
-        <p className="text-xs text-slate-600 font-bold">
+        <p className="text-xs text-slate-950 font-black">
           Staff Portal • Lucky Cat &amp; JPE Karaoke by Ryan Gerrit
         </p>
       </div>

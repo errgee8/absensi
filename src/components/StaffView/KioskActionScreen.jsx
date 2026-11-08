@@ -143,9 +143,9 @@ export default function KioskActionScreen({
         {/* Active Shift Details Box if already checked in and not on break */}
         {isCheckedIn && !isOnBreak && (
           <div className="bg-slate-50 border-2 border-slate-200 rounded-2xl p-4 mb-5">
-            <div className="flex items-center justify-between text-xs text-slate-800 mb-2 font-extrabold">
+            <div className="flex items-center justify-between text-xs text-slate-900 mb-2 font-black">
               <span className="flex items-center space-x-1.5">
-                <Clock className="w-4 h-4 text-slate-600" />
+                <Clock className="w-4 h-4 text-slate-700 stroke-[2.2]" />
                 <span>Masuk Pukul:</span>
               </span>
               <span className="font-mono font-black text-slate-950 text-sm">
@@ -154,7 +154,7 @@ export default function KioskActionScreen({
             </div>
 
             <div className="text-center py-2.5 bg-white rounded-xl border border-slate-300 shadow-sm">
-              <span className="text-[11px] text-slate-700 uppercase font-black tracking-wider block mb-0.5">
+              <span className="text-[11px] text-slate-900 uppercase font-black tracking-wider block mb-0.5">
                 Durasi Bertugas
               </span>
               <span className="text-3xl font-black font-mono text-blue-700">
@@ -206,7 +206,7 @@ export default function KioskActionScreen({
                     <span>AMBIL FOTO & CHECK-OUT</span>
                   </button>
 
-                  <p className="text-xs text-slate-700 text-center font-bold">
+                  <p className="text-xs text-slate-950 text-center font-black">
                     Istirahat 1x per shift (maks 1 jam). Jendela istirahat: <strong>{breakStartTime ? `${breakStartTime} – ` : ''}{breakCutoffTime} WITA</strong> (maks 2 jam sebelum shift usai).
                   </p>
                 </div>
@@ -274,12 +274,12 @@ export default function KioskActionScreen({
         </div>
 
         {/* Shift details footer */}
-        <div className="mt-6 pt-4 border-t-2 border-slate-200 text-xs text-slate-700 flex flex-col sm:flex-row sm:items-center justify-between gap-1 font-bold">
+        <div className="mt-6 pt-4 border-t-2 border-slate-200 text-xs text-slate-900 flex flex-col sm:flex-row sm:items-center justify-between gap-1 font-black">
           <span className="flex items-center space-x-1.5">
             <span className="inline-block w-2.5 h-2.5 rounded-full bg-blue-600"></span>
-            <span>Jadwal: <strong className="text-slate-950">{currentShiftName} ({shiftStart} - {shiftEnd})</strong></span>
+            <span>Jadwal: <strong className="text-slate-950 font-black">{currentShiftName} ({shiftStart} - {shiftEnd})</strong></span>
           </span>
-          <span className="text-emerald-700 font-extrabold">Toleransi Grace Period: 10 Menit</span>
+          <span className="text-emerald-700 font-black">Toleransi Grace Period: 10 Menit</span>
         </div>
       </div>
 
