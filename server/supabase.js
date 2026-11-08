@@ -63,12 +63,53 @@ export async function uploadPhotoToSupabase(base64Data, filenamePrefix = 'selfie
   return publicData.publicUrl;
 }
 
+const LEGACY_ALIAS_MAP = {
+  'JP-CSH-01': 'JP-CAS-01', // Ica
+  'JP-CSH-02': 'JP-CAS-02', // Adis
+  'JP-SRV-01': 'JP-SER-03', // Rojes
+  'JP-SRV-02': 'JP-SER-04', // Alex
+  'JP-SRV-03': 'JP-SER-05', // Dio
+  'JP-SRV-04': 'JP-SER-06', // Made
+  'JP-SRV-05': 'JP-SER-07', // Dein
+  'JP-CLN-01': 'JP-CLE-08', // Yohan
+  'JP-CLN-02': 'JP-CLE-09', // Emil
+  'JP-CLN-03': 'JP-CLE-10', // Anang
+  'JP-STR-01': 'JP-STO-11', // Aris
+  'JP-STR-02': 'JP-STO-12', // Galang
+  'JP-STR-03': 'JP-STO-13', // Febry
+  'LC-SRV-01': 'LC-SER-01', // Roni
+  'LC-SRV-02': 'LC-SER-02', // Dika
+  'LC-SRV-03': 'LC-SER-03', // Haslam
+  'LC-SRV-04': 'LC-SER-04', // Ferin
+  'LC-SRV-05': 'LC-SER-05', // Oky
+  'LC-SRV-06': 'LC-SER-06', // Martin
+  'LC-SRV-07': 'LC-SER-07', // Andre
+  'LC-SRV-08': 'LC-SER-08', // Fontana
+  'LC-CSH-01': 'LC-CAS-09', // Santi
+  'LC-CSH-02': 'LC-CAS-10', // Manda
+  'LC-CSH-03': 'LC-CAS-11', // Widia
+  'LC-BAR-01': 'LC-BAR-12', // Gerry
+  'LC-BAR-02': 'LC-BAR-13', // Mada
+  'LC-BAR-03': 'LC-BAR-14', // Raymond
+  'LC-BAR-04': 'LC-BAR-15', // Jackson
+  'LC-KIT-01': 'LC-KIT-16', // Anto
+  'LC-KIT-02': 'LC-KIT-17', // Nurjanah
+  'LC-KIT-03': 'LC-KIT-18', // Martha
+  'LC-KIT-04': 'LC-KIT-19', // Edo
+  'LC-KIT-05': 'LC-KIT-20', // Ulul
+  'LC-KIT-06': 'LC-KIT-21'  // Harun
+};
+
 /**
  * Safely find a staff member in Supabase without triggering 22P02 UUID syntax error
  */
 export async function findStaffInSupabase(identifier) {
   if (!supabase || !identifier) return null;
-  const str = String(identifier).trim();
+  let str = String(identifier).trim();
+  if (LEGACY_ALIAS_MAP[str]) {
+    str = LEGACY_ALIAS_MAP[str];
+  }
+
   const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
 
   let query = supabase.from('staff').select('*');

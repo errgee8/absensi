@@ -226,51 +226,44 @@ export const seedExactStaffRoster = (force = false) => {
   }
 
   const allStaff = [
-    // --- JP Karaoke Staff (13 staff) ---
-    // Cashier
-    { id: 'JP-CSH-01', name: 'Ica', venue: 'JP Karaoke', division: 'Server and Cashier', role: 'Cashier', department: 'Cashier', pin: '6443', shift_start: '18:30', shift_end: '03:00', standard_hours: 8.5 },
-    { id: 'JP-CSH-02', name: 'Adis', venue: 'JP Karaoke', division: 'Server and Cashier', role: 'Cashier', department: 'Cashier', pin: '3447', shift_start: '13:00', shift_end: '22:00', standard_hours: 9.0 },
-    // Server
-    { id: 'JP-SRV-01', name: 'Rojes', venue: 'JP Karaoke', division: 'Server and Cashier', role: 'Server', department: 'Service', pin: '4108', shift_start: '18:30', shift_end: '03:00', standard_hours: 8.5 },
-    { id: 'JP-SRV-02', name: 'Alex', venue: 'JP Karaoke', division: 'Server and Cashier', role: 'Server', department: 'Service', pin: '5144', shift_start: '13:00', shift_end: '22:00', standard_hours: 9.0 },
-    { id: 'JP-SRV-03', name: 'Dio', venue: 'JP Karaoke', division: 'Server and Cashier', role: 'Server', department: 'Service', pin: '8069', shift_start: '13:00', shift_end: '22:00', standard_hours: 9.0 },
-    { id: 'JP-SRV-04', name: 'Made', venue: 'JP Karaoke', division: 'Server and Cashier', role: 'Server', department: 'Service', pin: '2937', shift_start: '13:00', shift_end: '22:00', standard_hours: 9.0 },
-    { id: 'JP-SRV-05', name: 'Dein', venue: 'JP Karaoke', division: 'Server and Cashier', role: 'Server', department: 'Service', pin: '3763', shift_start: '18:30', shift_end: '03:00', standard_hours: 8.5 },
-    // Cleaning Service
-    { id: 'JP-CLN-01', name: 'Yohan', venue: 'JP Karaoke', division: 'Cleaning Service', role: 'Cleaning Service', department: 'Housekeeping', pin: '9267', shift_start: '10:00', shift_end: '19:00', standard_hours: 9.0 },
-    { id: 'JP-CLN-02', name: 'Emil', venue: 'JP Karaoke', division: 'Cleaning Service', role: 'Cleaning Service', department: 'Housekeeping', pin: '1845', shift_start: '18:30', shift_end: '03:00', standard_hours: 8.5 },
-    { id: 'JP-CLN-03', name: 'Anang', venue: 'JP Karaoke', division: 'Cleaning Service', role: 'Cleaning Service', department: 'Housekeeping', pin: '2666', shift_start: '10:00', shift_end: '19:00', standard_hours: 9.0 },
-    // Storage
-    { id: 'JP-STR-01', name: 'Aris', venue: 'JP Karaoke', division: 'Storage Staff', role: 'Storage Staff', department: 'Logistics', pin: '9315', shift_start: '10:00', shift_end: '19:00', standard_hours: 9.0 },
-    { id: 'JP-STR-02', name: 'Galang', venue: 'JP Karaoke', division: 'Storage Staff', role: 'Storage Staff', department: 'Logistics', pin: '5449', shift_start: '13:00', shift_end: '22:00', standard_hours: 9.0 },
-    { id: 'JP-STR-03', name: 'Febry', venue: 'JP Karaoke', division: 'Storage Staff', role: 'Storage Staff', department: 'Logistics', pin: '4471', shift_start: '18:30', shift_end: '03:30', standard_hours: 9.0 },
+    // --- JP Karaoke Staff (14 staff) ---
+    { id: 'JP-CAS-01', name: 'Ica', venue: 'JP Karaoke', division: 'Server and Cashier', role: 'Cashier', department: 'Cashier', pin: '6443', shift_start: '18:30', shift_end: '03:00', standard_hours: 8.5 },
+    { id: 'JP-CAS-02', name: 'Adis', venue: 'JP Karaoke', division: 'Server and Cashier', role: 'Cashier', department: 'Cashier', pin: '3447', shift_start: '13:00', shift_end: '22:00', standard_hours: 9.0 },
+    { id: 'JP-SER-03', name: 'Rojes', venue: 'JP Karaoke', division: 'Server and Cashier', role: 'Server', department: 'Service', pin: '4108', shift_start: '18:30', shift_end: '03:00', standard_hours: 8.5 },
+    { id: 'JP-SER-04', name: 'Alex', venue: 'JP Karaoke', division: 'Server and Cashier', role: 'Server', department: 'Service', pin: '5144', shift_start: '13:00', shift_end: '22:00', standard_hours: 9.0 },
+    { id: 'JP-SER-05', name: 'Dio', venue: 'JP Karaoke', division: 'Server and Cashier', role: 'Server', department: 'Service', pin: '8069', shift_start: '13:00', shift_end: '22:00', standard_hours: 9.0 },
+    { id: 'JP-SER-06', name: 'Made', venue: 'JP Karaoke', division: 'Server and Cashier', role: 'Server', department: 'Service', pin: '2937', shift_start: '13:00', shift_end: '22:00', standard_hours: 9.0 },
+    { id: 'JP-SER-07', name: 'Dein', venue: 'JP Karaoke', division: 'Server and Cashier', role: 'Server', department: 'Service', pin: '3763', shift_start: '18:30', shift_end: '03:00', standard_hours: 8.5 },
+    { id: 'JP-SER-8978737', name: 'Hendy', venue: 'JP Karaoke', division: 'Server and Cashier', role: 'Server', department: 'Server and Cashier', pin: '2687', shift_start: '13:00', shift_end: '22:00', standard_hours: 8.5 },
+    { id: 'JP-CLE-08', name: 'Yohan', venue: 'JP Karaoke', division: 'Cleaning Service', role: 'Cleaning Service', department: 'Housekeeping', pin: '9267', shift_start: '10:00', shift_end: '19:00', standard_hours: 9.0 },
+    { id: 'JP-CLE-09', name: 'Emil', venue: 'JP Karaoke', division: 'Cleaning Service', role: 'Cleaning Service', department: 'Housekeeping', pin: '2005', shift_start: '18:30', shift_end: '03:00', standard_hours: 8.5 },
+    { id: 'JP-CLE-10', name: 'Anang', venue: 'JP Karaoke', division: 'Cleaning Service', role: 'Cleaning Service', department: 'Housekeeping', pin: '2666', shift_start: '10:00', shift_end: '19:00', standard_hours: 9.0 },
+    { id: 'JP-STO-11', name: 'Aris', venue: 'JP Karaoke', division: 'Storage Staff', role: 'Storage Staff', department: 'Logistics', pin: '9315', shift_start: '10:00', shift_end: '19:00', standard_hours: 9.0 },
+    { id: 'JP-STO-12', name: 'Galang', venue: 'JP Karaoke', division: 'Storage Staff', role: 'Storage Staff', department: 'Logistics', pin: '5449', shift_start: '13:00', shift_end: '22:00', standard_hours: 9.0 },
+    { id: 'JP-STO-13', name: 'Febry', venue: 'JP Karaoke', division: 'Storage Staff', role: 'Storage Staff', department: 'Logistics', pin: '4471', shift_start: '18:30', shift_end: '03:30', standard_hours: 9.0 },
 
     // --- LuckyCat (LC) Staff (21 staff) ---
-    // Server
-    { id: 'LC-SRV-01', name: 'Roni', venue: 'LuckyCat', division: 'Bar, Cashier, and Server', role: 'Server', department: 'Service', pin: '6177', shift_start: '10:00', shift_end: '19:00', standard_hours: 9.0 },
-    { id: 'LC-SRV-02', name: 'Dika', venue: 'LuckyCat', division: 'Bar, Cashier, and Server', role: 'Server', department: 'Service', pin: '8401', shift_start: '10:00', shift_end: '19:00', standard_hours: 9.0 },
-    { id: 'LC-SRV-03', name: 'Haslam', venue: 'LuckyCat', division: 'Bar, Cashier, and Server', role: 'Server', department: 'Service', pin: '3858', shift_start: '18:30', shift_end: '03:30', standard_hours: 9.0 },
-    { id: 'LC-SRV-04', name: 'Ferin', venue: 'LuckyCat', division: 'Bar, Cashier, and Server', role: 'Server', department: 'Service', pin: '8843', shift_start: '18:30', shift_end: '03:30', standard_hours: 9.0 },
-    { id: 'LC-SRV-05', name: 'Oky', venue: 'LuckyCat', division: 'Bar, Cashier, and Server', role: 'Server', department: 'Service', pin: '2740', shift_start: '10:00', shift_end: '19:00', standard_hours: 9.0 },
-    { id: 'LC-SRV-06', name: 'Martin', venue: 'LuckyCat', division: 'Bar, Cashier, and Server', role: 'Server', department: 'Service', pin: '7967', shift_start: '18:30', shift_end: '03:30', standard_hours: 9.0 },
-    { id: 'LC-SRV-07', name: 'Andre', venue: 'LuckyCat', division: 'Bar, Cashier, and Server', role: 'Server', department: 'Service', pin: '3835', shift_start: '10:00', shift_end: '19:00', standard_hours: 9.0 },
-    { id: 'LC-SRV-08', name: 'Fontana', venue: 'LuckyCat', division: 'Bar, Cashier, and Server', role: 'Server', department: 'Service', pin: '2681', shift_start: '18:30', shift_end: '03:30', standard_hours: 9.0 },
-    // Cashier
-    { id: 'LC-CSH-01', name: 'Santi', venue: 'LuckyCat', division: 'Bar, Cashier, and Server', role: 'Cashier', department: 'Cashier', pin: '8869', shift_start: '10:00', shift_end: '19:00', standard_hours: 9.0 },
-    { id: 'LC-CSH-02', name: 'Manda', venue: 'LuckyCat', division: 'Bar, Cashier, and Server', role: 'Cashier', department: 'Cashier', pin: '4485', shift_start: '18:30', shift_end: '03:30', standard_hours: 9.0 },
-    { id: 'LC-CSH-03', name: 'Widia', venue: 'LuckyCat', division: 'Bar, Cashier, and Server', role: 'Cashier', department: 'Cashier', pin: '7514', shift_start: '10:00', shift_end: '19:00', standard_hours: 9.0 },
-    // Bar
-    { id: 'LC-BAR-01', name: 'Gerry', venue: 'LuckyCat', division: 'Bar, Cashier, and Server', role: 'Bar Staff', department: 'Bar', pin: '3714', shift_start: '10:00', shift_end: '19:00', standard_hours: 9.0 },
-    { id: 'LC-BAR-02', name: 'Mada', venue: 'LuckyCat', division: 'Bar, Cashier, and Server', role: 'Bar Staff', department: 'Bar', pin: '7297', shift_start: '18:30', shift_end: '03:30', standard_hours: 9.0 },
-    { id: 'LC-BAR-03', name: 'Raymond', venue: 'LuckyCat', division: 'Bar, Cashier, and Server', role: 'Bar Staff', department: 'Bar', pin: '5484', shift_start: '10:00', shift_end: '19:00', standard_hours: 9.0 },
-    { id: 'LC-BAR-04', name: 'Jackson', venue: 'LuckyCat', division: 'Bar, Cashier, and Server', role: 'Bar Staff', department: 'Bar', pin: '6834', shift_start: '18:30', shift_end: '03:30', standard_hours: 9.0 },
-    // Kitchen
-    { id: 'LC-KIT-01', name: 'Anto', venue: 'LuckyCat', division: 'Kitchen', role: 'Kitchen Staff', department: 'Kitchen', pin: '7205', shift_start: '09:00', shift_end: '19:00', standard_hours: 10.0 },
-    { id: 'LC-KIT-02', name: 'Nurjanah', venue: 'LuckyCat', division: 'Kitchen', role: 'Kitchen Staff', department: 'Kitchen', pin: '4290', shift_start: '14:00', shift_end: '00:00', standard_hours: 10.0 },
-    { id: 'LC-KIT-03', name: 'Martha', venue: 'LuckyCat', division: 'Kitchen', role: 'Kitchen Staff', department: 'Kitchen', pin: '7672', shift_start: '18:00', shift_end: '03:00', standard_hours: 9.0 },
-    { id: 'LC-KIT-04', name: 'Edo', venue: 'LuckyCat', division: 'Kitchen', role: 'Kitchen Staff', department: 'Kitchen', pin: '4421', shift_start: '12:00', shift_end: '22:00', standard_hours: 10.0 },
-    { id: 'LC-KIT-05', name: 'Ulul', venue: 'LuckyCat', division: 'Kitchen', role: 'Kitchen Staff', department: 'Kitchen', pin: '9466', shift_start: '09:00', shift_end: '19:00', standard_hours: 10.0 },
-    { id: 'LC-KIT-06', name: 'Harun', venue: 'LuckyCat', division: 'Kitchen', role: 'Kitchen Staff', department: 'Kitchen', pin: '8867', shift_start: '18:00', shift_end: '03:00', standard_hours: 9.0 }
+    { id: 'LC-SER-01', name: 'Roni', venue: 'LuckyCat', division: 'Bar, Cashier, and Server', role: 'Server', department: 'Service', pin: '1212', shift_start: '10:00', shift_end: '19:00', standard_hours: 9.0 },
+    { id: 'LC-SER-02', name: 'Dika', venue: 'LuckyCat', division: 'Bar, Cashier, and Server', role: 'Server', department: 'Service', pin: '2011', shift_start: '10:00', shift_end: '19:00', standard_hours: 9.0 },
+    { id: 'LC-SER-03', name: 'Haslam', venue: 'LuckyCat', division: 'Bar, Cashier, and Server', role: 'Server', department: 'Service', pin: '3858', shift_start: '18:30', shift_end: '03:30', standard_hours: 9.0 },
+    { id: 'LC-SER-04', name: 'Ferin', venue: 'LuckyCat', division: 'Bar, Cashier, and Server', role: 'Server', department: 'Service', pin: '4567', shift_start: '18:30', shift_end: '03:30', standard_hours: 9.0 },
+    { id: 'LC-SER-05', name: 'Oky', venue: 'LuckyCat', division: 'Bar, Cashier, and Server', role: 'Server', department: 'Service', pin: '2740', shift_start: '10:00', shift_end: '19:00', standard_hours: 9.0 },
+    { id: 'LC-SER-06', name: 'Martin', venue: 'LuckyCat', division: 'Bar, Cashier, and Server', role: 'Server', department: 'Service', pin: '7967', shift_start: '18:30', shift_end: '03:30', standard_hours: 9.0 },
+    { id: 'LC-SER-07', name: 'Andre', venue: 'LuckyCat', division: 'Bar, Cashier, and Server', role: 'Server', department: 'Service', pin: '2589', shift_start: '10:00', shift_end: '19:00', standard_hours: 9.0 },
+    { id: 'LC-SER-08', name: 'Fontana', venue: 'LuckyCat', division: 'Bar, Cashier, and Server', role: 'Server', department: 'Service', pin: '3451', shift_start: '18:30', shift_end: '03:30', standard_hours: 9.0 },
+    { id: 'LC-CAS-09', name: 'Santi', venue: 'LuckyCat', division: 'Bar, Cashier, and Server', role: 'Cashier', department: 'Cashier', pin: '8869', shift_start: '10:00', shift_end: '19:00', standard_hours: 9.0 },
+    { id: 'LC-CAS-10', name: 'Manda', venue: 'LuckyCat', division: 'Bar, Cashier, and Server', role: 'Cashier', department: 'Cashier', pin: '4485', shift_start: '18:30', shift_end: '03:30', standard_hours: 9.0 },
+    { id: 'LC-CAS-11', name: 'Widia', venue: 'LuckyCat', division: 'Bar, Cashier, and Server', role: 'Cashier', department: 'Cashier', pin: '7514', shift_start: '10:00', shift_end: '19:00', standard_hours: 9.0 },
+    { id: 'LC-BAR-12', name: 'Gerry', venue: 'LuckyCat', division: 'Bar, Cashier, and Server', role: 'Bar Staff', department: 'Bar', pin: '3714', shift_start: '10:00', shift_end: '19:00', standard_hours: 9.0 },
+    { id: 'LC-BAR-13', name: 'Mada', venue: 'LuckyCat', division: 'Bar, Cashier, and Server', role: 'Bar Staff', department: 'Bar', pin: '7297', shift_start: '18:30', shift_end: '03:30', standard_hours: 9.0 },
+    { id: 'LC-BAR-14', name: 'Raymond', venue: 'LuckyCat', division: 'Bar, Cashier, and Server', role: 'Bar Staff', department: 'Bar', pin: '5484', shift_start: '10:00', shift_end: '19:00', standard_hours: 9.0 },
+    { id: 'LC-BAR-15', name: 'Jackson', venue: 'LuckyCat', division: 'Bar, Cashier, and Server', role: 'Bar Staff', department: 'Bar', pin: '6834', shift_start: '18:30', shift_end: '03:30', standard_hours: 9.0 },
+    { id: 'LC-KIT-16', name: 'Anto', venue: 'LuckyCat', division: 'Kitchen', role: 'Kitchen Staff', department: 'Kitchen', pin: '7205', shift_start: '09:00', shift_end: '19:00', standard_hours: 10.0 },
+    { id: 'LC-KIT-17', name: 'Nurjanah', venue: 'LuckyCat', division: 'Kitchen', role: 'Kitchen Staff', department: 'Kitchen', pin: '4290', shift_start: '14:00', shift_end: '00:00', standard_hours: 10.0 },
+    { id: 'LC-KIT-18', name: 'Martha', venue: 'LuckyCat', division: 'Kitchen', role: 'Kitchen Staff', department: 'Kitchen', pin: '7672', shift_start: '18:00', shift_end: '03:00', standard_hours: 9.0 },
+    { id: 'LC-KIT-19', name: 'Edo', venue: 'LuckyCat', division: 'Kitchen', role: 'Kitchen Staff', department: 'Kitchen', pin: '4421', shift_start: '12:00', shift_end: '22:00', standard_hours: 10.0 },
+    { id: 'LC-KIT-20', name: 'Ulul', venue: 'LuckyCat', division: 'Kitchen', role: 'Kitchen Staff', department: 'Kitchen', pin: '9466', shift_start: '09:00', shift_end: '19:00', standard_hours: 10.0 },
+    { id: 'LC-KIT-21', name: 'Harun', venue: 'LuckyCat', division: 'Kitchen', role: 'Kitchen Staff', department: 'Kitchen', pin: '8867', shift_start: '18:00', shift_end: '03:00', standard_hours: 9.0 }
   ];
 
   const stmt = db.prepare(`

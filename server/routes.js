@@ -473,34 +473,66 @@ router.post('/staff/verify-pin', async (req, res) => {
   }
 
   const cleanPin = pin.trim();
-  let staff;
+  let staff = null;
 
-  if (staffId) {
-    staff = db.prepare('SELECT * FROM staff WHERE id = ?').get(staffId);
-  } else {
-    // Direct lookup by PIN across active staff
-    staff = db.prepare('SELECT * FROM staff WHERE pin = ? AND is_active = 1').get(cleanPin);
-  }
-
-  // Fallback to Supabase Cloud if not found in SQLite
-  if (!staff && isSupabaseConfigured) {
+  // 1. Primary: Lookup in Supabase Cloud
+  if (isSupabaseConfigured) {
     try {
-      const { data: supaStaff } = await supabase
-        .from('staff')
-        .select('*')
-        .eq('pin', cleanPin)
-        .eq('is_active', true)
-        .maybeSingle();
+      if (staffId) {
+        const supa = await findStaffInSupabase(staffId);
+        if (supa) {
+          staff = { ...supa, id: supa.legacy_code || supa.id, uuid: supa.id };
+        }
+      } else {
+        const { data: supaStaff } = await supabase
+          .from('staff')
+          .select('*')
+          .eq('pin', cleanPin)
+          .eq('is_active', true)
+          .maybeSingle();
 
-      if (supaStaff) {
-        staff = {
-          ...supaStaff,
-          id: supaStaff.legacy_code || supaStaff.id,
-          uuid: supaStaff.id
-        };
+        if (supaStaff) {
+          staff = {
+            ...supaStaff,
+            id: supaStaff.legacy_code || supaStaff.id,
+            uuid: supaStaff.id
+          };
+        }
+      }
+
+      if (staff) {
+        // Upsert to SQLite to ensure local cache consistency
+        try {
+          db.prepare(`
+            INSERT OR REPLACE INTO staff (id, name, venue, division, role, department, pin, shift_start, shift_end, standard_hours, is_active, uuid)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `).run(
+            staff.id,
+            staff.name,
+            staff.venue,
+            staff.division,
+            staff.role,
+            staff.department || staff.division,
+            staff.pin,
+            staff.shift_start || '13:00',
+            staff.shift_end || '22:00',
+            staff.standard_hours || 8.5,
+            staff.is_active ? 1 : 0,
+            staff.uuid
+          );
+        } catch {}
       }
     } catch (e) {
       console.warn('Supabase pin query error:', e.message);
+    }
+  }
+
+  // 2. Fallback to SQLite
+  if (!staff) {
+    if (staffId) {
+      staff = db.prepare('SELECT * FROM staff WHERE id = ?').get(staffId);
+    } else {
+      staff = db.prepare('SELECT * FROM staff WHERE pin = ? AND is_active = 1').get(cleanPin);
     }
   }
 
