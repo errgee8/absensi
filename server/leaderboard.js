@@ -49,6 +49,34 @@ export async function computeLeaderboard(targetMonthStr) {
 
   if (logErr) throw logErr;
 
+  // Build photo map of latest staff check-in selfies
+  const staffPhotoMap = {};
+  for (const log of attendanceLogs || []) {
+    if (log.check_in_photo_url && log.staff_id) {
+      if (!staffPhotoMap[log.staff_id]) {
+        staffPhotoMap[log.staff_id] = log.check_in_photo_url;
+      }
+    }
+  }
+
+  // Also query recent overall attendance photos to ensure every staff has their latest selfie
+  try {
+    const { data: recentPhotos } = await supabase
+      .from('attendance_logs')
+      .select('staff_id, check_in_photo_url, created_at')
+      .not('check_in_photo_url', 'is', null)
+      .order('created_at', { ascending: false })
+      .limit(100);
+
+    for (const r of recentPhotos || []) {
+      if (!staffPhotoMap[r.staff_id]) {
+        staffPhotoMap[r.staff_id] = r.check_in_photo_url;
+      }
+    }
+  } catch (e) {
+    console.warn('Recent photos query note:', e.message);
+  }
+
   const staffStats = {};
   for (const s of staffList || []) {
     // Exclude management division
@@ -131,6 +159,7 @@ export async function computeLeaderboard(targetMonthStr) {
       role: st.role,
       venue: st.venue,
       division: st.division,
+      photo_url: staffPhotoMap[st.staff_id] || null,
       total_days: totalDays,
       max_days: 26,
       total_late_seconds: st.totalLateSeconds,
@@ -198,6 +227,9 @@ export async function computeLeaderboard(targetMonthStr) {
 
     if (ins.photo_url) {
       toiletStats[rawName].verified_photos_count++;
+      if (!toiletStats[rawName].latest_photo_url) {
+        toiletStats[rawName].latest_photo_url = ins.photo_url;
+      }
     }
 
     if (new Date(ins.created_at) > new Date(toiletStats[rawName].recent_inspection_at)) {
@@ -220,10 +252,13 @@ export async function computeLeaderboard(targetMonthStr) {
       ? Math.round((ts.pass_count / ts.total_inspections) * 100)
       : 100;
 
+    const photoUrl = (matchedStaff && staffPhotoMap[matchedStaff.id]) ? staffPhotoMap[matchedStaff.id] : (ts.latest_photo_url || null);
+
     return {
       name: ts.name,
       role,
       venue,
+      photo_url: photoUrl,
       total_inspections: ts.total_inspections,
       pass_count: ts.pass_count,
       fail_count: ts.fail_count,

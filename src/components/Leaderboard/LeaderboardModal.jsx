@@ -16,18 +16,331 @@ import {
   Camera,
   Flame,
   Info,
-  ShieldCheck,
-  Building2
+  Building2,
+  Columns,
+  Eye
 } from 'lucide-react';
 
-export default function LeaderboardModal({ isOpen, onClose, currentStaff }) {
+// Reusable Elegant Framed Avatar Component with Fallback
+function StaffAvatarFrame({ photo, name, rank, size = 'md' }) {
+  const [imgError, setImgError] = useState(false);
+
+  // Frame styles based on rank
+  let ringClasses = 'ring-2 ring-slate-700 border border-slate-600';
+  let badgeColor = 'bg-slate-700 text-slate-200';
+  let crownColor = null;
+
+  if (rank === 1) {
+    ringClasses = 'ring-4 ring-amber-400 shadow-xl shadow-amber-500/40 border-2 border-yellow-200 bg-gradient-to-br from-amber-400 via-yellow-200 to-amber-600 p-0.5';
+    badgeColor = 'bg-gradient-to-r from-amber-400 to-yellow-300 text-slate-950 font-black border border-white';
+    crownColor = 'text-amber-300 fill-amber-300';
+  } else if (rank === 2) {
+    ringClasses = 'ring-3 ring-slate-300 shadow-lg shadow-slate-400/20 border-2 border-white bg-gradient-to-br from-slate-200 via-white to-slate-400 p-0.5';
+    badgeColor = 'bg-slate-300 text-slate-950 font-black border border-white';
+  } else if (rank === 3) {
+    ringClasses = 'ring-3 ring-amber-600 shadow-lg shadow-amber-700/25 border-2 border-amber-400 bg-gradient-to-br from-amber-600 via-yellow-700 to-amber-800 p-0.5';
+    badgeColor = 'bg-amber-700 text-white font-black border border-amber-400';
+  }
+
+  const dimensions =
+    size === 'xl'
+      ? 'w-18 h-18 sm:w-20 sm:h-20'
+      : size === 'lg'
+      ? 'w-14 h-14 sm:w-16 sm:h-16'
+      : 'w-11 h-11';
+
+  return (
+    <div className="relative inline-block shrink-0">
+      {/* Animated Crown for Rank 1 */}
+      {crownColor && (
+        <div className="absolute -top-4 left-1/2 -translate-x-1/2 z-20 animate-bounce pointer-events-none">
+          <Crown className={`w-6 h-6 sm:w-7 sm:h-7 ${crownColor} drop-shadow-md`} />
+        </div>
+      )}
+
+      {/* Elegant Portrait Frame */}
+      <div className={`${dimensions} rounded-2xl ${ringClasses} overflow-hidden relative flex items-center justify-center bg-slate-950 transition-transform duration-200 hover:scale-105`}>
+        {photo && !imgError ? (
+          <img
+            src={photo}
+            alt={name}
+            onError={() => setImgError(true)}
+            className="w-full h-full object-cover rounded-xl"
+            loading="lazy"
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center font-black text-white text-base sm:text-xl bg-gradient-to-br from-slate-800 to-slate-900">
+            {name?.charAt(0)?.toUpperCase()}
+          </div>
+        )}
+      </div>
+
+      {/* Rank Badge Indicator */}
+      <span
+        className={`absolute -bottom-2 -right-1 px-1.5 sm:px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-black shadow-md z-10 flex items-center justify-center ${badgeColor}`}
+      >
+        #{rank}
+      </span>
+    </div>
+  );
+}
+
+// Side-by-Side Column Component for either Attendance or Toilet Leaderboard
+function LeaderboardColumn({
+  title,
+  subtitle,
+  icon: HeaderIcon,
+  themeColor = 'amber', // 'amber' | 'blue'
+  list = [],
+  type = 'attendance' // 'attendance' | 'toilet'
+}) {
+  const top1 = list[0];
+  const top2 = list[1];
+  const top3 = list[2];
+  const restList = list.slice(3, 5); // Rank 4 & 5
+
+  const isAttendance = type === 'attendance';
+
+  const themeGradient =
+    themeColor === 'amber'
+      ? 'from-amber-400 via-yellow-300 to-amber-500'
+      : 'from-cyan-400 via-sky-300 to-blue-500';
+
+  const headerBorder =
+    themeColor === 'amber' ? 'border-amber-500/30' : 'border-cyan-500/30';
+
+  return (
+    <div className="bg-slate-950/80 border-2 border-slate-800/90 hover:border-slate-700/80 rounded-3xl p-4 sm:p-5 flex flex-col justify-between shadow-xl relative overflow-hidden backdrop-blur-sm">
+      
+      {/* Top ambient column glow */}
+      <div
+        className={`absolute top-0 right-0 w-60 h-32 bg-gradient-to-b ${
+          themeColor === 'amber' ? 'from-amber-500/10' : 'from-cyan-500/10'
+        } to-transparent blur-2xl pointer-events-none`}
+      />
+
+      <div>
+        {/* Column Header */}
+        <div className={`flex items-center justify-between pb-3.5 mb-4 border-b ${headerBorder}`}>
+          <div className="flex items-center space-x-2.5">
+            <div
+              className={`w-10 h-10 rounded-2xl bg-gradient-to-br ${themeGradient} flex items-center justify-center text-slate-950 shadow-md shrink-0`}
+            >
+              <HeaderIcon className="w-5 h-5 stroke-[2.5]" />
+            </div>
+            <div>
+              <h3 className="text-sm sm:text-base font-black text-white tracking-tight flex items-center space-x-1.5">
+                <span>{title}</span>
+              </h3>
+              <p className="text-[11px] text-slate-400 font-bold">{subtitle}</p>
+            </div>
+          </div>
+
+          <span
+            className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border ${
+              themeColor === 'amber'
+                ? 'bg-amber-400/15 text-amber-300 border-amber-400/30'
+                : 'bg-cyan-400/15 text-cyan-300 border-cyan-400/30'
+            }`}
+          >
+            Top 5
+          </span>
+        </div>
+
+        {list.length === 0 ? (
+          <div className="py-16 text-center text-slate-400 text-xs">
+            Belum ada data tercatat untuk kolom ini.
+          </div>
+        ) : (
+          <>
+            {/* MINI PODIUM (Top 3) */}
+            <div className="bg-slate-900/70 border border-slate-800/80 rounded-2xl p-3 sm:p-4 mb-4">
+              <div className="grid grid-cols-3 gap-2 items-end pt-3">
+                
+                {/* #2 SILVER (Kiri) */}
+                {top2 ? (
+                  <div className="flex flex-col items-center text-center">
+                    <StaffAvatarFrame
+                      photo={top2.photo_url}
+                      name={top2.name}
+                      rank={2}
+                      size="lg"
+                    />
+                    <h4 className="text-xs font-black text-white truncate max-w-full mt-2">
+                      {top2.name}
+                    </h4>
+                    <span className="text-[9px] text-slate-400 font-bold truncate max-w-full">
+                      {top2.role}
+                    </span>
+                    <div className="mt-1.5 w-full py-1.5 px-1 bg-slate-950/80 rounded-xl border border-slate-800 text-[10px]">
+                      <span className="block font-mono font-black text-slate-200">
+                        {top2.score} Pts
+                      </span>
+                      <span className="text-slate-400 text-[8px] sm:text-[9px] block">
+                        {isAttendance
+                          ? `${top2.total_days}h • Tlt ${top2.total_late_minutes}m`
+                          : `${top2.total_inspections}x Cek (${top2.pass_rate}%)`}
+                      </span>
+                    </div>
+                  </div>
+                ) : <div />}
+
+                {/* #1 GOLD (Tengah - Elevated) */}
+                {top1 ? (
+                  <div className="flex flex-col items-center text-center -translate-y-2">
+                    <StaffAvatarFrame
+                      photo={top1.photo_url}
+                      name={top1.name}
+                      rank={1}
+                      size="xl"
+                    />
+                    <h4 className="text-xs sm:text-sm font-black text-amber-200 truncate max-w-full mt-2">
+                      {top1.name}
+                    </h4>
+                    <span className="text-[9px] text-amber-300/80 font-bold truncate max-w-full">
+                      {top1.role} • {top1.venue}
+                    </span>
+                    <div className="mt-1.5 w-full py-2 px-1 bg-gradient-to-b from-amber-500/20 to-slate-950 rounded-xl border-2 border-amber-400/60 shadow-md text-[10px]">
+                      <span className="block font-mono font-black text-amber-300 text-xs sm:text-sm">
+                        {top1.score} POIN
+                      </span>
+                      <span className="text-slate-300 text-[9px] font-bold block mt-0.5">
+                        {isAttendance
+                          ? `${top1.total_days}/26 Hari • Tlt ${top1.total_late_minutes}m ${top1.late_seconds_remainder}s`
+                          : `${top1.total_inspections}x Inspeksi (${top1.pass_rate}%)`}
+                      </span>
+                      {isAttendance && top1.early_bird_30m_count > 0 && (
+                        <span className="inline-block mt-0.5 px-1.5 py-0.2 rounded-full bg-amber-400/20 text-amber-200 text-[8px] font-black">
+                          ⚡ Awal: {top1.early_bird_30m_count}x
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ) : <div />}
+
+                {/* #3 BRONZE (Kanan) */}
+                {top3 ? (
+                  <div className="flex flex-col items-center text-center">
+                    <StaffAvatarFrame
+                      photo={top3.photo_url}
+                      name={top3.name}
+                      rank={3}
+                      size="lg"
+                    />
+                    <h4 className="text-xs font-black text-white truncate max-w-full mt-2">
+                      {top3.name}
+                    </h4>
+                    <span className="text-[9px] text-slate-400 font-bold truncate max-w-full">
+                      {top3.role}
+                    </span>
+                    <div className="mt-1.5 w-full py-1.5 px-1 bg-slate-950/80 rounded-xl border border-slate-800 text-[10px]">
+                      <span className="block font-mono font-black text-amber-400">
+                        {top3.score} Pts
+                      </span>
+                      <span className="text-slate-400 text-[8px] sm:text-[9px] block">
+                        {isAttendance
+                          ? `${top3.total_days}h • Tlt ${top3.total_late_minutes}m`
+                          : `${top3.total_inspections}x Cek (${top3.pass_rate}%)`}
+                      </span>
+                    </div>
+                  </div>
+                ) : <div />}
+
+              </div>
+            </div>
+
+            {/* RANK 4 & 5 CARDS */}
+            <div className="space-y-2">
+              <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block px-1">
+                Kandidat Posisi #4 &amp; #5:
+              </span>
+
+              {restList.map((item) => (
+                <div
+                  key={item.staff_id || item.name}
+                  className="p-2.5 rounded-2xl bg-slate-900/80 border border-slate-800 hover:border-slate-700 transition flex items-center justify-between gap-2.5 shadow-sm"
+                >
+                  <div className="flex items-center space-x-2.5 min-w-0">
+                    <StaffAvatarFrame
+                      photo={item.photo_url}
+                      name={item.name}
+                      rank={item.rank}
+                      size="sm"
+                    />
+
+                    <div className="min-w-0">
+                      <div className="flex items-center space-x-1.5">
+                        <h5 className="text-xs font-black text-white truncate">
+                          {item.name}
+                        </h5>
+                        <span className="text-[9px] text-slate-400 font-bold hidden sm:inline">
+                          • {item.role}
+                        </span>
+                      </div>
+
+                      {isAttendance ? (
+                        <div className="flex flex-wrap items-center gap-1 mt-0.5 text-[9px] font-bold">
+                          <span className="px-1.5 py-0.2 rounded bg-blue-950 text-blue-300 border border-blue-900/60 font-mono">
+                            📅 {item.total_days}/26h
+                          </span>
+                          <span
+                            className={`px-1.5 py-0.2 rounded border font-mono ${
+                              item.total_late_seconds === 0
+                                ? 'bg-emerald-950 text-emerald-300 border-emerald-900/60'
+                                : 'bg-rose-950 text-rose-300 border-rose-900/60'
+                            }`}
+                          >
+                            ⏱️ {item.total_late_seconds === 0 ? 'Tepat Waktu' : `Telat ${item.total_late_minutes}m`}
+                          </span>
+                          {item.early_bird_30m_count > 0 && (
+                            <span className="px-1.5 py-0.2 rounded bg-amber-950 text-amber-300 border border-amber-900/60 font-mono">
+                              ⚡ Awal {item.early_bird_30m_count}x
+                            </span>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="flex flex-wrap items-center gap-1 mt-0.5 text-[9px] font-bold">
+                          <span className="px-1.5 py-0.2 rounded bg-cyan-950 text-cyan-300 border border-cyan-900/60 font-mono">
+                            🧹 {item.total_inspections}x
+                          </span>
+                          <span className="px-1.5 py-0.2 rounded bg-emerald-950 text-emerald-300 border border-emerald-900/60 font-mono">
+                            ✓ {item.pass_rate}% Pass
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="text-right shrink-0">
+                    <span className="text-sm font-black font-mono text-amber-300 block">
+                      {item.score}
+                    </span>
+                    <span className="text-[9px] text-slate-400 uppercase font-black">
+                      Poin
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Rules Mini Footer */}
+      <div className="mt-3.5 pt-2.5 border-t border-slate-800/80 text-[10px] text-slate-400 flex items-center justify-between font-bold">
+        <span>{isAttendance ? 'Target: 26 Hari Kerja Maksimal' : '10 Poin Tiap Checklist Sukses'}</span>
+        <span className="text-amber-300/80">{isAttendance ? 'Presisi Detik & Menit' : 'Wajib Lampirkan Foto'}</span>
+      </div>
+    </div>
+  );
+}
+
+export default function LeaderboardModal({ isOpen, onClose }) {
   if (!isOpen) return null;
 
-  const [activeTab, setActiveTab] = useState('attendance'); // 'attendance' | 'toilet'
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [showAll, setShowAll] = useState(false);
 
   const fetchLeaderboard = async () => {
     try {
@@ -53,42 +366,63 @@ export default function LeaderboardModal({ isOpen, onClose, currentStaff }) {
   const attendanceList = data?.attendance || [];
   const toiletList = data?.toilet || [];
 
-  const currentList = activeTab === 'attendance' ? attendanceList : toiletList;
-  const top1 = currentList[0];
-  const top2 = currentList[1];
-  const top3 = currentList[2];
-  const restList = showAll ? currentList.slice(3) : currentList.slice(3, 5);
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-950/80 backdrop-blur-md animate-fade-in">
-      <div className="bg-slate-900 border-2 border-amber-400/40 rounded-3xl max-w-2xl w-full overflow-hidden shadow-2xl shadow-amber-500/10 flex flex-col max-h-[92vh] text-white relative">
-        
-        {/* Glow ambient background effects */}
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-96 h-36 bg-gradient-to-b from-amber-500/20 via-blue-500/10 to-transparent blur-3xl pointer-events-none" />
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 bg-slate-950/85 backdrop-blur-md animate-fade-in overflow-y-auto">
+      
+      {/* Sparkles / Confetti CSS Keyframe Styles */}
+      <style>{`
+        @keyframes festive-float {
+          0% { transform: translateY(0px) rotate(0deg); opacity: 0.8; }
+          50% { transform: translateY(-12px) rotate(15deg); opacity: 1; }
+          100% { transform: translateY(0px) rotate(0deg); opacity: 0.8; }
+        }
+        @keyframes festive-shimmer {
+          0% { opacity: 0.3; transform: scale(0.95); }
+          50% { opacity: 0.9; transform: scale(1.05); }
+          100% { opacity: 0.3; transform: scale(0.95); }
+        }
+        .anim-float { animation: festive-float 3s ease-in-out infinite; }
+        .anim-float-delay { animation: festive-float 3.5s ease-in-out 1.2s infinite; }
+        .anim-shimmer { animation: festive-shimmer 2.5s ease-in-out infinite; }
+      `}</style>
 
-        {/* Modal Top Header - Luxurious Gold & Obsidian */}
-        <div className="p-4 sm:p-5 border-b border-amber-500/20 bg-slate-950/90 relative z-10 flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-400 via-yellow-300 to-amber-600 flex items-center justify-center text-slate-950 shadow-lg shadow-amber-500/30 shrink-0">
+      <div className="bg-slate-900 border-2 border-amber-400/40 rounded-3xl max-w-5xl w-full overflow-hidden shadow-2xl shadow-amber-500/10 flex flex-col max-h-[94vh] text-white relative">
+        
+        {/* Festive Ambient Background Accents */}
+        <div className="absolute top-0 left-1/4 w-80 h-32 bg-amber-500/15 blur-3xl pointer-events-none anim-shimmer" />
+        <div className="absolute top-0 right-1/4 w-80 h-32 bg-cyan-500/15 blur-3xl pointer-events-none anim-shimmer" />
+
+        {/* Modal Top Header - Festive Gold & Obsidian */}
+        <div className="p-4 sm:p-5 border-b border-amber-500/25 bg-slate-950/95 relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          
+          <div className="flex items-center space-x-3.5">
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-400 via-yellow-300 to-amber-600 flex items-center justify-center text-slate-950 shadow-lg shadow-amber-500/30 shrink-0 anim-float">
               <Trophy className="w-7 h-7 stroke-[2.5]" />
             </div>
             <div>
-              <div className="flex items-center space-x-2">
-                <span className="text-sm sm:text-base font-black tracking-tight bg-gradient-to-r from-amber-300 via-yellow-200 to-amber-400 bg-clip-text text-transparent">
-                  LEADERBOARD STAF TERAJIN
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-base sm:text-lg font-black tracking-tight bg-gradient-to-r from-amber-300 via-yellow-200 to-amber-400 bg-clip-text text-transparent flex items-center space-x-1.5">
+                  <span>LEADERBOARD STAF TERAJIN</span>
+                  <span className="anim-float-delay">✨</span>
                 </span>
-                <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-amber-400/15 text-amber-300 border border-amber-400/30 flex items-center space-x-1">
+                <span className="px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-amber-400/15 text-amber-300 border border-amber-400/30 flex items-center space-x-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
                   <span>Real-Time MTD</span>
                 </span>
               </div>
               <p className="text-xs text-slate-400 font-bold mt-0.5">
-                Periode Penilaian Bonus: <strong className="text-white">{period?.monthName || 'Bulan Berjalan'} (1 - {period?.endDate?.split('-')[2] || '30'})</strong>
+                Penentuan Bonus Prestasi Bulanan: <strong className="text-white">{period?.monthName || 'Bulan Berjalan'} (1 - {period?.endDate?.split('-')[2] || '30'})</strong>
               </p>
             </div>
           </div>
 
-          <div className="flex items-center space-x-2">
+          {/* Action buttons */}
+          <div className="flex items-center space-x-2 self-end sm:self-auto">
+            <div className="hidden sm:flex items-center space-x-1 text-[11px] font-black text-amber-300/80 bg-slate-800/80 px-3 py-1.5 rounded-xl border border-amber-500/20">
+              <Columns className="w-3.5 h-3.5 text-amber-400" />
+              <span>Side-by-Side View</span>
+            </div>
+
             <button
               onClick={fetchLeaderboard}
               disabled={loading}
@@ -107,42 +441,15 @@ export default function LeaderboardModal({ isOpen, onClose, currentStaff }) {
           </div>
         </div>
 
-        {/* Tab Switcher: Absensi vs Inspeksi Toilet */}
-        <div className="p-2 bg-slate-950/70 border-b border-slate-800 flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => { setActiveTab('attendance'); setShowAll(false); }}
-            className={`flex-1 flex items-center justify-center space-x-2 py-2.5 px-3 rounded-2xl text-xs font-black transition relative overflow-hidden ${
-              activeTab === 'attendance'
-                ? 'bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 text-slate-950 shadow-md shadow-amber-500/25 font-black'
-                : 'bg-slate-900/80 text-slate-300 hover:bg-slate-800 border border-slate-800'
-            }`}
-          >
-            <Clock className="w-4 h-4" />
-            <span>1. Peringkat Absensi &amp; Jam Masuk</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => { setActiveTab('toilet'); setShowAll(false); }}
-            className={`flex-1 flex items-center justify-center space-x-2 py-2.5 px-3 rounded-2xl text-xs font-black transition relative overflow-hidden ${
-              activeTab === 'toilet'
-                ? 'bg-gradient-to-r from-blue-500 via-cyan-400 to-blue-500 text-slate-950 shadow-md shadow-cyan-500/25 font-black'
-                : 'bg-slate-900/80 text-slate-300 hover:bg-slate-800 border border-slate-800'
-            }`}
-          >
-            <Sparkles className="w-4 h-4" />
-            <span>2. Peringkat Inspeksi Toilet QR</span>
-          </button>
-        </div>
-
-        {/* Modal Scrollable Body */}
-        <div className="p-4 sm:p-5 overflow-y-auto space-y-5 custom-scrollbar">
+        {/* Modal Scrollable Body: 2 Columns Side by Side */}
+        <div className="p-3 sm:p-5 overflow-y-auto space-y-4 custom-scrollbar">
 
           {loading && !data && (
-            <div className="py-16 text-center space-y-3">
+            <div className="py-24 text-center space-y-3">
               <RefreshCw className="w-8 h-8 text-amber-400 animate-spin mx-auto" />
-              <p className="text-sm font-bold text-slate-300">Menghitung poin dan data kedisiplinan staf secara real-time...</p>
+              <p className="text-sm font-bold text-slate-300">
+                Menghitung skor poin, akurasi menit/detik, dan foto selfie absensi staf...
+              </p>
             </div>
           )}
 
@@ -153,230 +460,45 @@ export default function LeaderboardModal({ isOpen, onClose, currentStaff }) {
             </div>
           )}
 
-          {!loading && currentList.length === 0 && (
-            <div className="py-12 text-center text-slate-400 text-xs">
-              Belum ada data aktivitas tercatat untuk periode ini.
-            </div>
-          )}
-
-          {!loading && currentList.length > 0 && (
+          {!loading && data && (
             <>
-              {/* TOP 3 PODIUM DISPLAY */}
-              <div className="bg-slate-950/60 border border-slate-800 rounded-3xl p-4 sm:p-5 relative overflow-hidden">
-                <div className="text-center mb-4">
-                  <span className="text-[11px] font-black uppercase tracking-widest text-amber-300/80 flex items-center justify-center space-x-1.5">
-                    <Crown className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
-                    <span>PODIUM TOP 3 KANDIDAT BONUS TERBAIK</span>
-                    <Crown className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
-                  </span>
-                </div>
+              {/* SIDE BY SIDE 2-COLUMN GRID */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-5">
+                
+                {/* COLUMN 1: KEDISIPLINAN ABSENSI (TOP 5) */}
+                <LeaderboardColumn
+                  title="1. Kedisiplinan Absensi"
+                  subtitle="Paling sedikit telat & hari kerja terbanyak (maks 26h)"
+                  icon={Clock}
+                  themeColor="amber"
+                  list={attendanceList}
+                  type="attendance"
+                />
 
-                <div className="grid grid-cols-3 gap-2 sm:gap-3 items-end pt-4">
-                  
-                  {/* #2 SILVER (KIRI) */}
-                  {top2 ? (
-                    <div className="flex flex-col items-center text-center">
-                      <div className="relative mb-2">
-                        <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-br from-slate-200 via-slate-100 to-slate-400 text-slate-900 flex items-center justify-center font-black text-xl shadow-lg border-2 border-slate-300">
-                          {top2.name.charAt(0)}
-                        </div>
-                        <span className="absolute -bottom-2 -right-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-slate-300 text-slate-950 shadow border border-white">
-                          #2
-                        </span>
-                      </div>
-                      <h4 className="text-xs sm:text-sm font-black text-white truncate max-w-full">
-                        {top2.name}
-                      </h4>
-                      <span className="text-[10px] text-slate-400 font-bold truncate max-w-full">
-                        {top2.role}
-                      </span>
-                      <div className="mt-2 w-full py-2 px-1 bg-slate-900/90 rounded-xl border border-slate-700/80 text-[10px]">
-                        <span className="block font-mono font-black text-slate-200 text-xs">
-                          {activeTab === 'attendance' ? `${top2.score} Pts` : `${top2.score} Pts`}
-                        </span>
-                        <span className="text-slate-400 text-[9px] block">
-                          {activeTab === 'attendance'
-                            ? `${top2.total_days}/26 Hari • Telat ${top2.total_late_minutes}m`
-                            : `${top2.total_inspections}x Cek (${top2.pass_rate}%)`}
-                        </span>
-                      </div>
-                    </div>
-                  ) : <div />}
+                {/* COLUMN 2: INSPEKSI TOILET (TOP 5) */}
+                <LeaderboardColumn
+                  title="2. Inspeksi Toilet QR"
+                  subtitle="Paling rajin merawat kebersihan toilet harian"
+                  icon={Sparkles}
+                  themeColor="blue"
+                  list={toiletList}
+                  type="toilet"
+                />
 
-                  {/* #1 GOLD (TENGAH - JUARA UTAMA) */}
-                  {top1 ? (
-                    <div className="flex flex-col items-center text-center -translate-y-3 sm:-translate-y-4">
-                      {/* Floating Crown Animation */}
-                      <Crown className="w-7 h-7 text-amber-300 fill-amber-300 mb-1 animate-bounce" />
-                      
-                      <div className="relative mb-2">
-                        <div className="w-18 h-18 sm:w-20 sm:h-20 rounded-2xl bg-gradient-to-br from-amber-300 via-yellow-200 to-amber-500 text-slate-950 flex items-center justify-center font-black text-2xl sm:text-3xl shadow-xl shadow-amber-500/30 border-3 border-amber-200">
-                          {top1.name.charAt(0)}
-                        </div>
-                        <span className="absolute -bottom-2.5 -right-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-black bg-gradient-to-r from-amber-400 to-yellow-400 text-slate-950 shadow-md border-2 border-white flex items-center space-x-0.5">
-                          <span>🥇 #1</span>
-                        </span>
-                      </div>
-
-                      <h4 className="text-sm sm:text-base font-black text-amber-200 truncate max-w-full">
-                        {top1.name}
-                      </h4>
-                      <span className="text-[10px] sm:text-xs text-amber-300/80 font-bold truncate max-w-full">
-                        {top1.role} • {top1.venue}
-                      </span>
-
-                      <div className="mt-2.5 w-full py-2.5 px-2 bg-gradient-to-b from-amber-500/20 to-slate-900 rounded-xl border-2 border-amber-400/60 shadow-lg text-[10px]">
-                        <span className="block font-mono font-black text-amber-300 text-sm sm:text-base">
-                          {top1.score} POIN
-                        </span>
-                        <span className="text-slate-300 text-[10px] font-bold block mt-0.5">
-                          {activeTab === 'attendance'
-                            ? `${top1.total_days}/26 Hari • Telat ${top1.total_late_minutes}m ${top1.late_seconds_remainder}s`
-                            : `${top1.total_inspections}x Inspeksi • ${top1.verified_photos_count} Foto`}
-                        </span>
-                        {activeTab === 'attendance' && top1.early_bird_count > 0 && (
-                          <span className="inline-block mt-1 px-2 py-0.2 rounded-full bg-amber-400/20 text-amber-200 text-[9px] font-black">
-                            ⚡ Awal 30m: {top1.early_bird_30m_count}x
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  ) : <div />}
-
-                  {/* #3 BRONZE (KANAN) */}
-                  {top3 ? (
-                    <div className="flex flex-col items-center text-center">
-                      <div className="relative mb-2">
-                        <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-br from-amber-700 via-amber-600 to-yellow-900 text-amber-100 flex items-center justify-center font-black text-xl shadow-lg border-2 border-amber-600">
-                          {top3.name.charAt(0)}
-                        </div>
-                        <span className="absolute -bottom-2 -right-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-700 text-white shadow border border-amber-400">
-                          #3
-                        </span>
-                      </div>
-                      <h4 className="text-xs sm:text-sm font-black text-white truncate max-w-full">
-                        {top3.name}
-                      </h4>
-                      <span className="text-[10px] text-slate-400 font-bold truncate max-w-full">
-                        {top3.role}
-                      </span>
-                      <div className="mt-2 w-full py-2 px-1 bg-slate-900/90 rounded-xl border border-slate-700/80 text-[10px]">
-                        <span className="block font-mono font-black text-amber-400 text-xs">
-                          {top3.score} Pts
-                        </span>
-                        <span className="text-slate-400 text-[9px] block">
-                          {activeTab === 'attendance'
-                            ? `${top3.total_days}/26 Hari • Telat ${top3.total_late_minutes}m`
-                            : `${top3.total_inspections}x Cek (${top3.pass_rate}%)`}
-                        </span>
-                      </div>
-                    </div>
-                  ) : <div />}
-
-                </div>
               </div>
 
-              {/* LIST PERINGKAT 4, 5, DST */}
-              <div className="space-y-2.5">
-                <div className="flex items-center justify-between px-1">
-                  <span className="text-xs font-black uppercase tracking-wider text-slate-400">
-                    Kandidat Peringkat Berikutnya:
-                  </span>
-                  {currentList.length > 5 && (
-                    <button
-                      type="button"
-                      onClick={() => setShowAll(!showAll)}
-                      className="text-xs font-black text-amber-400 hover:text-amber-300 underline"
-                    >
-                      {showAll ? 'Tampilkan Top 5 Saja' : `Lihat Semua (${currentList.length} Staf)`}
-                    </button>
-                  )}
-                </div>
-
-                {restList.map((item) => (
-                  <div
-                    key={item.staff_id || item.name}
-                    className="p-3.5 sm:p-4 rounded-2xl bg-slate-950/80 border border-slate-800 hover:border-slate-700 transition flex items-center justify-between gap-3 shadow-sm"
-                  >
-                    <div className="flex items-center space-x-3 min-w-0">
-                      <span className="w-8 h-8 rounded-xl bg-slate-900 border border-slate-700 flex items-center justify-center font-mono font-black text-xs text-slate-300 shrink-0">
-                        #{item.rank}
-                      </span>
-                      <div className="min-w-0">
-                        <div className="flex items-center space-x-2">
-                          <h4 className="text-xs sm:text-sm font-black text-white truncate">
-                            {item.name}
-                          </h4>
-                          <span className="text-[10px] text-slate-400 font-bold hidden sm:inline">
-                            • {item.role}
-                          </span>
-                        </div>
-
-                        {activeTab === 'attendance' ? (
-                          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 mt-1 text-[10px] font-bold">
-                            <span className="px-2 py-0.5 rounded-md bg-blue-950 text-blue-300 border border-blue-800/80 font-mono">
-                              📅 {item.total_days}/26 Hari Kerja
-                            </span>
-                            <span className={`px-2 py-0.5 rounded-md border font-mono ${
-                              item.total_late_seconds === 0
-                                ? 'bg-emerald-950 text-emerald-300 border-emerald-800'
-                                : 'bg-rose-950 text-rose-300 border-rose-800'
-                            }`}>
-                              ⏱️ {item.total_late_seconds === 0 ? 'Telat 0m 0s (Tepat Waktu)' : `Telat ${item.total_late_minutes}m ${item.late_seconds_remainder}s`}
-                            </span>
-                            {item.early_bird_30m_count > 0 && (
-                              <span className="px-2 py-0.5 rounded-md bg-amber-950 text-amber-300 border border-amber-800 font-mono">
-                                ⚡ Datang Awal: {item.early_bird_30m_count}x
-                              </span>
-                            )}
-                          </div>
-                        ) : (
-                          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 mt-1 text-[10px] font-bold">
-                            <span className="px-2 py-0.5 rounded-md bg-cyan-950 text-cyan-300 border border-cyan-800 font-mono">
-                              🧹 {item.total_inspections}x Inspeksi
-                            </span>
-                            <span className="px-2 py-0.5 rounded-md bg-emerald-950 text-emerald-300 border border-emerald-800 font-mono">
-                              ✓ {item.pass_rate}% Lolos Pass
-                            </span>
-                            <span className="px-2 py-0.5 rounded-md bg-indigo-950 text-indigo-300 border border-indigo-800 font-mono">
-                              📷 {item.verified_photos_count} Foto Terverifikasi
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="text-right shrink-0">
-                      <span className="text-base sm:text-lg font-black font-mono text-amber-300 block">
-                        {item.score}
-                      </span>
-                      <span className="text-[10px] text-slate-400 uppercase font-black tracking-wider">
-                        Poin
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* RULES & FAIR PLAY BANNER */}
-              <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-500/10 via-yellow-500/5 to-slate-900 border border-amber-400/30 text-xs space-y-1.5">
-                <div className="flex items-center space-x-1.5 text-amber-300 font-black">
+              {/* Informative Fair Play Footer Banner */}
+              <div className="p-3.5 sm:p-4 rounded-2xl bg-gradient-to-r from-amber-500/10 via-yellow-500/5 to-slate-900 border border-amber-400/30 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-slate-300 font-bold">
+                <div className="flex items-center space-x-2 text-amber-300 font-black">
                   <Info className="w-4 h-4 shrink-0" />
-                  <span>Aturan Transparan Perhitungan Bonus Staf:</span>
+                  <span>Kriteria Penilaian Bonus:</span>
                 </div>
-                {activeTab === 'attendance' ? (
-                  <ul className="text-[11px] text-slate-300 list-disc list-inside space-y-0.5 leading-relaxed font-bold">
-                    <li><strong>Hari Kerja (Maks 26 Hari)</strong>: Nilai dasar kehadiran hingga 100 poin penuh.</li>
-                    <li><strong>Akurasi Keterlambatan</strong>: Mengurangi poin sesuai detik &amp; menit telat (-0.5 poin/menit).</li>
-                    <li><strong>Datang Lebih Awal</strong>: Datang ≥ 15-30 menit sebelum shift memberikan bonus poin tambahan.</li>
-                  </ul>
-                ) : (
-                  <ul className="text-[11px] text-slate-300 list-disc list-inside space-y-0.5 leading-relaxed font-bold">
-                    <li><strong>10 Poin per Inspeksi</strong>: Tiap checklist toilet sukses (PASS) terverifikasi sistem.</li>
-                    <li><strong>+3 Poin Bukti Foto</strong>: Foto kondisi toilet yang jelas dan terunggah otomatis.</li>
-                    <li><strong>-5 Poin Penalti</strong>: Checklist bermasalah (FAIL) yang tidak segera dibersihkan.</li>
-                  </ul>
-                )}
+                <div className="text-[11px] text-slate-300 flex flex-wrap gap-x-4 gap-y-1">
+                  <span>📅 Kehadiran Maks 26 Hari</span>
+                  <span>⏱️ Akurasi Hitungan Menit &amp; Detik</span>
+                  <span>⚡ Poin Tambahan Datang 30m Awal</span>
+                  <span>📸 Bukti Foto Terverifikasi</span>
+                </div>
               </div>
             </>
           )}
