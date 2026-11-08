@@ -6,7 +6,7 @@ import { calculateDistanceMeters, isWithinGeofence } from './geofence.js';
 import { getClientIp, validateClientNetwork } from './network.js';
 import { evaluateCheckinFlags, evaluateCheckoutFlags, evaluateBreakFlags, auditOpenShifts, FLAG_TYPES } from './flags.js';
 import { isSupabaseConfigured, uploadPhotoToSupabase, cloudDb, supabase, findStaffInSupabase } from './supabase.js';
-import { detectShiftSchedule, getBreakCutoff, isBreakAllowedNow, getWitaTimeString } from './shifts.js';
+import { detectShiftSchedule, getBreakCutoff, isBreakAllowedNow, getWitaTimeString, getWitaDateYMD } from './shifts.js';
 import { computeLeaderboard } from './leaderboard.js';
 
 const router = express.Router();
@@ -976,12 +976,14 @@ router.post('/checkin', async (req, res) => {
 
   const photoUrl = await savePhoto(photoBase64, `in_${staff.id}`);
   const now = new Date();
-  const dateStr = now.toISOString().split('T')[0];
+  const dateStr = getWitaDateYMD(now);
   const checkinTime = timestamp || now.toISOString();
 
   // Shift schedule determination (from staff confirmation dialog or 30-min window detection)
   let scheduledStart = confirmedShift?.start_time;
   let scheduledEnd = confirmedShift?.end_time;
+  let shiftNumber = confirmedShift?.shift_number;
+  let shiftName = confirmedShift?.name;
 
   if (!scheduledStart) {
     const schedules = db.prepare(`
@@ -993,6 +995,16 @@ router.post('/checkin', async (req, res) => {
     const matchedSchedule = detectShiftSchedule(schedules, checkinTime);
     scheduledStart = matchedSchedule ? matchedSchedule.start_time : (staff.shift_start || '13:00');
     scheduledEnd = matchedSchedule ? matchedSchedule.end_time : (staff.shift_end || '22:00');
+    shiftNumber = matchedSchedule?.shift_number || 1;
+    shiftName = matchedSchedule?.name || `Shift ${shiftNumber}`;
+  } else if (!shiftNumber) {
+    try {
+      const matched = db.prepare('SELECT shift_number, name FROM shift_schedules WHERE venue = ? AND division = ? AND start_time = ? LIMIT 1').get(staff.venue, staff.division, scheduledStart);
+      if (matched) {
+        shiftNumber = matched.shift_number;
+        shiftName = matched.name;
+      }
+    } catch {}
   }
 
   const flags = evaluateCheckinFlags({
@@ -1022,7 +1034,9 @@ router.post('/checkin', async (req, res) => {
         wifiPass: wifiValidation.isMatch,
         flags,
         scheduledStart,
-        scheduledEnd
+        scheduledEnd,
+        shiftNumber,
+        shiftName
       });
     } catch (e) {
       console.warn('Supabase Checkin Cloud Sync Note:', e.message);

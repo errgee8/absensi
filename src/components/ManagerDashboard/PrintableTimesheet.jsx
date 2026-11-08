@@ -1,5 +1,6 @@
 import React from 'react';
 import { formatWitaDateOnly, formatWitaTimeOnly, formatDuration, formatWitaDateTime } from '../../utils/time';
+import { resolveShift } from '../../utils/shiftResolver';
 
 export default function PrintableTimesheet({ shifts = [], venueName = 'JP Karaoke & LuckyCat Outlets' }) {
   const generatedTime = formatWitaDateTime(new Date().toISOString());
@@ -31,6 +32,7 @@ export default function PrintableTimesheet({ shifts = [], venueName = 'JP Karaok
             <th style={{ width: '75px' }}>Date</th>
             <th>Staff Name & ID</th>
             <th>Outlet & Division</th>
+            <th style={{ width: '70px' }}>Shift</th>
             <th style={{ width: '80px' }}>In (WITA)</th>
             <th style={{ width: '75px' }}>1-Hr Break</th>
             <th style={{ width: '80px' }}>Out (WITA)</th>
@@ -43,6 +45,7 @@ export default function PrintableTimesheet({ shifts = [], venueName = 'JP Karaok
         <tbody>
           {shifts.map((s) => {
             const hasFlags = s.flags && s.flags.length > 0;
+            const shiftInfo = resolveShift(s);
             return (
               <tr key={s.id}>
                 <td>{formatWitaDateOnly(s.checkin_time)}</td>
@@ -53,6 +56,10 @@ export default function PrintableTimesheet({ shifts = [], venueName = 'JP Karaok
                 <td>
                   <strong>{s.staff_venue || 'JP'}</strong>
                   <div style={{ fontSize: '8pt', color: '#475569' }}>{s.staff_division || s.staff_role}</div>
+                </td>
+                <td>
+                  <strong>{shiftInfo.badgeLabel}</strong>
+                  <div style={{ fontSize: '7.5pt', color: '#64748b' }}>{shiftInfo.timeRange}</div>
                 </td>
                 <td>{formatWitaTimeOnly(s.checkin_time)}</td>
                 <td>

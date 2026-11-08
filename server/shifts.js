@@ -17,6 +17,15 @@ export function getWitaTimeString(date = new Date()) {
   return `${curH}:${curM}`;
 }
 
+export function getWitaDateYMD(date = new Date()) {
+  if (!date) return '';
+  const d = typeof date === 'string' ? new Date(date) : date;
+  if (isNaN(d.getTime())) return '';
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Makassar'
+  }).format(d);
+}
+
 export function toMinutes(timeStr) {
   if (!timeStr || !timeStr.includes(':')) return 780;
   const [h, m] = timeStr.split(':').map(Number);

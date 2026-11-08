@@ -9,7 +9,9 @@ import StaffManagementTab from './StaffManagementTab';
 import ShiftSchedulesTab from './ShiftSchedulesTab';
 import ToiletInspectionTab from './ToiletInspectionTab';
 import { exportTimesheetToExcel } from '../../utils/excelExport';
-import { getShifts, getStats, subscribeRealtimeEvents } from '../../utils/api';
+import { getShifts, getStats, getShiftSchedules, subscribeRealtimeEvents } from '../../utils/api';
+import { getWitaDateYMD } from '../../utils/time';
+import { resolveShift } from '../../utils/shiftResolver';
 import { LayoutDashboard, Users, Clock, Radio, Building2, Sparkles, Eye, ShieldAlert, Trophy } from 'lucide-react';
 
 export default function ManagerDashboard({ venueSettings, refreshSettings, adminAuth, isReadOnly = false, onOpenLeaderboard }) {
@@ -17,11 +19,14 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
   const [activeTab, setActiveTab] = useState('AUDIT');
 
   const [shifts, setShifts] = useState([]);
+  const [schedules, setSchedules] = useState([]);
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
 
   // Filters
   const [dateRange, setDateRange] = useState('ALL');
+  const [specificDate, setSpecificDate] = useState('');
+  const [shiftFilter, setShiftFilter] = useState('ALL');
   const [venue, setVenue] = useState('ALL');
   const [department, setDepartment] = useState('ALL');
   const [flagFilter, setFlagFilter] = useState('ALL');
@@ -40,26 +45,49 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
     'Management'
   ];
 
+  const loadSchedules = async () => {
+    try {
+      const data = await getShiftSchedules();
+      if (Array.isArray(data)) setSchedules(data);
+    } catch (e) {
+      console.warn('Failed to load schedules in dashboard:', e);
+    }
+  };
+
+  useEffect(() => {
+    loadSchedules();
+  }, []);
+
   const loadData = async () => {
     setLoading(true);
     try {
       const today = new Date();
+      const todayStr = getWitaDateYMD(today);
       let startDate = null;
       let endDate = null;
 
-      if (dateRange === 'TODAY') {
-        startDate = today.toISOString().split('T')[0];
-        endDate = startDate;
+      if (dateRange === 'CUSTOM' && specificDate) {
+        startDate = specificDate;
+        endDate = specificDate;
+      } else if (dateRange === 'TODAY') {
+        startDate = todayStr;
+        endDate = todayStr;
       } else if (dateRange === 'YESTERDAY') {
         const y = new Date(today);
         y.setDate(y.getDate() - 1);
-        startDate = y.toISOString().split('T')[0];
-        endDate = startDate;
+        const yStr = getWitaDateYMD(y);
+        startDate = yStr;
+        endDate = yStr;
       } else if (dateRange === 'LAST_7_DAYS') {
         const d = new Date(today);
         d.setDate(d.getDate() - 7);
-        startDate = d.toISOString().split('T')[0];
-        endDate = today.toISOString().split('T')[0];
+        startDate = getWitaDateYMD(d);
+        endDate = todayStr;
+      } else if (dateRange === 'THIS_MONTH') {
+        const [year, month] = todayStr.split('-');
+        startDate = `${year}-${month}-01`;
+        const lastDay = new Date(Number(year), Number(month), 0).getDate();
+        endDate = `${year}-${month}-${String(lastDay).padStart(2, '0')}`;
       }
 
       const [shiftsData, statsData] = await Promise.all([
@@ -74,7 +102,7 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
         getStats()
       ]);
 
-      setShifts(shiftsData);
+      setShifts(shiftsData || []);
       setStats(statsData);
     } catch (err) {
       console.error('Failed to load dashboard data:', err);
@@ -85,7 +113,7 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
 
   useEffect(() => {
     loadData();
-  }, [dateRange, venue, department, flagFilter, search]);
+  }, [dateRange, specificDate, venue, department, flagFilter, search]);
 
   useEffect(() => {
     const unsubscribe = subscribeRealtimeEvents((eventType) => {
@@ -99,11 +127,22 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
     };
   }, []);
 
+  const displayedShifts = React.useMemo(() => {
+    if (shiftFilter === 'ALL') return shifts;
+    return shifts.filter((s) => {
+      const info = resolveShift(s, schedules);
+      if (shiftFilter === 'FLEX') {
+        return info.shiftNumber === null || info.shiftName.toLowerCase().includes('fleksibel');
+      }
+      return String(info.shiftNumber) === String(shiftFilter);
+    });
+  }, [shifts, shiftFilter, schedules]);
+
   const handleExportCsv = async () => {
-    if (shifts.length === 0) return alert('No records to export');
+    if (displayedShifts.length === 0) return alert('No records to export');
     try {
       await exportTimesheetToExcel({
-        shifts,
+        shifts: displayedShifts,
         venueName: venueSettings?.venue_name || 'JP Karaoke & LuckyCat Outlets'
       });
     } catch (err) {
@@ -242,6 +281,10 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
             <FilterBar
               dateRange={dateRange}
               setDateRange={setDateRange}
+              specificDate={specificDate}
+              setSpecificDate={setSpecificDate}
+              shiftFilter={shiftFilter}
+              setShiftFilter={setShiftFilter}
               venue={venue}
               setVenue={setVenue}
               department={department}
@@ -252,10 +295,12 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
               setSearch={setSearch}
               departments={departments}
               onRefresh={loadData}
+              totalResults={displayedShifts.length}
             />
 
             <ShiftTable
-              shifts={shifts}
+              shifts={displayedShifts}
+              schedules={schedules}
               onInspectPhoto={(shift, type) => setInspectData({ shift, type })}
             />
           </>
@@ -302,7 +347,7 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
 
       {/* Printable Timesheet Layout (Active only on Print) */}
       <PrintableTimesheet
-        shifts={shifts}
+        shifts={displayedShifts}
         venueName={venueSettings?.venue_name || 'JP Karaoke & LuckyCat Outlets'}
       />
     </div>

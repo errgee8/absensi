@@ -1,14 +1,15 @@
 import React from 'react';
-import { Wifi, WifiOff, MapPin, Eye, AlertTriangle, CheckCircle, Clock, Coffee } from 'lucide-react';
+import { Wifi, WifiOff, Eye, AlertTriangle, CheckCircle, Clock, Coffee } from 'lucide-react';
 import { formatWitaTimeOnly, formatWitaDateOnly, formatDuration } from '../../utils/time';
+import { resolveShift } from '../../utils/shiftResolver';
 
-export default function ShiftTable({ shifts = [], onInspectPhoto }) {
+export default function ShiftTable({ shifts = [], schedules = [], onInspectPhoto }) {
   if (shifts.length === 0) {
     return (
       <div className="bg-white border-2 border-slate-200 rounded-3xl p-12 text-center shadow-sm">
         <Clock className="w-10 h-10 text-slate-400 mx-auto mb-3" />
         <h3 className="text-base font-black text-slate-950">Tidak ada riwayat shift yang cocok dengan filter</h3>
-        <p className="text-xs text-slate-700 font-bold mt-1">Coba ganti filter tanggal, venue, atau divisi.</p>
+        <p className="text-xs text-slate-700 font-bold mt-1">Coba ganti filter tanggal, shift, venue, atau divisi.</p>
       </div>
     );
   }
@@ -66,6 +67,7 @@ export default function ShiftTable({ shifts = [], onInspectPhoto }) {
               <th className="py-3.5 px-3">Tanggal</th>
               <th className="py-3.5 px-3">Nama Staff</th>
               <th className="py-3.5 px-3">Outlet &amp; Divisi</th>
+              <th className="py-3.5 px-3">Indikator Shift</th>
               <th className="py-3.5 px-3">Masuk</th>
               <th className="py-3.5 px-2 text-center">Foto Masuk</th>
               <th className="py-3.5 px-3">Istirahat</th>
@@ -83,6 +85,8 @@ export default function ShiftTable({ shifts = [], onInspectPhoto }) {
             {shifts.map((shift) => {
               const hasFlags = shift.flags && shift.flags.length > 0;
               const isWifiPass = shift.checkin_wifi_pass === 1;
+              const shiftInfo = resolveShift(shift, schedules);
+              const isActive = !shift.checkout_time || shift.status === 'IN_PROGRESS' || shift.status === 'ON_DUTY' || shift.status === 'ON_BREAK';
 
               return (
                 <tr
@@ -109,6 +113,25 @@ export default function ShiftTable({ shifts = [], onInspectPhoto }) {
                     </div>
                     <div className="text-[10px] text-blue-800 font-black">
                       {shift.staff_division || shift.staff_role}
+                    </div>
+                  </td>
+
+                  {/* Shift Indicator (New Column!) */}
+                  <td className="py-3 px-3 whitespace-nowrap">
+                    <div className="flex flex-col gap-1 items-start">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-lg text-[11px] font-black border shadow-xs ${shiftInfo.badgeClass}`}>
+                        <span className="w-1.5 h-1.5 rounded-full mr-1.5 bg-current opacity-70"></span>
+                        {shiftInfo.badgeLabel}
+                      </span>
+                      <span className="text-[10px] font-mono text-slate-600 font-bold">
+                        🕒 {shiftInfo.timeRange}
+                      </span>
+                      {isActive && (
+                        <span className="inline-flex items-center space-x-1 px-1.5 py-0.5 rounded text-[9px] font-black bg-emerald-100 text-emerald-950 border border-emerald-300 animate-pulse">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
+                          <span>Sedang Berjalan</span>
+                        </span>
+                      )}
                     </div>
                   </td>
 

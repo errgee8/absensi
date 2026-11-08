@@ -43,6 +43,28 @@ export function formatWitaDateOnly(isoString) {
   }).format(date);
 }
 
+export function getWitaDateYMD(date = new Date()) {
+  if (!date) return '';
+  const d = typeof date === 'string' ? new Date(date) : date;
+  if (isNaN(d.getTime())) return '';
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Makassar'
+  }).format(d);
+}
+
+export function formatWitaDateFull(isoString) {
+  if (!isoString) return '-';
+  const date = new Date(isoString);
+  if (isNaN(date.getTime())) return '-';
+  return new Intl.DateTimeFormat('id-ID', {
+    timeZone: 'Asia/Makassar',
+    weekday: 'long',
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric'
+  }).format(date);
+}
+
 export function formatDuration(minutes) {
   if (minutes == null || isNaN(minutes)) return '-';
   const h = Math.floor(minutes / 60);

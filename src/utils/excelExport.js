@@ -1,5 +1,6 @@
 import ExcelJS from 'exceljs';
 import { formatWitaTimeOnly, formatWitaDateOnly, formatWitaDateTime, formatDuration } from './time';
+import { resolveShift } from './shiftResolver';
 
 /**
  * Generates an executive, color-coded, professionally styled Excel (.xlsx) file
@@ -104,6 +105,7 @@ export async function exportTimesheetToExcel({ shifts = [], venueName = 'JP Kara
     { key: 'date', header: 'Tanggal', width: 14 },
     { key: 'venue', header: 'Outlet / Venue', width: 16 },
     { key: 'division', header: 'Divisi / Bagian', width: 18 },
+    { key: 'shift', header: 'Shift', width: 16 },
     { key: 'staff_name', header: 'Nama Karyawan', width: 26 },
     { key: 'checkin_time', header: 'Jam Masuk', width: 15 },
     { key: 'break_start_time', header: 'Mulai Istirahat', width: 16 },
@@ -184,12 +186,15 @@ export async function exportTimesheetToExcel({ shifts = [], venueName = 'JP Kara
       ? 'Sedang Bertugas'
       : '-';
 
+    const shiftInfo = resolveShift(shift);
+
     // Insert row values
     row.values = [
       index + 1,
       shift.date || (shift.checkin_time ? formatWitaDateOnly(shift.checkin_time) : '-'),
       venueText,
       shift.staff_division || shift.division || '-',
+      `${shiftInfo.badgeLabel} (${shiftInfo.timeRange})`,
       shift.staff_name || '-',
       shift.checkin_time ? formatWitaTimeOnly(shift.checkin_time) : '-',
       shift.break_start_time ? formatWitaTimeOnly(shift.break_start_time) : '-',
@@ -202,7 +207,7 @@ export async function exportTimesheetToExcel({ shifts = [], venueName = 'JP Kara
     ];
 
     // Style each cell in the row
-    for (let c = 1; c <= 13; c++) {
+    for (let c = 1; c <= 14; c++) {
       const cell = row.getCell(c);
       cell.font = { name: 'Segoe UI', size: 9.5, color: { argb: 'FF1E293B' } };
       cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: baseBgColor } };

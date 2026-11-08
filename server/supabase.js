@@ -13,6 +13,14 @@ export const supabase = isSupabaseConfigured
     })
   : null;
 
+function getWitaDateYMD(date = new Date()) {
+  const d = typeof date === 'string' ? new Date(date) : date;
+  if (isNaN(d.getTime())) return '';
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Makassar'
+  }).format(d);
+}
+
 if (isSupabaseConfigured) {
   console.log('✅ Supabase Cloud connected successfully:', supabaseUrl);
 } else {
@@ -197,22 +205,25 @@ export const cloudDb = {
   },
 
   // 3. Record Check-In in attendance_logs
-  async recordCheckin({ staffId, userLat, userLng, accuracy, distance, photoUrl, clientIp, wifiPass, flags, scheduledStart, scheduledEnd }) {
+  async recordCheckin({ staffId, userLat, userLng, accuracy, distance, photoUrl, clientIp, wifiPass, flags, scheduledStart, scheduledEnd, shiftNumber, shiftName }) {
     if (!supabase) return null;
     const staff = await findStaffInSupabase(staffId);
     if (!staff) throw new Error('Staff record not found: ' + staffId);
 
     const checkinTime = new Date().toISOString();
+    const shiftDate = getWitaDateYMD(checkinTime);
     const notesJson = JSON.stringify({
       scheduled_start: scheduledStart || staff.shift_start || '13:00',
-      scheduled_end: scheduledEnd || staff.shift_end || '22:00'
+      scheduled_end: scheduledEnd || staff.shift_end || '22:00',
+      shift_number: shiftNumber != null ? Number(shiftNumber) : null,
+      shift_name: shiftName || null
     });
 
     const { data, error } = await supabase
       .from('attendance_logs')
       .insert({
         staff_id: staff.id,
-        shift_date: checkinTime.split('T')[0],
+        shift_date: shiftDate,
         check_in_time: checkinTime,
         check_in_photo_url: photoUrl,
         check_in_lat: userLat,
@@ -463,9 +474,11 @@ export const cloudDb = {
         staff_role: st.role || 'Staff',
         staff_department: st.department || 'Operations',
         standard_hours: st.standard_hours || 8.5,
-        date: row.shift_date || (row.check_in_time ? row.check_in_time.split('T')[0] : ''),
+        date: row.shift_date || (row.check_in_time ? getWitaDateYMD(row.check_in_time) : ''),
         scheduled_start: parsedNotes.scheduled_start || st.shift_start || '13:00',
         scheduled_end: parsedNotes.scheduled_end || st.shift_end || '22:00',
+        shift_number: parsedNotes.shift_number != null ? Number(parsedNotes.shift_number) : null,
+        shift_name: parsedNotes.shift_name || null,
         checkin_time: row.check_in_time,
         checkin_lat: row.check_in_lat,
         checkin_lng: row.check_in_lng,
