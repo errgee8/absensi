@@ -95,6 +95,8 @@ export async function computeLeaderboard(targetMonthStr) {
       earlyBird15mCount: 0,
       earlyBird30mCount: 0,
       onTimeCount: 0,
+      earlyCheckoutCount: 0,
+      totalEarlyCheckoutSeconds: 0,
       perfectDays: 0
     };
   }
@@ -138,6 +140,45 @@ export async function computeLeaderboard(targetMonthStr) {
         if (early >= 1800) staffStats[sId].earlyBird30mCount++;
       }
     }
+
+    // Evaluate early checkout / pulang lebih awal
+    if (log.check_out_time) {
+      let schedEnd = '22:00';
+      try {
+        if (log.notes) {
+          const parsed = typeof log.notes === 'string' ? JSON.parse(log.notes) : log.notes;
+          if (parsed?.scheduled_end) schedEnd = parsed.scheduled_end;
+        }
+      } catch (e) {}
+
+      if (schedEnd === '22:00' && log.staff?.shift_end) {
+        schedEnd = log.staff.shift_end;
+      }
+
+      const flagsArr = Array.isArray(log.flags)
+        ? log.flags
+        : (typeof log.flags === 'string' ? JSON.parse(log.flags || '[]') : []);
+      const hasEarlyFlag = flagsArr.some(f => String(f).includes('EARLY_CHECKOUT'));
+
+      const dOut = new Date(log.check_out_time);
+      const witaOutStr = dOut.toLocaleTimeString('en-GB', { timeZone: 'Asia/Makassar', hour12: false });
+      const [oH, oM, oS] = witaOutStr.split(':').map(Number);
+      const checkOutSecs = (oH * 3600) + (oM * 60) + (oS || 0);
+
+      const [eH, eM] = schedEnd.split(':').map(Number);
+      const schedEndSecs = (eH * 3600) + (eM * 60);
+
+      let earlySecs = schedEndSecs - checkOutSecs;
+      // Handle shift ending past midnight (e.g. 03:00)
+      if (schedEndSecs < 12 * 3600 && checkOutSecs > 12 * 3600) {
+        earlySecs = (schedEndSecs + 24 * 3600) - checkOutSecs;
+      }
+
+      if (hasEarlyFlag || (earlySecs > 600 && earlySecs < 12 * 3600)) {
+        staffStats[sId].earlyCheckoutCount++;
+        staffStats[sId].totalEarlyCheckoutSeconds += Math.max(0, earlySecs);
+      }
+    }
   }
 
   const attendanceRanked = Object.values(staffStats).map(st => {
@@ -168,6 +209,8 @@ export async function computeLeaderboard(targetMonthStr) {
       early_bird_count: st.earlyBird15mCount,
       early_bird_30m_count: st.earlyBird30mCount,
       on_time_count: st.onTimeCount,
+      early_checkout_count: st.earlyCheckoutCount,
+      early_checkout_minutes: Math.round(st.totalEarlyCheckoutSeconds / 60),
       score: finalScore,
       breakdown: {
         workDaysScore,
@@ -286,6 +329,20 @@ export async function computeLeaderboard(targetMonthStr) {
     item.rank = idx + 1;
   });
 
+  // Single Candidate Spotlight: Staf Paling Butuh Semangat / Improvement (Hall of Wake-Up Call)
+  // Kriteria: Hari kerja paling sedikit, telat paling banyak, pulang lebih awal terbanyak
+  const attendeesPool = attendanceRanked.filter(a => a.total_days > 0);
+  const pool = attendeesPool.length > 0 ? attendeesPool : attendanceRanked;
+
+  const sortedImprovement = [...pool].sort((a, b) => {
+    if (b.total_late_seconds !== a.total_late_seconds) return b.total_late_seconds - a.total_late_seconds;
+    if (b.early_checkout_count !== a.early_checkout_count) return b.early_checkout_count - a.early_checkout_count;
+    if (a.total_days !== b.total_days) return a.total_days - b.total_days;
+    return a.score - b.score;
+  });
+
+  const needsImprovement = sortedImprovement[0] || null;
+
   return {
     period: {
       monthName,
@@ -297,6 +354,7 @@ export async function computeLeaderboard(targetMonthStr) {
       generatedAt: new Date().toISOString()
     },
     attendance: attendanceRanked,
-    toilet: toiletRanked
+    toilet: toiletRanked,
+    needsImprovement
   };
 }

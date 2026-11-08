@@ -18,7 +18,8 @@ import {
   Info,
   Building2,
   Columns,
-  Eye
+  Eye,
+  Coffee
 } from 'lucide-react';
 
 // Reusable Elegant Framed Avatar Component with Fallback
@@ -335,6 +336,112 @@ function LeaderboardColumn({
   );
 }
 
+// Special 1-Person Spotlight: Zona Butuh Semangat / Wake-Up Call Zone
+function NeedsImprovementSpotlight({ staff }) {
+  const [imgError, setImgError] = useState(false);
+  if (!staff) return null;
+
+  return (
+    <div className="rounded-3xl border-2 border-dashed border-amber-400/80 bg-gradient-to-r from-purple-950/70 via-slate-950/90 to-rose-950/60 p-4 sm:p-5 relative overflow-hidden shadow-2xl">
+      
+      {/* Playful background ambient glow */}
+      <div className="absolute top-0 right-10 w-52 h-28 bg-purple-600/20 blur-2xl pointer-events-none" />
+
+      <div className="flex flex-col md:flex-row items-center justify-between gap-4 relative z-10">
+        
+        {/* Left: Funny Avatar Frame with Zombie/Sleepy Effect */}
+        <div className="flex items-center space-x-4">
+          <div className="relative inline-block shrink-0 anim-zombie">
+            
+            {/* Funny Floating Zombie / Sleepy Badges */}
+            <div className="absolute -top-3 -left-2 z-20 bg-slate-950/95 border-2 border-amber-400 rounded-full px-2 py-0.5 text-xs shadow-lg font-black flex items-center space-x-1">
+              <span>🧟‍♂️</span>
+              <span className="text-[9px] text-amber-300 tracking-wider">ZOMBIE</span>
+            </div>
+            
+            <div className="absolute -bottom-2 -right-2 z-20 bg-purple-900 border-2 border-purple-400 rounded-full px-2 py-0.5 text-xs shadow-lg font-black">
+              <span>💤 😭</span>
+            </div>
+
+            {/* Quirky Wobbly Avatar Frame */}
+            <div className="w-18 h-18 sm:w-20 sm:h-20 rounded-2xl ring-4 ring-purple-500/70 border-2 border-dashed border-amber-400 overflow-hidden relative bg-slate-950 shadow-2xl flex items-center justify-center">
+              {staff.photo_url && !imgError ? (
+                <img
+                  src={staff.photo_url}
+                  alt={staff.name}
+                  onError={() => setImgError(true)}
+                  className="w-full h-full object-cover filter contrast-110"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center font-black text-2xl text-purple-300 bg-slate-900">
+                  {staff.name?.charAt(0)}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-rose-500/25 text-rose-300 border border-rose-500/40 flex items-center space-x-1 shadow-sm">
+                <span>☕ ZONA BUTUH NGOPI (WAKE-UP CALL)</span>
+              </span>
+              <span className="text-xs text-slate-400 font-bold">
+                {staff.venue} • {staff.division}
+              </span>
+            </div>
+            
+            <h4 className="text-base sm:text-lg font-black text-white mt-1">
+              {staff.name} <span className="text-xs text-slate-400 font-bold">({staff.role})</span>
+            </h4>
+            
+            <p className="text-xs text-amber-300/90 font-bold mt-0.5">
+              "Paling butuh kopi &amp; semangat bulan ini! Yuk bangkit, datang lebih awal, dan keluar dari zona ini!" ⚡
+            </p>
+          </div>
+        </div>
+
+        {/* Right: Metrics Chips & Motivational Callout */}
+        <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-3 w-full md:w-auto">
+          <div className="grid grid-cols-3 gap-2 w-full sm:w-auto text-center">
+            
+            <div className="bg-slate-950/80 p-2 sm:p-2.5 rounded-xl border border-slate-800">
+              <span className="text-[9px] text-slate-400 block uppercase font-black">Hari Kerja</span>
+              <span className="font-mono font-black text-rose-400 text-xs sm:text-sm">
+                {staff.total_days} / 26h
+              </span>
+            </div>
+
+            <div className="bg-slate-950/80 p-2 sm:p-2.5 rounded-xl border border-slate-800">
+              <span className="text-[9px] text-slate-400 block uppercase font-black">Total Telat</span>
+              <span className="font-mono font-black text-rose-400 text-xs sm:text-sm">
+                {staff.total_late_minutes}m
+              </span>
+            </div>
+
+            <div className="bg-slate-950/80 p-2 sm:p-2.5 rounded-xl border border-slate-800">
+              <span className="text-[9px] text-slate-400 block uppercase font-black">Pulang Awal</span>
+              <span className="font-mono font-black text-rose-400 text-xs sm:text-sm">
+                {staff.early_checkout_count}x
+              </span>
+            </div>
+
+          </div>
+        </div>
+
+      </div>
+
+      {/* Motivational Bottom Bar */}
+      <div className="mt-3.5 pt-2.5 border-t border-purple-500/30 text-[11px] text-slate-300 flex flex-col sm:flex-row sm:items-center justify-between gap-1 font-bold">
+        <span className="text-purple-300/90 flex items-center space-x-1.5">
+          <span>🎯</span>
+          <span>Bukan untuk mencela, tapi bahan evaluasi diri agar besok bisa datang 15 menit lebih awal dan raih bonus!</span>
+        </span>
+        <span className="text-amber-300 font-black">Target: Keluar dari Zona Zombie! 🚀</span>
+      </div>
+    </div>
+  );
+}
+
 export default function LeaderboardModal({ isOpen, onClose }) {
   if (!isOpen) return null;
 
@@ -365,11 +472,12 @@ export default function LeaderboardModal({ isOpen, onClose }) {
   const period = data?.period;
   const attendanceList = data?.attendance || [];
   const toiletList = data?.toilet || [];
+  const needsImprovementStaff = data?.needsImprovement;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 bg-slate-950/85 backdrop-blur-md animate-fade-in overflow-y-auto">
       
-      {/* Sparkles / Confetti CSS Keyframe Styles */}
+      {/* Festive & Zombie CSS Keyframe Styles */}
       <style>{`
         @keyframes festive-float {
           0% { transform: translateY(0px) rotate(0deg); opacity: 0.8; }
@@ -381,9 +489,17 @@ export default function LeaderboardModal({ isOpen, onClose }) {
           50% { opacity: 0.9; transform: scale(1.05); }
           100% { opacity: 0.3; transform: scale(0.95); }
         }
+        @keyframes zombie-wobble {
+          0% { transform: rotate(0deg); }
+          25% { transform: rotate(-3deg); }
+          50% { transform: rotate(3deg); }
+          75% { transform: rotate(-2deg); }
+          100% { transform: rotate(0deg); }
+        }
         .anim-float { animation: festive-float 3s ease-in-out infinite; }
         .anim-float-delay { animation: festive-float 3.5s ease-in-out 1.2s infinite; }
         .anim-shimmer { animation: festive-shimmer 2.5s ease-in-out infinite; }
+        .anim-zombie { animation: zombie-wobble 4s ease-in-out infinite; }
       `}</style>
 
       <div className="bg-slate-900 border-2 border-amber-400/40 rounded-3xl max-w-5xl w-full overflow-hidden shadow-2xl shadow-amber-500/10 flex flex-col max-h-[94vh] text-white relative">
@@ -441,8 +557,8 @@ export default function LeaderboardModal({ isOpen, onClose }) {
           </div>
         </div>
 
-        {/* Modal Scrollable Body: 2 Columns Side by Side */}
-        <div className="p-3 sm:p-5 overflow-y-auto space-y-4 custom-scrollbar">
+        {/* Modal Scrollable Body: 2 Columns Side by Side + Zombie Spotlight */}
+        <div className="p-3 sm:p-5 overflow-y-auto space-y-5 custom-scrollbar">
 
           {loading && !data && (
             <div className="py-24 text-center space-y-3">
@@ -486,6 +602,11 @@ export default function LeaderboardModal({ isOpen, onClose }) {
                 />
 
               </div>
+
+              {/* SPECIAL 1-PERSON SPOTLIGHT: ZONA BUTUH NGOPI / WAKE-UP CALL ZONE */}
+              {needsImprovementStaff && (
+                <NeedsImprovementSpotlight staff={needsImprovementStaff} />
+              )}
 
               {/* Informative Fair Play Footer Banner */}
               <div className="p-3.5 sm:p-4 rounded-2xl bg-gradient-to-r from-amber-500/10 via-yellow-500/5 to-slate-900 border border-amber-400/30 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-slate-300 font-bold">
