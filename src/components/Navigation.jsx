@@ -48,7 +48,7 @@ export default function Navigation({
             {/* WITA Live Clock */}
             <div className="flex items-center space-x-1.5 px-3 py-1.5 bg-blue-100 rounded-xl border-2 border-blue-300 text-xs font-mono font-black text-blue-950 shadow-sm">
               <Clock className="w-3.5 h-3.5 text-blue-700 stroke-[2.5]" />
-              <span>{timeStr || 'Loading...'} WITA</span>
+              <span>{timeStr || 'Memuat...'}</span>
             </div>
 
             {/* In Manager View: Show Switcher to Return to Kiosk or Lock */}

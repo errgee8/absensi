@@ -166,7 +166,7 @@ export default function PhotoDetailModal({ shift, type = 'in', onClose }) {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
             <div className="bg-slate-50 p-3.5 rounded-2xl border-2 border-slate-200">
               <span className="text-[10px] text-slate-700 uppercase font-black block mb-1">
-                Waktu Rekam (WITA)
+                Waktu Rekam
               </span>
               <span className="font-mono font-black text-slate-950 text-sm">
                 {time ? formatWitaDateTime(time) : 'Belum tercatat'}

@@ -41,7 +41,7 @@ export default function ShiftSuccessModal({ shift, type = 'checkin', onClose }) 
           </div>
 
           <div className="flex justify-between items-center">
-            <span className="text-slate-400">Time (WITA):</span>
+            <span className="text-slate-400">Waktu Absen:</span>
             <span className="font-mono font-bold text-emerald-400">
               {formatWitaTimeOnly(isCheckin ? shift.checkin_time : shift.checkout_time)}
             </span>
@@ -49,7 +49,7 @@ export default function ShiftSuccessModal({ shift, type = 'checkin', onClose }) 
 
           {!isCheckin && (
             <div className="flex justify-between items-center">
-              <span className="text-slate-400">Total Shift Duration:</span>
+              <span className="text-slate-400">Total Durasi Shift:</span>
               <span className="font-bold text-white">
                 {formatDuration(shift.duration_minutes)}
               </span>
@@ -57,9 +57,9 @@ export default function ShiftSuccessModal({ shift, type = 'checkin', onClose }) 
           )}
 
           <div className="flex justify-between items-center">
-            <span className="text-slate-400">Wi-Fi Status:</span>
+            <span className="text-slate-400">Status Wi-Fi:</span>
             <span className={`font-semibold ${shift.checkin_wifi_pass ? 'text-emerald-400' : 'text-amber-400'}`}>
-              {shift.checkin_wifi_pass ? 'Venue Network Verified' : 'Off-Network Flagged'}
+              {shift.checkin_wifi_pass ? 'Terverifikasi (Jaringan Outlet)' : 'Off-Network'}
             </span>
           </div>
 
