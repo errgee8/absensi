@@ -47,6 +47,26 @@ export async function updateShiftSchedule(id, payload) {
   return data;
 }
 
+export async function createShiftSchedule(payload) {
+  const res = await fetch(`${API_BASE}/schedules`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to create schedule');
+  return data;
+}
+
+export async function deleteShiftSchedule(id) {
+  const res = await fetch(`${API_BASE}/schedules/${id}`, {
+    method: 'DELETE'
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to delete schedule');
+  return data;
+}
+
 export async function verifyStaffPin({ staffId, pin }) {
   const res = await fetch(`${API_BASE}/staff/verify-pin`, {
     method: 'POST',

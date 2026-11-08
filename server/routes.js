@@ -111,24 +111,46 @@ router.get('/network-status', (req, res) => {
 // 3. Shift Schedules Management (Timing Editor)
 router.get('/schedules', async (req, res) => {
   let schedules = db.prepare('SELECT * FROM shift_schedules ORDER BY venue ASC, division ASC, shift_number ASC').all();
+  let breakWindows = {};
+
   if (isSupabaseConfigured) {
     try {
-      const { data: cloudSchedules, error } = await supabase
-        .from('shift_schedules')
-        .select('*')
-        .order('venue', { ascending: true })
-        .order('division', { ascending: true })
-        .order('shift_number', { ascending: true });
-      if (!error && cloudSchedules && cloudSchedules.length > 0) {
-        schedules = cloudSchedules.map((s) => ({
-          ...s,
-          is_flexible_checkout: s.is_flexible_checkout ? 1 : 0,
-          allows_break: s.allows_break ? 1 : 0
-        }));
-        for (const s of cloudSchedules) {
+      const [{ data: cloudSchedules, error: schedErr }, { data: bwRow }] = await Promise.all([
+        supabase
+          .from('shift_schedules')
+          .select('*')
+          .order('venue', { ascending: true })
+          .order('division', { ascending: true })
+          .order('shift_number', { ascending: true }),
+        supabase
+          .from('app_settings')
+          .select('value')
+          .eq('key', 'shift_break_windows')
+          .maybeSingle()
+      ]);
+
+      if (bwRow && bwRow.value && typeof bwRow.value === 'object') {
+        breakWindows = bwRow.value;
+      }
+
+      if (!schedErr && cloudSchedules && cloudSchedules.length > 0) {
+        schedules = cloudSchedules.map((s) => {
+          const normVenue = s.venue ? (s.venue.replace(/\s+/g, '').toLowerCase() === 'luckycat' ? 'LuckyCat' : s.venue) : 'LuckyCat';
+          const bw = breakWindows[String(s.id)] || {};
+          return {
+            ...s,
+            venue: normVenue,
+            is_flexible_checkout: s.is_flexible_checkout ? 1 : 0,
+            allows_break: s.allows_break ? 1 : 0,
+            break_start_time: bw.break_start_time || s.break_start_time || null,
+            max_break_end: bw.max_break_end || s.max_break_end || null
+          };
+        });
+
+        for (const s of schedules) {
           db.prepare(`
-            INSERT OR REPLACE INTO shift_schedules (id, venue, division, shift_number, name, start_time, end_time, is_flexible_checkout, allows_break, max_break_end)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT OR REPLACE INTO shift_schedules (id, venue, division, shift_number, name, start_time, end_time, is_flexible_checkout, allows_break, max_break_end, break_start_time)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           `).run(
             s.id,
             s.venue,
@@ -139,7 +161,8 @@ router.get('/schedules', async (req, res) => {
             s.end_time,
             s.is_flexible_checkout ? 1 : 0,
             s.allows_break ? 1 : 0,
-            s.max_break_end || null
+            s.max_break_end || null,
+            s.break_start_time || null
           );
         }
       }
@@ -147,35 +170,141 @@ router.get('/schedules', async (req, res) => {
       console.warn('Supabase fetch schedules note:', e.message);
     }
   }
+
+  // Ensure normalized venue
+  schedules = schedules.map((s) => ({
+    ...s,
+    venue: s.venue && s.venue.replace(/\s+/g, '').toLowerCase() === 'luckycat' ? 'LuckyCat' : s.venue
+  }));
+
   res.json(schedules);
+});
+
+router.post('/schedules', async (req, res) => {
+  const { venue, division, shift_number, name, start_time, end_time, is_flexible_checkout, allows_break, max_break_end, break_start_time } = req.body;
+
+  if (!division || !start_time || !end_time) {
+    return res.status(400).json({ error: 'Division, start time, and end time are required' });
+  }
+
+  const normVenue = venue && venue.replace(/\s+/g, '').toLowerCase() === 'luckycat' ? 'LuckyCat' : (venue || 'LuckyCat');
+  const shiftName = name || `Shift ${shift_number || 1}`;
+  const shiftNum = parseInt(shift_number, 10) || 1;
+
+  try {
+    let cloudId = null;
+
+    if (isSupabaseConfigured) {
+      try {
+        const { data: inserted, error: insErr } = await supabase.from('shift_schedules').insert({
+          venue: normVenue,
+          division: division.trim(),
+          shift_number: shiftNum,
+          name: shiftName.trim(),
+          start_time: start_time.trim(),
+          end_time: end_time.trim(),
+          is_flexible_checkout: Boolean(is_flexible_checkout),
+          allows_break: Boolean(allows_break),
+          max_break_end: max_break_end ? max_break_end.trim().substring(0, 10) : null
+        }).select().single();
+
+        if (!insErr && inserted) {
+          cloudId = inserted.id;
+        }
+      } catch (e) {
+        console.warn('Supabase insert schedule note:', e.message);
+      }
+    }
+
+    const info = db.prepare(`
+      INSERT INTO shift_schedules (id, venue, division, shift_number, name, start_time, end_time, is_flexible_checkout, allows_break, max_break_end, break_start_time)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      cloudId,
+      normVenue,
+      division.trim(),
+      shiftNum,
+      shiftName.trim(),
+      start_time.trim(),
+      end_time.trim(),
+      is_flexible_checkout ? 1 : 0,
+      allows_break ? 1 : 0,
+      max_break_end ? max_break_end.trim() : null,
+      break_start_time ? break_start_time.trim() : null
+    );
+
+    const assignedId = cloudId || info.lastInsertRowid;
+
+    if (isSupabaseConfigured) {
+      try {
+        const { data: bwRow } = await supabase.from('app_settings').select('value').eq('key', 'shift_break_windows').maybeSingle();
+        const currentBw = (bwRow && bwRow.value && typeof bwRow.value === 'object') ? bwRow.value : {};
+        currentBw[String(assignedId)] = {
+          allows_break: allows_break ? 1 : 0,
+          break_start_time: break_start_time ? break_start_time.trim() : null,
+          max_break_end: max_break_end ? max_break_end.trim() : null
+        };
+        await supabase.from('app_settings').upsert({
+          key: 'shift_break_windows',
+          value: currentBw,
+          updated_at: new Date().toISOString()
+        });
+      } catch (e) {}
+    }
+
+    broadcastEvent('SCHEDULES_UPDATE', { action: 'CREATED', id: assignedId });
+    res.json({ success: true, message: 'Shift schedule created successfully', id: assignedId });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
 });
 
 router.put('/schedules/:id', async (req, res) => {
   const { id } = req.params;
-  const { start_time, end_time, is_flexible_checkout, allows_break, max_break_end } = req.body;
+  const { venue, division, name, start_time, end_time, is_flexible_checkout, allows_break, max_break_end, break_start_time } = req.body;
 
   try {
     db.prepare(`
       UPDATE shift_schedules SET
+        venue = COALESCE(?, venue),
+        division = COALESCE(?, division),
+        name = COALESCE(?, name),
         start_time = COALESCE(?, start_time),
         end_time = COALESCE(?, end_time),
         is_flexible_checkout = COALESCE(?, is_flexible_checkout),
         allows_break = COALESCE(?, allows_break),
         max_break_end = COALESCE(?, max_break_end),
+        break_start_time = COALESCE(?, break_start_time),
         updated_at = datetime('now')
       WHERE id = ?
-    `).run(start_time, end_time, is_flexible_checkout, allows_break, max_break_end, id);
+    `).run(venue, division, name, start_time, end_time, is_flexible_checkout, allows_break, max_break_end, break_start_time, id);
 
     if (isSupabaseConfigured) {
       try {
         const updatePayload = { updated_at: new Date().toISOString() };
+        if (venue !== undefined) updatePayload.venue = venue.replace(/\s+/g, '').toLowerCase() === 'luckycat' ? 'LuckyCat' : venue;
+        if (division !== undefined) updatePayload.division = division;
+        if (name !== undefined) updatePayload.name = name;
         if (start_time !== undefined) updatePayload.start_time = start_time;
         if (end_time !== undefined) updatePayload.end_time = end_time;
         if (is_flexible_checkout !== undefined) updatePayload.is_flexible_checkout = Boolean(is_flexible_checkout);
         if (allows_break !== undefined) updatePayload.allows_break = Boolean(allows_break);
-        if (max_break_end !== undefined) updatePayload.max_break_end = max_break_end || null;
+        if (max_break_end !== undefined) updatePayload.max_break_end = max_break_end ? max_break_end.substring(0, 10) : null;
 
         await supabase.from('shift_schedules').update(updatePayload).eq('id', id);
+
+        const { data: bwRow } = await supabase.from('app_settings').select('value').eq('key', 'shift_break_windows').maybeSingle();
+        const currentBw = (bwRow && bwRow.value && typeof bwRow.value === 'object') ? bwRow.value : {};
+        currentBw[String(id)] = {
+          allows_break: allows_break ? 1 : 0,
+          break_start_time: break_start_time || currentBw[String(id)]?.break_start_time || null,
+          max_break_end: max_break_end || currentBw[String(id)]?.max_break_end || null
+        };
+        await supabase.from('app_settings').upsert({
+          key: 'shift_break_windows',
+          value: currentBw,
+          updated_at: new Date().toISOString()
+        });
       } catch (e) {
         console.warn('Supabase schedule update error:', e.message);
       }
@@ -183,6 +312,35 @@ router.put('/schedules/:id', async (req, res) => {
 
     broadcastEvent('SCHEDULES_UPDATE', { id });
     res.json({ success: true, message: 'Shift schedule timing updated' });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+router.delete('/schedules/:id', async (req, res) => {
+  const { id } = req.params;
+  try {
+    db.prepare('DELETE FROM shift_schedules WHERE id = ?').run(id);
+
+    if (isSupabaseConfigured) {
+      try {
+        await supabase.from('shift_schedules').delete().eq('id', id);
+        const { data: bwRow } = await supabase.from('app_settings').select('value').eq('key', 'shift_break_windows').maybeSingle();
+        if (bwRow && bwRow.value && bwRow.value[String(id)]) {
+          delete bwRow.value[String(id)];
+          await supabase.from('app_settings').upsert({
+            key: 'shift_break_windows',
+            value: bwRow.value,
+            updated_at: new Date().toISOString()
+          });
+        }
+      } catch (e) {
+        console.warn('Supabase delete schedule note:', e.message);
+      }
+    }
+
+    broadcastEvent('SCHEDULES_UPDATE', { action: 'DELETED', id });
+    res.json({ success: true, message: 'Shift schedule deleted' });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -342,16 +500,18 @@ router.post('/staff/verify-pin', async (req, res) => {
     } catch (e) {}
   }
 
-  // Fetch schedules for staff member's venue & division
+  // Fetch schedules for staff member's venue & division (normalize venue name)
+  const normVenue = staff.venue && staff.venue.replace(/\s+/g, '').toLowerCase() === 'luckycat' ? 'LuckyCat' : staff.venue;
   const schedules = db.prepare(`
     SELECT * FROM shift_schedules 
-    WHERE venue = ? AND division = ?
+    WHERE REPLACE(LOWER(venue), ' ', '') = REPLACE(LOWER(?), ' ', '') AND division = ?
     ORDER BY shift_number ASC
-  `).all(staff.venue, staff.division);
+  `).all(normVenue, staff.division);
 
   let detectedShift = null;
   let breakAllowed = false;
   let breakCutoffTime = '20:00';
+  let breakStartTime = null;
   let isWithin2HoursOfEnd = false;
 
   if (activeShift && activeShift.scheduled_start) {
@@ -369,14 +529,18 @@ router.post('/staff/verify-pin', async (req, res) => {
       allows_break: 1
     };
 
-    const timeAllowed = isBreakAllowedNow(shiftStart, shiftEnd, new Date());
+    breakStartTime = detectedShift?.break_start_time || null;
+    const breakEndTime = detectedShift?.max_break_end || cutoff.cutoffTimeStr;
+    const shiftAllowsBreak = Boolean(detectedShift?.allows_break);
+
+    const timeAllowed = isBreakAllowedNow(shiftStart, shiftEnd, new Date(), breakStartTime, breakEndTime);
     isWithin2HoursOfEnd = !timeAllowed;
     const breakCount = activeShift.break_count || 0;
     const isCompletedBreak = activeShift.break_status === 'COMPLETED';
     const isOnBreak = activeShift.break_status === 'ON_BREAK';
 
-    // Break is allowed: 1 break per shift, must be finished 2 hours before shift ends
-    breakAllowed = !isOnBreak && breakCount === 0 && !isCompletedBreak && timeAllowed;
+    // Break is allowed only if shift allows break, break not yet taken, and time is inside allowed break window
+    breakAllowed = shiftAllowsBreak && !isOnBreak && breakCount === 0 && !isCompletedBreak && timeAllowed;
   } else {
     // 30-minute auto-detect candidate
     detectedShift = detectShiftSchedule(schedules, new Date());
@@ -394,8 +558,9 @@ router.post('/staff/verify-pin', async (req, res) => {
       shift_start: detectedShift?.start_time || staff.shift_start || '13:00',
       shift_end: detectedShift?.end_time || staff.shift_end || '22:00',
       standard_hours: staff.standard_hours,
-      allows_break: 1,
-      max_break_end: breakCutoffTime,
+      allows_break: detectedShift?.allows_break ?? 1,
+      break_start_time: breakStartTime,
+      max_break_end: detectedShift?.max_break_end || breakCutoffTime,
       breakAllowed,
       breakCutoffTime,
       isWithin2HoursOfEnd,

@@ -39,6 +39,7 @@ db.exec(`
     is_flexible_checkout INTEGER DEFAULT 0,
     allows_break INTEGER DEFAULT 0,
     max_break_end TEXT,
+    break_start_time TEXT,
     created_at TEXT DEFAULT (datetime('now')),
     updated_at TEXT DEFAULT (datetime('now'))
   );

@@ -53,18 +53,40 @@ export function getBreakCutoff(endTimeStr) {
 
 /**
  * Checks whether staff is currently allowed to start a break.
- * Rule: Break must be finished 2 hours before shift ends (no break allowed within 2 hours of shift end).
+ * Rules:
+ *  1. If break window (breakStartWindow & breakEndWindow) is specified, current time must fall inside this window.
+ *  2. Hard constraint: Break must be finished at least 2 hours before shift ends.
  */
-export function isBreakAllowedNow(startTimeStr, endTimeStr, checkTime = new Date()) {
+export function isBreakAllowedNow(startTimeStr, endTimeStr, checkTime = new Date(), breakStartWindow = null, breakEndWindow = null) {
   if (!startTimeStr || !endTimeStr) return true;
 
   const curTimeStr = typeof checkTime === 'string' && checkTime.includes(':') && !checkTime.includes('T')
     ? checkTime
     : getWitaTimeString(checkTime);
 
+  const curM = toMinutes(curTimeStr);
+
+  // 1. Explicit Break Window (e.g. allowed break button shown from xx to xx)
+  if (breakStartWindow && breakEndWindow) {
+    const bStartM = toMinutes(breakStartWindow);
+    const bEndM = toMinutes(breakEndWindow);
+    if (bEndM >= bStartM) {
+      if (curM < bStartM || curM > bEndM) return false;
+    } else {
+      // Overnight break window (e.g. 23:00 to 02:00)
+      if (curM < bStartM && curM > bEndM) return false;
+    }
+  } else if (breakStartWindow) {
+    const bStartM = toMinutes(breakStartWindow);
+    if (curM < bStartM) return false;
+  } else if (breakEndWindow) {
+    const bEndM = toMinutes(breakEndWindow);
+    if (curM > bEndM) return false;
+  }
+
+  // 2. 2-Hours Before Shift End Cutoff
   const startM = toMinutes(startTimeStr);
   const endM = toMinutes(endTimeStr);
-  const curM = toMinutes(curTimeStr);
   const { cutoffMinutes } = getBreakCutoff(endTimeStr);
 
   const isOvernight = endM < startM;
@@ -73,7 +95,6 @@ export function isBreakAllowedNow(startTimeStr, endTimeStr, checkTime = new Date
     return curM <= cutoffMinutes;
   } else {
     // Overnight shift (e.g. 18:30 - 03:00, cutoff 01:00, end 03:00)
-    // Between cutoff (01:00) and end (03:00) is the forbidden window!
     if (curM > cutoffMinutes && curM < endM) {
       return false;
     }
