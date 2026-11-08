@@ -1075,36 +1075,70 @@ router.post('/checkin', async (req, res) => {
 router.post('/break/start', async (req, res) => {
   const { shiftId, staffId, pin, photoBase64, timestamp, lat, lng } = req.body;
 
-  let staff = db.prepare('SELECT * FROM staff WHERE id = ?').get(staffId);
-  if (!staff && isSupabaseConfigured) {
+  let staff = null;
+  if (isSupabaseConfigured) {
     const supaStaff = await findStaffInSupabase(staffId);
     if (supaStaff) {
       staff = { ...supaStaff, id: supaStaff.legacy_code || supaStaff.id, uuid: supaStaff.id };
     }
   }
+  if (!staff) {
+    staff = db.prepare('SELECT * FROM staff WHERE id = ?').get(staffId);
+  }
 
   if (!staff) return res.status(404).json({ error: 'Karyawan tidak ditemukan.' });
 
-  let shift;
-  if (shiftId) {
-    shift = db.prepare('SELECT * FROM shifts WHERE id = ?').get(shiftId);
-  } else {
-    shift = db.prepare("SELECT * FROM shifts WHERE staff_id = ? AND status != 'COMPLETED' ORDER BY id DESC LIMIT 1").get(staff.id);
+  let shift = null;
+  const isShiftUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(shiftId || ''));
+
+  if (isShiftUuid && isSupabaseConfigured) {
+    try {
+      const { data: cloudShift } = await supabase
+        .from('attendance_logs')
+        .select('*')
+        .eq('id', shiftId)
+        .maybeSingle();
+
+      if (cloudShift) {
+        let parsedNotes = {};
+        try { parsedNotes = JSON.parse(cloudShift.notes || '{}'); } catch {}
+        shift = {
+          id: cloudShift.id,
+          supabase_id: cloudShift.id,
+          staff_id: staff.id,
+          status: cloudShift.status,
+          break_status: cloudShift.status === 'ON_BREAK' ? 'ON_BREAK' : 'NONE',
+          flags: JSON.stringify(cloudShift.flags || []),
+          checkin_time: cloudShift.check_in_time,
+          scheduled_start: parsedNotes.scheduled_start || staff.shift_start || '13:00',
+          scheduled_end: parsedNotes.scheduled_end || staff.shift_end || '22:00'
+        };
+      }
+    } catch (e) {}
+  }
+
+  if (!shift && shiftId && !isShiftUuid) {
+    try { shift = db.prepare('SELECT * FROM shifts WHERE id = ?').get(shiftId); } catch {}
+  }
+  if (!shift) {
+    try { shift = db.prepare("SELECT * FROM shifts WHERE staff_id = ? AND status != 'COMPLETED' ORDER BY id DESC LIMIT 1").get(staff.id); } catch {}
   }
 
   // Cloud fallback if shift is missing in this serverless container
-  if (!shift && isSupabaseConfigured) {
+  if (!shift && isSupabaseConfigured && staff?.uuid) {
     try {
       const { data } = await supabase
         .from('attendance_logs')
         .select('*')
-        .eq('staff_id', staff.uuid || staff.id)
+        .eq('staff_id', staff.uuid)
         .neq('status', 'COMPLETED')
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle();
 
       if (data) {
+        let parsedNotes = {};
+        try { parsedNotes = JSON.parse(data.notes || '{}'); } catch {}
         shift = {
           id: data.id,
           supabase_id: data.id,
@@ -1112,7 +1146,9 @@ router.post('/break/start', async (req, res) => {
           status: data.status,
           break_status: data.status === 'ON_BREAK' ? 'ON_BREAK' : 'NONE',
           flags: JSON.stringify(data.flags || []),
-          checkin_time: data.check_in_time
+          checkin_time: data.check_in_time,
+          scheduled_start: parsedNotes.scheduled_start || staff.shift_start || '13:00',
+          scheduled_end: parsedNotes.scheduled_end || staff.shift_end || '22:00'
         };
       }
     } catch (e) {}
@@ -1196,28 +1232,60 @@ router.post('/break/start', async (req, res) => {
 router.post('/break/end', async (req, res) => {
   const { shiftId, staffId, pin, photoBase64, timestamp, lat, lng } = req.body;
 
-  let staff = db.prepare('SELECT * FROM staff WHERE id = ?').get(staffId);
-  if (!staff && isSupabaseConfigured) {
+  let staff = null;
+  if (isSupabaseConfigured) {
     const supaStaff = await findStaffInSupabase(staffId);
     if (supaStaff) {
       staff = { ...supaStaff, id: supaStaff.legacy_code || supaStaff.id, uuid: supaStaff.id };
     }
   }
+  if (!staff) {
+    staff = db.prepare('SELECT * FROM staff WHERE id = ?').get(staffId);
+  }
 
-  let shift;
-  if (shiftId) {
-    shift = db.prepare('SELECT s.*, st.venue, st.division, st.shift_start FROM shifts s JOIN staff st ON s.staff_id = st.id WHERE s.id = ?').get(shiftId);
-  } else if (staff) {
-    shift = db.prepare("SELECT s.*, st.venue, st.division, st.shift_start FROM shifts s JOIN staff st ON s.staff_id = st.id WHERE s.staff_id = ? AND s.status != 'COMPLETED' ORDER BY s.id DESC LIMIT 1").get(staff.id);
+  let shift = null;
+  const isShiftUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(shiftId || ''));
+
+  if (isShiftUuid && isSupabaseConfigured) {
+    try {
+      const { data: cloudShift } = await supabase
+        .from('attendance_logs')
+        .select('*')
+        .eq('id', shiftId)
+        .maybeSingle();
+
+      if (cloudShift) {
+        let parsedNotes = {};
+        try { parsedNotes = JSON.parse(cloudShift.notes || '{}'); } catch {}
+        shift = {
+          id: cloudShift.id,
+          supabase_id: cloudShift.id,
+          staff_id: staff?.id || staffId,
+          status: cloudShift.status,
+          break_status: 'ON_BREAK',
+          break_start_time: cloudShift.created_at,
+          flags: JSON.stringify(cloudShift.flags || []),
+          venue: staff?.venue || 'JP Karaoke',
+          division: staff?.division || 'Server and Cashier'
+        };
+      }
+    } catch (e) {}
+  }
+
+  if (!shift && shiftId && !isShiftUuid) {
+    try { shift = db.prepare('SELECT s.*, st.venue, st.division, st.shift_start FROM shifts s JOIN staff st ON s.staff_id = st.id WHERE s.id = ?').get(shiftId); } catch {}
+  }
+  if (!shift && staff) {
+    try { shift = db.prepare("SELECT s.*, st.venue, st.division, st.shift_start FROM shifts s JOIN staff st ON s.staff_id = st.id WHERE s.staff_id = ? AND s.status != 'COMPLETED' ORDER BY s.id DESC LIMIT 1").get(staff.id); } catch {}
   }
 
   // Cloud fallback if shift is missing in SQLite
-  if (!shift && isSupabaseConfigured && staff) {
+  if (!shift && isSupabaseConfigured && staff?.uuid) {
     try {
       const { data } = await supabase
         .from('attendance_logs')
         .select('*')
-        .eq('staff_id', staff.uuid || staff.id)
+        .eq('staff_id', staff.uuid)
         .eq('status', 'ON_BREAK')
         .order('created_at', { ascending: false })
         .limit(1)
@@ -1334,34 +1402,80 @@ router.post('/break/end', async (req, res) => {
 router.post('/checkout', async (req, res) => {
   const { shiftId, staffId, pin, lat, lng, accuracy, photoBase64, timestamp, notes } = req.body;
 
-  let staff = db.prepare('SELECT * FROM staff WHERE id = ?').get(staffId);
-  if (!staff && isSupabaseConfigured) {
+  let staff = null;
+  if (isSupabaseConfigured) {
     const supaStaff = await findStaffInSupabase(staffId);
     if (supaStaff) {
       staff = { ...supaStaff, id: supaStaff.legacy_code || supaStaff.id, uuid: supaStaff.id };
     }
   }
-
-  let shift;
-  if (shiftId) {
-    shift = db.prepare('SELECT s.*, st.standard_hours, st.pin, st.is_active, st.venue, st.division FROM shifts s JOIN staff st ON s.staff_id = st.id WHERE s.id = ?').get(shiftId);
-  } else if (staff) {
-    shift = db.prepare("SELECT s.*, st.standard_hours, st.pin, st.is_active, st.venue, st.division FROM shifts s JOIN staff st ON s.staff_id = st.id WHERE s.staff_id = ? AND s.status != 'COMPLETED' ORDER BY s.id DESC LIMIT 1").get(staff.id);
+  if (!staff) {
+    staff = db.prepare('SELECT * FROM staff WHERE id = ?').get(staffId);
   }
 
-  // Cloud fallback if shift not in SQLite container
-  if (!shift && isSupabaseConfigured && staff) {
+  let shift = null;
+
+  // 1. Direct Supabase Cloud lookup by shiftId if it's a UUID
+  const isShiftUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(shiftId || ''));
+  if (isShiftUuid && isSupabaseConfigured) {
+    try {
+      const { data: cloudShift } = await supabase
+        .from('attendance_logs')
+        .select('*')
+        .eq('id', shiftId)
+        .maybeSingle();
+
+      if (cloudShift) {
+        let parsedNotes = {};
+        try { parsedNotes = JSON.parse(cloudShift.notes || '{}'); } catch {}
+        shift = {
+          id: cloudShift.id,
+          supabase_id: cloudShift.id,
+          staff_id: staff?.id || staffId,
+          checkin_time: cloudShift.check_in_time,
+          status: cloudShift.status,
+          flags: JSON.stringify(cloudShift.flags || []),
+          scheduled_start: parsedNotes.scheduled_start || staff?.shift_start || '13:00',
+          scheduled_end: parsedNotes.scheduled_end || staff?.shift_end || '22:00',
+          standard_hours: staff?.standard_hours || 8.5,
+          venue: staff?.venue || 'JP Karaoke',
+          division: staff?.division || 'Server and Cashier',
+          pin: staff?.pin
+        };
+      }
+    } catch (e) {
+      console.warn('Supabase checkout shiftId lookup note:', e.message);
+    }
+  }
+
+  // 2. Local SQLite lookup if not found yet
+  if (!shift && shiftId && !isShiftUuid) {
+    try {
+      shift = db.prepare('SELECT s.*, st.standard_hours, st.pin, st.is_active, st.venue, st.division FROM shifts s JOIN staff st ON s.staff_id = st.id WHERE s.id = ?').get(shiftId);
+    } catch {}
+  }
+
+  if (!shift && staff) {
+    try {
+      shift = db.prepare("SELECT s.*, st.standard_hours, st.pin, st.is_active, st.venue, st.division FROM shifts s JOIN staff st ON s.staff_id = st.id WHERE s.staff_id = ? AND s.status != 'COMPLETED' ORDER BY s.id DESC LIMIT 1").get(staff.id);
+    } catch {}
+  }
+
+  // 3. Fallback to Supabase Cloud active shift by staff UUID
+  if (!shift && isSupabaseConfigured && staff?.uuid) {
     try {
       const { data } = await supabase
         .from('attendance_logs')
         .select('*')
-        .eq('staff_id', staff.uuid || staff.id)
+        .eq('staff_id', staff.uuid)
         .neq('status', 'COMPLETED')
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle();
 
       if (data) {
+        let parsedNotes = {};
+        try { parsedNotes = JSON.parse(data.notes || '{}'); } catch {}
         shift = {
           id: data.id,
           supabase_id: data.id,
@@ -1369,13 +1483,17 @@ router.post('/checkout', async (req, res) => {
           checkin_time: data.check_in_time,
           status: data.status,
           flags: JSON.stringify(data.flags || []),
+          scheduled_start: parsedNotes.scheduled_start || staff.shift_start || '13:00',
+          scheduled_end: parsedNotes.scheduled_end || staff.shift_end || '22:00',
           standard_hours: staff.standard_hours || 8.5,
           venue: staff.venue,
           division: staff.division,
           pin: staff.pin
         };
       }
-    } catch (e) {}
+    } catch (e) {
+      console.warn('Supabase checkout staff.uuid fallback note:', e.message);
+    }
   }
 
   if (!shift) return res.status(404).json({ error: 'Tidak ditemukan shift aktif untuk Check-Out.' });
