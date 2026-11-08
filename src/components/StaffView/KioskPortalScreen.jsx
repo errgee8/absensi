@@ -1,5 +1,5 @@
 import React from 'react';
-import { Camera, Sparkles, QrCode, LogOut, CheckCircle, Clock, Building2, User, Coffee, ArrowRight, ShieldCheck } from 'lucide-react';
+import { Camera, Sparkles, QrCode, LogOut, CheckCircle, Clock, Building2, User, Coffee, ArrowRight, ShieldCheck, Star } from 'lucide-react';
 
 export default function KioskPortalScreen({
   staff,
@@ -85,57 +85,110 @@ export default function KioskPortalScreen({
         </span>
       </div>
 
-      {/* Two Big Action Portal Cards - Clear Borders, High Contrast Text */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {/* Card 1: Absensi & Waktu Kerja */}
+      {/* Action Options Prompt */}
+      <div className="flex items-center justify-between px-1">
+        <span className="text-xs font-black uppercase tracking-wider text-slate-900">
+          Pilih Aktivitas Anda:
+        </span>
+        <span className="text-[11px] font-black text-blue-800 bg-blue-100 px-3 py-1 rounded-full border border-blue-300 flex items-center space-x-1">
+          <Star className="w-3 h-3 text-amber-500 fill-amber-500" />
+          <span>Absensi adalah Menu Utama</span>
+        </span>
+      </div>
+
+      {/* Action Portal Cards: Card 1 (Absensi) is Made Highly Prominent & Dominant */}
+      <div className="space-y-4">
+        {/* CARD 1: PRIMARY ACTION - ABSENSI KERJA (Check-In / Break / Pulang) */}
         <button
           type="button"
           onClick={onSelectAttendance}
-          className="bg-white rounded-3xl p-5 border-2 border-slate-300 hover:border-blue-600 shadow-md hover:shadow-xl transition-all text-left flex flex-col justify-between group touch-press"
+          className="w-full relative bg-white rounded-3xl p-6 sm:p-7 border-3 border-blue-600 shadow-xl shadow-blue-600/15 ring-4 ring-blue-500/10 hover:ring-blue-500/25 transition-all text-left flex flex-col justify-between group touch-press overflow-hidden"
         >
+          {/* Top colored accent bar */}
+          <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-emerald-500" />
+
           <div>
-            <div className="w-13 h-13 w-12 h-12 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-600 text-white flex items-center justify-center mb-4 shadow-md shadow-emerald-600/30 group-hover:scale-105 transition">
-              <Camera className="w-6 h-6 stroke-[2.5]" />
+            {/* High Priority Badge */}
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-3.5">
+              <span className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-blue-600 text-white shadow-md shadow-blue-600/30">
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>1. UTAMA: WAJIB DI AWAL &amp; AKHIR SHIFT</span>
+              </span>
+              <span className="text-xs font-black text-blue-700 animate-pulse hidden sm:inline">
+                Pencet Di Sini Untuk Absen →
+              </span>
             </div>
-            <h3 className="text-lg font-black text-slate-950 group-hover:text-blue-700 transition">
-              1. Absensi Kerja
-            </h3>
-            <p className="text-xs text-slate-700 font-semibold mt-1.5 leading-relaxed">
-              {isOnBreak
-                ? 'Tekan tombol ini untuk menyelesaikan waktu istirahat dan kembali bertugas.'
-                : isCheckedIn
-                ? 'Ambil waktu istirahat atau lakukan check-out saat jam pulang shift.'
-                : 'Ambil foto selfie langsung untuk Check-In masuk dinas hari ini.'}
-            </p>
+
+            <div className="flex items-start space-x-4">
+              <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-700 text-white flex items-center justify-center shrink-0 shadow-lg shadow-blue-600/35 group-hover:scale-105 transition">
+                <Camera className="w-7 h-7 sm:w-8 sm:h-8 stroke-[2.5]" />
+              </div>
+              <div className="flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h3 className="text-xl sm:text-2xl font-black text-slate-950 group-hover:text-blue-700 transition tracking-tight">
+                    Absensi Kerja
+                  </h3>
+                  <span className="px-2.5 py-0.5 rounded-lg text-[10px] font-black uppercase bg-emerald-100 text-emerald-950 border border-emerald-300">
+                    {isOnBreak ? 'Selesai Istirahat' : isCheckedIn ? 'Pulang / Istirahat' : 'Check-In Masuk'}
+                  </span>
+                </div>
+
+                <p className="text-xs sm:text-sm text-slate-700 font-bold mt-1.5 leading-relaxed">
+                  {isOnBreak
+                    ? 'Tekan tombol ini untuk foto selfie selesai istirahat dan kembali dinas.'
+                    : isCheckedIn
+                    ? 'Tekan tombol ini untuk mengambil istirahat (bila ada) atau ambil foto check-out saat pulang kerja.'
+                    : 'Untuk staf yang baru tiba di outlet: Ambil foto selfie langsung untuk Check-In masuk dinas hari ini.'}
+                </p>
+              </div>
+            </div>
           </div>
 
-          <div className="pt-4 mt-4 border-t border-slate-200 flex items-center justify-between text-xs font-black text-blue-700">
-            <span>Buka Menu Absensi</span>
-            <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition stroke-[2.5]" />
+          {/* Prominent Large Solid CTA Button */}
+          <div className="mt-5 w-full py-4 px-6 rounded-2xl bg-blue-600 group-hover:bg-blue-700 text-white font-black text-sm sm:text-base flex items-center justify-center space-x-2.5 shadow-lg shadow-blue-600/30 transition">
+            <Camera className="w-5 h-5 stroke-[2.5]" />
+            <span>
+              {isOnBreak
+                ? 'BUKA MENU SELESAI ISTIRAHAT'
+                : isCheckedIn
+                ? 'BUKA MENU PULANG / ISTIRAHAT'
+                : 'BUKA MENU CHECK-IN MASUK'}
+            </span>
+            <ArrowRight className="w-5 h-5 group-hover:translate-x-1.5 transition stroke-[2.5]" />
           </div>
         </button>
 
-        {/* Card 2: Scan QR Checklist Toilet */}
+        {/* CARD 2: SECONDARY ACTION - SCAN QR CHECKLIST TOILET */}
         <button
           type="button"
           onClick={onSelectToilet}
-          className="bg-white rounded-3xl p-5 border-2 border-slate-300 hover:border-indigo-600 shadow-md hover:shadow-xl transition-all text-left flex flex-col justify-between group touch-press"
+          className="w-full bg-slate-50 hover:bg-white rounded-3xl p-5 border-2 border-slate-300 hover:border-slate-400 shadow-sm hover:shadow-md transition-all text-left flex flex-col justify-between group touch-press"
         >
           <div>
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-700 text-white flex items-center justify-center mb-4 shadow-md shadow-indigo-600/30 group-hover:scale-105 transition">
-              <QrCode className="w-6 h-6 stroke-[2.5]" />
+            <div className="flex items-center justify-between mb-2">
+              <span className="inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-slate-200 text-slate-700 border border-slate-300">
+                <span>2. Opsi Tambahan (Bila Sedang Bertugas)</span>
+              </span>
             </div>
-            <h3 className="text-lg font-black text-slate-950 group-hover:text-indigo-700 transition">
-              2. Scan QR Toilet
-            </h3>
-            <p className="text-xs text-slate-700 font-semibold mt-1.5 leading-relaxed">
-              Pembersihan toilet JP &amp; LC. Arahkan kamera ke stiker QR di toilet untuk mengisi checklist berkala.
-            </p>
+
+            <div className="flex items-start space-x-3.5">
+              <div className="w-11 h-11 rounded-2xl bg-slate-200 text-slate-700 group-hover:bg-indigo-600 group-hover:text-white flex items-center justify-center shrink-0 transition">
+                <QrCode className="w-5 h-5 stroke-[2.5]" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-base font-black text-slate-800 group-hover:text-slate-950 transition">
+                  Scan QR Checklist Toilet
+                </h3>
+                <p className="text-xs text-slate-600 font-semibold mt-0.5 leading-relaxed">
+                  Khusus saat membersihkan toilet JP &amp; LC. Arahkan kamera HP ke stiker QR di toilet untuk mengisi form kebersihan berkala.
+                </p>
+              </div>
+            </div>
           </div>
 
-          <div className="pt-4 mt-4 border-t border-slate-200 flex items-center justify-between text-xs font-black text-indigo-700">
+          <div className="pt-3 mt-3 border-t border-slate-200 flex items-center justify-between text-xs font-black text-slate-700 group-hover:text-indigo-700">
             <span>Scan Stiker Toilet</span>
-            <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition stroke-[2.5]" />
+            <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition stroke-[2.5]" />
           </div>
         </button>
       </div>
