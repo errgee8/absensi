@@ -1,17 +1,30 @@
-import React, { useState } from 'react';
-import { X, Save, MapPin, Wifi, Shield, RefreshCw } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, Save, MapPin, Wifi, Shield, RefreshCw, Clock, ArrowRight } from 'lucide-react';
 import { updateSettings } from '../../utils/api';
 
-export default function VenueSettingsModal({ settings, onClose, onSaved }) {
-  const [venueName, setVenueName] = useState(settings?.venue_name || '');
+export default function VenueSettingsModal({ settings, onClose, onSaved, onGoToSchedules }) {
+  const [venueName, setVenueName] = useState(settings?.venue_name || 'JP Karaoke & LuckyCat Outlets');
   const [lat, setLat] = useState(settings?.venue_lat ?? -8.780981);
   const [lng, setLng] = useState(settings?.venue_lng ?? 115.176863);
-  const [radius, setRadius] = useState(settings?.geofence_radius ?? 500);
+  const [radius, setRadius] = useState(settings?.geofence_radius ?? 150);
   const [subnets, setSubnets] = useState(
     Array.isArray(settings?.allowed_subnets) ? settings.allowed_subnets.join('\n') : ''
   );
   const [enforceWifi, setEnforceWifi] = useState(Boolean(settings?.enforce_wifi));
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (settings) {
+      if (settings.venue_name !== undefined) setVenueName(settings.venue_name);
+      if (settings.venue_lat !== undefined) setLat(settings.venue_lat);
+      if (settings.venue_lng !== undefined) setLng(settings.venue_lng);
+      if (settings.geofence_radius !== undefined) setRadius(settings.geofence_radius);
+      if (settings.allowed_subnets !== undefined) {
+        setSubnets(Array.isArray(settings.allowed_subnets) ? settings.allowed_subnets.join('\n') : '');
+      }
+      if (settings.enforce_wifi !== undefined) setEnforceWifi(Boolean(settings.enforce_wifi));
+    }
+  }, [settings]);
 
   // Helper to grab browser GPS as venue pin
   const handleUseCurrentGps = () => {
@@ -63,7 +76,7 @@ export default function VenueSettingsModal({ settings, onClose, onSaved }) {
               <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center">
                 <Shield className="w-4 h-4" />
               </div>
-              <h3 className="text-base font-bold text-white">Venue Geofence & Wi-Fi Gatekeeper Settings</h3>
+              <h3 className="text-base font-bold text-white">Pengaturan Lokasi, Geofence & Wi-Fi</h3>
             </div>
             <button
               type="button"
@@ -73,6 +86,24 @@ export default function VenueSettingsModal({ settings, onClose, onSaved }) {
               <X className="w-4 h-4" />
             </button>
           </div>
+
+          {/* Quick link to Shift Timing & Division Settings */}
+          {onGoToSchedules && (
+            <div className="mx-5 mt-4 p-3 bg-indigo-950/40 border border-indigo-700/50 rounded-2xl flex items-center justify-between">
+              <div className="flex items-center space-x-2 text-indigo-300">
+                <Clock className="w-4 h-4 text-indigo-400 flex-shrink-0" />
+                <span className="text-[11px] font-medium">Ingin mengatur jam kerja & divisi?</span>
+              </div>
+              <button
+                type="button"
+                onClick={onGoToSchedules}
+                className="text-[11px] font-bold text-indigo-300 hover:text-white bg-indigo-600/40 hover:bg-indigo-600 px-2.5 py-1 rounded-lg border border-indigo-500/40 transition flex items-center space-x-1"
+              >
+                <span>Buka Jadwal Divisi</span>
+                <ArrowRight className="w-3 h-3" />
+              </button>
+            </div>
+          )}
 
           {/* Form Content */}
           <div className="p-5 space-y-4 text-xs">

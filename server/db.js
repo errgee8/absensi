@@ -136,7 +136,7 @@ const initSettings = () => {
     admin_pin: '8080',
     venue_lat: -8.780981,
     venue_lng: 115.176863,
-    geofence_radius: 500,
+    geofence_radius: 150,
     allowed_subnets: [
       '192.168.1.0/24',
       '192.168.0.0/24',
@@ -152,14 +152,18 @@ const initSettings = () => {
   };
 
   for (const [key, val] of Object.entries(defaults)) {
-    if (getSetting(key) === null || key === 'venue_lat' || key === 'venue_lng' || key === 'geofence_radius') {
+    if (getSetting(key) === null) {
       setSetting(key, val);
     }
   }
 };
 
 // Seed Shift Schedules (Exact Timings per prompt specifications)
-export const initShiftSchedules = () => {
+export const initShiftSchedules = (force = false) => {
+  const existingCount = db.prepare('SELECT COUNT(*) as count FROM shift_schedules').get()?.count || 0;
+  if (existingCount >= 10 && !force) {
+    return;
+  }
   db.exec('DELETE FROM shift_schedules');
 
   const schedules = [

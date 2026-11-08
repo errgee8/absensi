@@ -129,7 +129,7 @@ export default function ManagerDashboard({ venueSettings, refreshSettings }) {
               }`}
             >
               <LayoutDashboard className="w-4 h-4" />
-              <span>Shift Activity & Anomaly Audit</span>
+              <span>Riwayat & Audit Shift</span>
             </button>
 
             <button
@@ -141,7 +141,7 @@ export default function ManagerDashboard({ venueSettings, refreshSettings }) {
               }`}
             >
               <Clock className="w-4 h-4" />
-              <span>Shift Timing Settings</span>
+              <span>Pengaturan Divisi & Jam Kerja (Shift Templates)</span>
             </button>
 
             <button
@@ -153,7 +153,7 @@ export default function ManagerDashboard({ venueSettings, refreshSettings }) {
               }`}
             >
               <Users className="w-4 h-4" />
-              <span>Staff Provisioning & PINs</span>
+              <span>Pengaturan Staff & PIN</span>
             </button>
           </div>
 
@@ -224,6 +224,10 @@ export default function ManagerDashboard({ venueSettings, refreshSettings }) {
             onSaved={() => {
               refreshSettings();
               loadData();
+            }}
+            onGoToSchedules={() => {
+              setSettingsOpen(false);
+              setActiveTab('SCHEDULES');
             }}
           />
         )}

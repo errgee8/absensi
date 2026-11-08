@@ -10,15 +10,11 @@ export default function StaffManagementTab({ onStaffUpdated }) {
 
   // Add staff modal state
   const [modalOpen, setModalOpen] = useState(false);
-  const [newVenue, setNewVenue] = useState('JP Karaoke');
-  const [newDivision, setNewDivision] = useState('Server and Cashier');
+  const [newVenue, setNewVenue] = useState('LuckyCat');
+  const [selectedRoleOption, setSelectedRoleOption] = useState('Server');
   const [newName, setNewName] = useState('');
-  const [newRole, setNewRole] = useState('Cashier');
   const [newPin, setNewPin] = useState('');
   const [newStatus, setNewStatus] = useState(true);
-  const [newShiftStart, setNewShiftStart] = useState('13:00');
-  const [newShiftEnd, setNewShiftEnd] = useState('22:00');
-  const [newHours, setNewHours] = useState(9);
   const [submitting, setSubmitting] = useState(false);
 
   // Reset PIN modal state
@@ -28,17 +24,88 @@ export default function StaffManagementTab({ onStaffUpdated }) {
 
   const [showPins, setShowPins] = useState({});
 
-  const divisionsByVenue = {
-    'JP Karaoke': [
-      'Server and Cashier',
-      'Cleaning Service',
-      'Storage Staff'
-    ],
+  // Division & Role templates mapping
+  const templatesByVenue = {
     'LuckyCat': [
-      'Bar, Cashier, and Server',
-      'Kitchen'
+      {
+        role: 'Server',
+        division: 'Bar, Cashier, and Server',
+        label: 'Server (2 Shift)',
+        description: 'Shift 1: 10:00 - 19:00 | Shift 2: 18:30 - 03:30 (Istirahat 1 Jam)',
+        start_time: '10:00',
+        end_time: '19:00',
+        standard_hours: 9
+      },
+      {
+        role: 'Cashier',
+        division: 'Bar, Cashier, and Server',
+        label: 'Cashier (2 Shift)',
+        description: 'Shift 1: 10:00 - 19:00 | Shift 2: 18:30 - 03:30 (Istirahat 1 Jam)',
+        start_time: '10:00',
+        end_time: '19:00',
+        standard_hours: 9
+      },
+      {
+        role: 'Bar',
+        division: 'Bar, Cashier, and Server',
+        label: 'Bar (2 Shift)',
+        description: 'Shift 1: 10:00 - 19:00 | Shift 2: 18:30 - 03:30 (Istirahat 1 Jam)',
+        start_time: '10:00',
+        end_time: '19:00',
+        standard_hours: 9
+      },
+      {
+        role: 'Kitchen',
+        division: 'Kitchen',
+        label: 'Kitchen (4 Shift: Pagi, Mid 1, Mid 2, Malam)',
+        description: 'Shift 1: 09:00-19:00 | Mid 1: 12:00-22:00 | Mid 2: 14:00-00:00 | Shift 2: 18:00-03:00 (Istirahat 1 Jam)',
+        start_time: '09:00',
+        end_time: '19:00',
+        standard_hours: 9
+      }
+    ],
+    'JP Karaoke': [
+      {
+        role: 'Cashier',
+        division: 'Server and Cashier',
+        label: 'Cashier (2 Shift)',
+        description: 'Shift 1: 13:00 - 22:00 | Shift 2: 18:30 - 03:00 (Tanpa Istirahat)',
+        start_time: '13:00',
+        end_time: '22:00',
+        standard_hours: 8.5
+      },
+      {
+        role: 'Server',
+        division: 'Server and Cashier',
+        label: 'Server (2 Shift)',
+        description: 'Shift 1: 13:00 - 22:00 | Shift 2: 18:30 - 03:00 (Tanpa Istirahat)',
+        start_time: '13:00',
+        end_time: '22:00',
+        standard_hours: 8.5
+      },
+      {
+        role: 'Cleaning Service',
+        division: 'Cleaning Service',
+        label: 'Cleaning Service (2 Shift)',
+        description: 'Shift 1: 10:00 - 19:00 | Shift 2: 18:30 - 03:00 (Tanpa Istirahat)',
+        start_time: '10:00',
+        end_time: '19:00',
+        standard_hours: 8.5
+      },
+      {
+        role: 'Storage Staff',
+        division: 'Storage Staff',
+        label: 'Storage Staff (3 Shift: Pagi, Mid, Malam)',
+        description: 'Shift 1: 10:00-19:00 | Shift 2: 13:00-22:00 | Shift 3: 18:30-03:30',
+        start_time: '10:00',
+        end_time: '19:00',
+        standard_hours: 9
+      }
     ]
   };
+
+  const currentTemplateOptions = templatesByVenue[newVenue] || [];
+  const currentTemplate = currentTemplateOptions.find((t) => t.role === selectedRoleOption) || currentTemplateOptions[0];
 
   const loadRoster = async () => {
     setLoading(true);
@@ -56,6 +123,15 @@ export default function StaffManagementTab({ onStaffUpdated }) {
     loadRoster();
   }, []);
 
+  const handleOpenAddModal = () => {
+    const randomPin = Math.floor(1000 + Math.random() * 9000).toString();
+    setNewPin(randomPin);
+    setNewName('');
+    setSelectedRoleOption('Server');
+    setNewVenue('LuckyCat');
+    setModalOpen(true);
+  };
+
   const handleGeneratePin = () => {
     const randomPin = Math.floor(1000 + Math.random() * 9000).toString();
     setNewPin(randomPin);
@@ -63,41 +139,35 @@ export default function StaffManagementTab({ onStaffUpdated }) {
 
   const handleVenueChange = (venue) => {
     setNewVenue(venue);
-    const divs = divisionsByVenue[venue] || [];
-    if (divs.length > 0) {
-      setNewDivision(divs[0]);
-      if (venue === 'JP Karaoke') {
-        setNewShiftStart('13:00');
-        setNewShiftEnd('22:00');
-      } else {
-        setNewShiftStart('10:00');
-        setNewShiftEnd('19:00');
-      }
+    const opts = templatesByVenue[venue] || [];
+    if (opts.length > 0) {
+      setSelectedRoleOption(opts[0].role);
     }
   };
 
   const handleCreateStaff = async (e) => {
     e.preventDefault();
-    if (!newName || !newRole) return;
+    if (!newName.trim()) return;
     setSubmitting(true);
 
     try {
+      const activeTemplate = currentTemplateOptions.find((t) => t.role === selectedRoleOption) || currentTemplateOptions[0];
+
       await createStaff({
-        name: newName,
+        name: newName.trim(),
         venue: newVenue,
-        division: newDivision,
-        role: newRole,
-        department: newDivision,
+        division: activeTemplate.division,
+        role: activeTemplate.role,
+        department: activeTemplate.division,
         pin: newPin || Math.floor(1000 + Math.random() * 9000).toString(),
         is_active: newStatus ? 1 : 0,
-        shift_start: newShiftStart,
-        shift_end: newShiftEnd,
-        standard_hours: newHours
+        shift_start: activeTemplate.start_time,
+        shift_end: activeTemplate.end_time,
+        standard_hours: activeTemplate.standard_hours
       });
 
       setModalOpen(false);
       setNewName('');
-      setNewRole('');
       setNewPin('');
       await loadRoster();
       if (onStaffUpdated) onStaffUpdated();
@@ -162,14 +232,11 @@ export default function StaffManagementTab({ onStaffUpdated }) {
         </div>
 
         <button
-          onClick={() => {
-            handleGeneratePin();
-            setModalOpen(true);
-          }}
+          onClick={handleOpenAddModal}
           className="px-4 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-bold rounded-xl text-xs flex items-center justify-center space-x-1.5 shadow-md shadow-emerald-500/20 transition shrink-0"
         >
           <UserPlus className="w-4 h-4" />
-          <span>Provision New Staff</span>
+          <span>+ Tambah Karyawan Baru</span>
         </button>
       </div>
 
@@ -329,7 +396,7 @@ export default function StaffManagementTab({ onStaffUpdated }) {
         </div>
       </div>
 
-      {/* Modal: Add New Staff */}
+      {/* Modal: Add New Staff (Simplified Template-based) */}
       {modalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fade-in">
           <div className="bg-slate-900 border border-slate-700 rounded-3xl max-w-md w-full overflow-hidden shadow-2xl">
@@ -337,7 +404,7 @@ export default function StaffManagementTab({ onStaffUpdated }) {
               <div className="p-4 sm:p-5 border-b border-slate-800 bg-slate-950 flex items-center justify-between">
                 <div className="flex items-center space-x-2">
                   <UserPlus className="w-5 h-5 text-emerald-400" />
-                  <h3 className="text-base font-bold text-white">Provision New Staff Member</h3>
+                  <h3 className="text-base font-bold text-white">Tambah Karyawan Baru</h3>
                 </div>
                 <button
                   type="button"
@@ -348,75 +415,76 @@ export default function StaffManagementTab({ onStaffUpdated }) {
                 </button>
               </div>
 
-              <div className="p-5 space-y-3.5 text-xs">
+              <div className="p-5 space-y-4 text-xs">
                 {/* Outlet Venue Selection */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-slate-300 font-semibold block mb-1">Outlet / Venue</label>
-                    <select
-                      value={newVenue}
-                      onChange={(e) => handleVenueChange(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-bold focus:outline-none focus:border-emerald-500"
-                    >
-                      <option value="JP Karaoke">JP Karaoke</option>
-                      <option value="LuckyCat">LuckyCat</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="text-slate-300 font-semibold block mb-1">Division</label>
-                    <select
-                      value={newDivision}
-                      onChange={(e) => setNewDivision(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-emerald-500"
-                    >
-                      {(divisionsByVenue[newVenue] || []).map((d) => (
-                        <option key={d} value={d}>
-                          {d}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                <div>
+                  <label className="text-slate-300 font-semibold block mb-1">Outlet / Lokasi</label>
+                  <select
+                    value={newVenue}
+                    onChange={(e) => handleVenueChange(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-bold focus:outline-none focus:border-emerald-500"
+                  >
+                    <option value="LuckyCat">LuckyCat (LC)</option>
+                    <option value="JP Karaoke">JP Karaoke</option>
+                  </select>
                 </div>
 
-                {/* Name & Role */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-slate-300 font-semibold block mb-1">Full Name</label>
-                    <input
-                      type="text"
-                      required
-                      value={newName}
-                      onChange={(e) => setNewName(e.target.value)}
-                      placeholder="e.g. Ketut Budiarta"
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-emerald-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-slate-300 font-semibold block mb-1">Role</label>
-                    <input
-                      type="text"
-                      required
-                      value={newRole}
-                      onChange={(e) => setNewRole(e.target.value)}
-                      placeholder="e.g. Server"
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-emerald-500"
-                    />
-                  </div>
+                {/* Division & Role Selection */}
+                <div>
+                  <label className="text-slate-300 font-semibold block mb-1">Divisi & Posisi Kerja</label>
+                  <select
+                    value={selectedRoleOption}
+                    onChange={(e) => setSelectedRoleOption(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-semibold focus:outline-none focus:border-emerald-500"
+                  >
+                    {currentTemplateOptions.map((opt) => (
+                      <option key={opt.role} value={opt.role}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
                 </div>
+
+                {/* Name */}
+                <div>
+                  <label className="text-slate-300 font-semibold block mb-1">Nama Karyawan</label>
+                  <input
+                    type="text"
+                    required
+                    value={newName}
+                    onChange={(e) => setNewName(e.target.value)}
+                    placeholder="Contoh: Iwan"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-white text-sm font-semibold focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+
+                {/* Template Shift Info Card (Auto Inherited) */}
+                {currentTemplate && (
+                  <div className="p-3.5 bg-indigo-950/30 border border-indigo-700/40 rounded-2xl space-y-1.5">
+                    <div className="flex items-center space-x-1.5 text-indigo-400 font-bold text-[11px]">
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>Template Jam Kerja Otomatis:</span>
+                    </div>
+                    <div className="text-[11px] font-mono text-cyan-300 font-medium">
+                      {currentTemplate.description}
+                    </div>
+                    <div className="text-[10px] text-slate-400">
+                      ✓ Jam shift terikat otomatis sesuai template divisi. Anda tidak perlu memasukkan jam manual.
+                    </div>
+                  </div>
+                )}
 
                 {/* PIN */}
                 <div>
                   <div className="flex justify-between items-center mb-1">
-                    <label className="text-slate-300 font-semibold">Assigned 4-Digit PIN</label>
+                    <label className="text-slate-300 font-semibold">PIN Karyawan (4-Digit)</label>
                     <button
                       type="button"
                       onClick={handleGeneratePin}
                       className="text-[11px] text-emerald-400 hover:underline flex items-center space-x-1"
                     >
                       <Sparkles className="w-3 h-3" />
-                      <span>Generate Random</span>
+                      <span>Acak Ulang PIN</span>
                     </button>
                   </div>
                   <input
@@ -425,40 +493,17 @@ export default function StaffManagementTab({ onStaffUpdated }) {
                     required
                     value={newPin}
                     onChange={(e) => setNewPin(e.target.value)}
-                    placeholder="4-digit PIN"
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-emerald-400 font-mono font-bold focus:outline-none focus:border-emerald-500"
+                    placeholder="Contoh: 4829"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-emerald-400 font-mono text-base font-bold tracking-widest focus:outline-none focus:border-emerald-500"
                   />
-                </div>
-
-                {/* Shift Hours */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-slate-300 font-semibold block mb-1">Shift Start</label>
-                    <input
-                      type="time"
-                      value={newShiftStart}
-                      onChange={(e) => setNewShiftStart(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-white font-mono focus:outline-none focus:border-emerald-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-slate-300 font-semibold block mb-1">Shift End</label>
-                    <input
-                      type="text"
-                      value={newShiftEnd}
-                      onChange={(e) => setNewShiftEnd(e.target.value)}
-                      placeholder="e.g. 22:00 or 03:00"
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-white font-mono focus:outline-none focus:border-emerald-500"
-                    />
-                  </div>
                 </div>
 
                 {/* Initial Status */}
                 <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 flex items-center justify-between">
                   <div>
-                    <span className="font-semibold text-white block">Initial Status</span>
+                    <span className="font-semibold text-white block">Status Karyawan</span>
                     <span className="text-[10px] text-slate-400">
-                      {newStatus ? 'Active (Staff can immediately log in)' : 'Suspended'}
+                      {newStatus ? 'Aktif (Karyawan langsung bisa login via PIN)' : 'Nonaktif / Suspended'}
                     </span>
                   </div>
                   <input
@@ -476,14 +521,14 @@ export default function StaffManagementTab({ onStaffUpdated }) {
                   onClick={() => setModalOpen(false)}
                   className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold"
                 >
-                  Cancel
+                  Batal
                 </button>
                 <button
                   type="submit"
                   disabled={submitting}
                   className="px-5 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold rounded-xl text-xs shadow-md shadow-emerald-500/20"
                 >
-                  {submitting ? 'Creating...' : 'Provision Staff'}
+                  {submitting ? 'Menyimpan...' : 'Simpan & Daftarkan Staff'}
                 </button>
               </div>
             </form>

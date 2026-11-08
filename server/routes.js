@@ -109,12 +109,48 @@ router.get('/network-status', (req, res) => {
 });
 
 // 3. Shift Schedules Management (Timing Editor)
-router.get('/schedules', (req, res) => {
-  const schedules = db.prepare('SELECT * FROM shift_schedules ORDER BY venue ASC, division ASC, shift_number ASC').all();
+router.get('/schedules', async (req, res) => {
+  let schedules = db.prepare('SELECT * FROM shift_schedules ORDER BY venue ASC, division ASC, shift_number ASC').all();
+  if (isSupabaseConfigured) {
+    try {
+      const { data: cloudSchedules, error } = await supabase
+        .from('shift_schedules')
+        .select('*')
+        .order('venue', { ascending: true })
+        .order('division', { ascending: true })
+        .order('shift_number', { ascending: true });
+      if (!error && cloudSchedules && cloudSchedules.length > 0) {
+        schedules = cloudSchedules.map((s) => ({
+          ...s,
+          is_flexible_checkout: s.is_flexible_checkout ? 1 : 0,
+          allows_break: s.allows_break ? 1 : 0
+        }));
+        for (const s of cloudSchedules) {
+          db.prepare(`
+            INSERT OR REPLACE INTO shift_schedules (id, venue, division, shift_number, name, start_time, end_time, is_flexible_checkout, allows_break, max_break_end)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `).run(
+            s.id,
+            s.venue,
+            s.division,
+            s.shift_number,
+            s.name,
+            s.start_time,
+            s.end_time,
+            s.is_flexible_checkout ? 1 : 0,
+            s.allows_break ? 1 : 0,
+            s.max_break_end || null
+          );
+        }
+      }
+    } catch (e) {
+      console.warn('Supabase fetch schedules note:', e.message);
+    }
+  }
   res.json(schedules);
 });
 
-router.put('/schedules/:id', (req, res) => {
+router.put('/schedules/:id', async (req, res) => {
   const { id } = req.params;
   const { start_time, end_time, is_flexible_checkout, allows_break, max_break_end } = req.body;
 
@@ -129,6 +165,21 @@ router.put('/schedules/:id', (req, res) => {
         updated_at = datetime('now')
       WHERE id = ?
     `).run(start_time, end_time, is_flexible_checkout, allows_break, max_break_end, id);
+
+    if (isSupabaseConfigured) {
+      try {
+        const updatePayload = { updated_at: new Date().toISOString() };
+        if (start_time !== undefined) updatePayload.start_time = start_time;
+        if (end_time !== undefined) updatePayload.end_time = end_time;
+        if (is_flexible_checkout !== undefined) updatePayload.is_flexible_checkout = Boolean(is_flexible_checkout);
+        if (allows_break !== undefined) updatePayload.allows_break = Boolean(allows_break);
+        if (max_break_end !== undefined) updatePayload.max_break_end = max_break_end || null;
+
+        await supabase.from('shift_schedules').update(updatePayload).eq('id', id);
+      } catch (e) {
+        console.warn('Supabase schedule update error:', e.message);
+      }
+    }
 
     broadcastEvent('SCHEDULES_UPDATE', { id });
     res.json({ success: true, message: 'Shift schedule timing updated' });
@@ -358,8 +409,8 @@ router.post('/staff/verify-pin', async (req, res) => {
 // 7. Manager Admin: Add New Staff Member
 router.post('/staff', async (req, res) => {
   const { name, venue, division, role, department, pin, is_active, shift_start, shift_end, standard_hours } = req.body;
-  if (!name || !role) {
-    return res.status(400).json({ error: 'Name and Role are required' });
+  if (!name || (!role && !division)) {
+    return res.status(400).json({ error: 'Name and Division/Role are required' });
   }
 
   try {
@@ -374,6 +425,29 @@ router.post('/staff', async (req, res) => {
       assignedId = `STF-${String(nextNum).padStart(3, '0')}`;
     }
 
+    const assignedVenue = venue || 'JP Karaoke';
+    const assignedDivision = division || 'Server and Cashier';
+    const assignedRole = (role || assignedDivision).trim();
+
+    // Auto-inherit shift template from division if not explicitly provided
+    let sStart = shift_start;
+    let sEnd = shift_end;
+    let sHours = standard_hours;
+
+    if (!sStart || !sEnd) {
+      const template = db.prepare('SELECT start_time, end_time FROM shift_schedules WHERE venue = ? AND division = ? ORDER BY shift_number ASC LIMIT 1').get(assignedVenue, assignedDivision);
+      if (template) {
+        sStart = template.start_time;
+        sEnd = template.end_time;
+      } else {
+        sStart = assignedVenue === 'LuckyCat' ? '10:00' : '13:00';
+        sEnd = assignedVenue === 'LuckyCat' ? '19:00' : '22:00';
+      }
+    }
+    if (!sHours) {
+      sHours = 9.0;
+    }
+
     const assignedPin = pin ? pin.trim() : Math.floor(1000 + Math.random() * 9000).toString();
     const activeStatus = is_active !== undefined ? (is_active ? 1 : 0) : 1;
 
@@ -383,14 +457,14 @@ router.post('/staff', async (req, res) => {
     `).run(
       assignedId,
       name.trim(),
-      venue || 'JP Karaoke',
-      division || 'Server and Cashier',
-      role.trim(),
-      department || 'General',
+      assignedVenue,
+      assignedDivision,
+      assignedRole,
+      department || assignedDivision,
       assignedPin,
-      shift_start || '13:00',
-      shift_end || '22:00',
-      parseFloat(standard_hours) || 8.0,
+      sStart,
+      sEnd,
+      parseFloat(sHours),
       activeStatus
     );
 
@@ -400,14 +474,14 @@ router.post('/staff', async (req, res) => {
         await supabase.from('staff').insert({
           legacy_code: assignedId,
           name: name.trim(),
-          venue: venue || 'JP Karaoke',
-          division: division || 'Server and Cashier',
-          role: role.trim(),
-          department: department || 'General',
+          venue: assignedVenue,
+          division: assignedDivision,
+          role: assignedRole,
+          department: department || assignedDivision,
           pin: assignedPin,
-          shift_start: shift_start || '13:00',
-          shift_end: shift_end || '22:00',
-          standard_hours: parseFloat(standard_hours) || 8.0,
+          shift_start: sStart,
+          shift_end: sEnd,
+          standard_hours: parseFloat(sHours),
           is_active: activeStatus === 1
         });
       } catch (e) {
@@ -989,7 +1063,20 @@ router.get('/stats', (req, res) => {
 });
 
 // 16. Venue Settings GET / PUT
-router.get('/settings', (req, res) => {
+router.get('/settings', async (req, res) => {
+  if (isSupabaseConfigured) {
+    try {
+      const { data: cloudSettings, error } = await supabase.from('app_settings').select('*');
+      if (!error && cloudSettings && cloudSettings.length > 0) {
+        for (const item of cloudSettings) {
+          setSetting(item.key, item.value);
+        }
+      }
+    } catch (e) {
+      console.warn('Supabase settings fetch note:', e.message);
+    }
+  }
+
   res.json({
     venue_name: getSetting('venue_name'),
     venue_lat: getSetting('venue_lat'),
@@ -1001,7 +1088,7 @@ router.get('/settings', (req, res) => {
   });
 });
 
-router.put('/settings', (req, res) => {
+router.put('/settings', async (req, res) => {
   const { venue_name, venue_lat, venue_lng, geofence_radius, allowed_subnets, enforce_wifi } = req.body;
 
   if (venue_name !== undefined) setSetting('venue_name', venue_name);
@@ -1010,6 +1097,29 @@ router.put('/settings', (req, res) => {
   if (geofence_radius !== undefined) setSetting('geofence_radius', parseInt(geofence_radius, 10));
   if (allowed_subnets !== undefined) setSetting('allowed_subnets', allowed_subnets);
   if (enforce_wifi !== undefined) setSetting('enforce_wifi', enforce_wifi ? 1 : 0);
+
+  // Sync directly to Supabase Cloud app_settings
+  if (isSupabaseConfigured) {
+    try {
+      const upsertItems = [];
+      if (venue_name !== undefined) upsertItems.push({ key: 'venue_name', value: venue_name });
+      if (venue_lat !== undefined) upsertItems.push({ key: 'venue_lat', value: parseFloat(venue_lat) });
+      if (venue_lng !== undefined) upsertItems.push({ key: 'venue_lng', value: parseFloat(venue_lng) });
+      if (geofence_radius !== undefined) upsertItems.push({ key: 'geofence_radius', value: parseInt(geofence_radius, 10) });
+      if (allowed_subnets !== undefined) upsertItems.push({ key: 'allowed_subnets', value: allowed_subnets });
+      if (enforce_wifi !== undefined) upsertItems.push({ key: 'enforce_wifi', value: enforce_wifi ? 1 : 0 });
+
+      for (const item of upsertItems) {
+        await supabase.from('app_settings').upsert({
+          key: item.key,
+          value: item.value,
+          updated_at: new Date().toISOString()
+        });
+      }
+    } catch (err) {
+      console.warn('Supabase cloud settings save note:', err.message);
+    }
+  }
 
   broadcastEvent('SETTINGS_UPDATE', { message: 'Settings modified' });
   res.json({ success: true, message: 'Venue settings updated' });
