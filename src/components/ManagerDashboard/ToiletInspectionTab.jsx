@@ -74,7 +74,7 @@ export default function ToiletInspectionTab() {
     const elapsedM = elapsedMinutes % 60;
     const elapsedFormatted = `${String(elapsedH).padStart(2, '0')}.${String(elapsedM).padStart(2, '0')}`;
 
-    const hasIssue = loc.last_status === 'issue';
+    const hasIssue = loc.last_status === 'issue' || loc.last_status === 'needs_attention' || loc.last_status === 'fail';
 
     // Cek apakah terlambat melampaui batas target interval (default 60 menit)
     const isOverdue = elapsedMinutes > targetIntervalMinutes;
