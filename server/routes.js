@@ -5,7 +5,7 @@ import { db, getSetting, setSetting, uploadsDir } from './db.js';
 import { calculateDistanceMeters, isWithinGeofence } from './geofence.js';
 import { getClientIp, validateClientNetwork } from './network.js';
 import { evaluateCheckinFlags, evaluateCheckoutFlags, evaluateBreakFlags, auditOpenShifts, FLAG_TYPES } from './flags.js';
-import { isSupabaseConfigured, uploadPhotoToSupabase, cloudDb, supabase } from './supabase.js';
+import { isSupabaseConfigured, uploadPhotoToSupabase, cloudDb, supabase, findStaffInSupabase } from './supabase.js';
 import { detectShiftSchedule, getBreakCutoff, isBreakAllowedNow, getWitaTimeString } from './shifts.js';
 
 const router = express.Router();
@@ -801,12 +801,42 @@ router.post('/checkin', async (req, res) => {
   if (!staffId) return res.status(400).json({ error: 'Karyawan wajib dipilih.' });
   if (!photoBase64) return res.status(400).json({ error: 'Foto selfie langsung wajib diambil.' });
 
-  const staff = db.prepare('SELECT * FROM staff WHERE id = ?').get(staffId);
+  let staff = db.prepare('SELECT * FROM staff WHERE id = ?').get(staffId);
+  if (!staff && isSupabaseConfigured) {
+    const supaStaff = await findStaffInSupabase(staffId);
+    if (supaStaff) {
+      staff = {
+        ...supaStaff,
+        id: supaStaff.legacy_code || supaStaff.id,
+        uuid: supaStaff.id
+      };
+      try {
+        db.prepare(`
+          INSERT OR REPLACE INTO staff (id, name, venue, division, role, department, pin, shift_start, shift_end, standard_hours, is_active, uuid)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(
+          staff.id,
+          staff.name,
+          staff.venue,
+          staff.division,
+          staff.role,
+          staff.department || staff.division,
+          staff.pin,
+          staff.shift_start || '13:00',
+          staff.shift_end || '22:00',
+          staff.standard_hours || 8.5,
+          staff.is_active ? 1 : 0,
+          staff.uuid
+        );
+      } catch {}
+    }
+  }
+
   if (!staff) return res.status(404).json({ error: 'Karyawan tidak ditemukan.' });
   if (!staff.is_active) return res.status(403).json({ error: 'Akun dinonaktifkan. Hubungi Manajer / HR.' });
   if (pin && staff.pin && staff.pin !== pin.trim()) return res.status(401).json({ error: 'PIN Rahasia salah.' });
 
-  const existingActive = db.prepare("SELECT id FROM shifts WHERE staff_id = ? AND status != 'COMPLETED'").get(staffId);
+  const existingActive = db.prepare("SELECT id FROM shifts WHERE staff_id = ? AND status != 'COMPLETED'").get(staff.id);
   if (existingActive) {
     return res.status(400).json({ error: 'Anda sudah memiliki shift yang sedang aktif. Silakan lakukan Check-Out terlebih dahulu.' });
   }
@@ -823,7 +853,7 @@ router.post('/checkin', async (req, res) => {
   const userLng = lng != null ? parseFloat(lng) : null;
   const distance = calculateDistanceMeters(userLat, userLng, venueLat, venueLng);
 
-  const photoUrl = await savePhoto(photoBase64, `in_${staffId}`);
+  const photoUrl = await savePhoto(photoBase64, `in_${staff.id}`);
   const now = new Date();
   const dateStr = now.toISOString().split('T')[0];
   const checkinTime = timestamp || now.toISOString();
@@ -855,20 +885,42 @@ router.post('/checkin', async (req, res) => {
     checkinTime
   });
 
+  // Sync to Supabase Cloud if connected
+  let supaShift = null;
+  if (isSupabaseConfigured) {
+    try {
+      supaShift = await cloudDb.recordCheckin({
+        staffId: staff.uuid || staff.id || staffId,
+        userLat,
+        userLng,
+        accuracy,
+        distance,
+        photoUrl,
+        clientIp,
+        wifiPass: wifiValidation.isMatch,
+        flags,
+        scheduledStart,
+        scheduledEnd
+      });
+    } catch (e) {
+      console.warn('Supabase Checkin Cloud Sync Note:', e.message);
+    }
+  }
+
   const result = db.prepare(`
     INSERT INTO shifts (
       staff_id, date, scheduled_start, scheduled_end,
       checkin_time, checkin_lat, checkin_lng, checkin_accuracy,
       checkin_distance, checkin_photo, checkin_ip, checkin_wifi_pass,
-      status, flags
+      status, flags, supabase_id
     ) VALUES (
       ?, ?, ?, ?,
       ?, ?, ?, ?,
       ?, ?, ?, ?,
-      'IN_PROGRESS', ?
+      'IN_PROGRESS', ?, ?
     )
   `).run(
-    staffId,
+    staff.id,
     dateStr,
     scheduledStart,
     scheduledEnd,
@@ -880,27 +932,9 @@ router.post('/checkin', async (req, res) => {
     photoUrl,
     clientIp,
     wifiValidation.isMatch ? 1 : 0,
-    JSON.stringify(flags)
+    JSON.stringify(flags),
+    supaShift?.id || null
   );
-
-  // Sync to Supabase Cloud if connected
-  if (isSupabaseConfigured) {
-    try {
-      await cloudDb.recordCheckin({
-        staffId,
-        userLat,
-        userLng,
-        accuracy,
-        distance,
-        photoUrl,
-        clientIp,
-        wifiPass: wifiValidation.isMatch,
-        flags
-      });
-    } catch (e) {
-      console.warn('Supabase Checkin Cloud Sync Note:', e.message);
-    }
-  }
 
   const newShift = db.prepare(`
     SELECT s.*, st.name as staff_name, st.venue, st.division, st.role, st.department
@@ -908,14 +942,14 @@ router.post('/checkin', async (req, res) => {
     JOIN staff st ON s.staff_id = st.id
     WHERE s.id = ?
   `).get(result.lastInsertRowid);
-  newShift.flags = flags;
+  if (newShift) newShift.flags = flags;
 
-  broadcastEvent('SHIFT_UPDATE', { action: 'CHECKIN', shift: newShift });
+  broadcastEvent('SHIFT_UPDATE', { action: 'CHECKIN', shift: newShift || supaShift });
 
   res.json({
     success: true,
     message: 'Absensi Masuk Berhasil Dicatat!',
-    shift: newShift,
+    shift: newShift || supaShift,
     flags
   });
 });
@@ -924,14 +958,47 @@ router.post('/checkin', async (req, res) => {
 router.post('/break/start', async (req, res) => {
   const { shiftId, staffId, pin, photoBase64, timestamp, lat, lng } = req.body;
 
-  const staff = db.prepare('SELECT * FROM staff WHERE id = ?').get(staffId);
+  let staff = db.prepare('SELECT * FROM staff WHERE id = ?').get(staffId);
+  if (!staff && isSupabaseConfigured) {
+    const supaStaff = await findStaffInSupabase(staffId);
+    if (supaStaff) {
+      staff = { ...supaStaff, id: supaStaff.legacy_code || supaStaff.id, uuid: supaStaff.id };
+    }
+  }
+
   if (!staff) return res.status(404).json({ error: 'Karyawan tidak ditemukan.' });
 
   let shift;
   if (shiftId) {
     shift = db.prepare('SELECT * FROM shifts WHERE id = ?').get(shiftId);
   } else {
-    shift = db.prepare("SELECT * FROM shifts WHERE staff_id = ? AND status != 'COMPLETED' ORDER BY id DESC LIMIT 1").get(staffId);
+    shift = db.prepare("SELECT * FROM shifts WHERE staff_id = ? AND status != 'COMPLETED' ORDER BY id DESC LIMIT 1").get(staff.id);
+  }
+
+  // Cloud fallback if shift is missing in this serverless container
+  if (!shift && isSupabaseConfigured) {
+    try {
+      const { data } = await supabase
+        .from('attendance_logs')
+        .select('*')
+        .eq('staff_id', staff.uuid || staff.id)
+        .neq('status', 'COMPLETED')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (data) {
+        shift = {
+          id: data.id,
+          supabase_id: data.id,
+          staff_id: staff.id,
+          status: data.status,
+          break_status: data.status === 'ON_BREAK' ? 'ON_BREAK' : 'NONE',
+          flags: JSON.stringify(data.flags || []),
+          checkin_time: data.check_in_time
+        };
+      }
+    } catch (e) {}
   }
 
   if (!shift) return res.status(404).json({ error: 'Shift aktif tidak ditemukan.' });
@@ -954,28 +1021,50 @@ router.post('/break/start', async (req, res) => {
 
   if (!photoBase64) return res.status(400).json({ error: 'Foto selfie mulai istirahat wajib diambil.' });
 
-  const photoUrl = await savePhoto(photoBase64, `break_start_${staffId}`);
+  const photoUrl = await savePhoto(photoBase64, `break_start_${staff.id}`);
   const startTime = timestamp || new Date().toISOString();
 
-  db.prepare(`
-    UPDATE shifts SET
-      break_status = 'ON_BREAK',
-      break_start_time = ?,
-      break_start_photo = ?,
-      updated_at = datetime('now')
-    WHERE id = ?
-  `).run(startTime, photoUrl, shift.id);
+  try {
+    db.prepare(`
+      UPDATE shifts SET
+        break_status = 'ON_BREAK',
+        break_start_time = ?,
+        break_start_photo = ?,
+        updated_at = datetime('now')
+      WHERE id = ?
+    `).run(startTime, photoUrl, shift.id);
+  } catch {}
 
   if (isSupabaseConfigured) {
     try {
-      await cloudDb.recordBreakStart({ attendanceId: shift.id, staffId, photoUrl });
+      await cloudDb.recordBreakStart({
+        attendanceId: shift.supabase_id || shift.id,
+        staffId: staff.uuid || staff.id,
+        photoUrl
+      });
     } catch (e) {
       console.warn('Supabase Break Start Cloud Sync Note:', e.message);
     }
   }
 
-  const updatedShift = db.prepare('SELECT s.*, st.name as staff_name, st.venue, st.division FROM shifts s JOIN staff st ON s.staff_id = st.id WHERE s.id = ?').get(shift.id);
-  updatedShift.flags = JSON.parse(updatedShift.flags || '[]');
+  let updatedShift = null;
+  try {
+    updatedShift = db.prepare('SELECT s.*, st.name as staff_name, st.venue, st.division FROM shifts s JOIN staff st ON s.staff_id = st.id WHERE s.id = ?').get(shift.id);
+  } catch {}
+
+  if (updatedShift) {
+    updatedShift.flags = JSON.parse(updatedShift.flags || '[]');
+  } else {
+    updatedShift = {
+      ...shift,
+      break_status: 'ON_BREAK',
+      break_start_time: startTime,
+      break_start_photo: photoUrl,
+      staff_name: staff.name,
+      staff_venue: staff.venue,
+      staff_division: staff.division
+    };
+  }
 
   broadcastEvent('SHIFT_UPDATE', { action: 'BREAK_START', shift: updatedShift });
 
@@ -990,32 +1079,70 @@ router.post('/break/start', async (req, res) => {
 router.post('/break/end', async (req, res) => {
   const { shiftId, staffId, pin, photoBase64, timestamp, lat, lng } = req.body;
 
+  let staff = db.prepare('SELECT * FROM staff WHERE id = ?').get(staffId);
+  if (!staff && isSupabaseConfigured) {
+    const supaStaff = await findStaffInSupabase(staffId);
+    if (supaStaff) {
+      staff = { ...supaStaff, id: supaStaff.legacy_code || supaStaff.id, uuid: supaStaff.id };
+    }
+  }
+
   let shift;
   if (shiftId) {
     shift = db.prepare('SELECT s.*, st.venue, st.division, st.shift_start FROM shifts s JOIN staff st ON s.staff_id = st.id WHERE s.id = ?').get(shiftId);
-  } else {
-    shift = db.prepare("SELECT s.*, st.venue, st.division, st.shift_start FROM shifts s JOIN staff st ON s.staff_id = st.id WHERE s.staff_id = ? AND s.status != 'COMPLETED' ORDER BY s.id DESC LIMIT 1").get(staffId);
+  } else if (staff) {
+    shift = db.prepare("SELECT s.*, st.venue, st.division, st.shift_start FROM shifts s JOIN staff st ON s.staff_id = st.id WHERE s.staff_id = ? AND s.status != 'COMPLETED' ORDER BY s.id DESC LIMIT 1").get(staff.id);
+  }
+
+  // Cloud fallback if shift is missing in SQLite
+  if (!shift && isSupabaseConfigured && staff) {
+    try {
+      const { data } = await supabase
+        .from('attendance_logs')
+        .select('*')
+        .eq('staff_id', staff.uuid || staff.id)
+        .eq('status', 'ON_BREAK')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (data) {
+        shift = {
+          id: data.id,
+          supabase_id: data.id,
+          staff_id: staff.id,
+          status: data.status,
+          break_status: 'ON_BREAK',
+          break_start_time: data.created_at,
+          flags: JSON.stringify(data.flags || []),
+          venue: staff.venue,
+          division: staff.division
+        };
+      }
+    } catch (e) {}
   }
 
   if (!shift) return res.status(404).json({ error: 'Shift aktif tidak ditemukan.' });
-  if (shift.break_status !== 'ON_BREAK' || !shift.break_start_time) {
+  if (shift.break_status !== 'ON_BREAK') {
     return res.status(400).json({ error: 'Anda belum memulai waktu istirahat.' });
   }
   if (!photoBase64) return res.status(400).json({ error: 'Foto selfie selesai istirahat wajib diambil.' });
 
   const photoUrl = await savePhoto(photoBase64, `break_end_${shift.staff_id}`);
   const endTime = timestamp || new Date().toISOString();
-  const startTime = new Date(shift.break_start_time).getTime();
+  const startTime = shift.break_start_time ? new Date(shift.break_start_time).getTime() : Date.now();
   const durationMinutes = Math.max(0, Math.round((new Date(endTime).getTime() - startTime) / (1000 * 60)));
 
-  // Determine max break end for this auto-detected shift
-  const schedule = db.prepare(`
-    SELECT max_break_end FROM shift_schedules 
-    WHERE venue = ? AND division = ? AND start_time = ?
-    LIMIT 1
-  `).get(shift.venue, shift.division, shift.scheduled_start);
-
-  const maxBreakEnd = schedule?.max_break_end || (shift.scheduled_start?.startsWith('18') ? '01:00' : '16:00');
+  // Determine max break end
+  let maxBreakEnd = '16:00';
+  try {
+    const schedule = db.prepare(`
+      SELECT max_break_end FROM shift_schedules 
+      WHERE venue = ? AND division = ? AND start_time = ?
+      LIMIT 1
+    `).get(shift.venue, shift.division, shift.scheduled_start);
+    maxBreakEnd = schedule?.max_break_end || (shift.scheduled_start?.startsWith('18') ? '01:00' : '16:00');
+  } catch {}
 
   let flags = [];
   try {
@@ -1031,28 +1158,50 @@ router.post('/break/end', async (req, res) => {
     existingFlags: flags
   });
 
-  db.prepare(`
-    UPDATE shifts SET
-      break_status = 'COMPLETED',
-      break_end_time = ?,
-      break_end_photo = ?,
-      break_duration_minutes = ?,
-      break_count = 1,
-      flags = ?,
-      updated_at = datetime('now')
-    WHERE id = ?
-  `).run(endTime, photoUrl, durationMinutes, JSON.stringify(updatedFlags), shift.id);
+  try {
+    db.prepare(`
+      UPDATE shifts SET
+        break_status = 'COMPLETED',
+        break_end_time = ?,
+        break_end_photo = ?,
+        break_duration_minutes = ?,
+        break_count = 1,
+        flags = ?,
+        updated_at = datetime('now')
+      WHERE id = ?
+    `).run(endTime, photoUrl, durationMinutes, JSON.stringify(updatedFlags), shift.id);
+  } catch {}
 
   if (isSupabaseConfigured) {
     try {
-      await cloudDb.recordBreakEnd({ attendanceId: shift.id, photoUrl, durationMinutes });
+      await cloudDb.recordBreakEnd({
+        attendanceId: shift.supabase_id || shift.id,
+        staffId: staff?.uuid || staff?.id,
+        photoUrl,
+        durationMinutes
+      });
     } catch (e) {
       console.warn('Supabase Break End Cloud Sync Note:', e.message);
     }
   }
 
-  const updatedShift = db.prepare('SELECT s.*, st.name as staff_name, st.venue, st.division FROM shifts s JOIN staff st ON s.staff_id = st.id WHERE s.id = ?').get(shift.id);
-  updatedShift.flags = updatedFlags;
+  let updatedShift = null;
+  try {
+    updatedShift = db.prepare('SELECT s.*, st.name as staff_name, st.venue, st.division FROM shifts s JOIN staff st ON s.staff_id = st.id WHERE s.id = ?').get(shift.id);
+  } catch {}
+
+  if (updatedShift) {
+    updatedShift.flags = updatedFlags;
+  } else {
+    updatedShift = {
+      ...shift,
+      break_status: 'COMPLETED',
+      break_end_time: endTime,
+      break_end_photo: photoUrl,
+      break_duration_minutes: durationMinutes,
+      flags: updatedFlags
+    };
+  }
 
   broadcastEvent('SHIFT_UPDATE', { action: 'BREAK_END', shift: updatedShift });
 
@@ -1068,11 +1217,48 @@ router.post('/break/end', async (req, res) => {
 router.post('/checkout', async (req, res) => {
   const { shiftId, staffId, pin, lat, lng, accuracy, photoBase64, timestamp, notes } = req.body;
 
+  let staff = db.prepare('SELECT * FROM staff WHERE id = ?').get(staffId);
+  if (!staff && isSupabaseConfigured) {
+    const supaStaff = await findStaffInSupabase(staffId);
+    if (supaStaff) {
+      staff = { ...supaStaff, id: supaStaff.legacy_code || supaStaff.id, uuid: supaStaff.id };
+    }
+  }
+
   let shift;
   if (shiftId) {
     shift = db.prepare('SELECT s.*, st.standard_hours, st.pin, st.is_active, st.venue, st.division FROM shifts s JOIN staff st ON s.staff_id = st.id WHERE s.id = ?').get(shiftId);
-  } else if (staffId) {
-    shift = db.prepare("SELECT s.*, st.standard_hours, st.pin, st.is_active, st.venue, st.division FROM shifts s JOIN staff st ON s.staff_id = st.id WHERE s.staff_id = ? AND s.status != 'COMPLETED' ORDER BY s.id DESC LIMIT 1").get(staffId);
+  } else if (staff) {
+    shift = db.prepare("SELECT s.*, st.standard_hours, st.pin, st.is_active, st.venue, st.division FROM shifts s JOIN staff st ON s.staff_id = st.id WHERE s.staff_id = ? AND s.status != 'COMPLETED' ORDER BY s.id DESC LIMIT 1").get(staff.id);
+  }
+
+  // Cloud fallback if shift not in SQLite container
+  if (!shift && isSupabaseConfigured && staff) {
+    try {
+      const { data } = await supabase
+        .from('attendance_logs')
+        .select('*')
+        .eq('staff_id', staff.uuid || staff.id)
+        .neq('status', 'COMPLETED')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (data) {
+        shift = {
+          id: data.id,
+          supabase_id: data.id,
+          staff_id: staff.id,
+          checkin_time: data.check_in_time,
+          status: data.status,
+          flags: JSON.stringify(data.flags || []),
+          standard_hours: staff.standard_hours || 8.5,
+          venue: staff.venue,
+          division: staff.division,
+          pin: staff.pin
+        };
+      }
+    } catch (e) {}
   }
 
   if (!shift) return res.status(404).json({ error: 'Tidak ditemukan shift aktif untuk Check-Out.' });
@@ -1104,19 +1290,20 @@ router.post('/checkout', async (req, res) => {
     existingFlags = [];
   }
 
-  // Check if shift is flexible checkout
-  const schedule = db.prepare(`
-    SELECT is_flexible_checkout FROM shift_schedules 
-    WHERE venue = ? AND division = ? AND start_time = ?
-    LIMIT 1
-  `).get(shift.venue, shift.division, shift.scheduled_start);
-
-  const isFlexible = schedule?.is_flexible_checkout || (shift.scheduled_end === '03:00' ? 1 : 0);
+  let isFlexible = 0;
+  try {
+    const schedule = db.prepare(`
+      SELECT is_flexible_checkout FROM shift_schedules 
+      WHERE venue = ? AND division = ? AND start_time = ?
+      LIMIT 1
+    `).get(shift.venue, shift.division, shift.scheduled_start);
+    isFlexible = schedule?.is_flexible_checkout || (shift.scheduled_end === '03:00' ? 1 : 0);
+  } catch {}
 
   const finalFlags = evaluateCheckoutFlags({
     checkinTime: shift.checkin_time,
     checkoutTime,
-    scheduledHours: shift.standard_hours,
+    scheduledHours: shift.standard_hours || 8.5,
     isFlexibleCheckout: isFlexible,
     clientIp,
     lat: userLat,
@@ -1129,41 +1316,44 @@ router.post('/checkout', async (req, res) => {
 
   const photoUrl = await savePhoto(photoBase64, `out_${shift.staff_id}`);
 
-  db.prepare(`
-    UPDATE shifts SET
-      checkout_time = ?,
-      checkout_lat = ?,
-      checkout_lng = ?,
-      checkout_accuracy = ?,
-      checkout_distance = ?,
-      checkout_photo = ?,
-      checkout_ip = ?,
-      checkout_wifi_pass = ?,
-      duration_minutes = ?,
-      status = 'COMPLETED',
-      flags = ?,
-      notes = ?,
-      updated_at = datetime('now')
-    WHERE id = ?
-  `).run(
-    checkoutTime,
-    userLat,
-    userLng,
-    accuracy || null,
-    distance,
-    photoUrl,
-    clientIp,
-    wifiValidation.isMatch ? 1 : 0,
-    durationMinutes,
-    JSON.stringify(finalFlags),
-    notes || null,
-    shift.id
-  );
+  try {
+    db.prepare(`
+      UPDATE shifts SET
+        checkout_time = ?,
+        checkout_lat = ?,
+        checkout_lng = ?,
+        checkout_accuracy = ?,
+        checkout_distance = ?,
+        checkout_photo = ?,
+        checkout_ip = ?,
+        checkout_wifi_pass = ?,
+        duration_minutes = ?,
+        status = 'COMPLETED',
+        flags = ?,
+        notes = ?,
+        updated_at = datetime('now')
+      WHERE id = ?
+    `).run(
+      checkoutTime,
+      userLat,
+      userLng,
+      accuracy || null,
+      distance,
+      photoUrl,
+      clientIp,
+      wifiValidation.isMatch ? 1 : 0,
+      durationMinutes,
+      JSON.stringify(finalFlags),
+      notes || null,
+      shift.id
+    );
+  } catch {}
 
   if (isSupabaseConfigured) {
     try {
       await cloudDb.recordCheckout({
-        attendanceId: shift.id,
+        attendanceId: shift.supabase_id || shift.id,
+        staffId: staff?.uuid || staff?.id,
         userLat,
         userLng,
         accuracy,
@@ -1180,13 +1370,28 @@ router.post('/checkout', async (req, res) => {
     }
   }
 
-  const updatedShift = db.prepare(`
-    SELECT s.*, st.name as staff_name, st.venue, st.division, st.role, st.department
-    FROM shifts s
-    JOIN staff st ON s.staff_id = st.id
-    WHERE s.id = ?
-  `).get(shift.id);
-  updatedShift.flags = finalFlags;
+  let updatedShift = null;
+  try {
+    updatedShift = db.prepare(`
+      SELECT s.*, st.name as staff_name, st.venue, st.division, st.role, st.department
+      FROM shifts s
+      JOIN staff st ON s.staff_id = st.id
+      WHERE s.id = ?
+    `).get(shift.id);
+  } catch {}
+
+  if (updatedShift) {
+    updatedShift.flags = finalFlags;
+  } else {
+    updatedShift = {
+      ...shift,
+      checkout_time: checkoutTime,
+      checkout_photo: photoUrl,
+      duration_minutes: durationMinutes,
+      status: 'COMPLETED',
+      flags: finalFlags
+    };
+  }
 
   broadcastEvent('SHIFT_UPDATE', { action: 'CHECKOUT', shift: updatedShift });
 
@@ -1199,8 +1404,20 @@ router.post('/checkout', async (req, res) => {
 });
 
 // 14. Manager Shifts List with Advanced Filters
-router.get('/shifts', (req, res) => {
+router.get('/shifts', async (req, res) => {
   auditOpenShifts();
+
+  // Primary: Supabase Cloud (authoritative & persistent across serverless containers)
+  if (isSupabaseConfigured) {
+    try {
+      const cloudShifts = await cloudDb.getShifts(req.query);
+      if (cloudShifts !== null) {
+        return res.json(cloudShifts);
+      }
+    } catch (e) {
+      console.warn('Supabase cloud shifts fetch note, falling back to SQLite:', e.message);
+    }
+  }
 
   const { startDate, endDate, venue, department, flagFilter, search } = req.query;
 
@@ -1259,8 +1476,23 @@ router.get('/shifts', (req, res) => {
 });
 
 // 15. Manager KPI Stats
-router.get('/stats', (req, res) => {
+router.get('/stats', async (req, res) => {
   auditOpenShifts();
+
+  // Primary: Supabase Cloud (authoritative & persistent across serverless containers)
+  if (isSupabaseConfigured) {
+    try {
+      const cloudStats = await cloudDb.getStats();
+      if (cloudStats !== null) {
+        return res.json({
+          ...cloudStats,
+          venueName: getSetting('venue_name')
+        });
+      }
+    } catch (e) {
+      console.warn('Supabase cloud stats fetch note, falling back to SQLite:', e.message);
+    }
+  }
 
   const todayStr = new Date().toISOString().split('T')[0];
 

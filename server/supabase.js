@@ -64,7 +64,38 @@ export async function uploadPhotoToSupabase(base64Data, filenamePrefix = 'selfie
 }
 
 /**
- * Supabase Cloud Database Helpers
+ * Safely find a staff member in Supabase without triggering 22P02 UUID syntax error
+ */
+export async function findStaffInSupabase(identifier) {
+  if (!supabase || !identifier) return null;
+  const str = String(identifier).trim();
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+
+  let query = supabase.from('staff').select('*');
+  if (isUuid) {
+    query = query.eq('id', str);
+  } else {
+    query = query.eq('legacy_code', str);
+  }
+
+  const { data, error } = await query.maybeSingle();
+  if (!error && data) return data;
+
+  // Fallback 1: match by exact name
+  const { data: byName } = await supabase.from('staff').select('*').ilike('name', str).maybeSingle();
+  if (byName) return byName;
+
+  // Fallback 2: match by PIN
+  if (/^\d{4,6}$/.test(str)) {
+    const { data: byPin } = await supabase.from('staff').select('*').eq('pin', str).maybeSingle();
+    if (byPin) return byPin;
+  }
+
+  return null;
+}
+
+/**
+ * Supabase Cloud Database Helpers (Source of Truth)
  */
 export const cloudDb = {
   // 1. Get staff list
@@ -76,9 +107,8 @@ export const cloudDb = {
     }
     const { data, error } = await query.order('venue', { ascending: true }).order('name', { ascending: true });
     if (error) throw error;
-    return data.map(s => ({
+    return (data || []).map(s => ({
       ...s,
-      // Map id to legacy_code if present for backward compatibility
       id: s.legacy_code || s.id,
       uuid: s.id
     }));
@@ -87,14 +117,18 @@ export const cloudDb = {
   // 2. Verify staff PIN & get active attendance
   async verifyStaffPin(staffIdOrCode, pin) {
     if (!supabase) return null;
-    const { data: staff, error } = await supabase
-      .from('staff')
-      .select('*')
-      .or(`id.eq.${staffIdOrCode},legacy_code.eq.${staffIdOrCode}`)
-      .single();
+    const cleanPin = pin ? pin.trim() : '';
+    let staff = null;
 
-    if (error || !staff) return null;
-    if (staff.pin !== pin.trim()) return { match: false, staff };
+    if (staffIdOrCode) {
+      staff = await findStaffInSupabase(staffIdOrCode);
+    } else if (cleanPin) {
+      const { data } = await supabase.from('staff').select('*').eq('pin', cleanPin).eq('is_active', true).maybeSingle();
+      staff = data;
+    }
+
+    if (!staff) return null;
+    if (staff.pin !== cleanPin) return { match: false, staff };
 
     // Fetch active attendance log
     const { data: activeLog } = await supabase
@@ -118,18 +152,17 @@ export const cloudDb = {
   },
 
   // 3. Record Check-In in attendance_logs
-  async recordCheckin({ staffId, userLat, userLng, accuracy, distance, photoUrl, clientIp, wifiPass, flags }) {
+  async recordCheckin({ staffId, userLat, userLng, accuracy, distance, photoUrl, clientIp, wifiPass, flags, scheduledStart, scheduledEnd }) {
     if (!supabase) return null;
-    // Resolve UUID
-    const { data: staff } = await supabase
-      .from('staff')
-      .select('id, venue, division, role, department, shift_start, shift_end')
-      .or(`id.eq.${staffId},legacy_code.eq.${staffId}`)
-      .single();
-
-    if (!staff) throw new Error('Staff record not found');
+    const staff = await findStaffInSupabase(staffId);
+    if (!staff) throw new Error('Staff record not found: ' + staffId);
 
     const checkinTime = new Date().toISOString();
+    const notesJson = JSON.stringify({
+      scheduled_start: scheduledStart || staff.shift_start || '13:00',
+      scheduled_end: scheduledEnd || staff.shift_end || '22:00'
+    });
+
     const { data, error } = await supabase
       .from('attendance_logs')
       .insert({
@@ -139,29 +172,62 @@ export const cloudDb = {
         check_in_photo_url: photoUrl,
         check_in_lat: userLat,
         check_in_lng: userLng,
-        check_in_accuracy: accuracy,
+        check_in_accuracy: accuracy || null,
         check_in_distance: distance,
         check_in_ip: clientIp,
-        check_in_wifi_pass: wifiPass,
+        check_in_wifi_pass: Boolean(wifiPass),
         check_in_network_status: wifiPass ? 'PASS' : 'FLAG_CELLULAR',
         status: 'ON_DUTY',
-        flags: flags || []
+        flags: flags || [],
+        notes: notesJson
       })
-      .select()
+      .select('*, staff:staff_id(*), break_logs(*)')
       .single();
 
     if (error) throw error;
-    return { ...data, staff_name: staff.name, venue: staff.venue };
+    return {
+      ...data,
+      staff_name: staff.name,
+      staff_id: staff.legacy_code || staff.id,
+      venue: staff.venue,
+      division: staff.division
+    };
   },
 
   // 4. Record Break Start
   async recordBreakStart({ attendanceId, staffId, photoUrl }) {
     if (!supabase) return null;
+    let targetLogId = attendanceId;
+    let staffUuid = null;
+
+    if (staffId) {
+      const staff = await findStaffInSupabase(staffId);
+      if (staff) staffUuid = staff.id;
+    }
+
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(attendanceId || ''));
+    if (!isUuid && staffUuid) {
+      const { data: activeLog } = await supabase
+        .from('attendance_logs')
+        .select('id')
+        .eq('staff_id', staffUuid)
+        .neq('status', 'COMPLETED')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (activeLog) targetLogId = activeLog.id;
+    }
+
+    if (!targetLogId || !staffUuid) {
+      console.warn('recordBreakStart: unable to identify active log or staff UUID');
+      return null;
+    }
+
     const { data, error } = await supabase
       .from('break_logs')
       .insert({
-        attendance_id: attendanceId,
-        staff_id: staffId,
+        attendance_id: targetLogId,
+        staff_id: staffUuid,
         break_start: new Date().toISOString(),
         break_start_photo_url: photoUrl,
         status: 'ON_BREAK',
@@ -174,17 +240,35 @@ export const cloudDb = {
 
     await supabase
       .from('attendance_logs')
-      .update({ status: 'ON_BREAK' })
-      .eq('id', attendanceId);
+      .update({ status: 'ON_BREAK', updated_at: new Date().toISOString() })
+      .eq('id', targetLogId);
 
     return data;
   },
 
   // 5. Record Break End
-  async recordBreakEnd({ attendanceId, photoUrl, durationMinutes }) {
+  async recordBreakEnd({ attendanceId, staffId, photoUrl, durationMinutes }) {
     if (!supabase) return null;
+    let targetLogId = attendanceId;
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(attendanceId || ''));
+    if (!isUuid && staffId) {
+      const staff = await findStaffInSupabase(staffId);
+      if (staff) {
+        const { data: activeLog } = await supabase
+          .from('attendance_logs')
+          .select('id')
+          .eq('staff_id', staff.id)
+          .eq('status', 'ON_BREAK')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (activeLog) targetLogId = activeLog.id;
+      }
+    }
+
+    if (!targetLogId) return null;
     const endTime = new Date().toISOString();
-    const excess = Math.max(0, durationMinutes - 60);
+    const excess = Math.max(0, (durationMinutes || 0) - 60);
 
     const { data, error } = await supabase
       .from('break_logs')
@@ -195,24 +279,46 @@ export const cloudDb = {
         excess_minutes: excess,
         status: 'COMPLETED'
       })
-      .eq('attendance_id', attendanceId)
+      .eq('attendance_id', targetLogId)
       .select()
-      .single();
+      .maybeSingle();
 
     if (error) throw error;
 
     await supabase
       .from('attendance_logs')
-      .update({ status: 'ON_DUTY' })
-      .eq('id', attendanceId);
+      .update({ status: 'ON_DUTY', updated_at: endTime })
+      .eq('id', targetLogId);
 
     return data;
   },
 
   // 6. Record Check-Out
-  async recordCheckout({ attendanceId, userLat, userLng, accuracy, distance, photoUrl, clientIp, wifiPass, durationMinutes, flags, notes }) {
+  async recordCheckout({ attendanceId, staffId, userLat, userLng, accuracy, distance, photoUrl, clientIp, wifiPass, durationMinutes, flags, notes }) {
     if (!supabase) return null;
     const checkoutTime = new Date().toISOString();
+
+    let targetLogId = attendanceId;
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(attendanceId || ''));
+    if (!isUuid && staffId) {
+      const staff = await findStaffInSupabase(staffId);
+      if (staff) {
+        const { data: activeLog } = await supabase
+          .from('attendance_logs')
+          .select('id')
+          .eq('staff_id', staff.id)
+          .neq('status', 'COMPLETED')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (activeLog) targetLogId = activeLog.id;
+      }
+    }
+
+    if (!targetLogId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(targetLogId))) {
+      console.warn('Supabase checkout: valid attendanceId not found');
+      return null;
+    }
 
     const { data, error } = await supabase
       .from('attendance_logs')
@@ -221,21 +327,207 @@ export const cloudDb = {
         check_out_photo_url: photoUrl,
         check_out_lat: userLat,
         check_out_lng: userLng,
-        check_out_accuracy: accuracy,
+        check_out_accuracy: accuracy || null,
         check_out_distance: distance,
         check_out_ip: clientIp,
-        check_out_wifi_pass: wifiPass,
+        check_out_wifi_pass: Boolean(wifiPass),
         check_out_network_status: wifiPass ? 'PASS' : 'FLAG_CELLULAR',
         duration_minutes: durationMinutes,
         status: 'COMPLETED',
         flags: flags || [],
-        notes: notes || null
+        notes: notes || null,
+        updated_at: checkoutTime
       })
-      .eq('id', attendanceId)
+      .eq('id', targetLogId)
       .select()
-      .single();
+      .maybeSingle();
 
     if (error) throw error;
     return data;
+  },
+
+  // 7. Get Shifts from Cloud with complete filter support
+  async getShifts({ startDate, endDate, venue, department, flagFilter, search } = {}) {
+    if (!supabase) return null;
+
+    let query = supabase
+      .from('attendance_logs')
+      .select(`
+        *,
+        staff:staff_id (
+          id,
+          name,
+          venue,
+          division,
+          role,
+          department,
+          standard_hours,
+          legacy_code,
+          shift_start,
+          shift_end
+        ),
+        break_logs (
+          id,
+          break_start,
+          break_start_photo_url,
+          break_end,
+          break_end_photo_url,
+          duration_minutes,
+          status
+        )
+      `)
+      .order('created_at', { ascending: false });
+
+    if (startDate) {
+      query = query.gte('shift_date', startDate);
+    }
+    if (endDate) {
+      query = query.lte('shift_date', endDate);
+    }
+
+    const { data, error } = await query;
+    if (error) throw error;
+
+    let formatted = (data || []).map(row => {
+      const st = row.staff || {};
+      const brk = (row.break_logs && row.break_logs.length > 0) ? row.break_logs[row.break_logs.length - 1] : null;
+
+      let parsedNotes = {};
+      if (typeof row.notes === 'string' && row.notes.startsWith('{')) {
+        try { parsedNotes = JSON.parse(row.notes); } catch {}
+      }
+
+      let parsedFlags = [];
+      if (Array.isArray(row.flags)) {
+        parsedFlags = row.flags;
+      } else if (typeof row.flags === 'string') {
+        try { parsedFlags = JSON.parse(row.flags || '[]'); } catch { parsedFlags = []; }
+      }
+
+      const breakStatus = row.status === 'ON_BREAK'
+        ? 'ON_BREAK'
+        : (row.break_logs && row.break_logs.length > 0 ? 'COMPLETED' : 'NONE');
+
+      return {
+        id: row.id,
+        supabase_id: row.id,
+        staff_id: st.legacy_code || st.id || row.staff_id,
+        staff_name: st.name || 'Staff',
+        staff_venue: st.venue || 'JP Karaoke',
+        staff_division: st.division || st.role || 'Server and Cashier',
+        staff_role: st.role || 'Staff',
+        staff_department: st.department || 'Operations',
+        standard_hours: st.standard_hours || 8.5,
+        date: row.shift_date || (row.check_in_time ? row.check_in_time.split('T')[0] : ''),
+        scheduled_start: parsedNotes.scheduled_start || st.shift_start || '13:00',
+        scheduled_end: parsedNotes.scheduled_end || st.shift_end || '22:00',
+        checkin_time: row.check_in_time,
+        checkin_lat: row.check_in_lat,
+        checkin_lng: row.check_in_lng,
+        checkin_accuracy: row.check_in_accuracy,
+        checkin_distance: row.check_in_distance,
+        checkin_photo: row.check_in_photo_url,
+        checkin_ip: row.check_in_ip,
+        checkin_wifi_pass: row.check_in_wifi_pass ? 1 : 0,
+        break_status: breakStatus,
+        break_start_time: brk?.break_start || null,
+        break_start_photo: brk?.break_start_photo_url || null,
+        break_end_time: brk?.break_end || null,
+        break_end_photo: brk?.break_end_photo_url || null,
+        break_duration_minutes: brk?.duration_minutes || null,
+        break_count: row.break_logs ? row.break_logs.length : 0,
+        checkout_time: row.check_out_time,
+        checkout_lat: row.check_out_lat,
+        checkout_lng: row.check_out_lng,
+        checkout_accuracy: row.check_out_accuracy,
+        checkout_distance: row.check_out_distance,
+        checkout_photo: row.check_out_photo_url,
+        checkout_ip: row.check_out_ip,
+        checkout_wifi_pass: row.check_out_wifi_pass ? 1 : 0,
+        duration_minutes: row.duration_minutes,
+        status: row.status === 'COMPLETED' ? 'COMPLETED' : (row.status === 'ON_BREAK' ? 'ON_BREAK' : 'IN_PROGRESS'),
+        flags: parsedFlags,
+        notes: typeof row.notes === 'string' && !row.notes.startsWith('{') ? row.notes : null,
+        created_at: row.created_at,
+        updated_at: row.updated_at
+      };
+    });
+
+    if (venue && venue !== 'ALL') {
+      formatted = formatted.filter(r => r.staff_venue === venue);
+    }
+    if (department && department !== 'ALL') {
+      formatted = formatted.filter(r => r.staff_division === department || r.staff_department === department);
+    }
+    if (search && search.trim()) {
+      const q = search.trim().toLowerCase();
+      formatted = formatted.filter(r =>
+        (r.staff_name && r.staff_name.toLowerCase().includes(q)) ||
+        (r.staff_id && String(r.staff_id).toLowerCase().includes(q)) ||
+        (r.staff_role && r.staff_role.toLowerCase().includes(q))
+      );
+    }
+    if (flagFilter === 'FLAGS_ONLY') {
+      formatted = formatted.filter(r => r.flags.length > 0);
+    } else if (flagFilter === 'NORMAL_ONLY') {
+      formatted = formatted.filter(r => r.flags.length === 0);
+    }
+
+    return formatted;
+  },
+
+  // 8. Get KPI Stats from Cloud
+  async getStats() {
+    if (!supabase) return null;
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    const { data: todayLogs, error } = await supabase
+      .from('attendance_logs')
+      .select(`
+        id,
+        shift_date,
+        status,
+        flags,
+        check_in_wifi_pass,
+        check_out_wifi_pass
+      `)
+      .eq('shift_date', todayStr);
+
+    if (error) throw error;
+
+    const list = todayLogs || [];
+    const activeCount = list.filter(s => s.status !== 'COMPLETED').length;
+    const onBreakCount = list.filter(s => s.status === 'ON_BREAK').length;
+    const completedCount = list.filter(s => s.status === 'COMPLETED').length;
+
+    let totalFlags = 0;
+    let wifiMatchPasses = 0;
+    let totalEvents = 0;
+
+    for (const s of list) {
+      const flags = Array.isArray(s.flags) ? s.flags : (typeof s.flags === 'string' ? JSON.parse(s.flags || '[]') : []);
+      totalFlags += flags.length;
+
+      if (s.check_in_wifi_pass != null) {
+        totalEvents++;
+        if (s.check_in_wifi_pass) wifiMatchPasses++;
+      }
+      if (s.check_out_wifi_pass != null) {
+        totalEvents++;
+        if (s.check_out_wifi_pass) wifiMatchPasses++;
+      }
+    }
+
+    const wifiComplianceRate = totalEvents > 0 ? Math.round((wifiMatchPasses / totalEvents) * 100) : 100;
+
+    return {
+      todayDate: todayStr,
+      totalToday: list.length,
+      activeShifts: activeCount,
+      onBreakShifts: onBreakCount,
+      completedShifts: completedCount,
+      flaggedAnomalies: totalFlags,
+      wifiComplianceRate
+    };
   }
 };

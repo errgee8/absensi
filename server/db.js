@@ -112,7 +112,9 @@ const ensureColumn = (tableName, columnName, definition) => {
 ensureColumn('staff', 'venue', "TEXT DEFAULT 'JP Karaoke'");
 ensureColumn('staff', 'division', "TEXT DEFAULT 'Server and Cashier'");
 ensureColumn('staff', 'shift_id', 'INTEGER');
+ensureColumn('staff', 'uuid', 'TEXT');
 
+ensureColumn('shifts', 'supabase_id', 'TEXT');
 ensureColumn('shifts', 'break_status', "TEXT DEFAULT 'NONE'");
 ensureColumn('shifts', 'break_start_time', 'TEXT');
 ensureColumn('shifts', 'break_start_photo', 'TEXT');
