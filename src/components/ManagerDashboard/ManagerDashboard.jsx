@@ -7,12 +7,13 @@ import VenueSettingsModal from './VenueSettingsModal';
 import PrintableTimesheet from './PrintableTimesheet';
 import StaffManagementTab from './StaffManagementTab';
 import ShiftSchedulesTab from './ShiftSchedulesTab';
+import ToiletInspectionTab from './ToiletInspectionTab';
 import { exportTimesheetToExcel } from '../../utils/excelExport';
 import { getShifts, getStats, subscribeRealtimeEvents } from '../../utils/api';
-import { LayoutDashboard, Users, Clock, Radio, Building2 } from 'lucide-react';
+import { LayoutDashboard, Users, Clock, Radio, Building2, Sparkles } from 'lucide-react';
 
 export default function ManagerDashboard({ venueSettings, refreshSettings }) {
-  // Tabs: 'AUDIT' | 'SCHEDULES' | 'STAFF'
+  // Tabs: 'AUDIT' | 'SCHEDULES' | 'STAFF' | 'TOILET'
   const [activeTab, setActiveTab] = useState('AUDIT');
 
   const [shifts, setShifts] = useState([]);
@@ -117,15 +118,15 @@ export default function ManagerDashboard({ venueSettings, refreshSettings }) {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
       <div className="no-print space-y-6">
-        {/* Navigation Tabs Bar */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-4">
-          <div className="flex flex-wrap bg-slate-900 p-1.5 rounded-2xl border border-slate-800 gap-1">
+        {/* Navigation Tabs Bar - Clean White & Blue Theme */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-4">
+          <div className="flex flex-wrap bg-white p-1.5 rounded-2xl border border-slate-200 shadow-sm gap-1">
             <button
               onClick={() => setActiveTab('AUDIT')}
               className={`flex items-center space-x-2 px-3.5 py-2 rounded-xl text-xs font-bold transition ${
                 activeTab === 'AUDIT'
-                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
-                  : 'text-slate-400 hover:text-white'
+                  ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
               }`}
             >
               <LayoutDashboard className="w-4 h-4" />
@@ -133,23 +134,35 @@ export default function ManagerDashboard({ venueSettings, refreshSettings }) {
             </button>
 
             <button
+              onClick={() => setActiveTab('TOILET')}
+              className={`flex items-center space-x-2 px-3.5 py-2 rounded-xl text-xs font-bold transition ${
+                activeTab === 'TOILET'
+                  ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+              }`}
+            >
+              <Sparkles className="w-4 h-4" />
+              <span>Kebersihan Toilet (QR Live)</span>
+            </button>
+
+            <button
               onClick={() => setActiveTab('SCHEDULES')}
               className={`flex items-center space-x-2 px-3.5 py-2 rounded-xl text-xs font-bold transition ${
                 activeTab === 'SCHEDULES'
-                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
-                  : 'text-slate-400 hover:text-white'
+                  ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
               }`}
             >
               <Clock className="w-4 h-4" />
-              <span>Pengaturan Divisi & Jam Kerja (Shift Templates)</span>
+              <span>Pengaturan Divisi & Jam Kerja</span>
             </button>
 
             <button
               onClick={() => setActiveTab('STAFF')}
               className={`flex items-center space-x-2 px-3.5 py-2 rounded-xl text-xs font-bold transition ${
                 activeTab === 'STAFF'
-                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
-                  : 'text-slate-400 hover:text-white'
+                  ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
               }`}
             >
               <Users className="w-4 h-4" />
@@ -158,9 +171,9 @@ export default function ManagerDashboard({ venueSettings, refreshSettings }) {
           </div>
 
           {/* SSE Realtime Indicator */}
-          <div className="flex items-center space-x-2 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 text-[11px] font-mono text-emerald-400">
-            <span className="flex h-2 w-2 rounded-full bg-emerald-400 animate-ping" />
-            <Radio className="w-3.5 h-3.5" />
+          <div className="flex items-center space-x-2 px-3 py-1.5 rounded-xl bg-white border border-slate-200 shadow-sm text-xs font-mono font-bold text-emerald-600">
+            <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-ping" />
+            <Radio className="w-3.5 h-3.5 text-emerald-500" />
             <span>Realtime Live Sync Active</span>
           </div>
         </div>
@@ -195,6 +208,8 @@ export default function ManagerDashboard({ venueSettings, refreshSettings }) {
             />
           </>
         )}
+
+        {activeTab === 'TOILET' && <ToiletInspectionTab />}
 
         {activeTab === 'SCHEDULES' && <ShiftSchedulesTab />}
 

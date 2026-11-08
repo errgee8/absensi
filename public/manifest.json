@@ -1,11 +1,11 @@
 {
-  "name": "JP Staff Shift & Attendance",
-  "short_name": "JP Shift",
-  "description": "Progressive Web App for Staff Shift Check-In, Check-Out & Audit Log",
+  "name": "Staff Portal by Ryan Gerrit - Lucky Cat & JPE Karaoke",
+  "short_name": "Staff Portal",
+  "description": "Staff Portal for Lucky Cat and JPE Karaoke by Ryan Gerrit",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0f172a",
-  "theme_color": "#0f172a",
+  "background_color": "#ffffff",
+  "theme_color": "#2563eb",
   "orientation": "portrait-primary",
   "icons": [
     {

@@ -4,7 +4,7 @@ import StaffView from './components/StaffView/StaffView';
 import ManagerDashboard from './components/ManagerDashboard/ManagerDashboard';
 import AdminPinModal from './components/ManagerDashboard/AdminPinModal';
 import { getNetworkStatus, getStaffList, getSettings } from './utils/api';
-import { Smartphone } from 'lucide-react';
+import { Smartphone, Download, Check } from 'lucide-react';
 
 export default function App() {
   const [currentView, setView] = useState('staff'); // 'staff' | 'manager'
@@ -12,6 +12,7 @@ export default function App() {
   const [networkStatus, setNetworkStatus] = useState(null);
   const [venueSettings, setVenueSettings] = useState(null);
   const [installPrompt, setInstallPrompt] = useState(null);
+  const [isInstalled, setIsInstalled] = useState(false);
 
   // Admin PIN Protection State
   const [adminModalOpen, setAdminModalOpen] = useState(false);
@@ -35,6 +36,11 @@ export default function App() {
   useEffect(() => {
     loadAppData();
 
+    // Check if already running standalone PWA
+    if (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true) {
+      setIsInstalled(true);
+    }
+
     const handleBeforeInstall = (e) => {
       e.preventDefault();
       setInstallPrompt(e);
@@ -45,11 +51,15 @@ export default function App() {
   }, []);
 
   const handleInstallPwa = async () => {
-    if (!installPrompt) return;
+    if (!installPrompt) {
+      alert('Untuk pengguna iPhone/Safari: Tekan tombol Bagikan (Share) di browser bawah lalu pilih "Tambahkan ke Layar Utama" (Add to Home Screen).\n\nUntuk Chrome di Android: Tekan titik tiga di pojok kanan atas lalu pilih "Install Aplikasi" / "Tambahkan ke Layar Utama".');
+      return;
+    }
     installPrompt.prompt();
     const { outcome } = await installPrompt.userChoice;
     if (outcome === 'accepted') {
       setInstallPrompt(null);
+      setIsInstalled(true);
     }
   };
 
@@ -65,19 +75,20 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
-      {/* PWA Home Screen Banner */}
-      {installPrompt && (
-        <div className="no-print bg-gradient-to-r from-emerald-600 to-teal-600 text-slate-950 px-4 py-2 flex items-center justify-between text-xs font-bold shadow-md">
+    <div className="min-h-screen bg-slate-50 text-slate-800 flex flex-col font-sans">
+      {/* PWA Home Screen Banner - Clean White & Blue */}
+      {!isInstalled && (
+        <div className="no-print bg-blue-600 text-white px-4 py-2.5 flex items-center justify-between text-xs font-bold shadow-md">
           <div className="flex items-center space-x-2">
-            <Smartphone className="w-4 h-4" />
-            <span>Install JP Shift PWA for 1-tap mobile check-in</span>
+            <Smartphone className="w-4 h-4 shrink-0" />
+            <span>Pasang Staff Portal PWA di HP staf untuk akses cepat 1-klik</span>
           </div>
           <button
             onClick={handleInstallPwa}
-            className="px-3 py-1 bg-slate-950 text-white rounded-lg text-xs font-semibold hover:bg-slate-900 transition"
+            className="px-3.5 py-1 bg-white text-blue-700 rounded-xl text-xs font-extrabold hover:bg-blue-50 active:scale-95 transition flex items-center space-x-1.5 shadow-sm shrink-0 ml-2"
           >
-            Install App
+            <Download className="w-3.5 h-3.5" />
+            <span>Download PWA</span>
           </button>
         </div>
       )}
@@ -98,38 +109,32 @@ export default function App() {
       />
 
       {/* Main Content View */}
-      <main className="flex-1 pb-12">
+      <main className="flex-1">
         {currentView === 'staff' ? (
           <StaffView
-            staffList={staffList}
-            networkStatus={networkStatus}
-            refreshNetwork={() => getNetworkStatus().then(setNetworkStatus)}
             venueSettings={venueSettings}
           />
         ) : (
           <ManagerDashboard
             venueSettings={venueSettings}
-            refreshSettings={() => {
-              getSettings().then(setVenueSettings);
-              getStaffList('ALL').then(setStaffList);
-            }}
+            refreshSettings={loadAppData}
           />
         )}
       </main>
 
-      {/* Admin PIN Unlock Modal */}
+      {/* Footer Branding */}
+      <footer className="no-print border-t border-slate-200 py-4 text-center text-xs text-slate-500 bg-white">
+        <p className="font-medium">
+          Staff Portal by Ryan Gerrit • Lucky Cat &amp; JP Executive Karaoke
+        </p>
+      </footer>
+
+      {/* Admin Authentication PIN Modal */}
       <AdminPinModal
         isOpen={adminModalOpen}
         onClose={() => setAdminModalOpen(false)}
         onSuccess={handleAdminSuccess}
       />
-
-      {/* Footer */}
-      <footer className="no-print py-4 border-t border-slate-900 text-center text-[11px] text-slate-500">
-        <div className="flex items-center justify-center space-x-2">
-          <span>JP Karaoke & LuckyCat Attendance System • Version 2.0 PWA</span>
-        </div>
-      </footer>
     </div>
   );
 }
