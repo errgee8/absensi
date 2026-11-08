@@ -85,23 +85,23 @@ export default function ActiveShiftTimer({ activeShift, onInitiateCheckout }) {
         </div>
       </div>
 
-      {/* Checkin location & network metadata */}
+      {/* Checkin location metadata */}
       <div className="grid grid-cols-2 gap-2 text-xs mb-5">
         <div className="bg-slate-900/80 p-2.5 rounded-xl border border-slate-800 flex items-center space-x-2">
-          <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+          <MapPin className="w-3.5 h-3.5 text-blue-400 shrink-0" />
           <div className="truncate">
-            <span className="text-[10px] text-slate-400 block">Check-in Distance</span>
+            <span className="text-[10px] text-slate-400 block">Jarak GPS Check-in</span>
             <span className="font-semibold text-slate-200">
-              {activeShift.checkin_distance != null ? `${activeShift.checkin_distance}m from pin` : 'Verified'}
+              {activeShift.checkin_distance != null ? `${activeShift.checkin_distance}m dari outlet` : 'Terverifikasi'}
             </span>
           </div>
         </div>
         <div className="bg-slate-900/80 p-2.5 rounded-xl border border-slate-800 flex items-center space-x-2">
-          <ShieldCheck className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+          <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
           <div className="truncate">
-            <span className="text-[10px] text-slate-400 block">Wi-Fi Gatekeeper</span>
-            <span className={`font-semibold ${activeShift.checkin_wifi_pass ? 'text-emerald-400' : 'text-amber-400'}`}>
-              {activeShift.checkin_wifi_pass ? 'Pass (Subnet OK)' : 'Off-Network'}
+            <span className="text-[10px] text-slate-400 block">Status Geofence</span>
+            <span className="font-semibold text-emerald-400">
+              {activeShift.checkin_distance != null && activeShift.checkin_distance <= 150 ? 'Valid (Dalam Geofence)' : 'GPS Aktif'}
             </span>
           </div>
         </div>

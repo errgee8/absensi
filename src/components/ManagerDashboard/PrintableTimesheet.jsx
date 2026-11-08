@@ -37,7 +37,6 @@ export default function PrintableTimesheet({ shifts = [], venueName = 'JP Karaok
             <th style={{ width: '75px' }}>1-Hr Break</th>
             <th style={{ width: '80px' }}>Out (WITA)</th>
             <th style={{ width: '65px' }}>Total Dur</th>
-            <th style={{ width: '60px' }}>Wi-Fi</th>
             <th style={{ width: '60px' }}>GPS Dist</th>
             <th>Audit & Anomaly Flags</th>
           </tr>
@@ -71,7 +70,6 @@ export default function PrintableTimesheet({ shifts = [], venueName = 'JP Karaok
                 </td>
                 <td>{s.checkout_time ? formatWitaTimeOnly(s.checkout_time) : 'IN PROGRESS'}</td>
                 <td>{formatDuration(s.duration_minutes)}</td>
-                <td>{s.checkin_wifi_pass === 1 ? 'PASS' : 'FAIL'}</td>
                 <td>{s.checkin_distance != null ? `${s.checkin_distance}m` : '-'}</td>
                 <td>
                   {hasFlags ? (

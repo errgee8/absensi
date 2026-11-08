@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Save, MapPin, Wifi, Shield, RefreshCw, Clock, ArrowRight } from 'lucide-react';
+import { X, Save, MapPin, Shield, RefreshCw, Clock, ArrowRight } from 'lucide-react';
 import { updateSettings } from '../../utils/api';
 
 export default function VenueSettingsModal({ settings, onClose, onSaved, onGoToSchedules }) {
@@ -10,7 +10,6 @@ export default function VenueSettingsModal({ settings, onClose, onSaved, onGoToS
   const [subnets, setSubnets] = useState(
     Array.isArray(settings?.allowed_subnets) ? settings.allowed_subnets.join('\n') : ''
   );
-  const [enforceWifi, setEnforceWifi] = useState(Boolean(settings?.enforce_wifi));
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -22,7 +21,6 @@ export default function VenueSettingsModal({ settings, onClose, onSaved, onGoToS
       if (settings.allowed_subnets !== undefined) {
         setSubnets(Array.isArray(settings.allowed_subnets) ? settings.allowed_subnets.join('\n') : '');
       }
-      if (settings.enforce_wifi !== undefined) setEnforceWifi(Boolean(settings.enforce_wifi));
     }
   }, [settings]);
 
@@ -54,7 +52,7 @@ export default function VenueSettingsModal({ settings, onClose, onSaved, onGoToS
         venue_lng: parseFloat(lng),
         geofence_radius: parseInt(radius, 10),
         allowed_subnets: parsedSubnets,
-        enforce_wifi: enforceWifi ? 1 : 0
+        enforce_wifi: 0
       });
 
       onSaved();
@@ -188,22 +186,6 @@ export default function VenueSettingsModal({ settings, onClose, onSaved, onGoToS
                 onChange={(e) => setSubnets(e.target.value)}
                 placeholder="192.168.1.0/24&#10;10.0.0.0/8"
                 className="w-full bg-slate-50 border-2 border-slate-300 rounded-xl p-2.5 text-slate-950 font-mono font-bold text-xs focus:outline-none focus:border-blue-600 focus:bg-white"
-              />
-            </div>
-
-            {/* Enforce Wi-Fi Strict Block */}
-            <div className="p-3.5 bg-slate-50 border-2 border-slate-200 rounded-2xl flex items-center justify-between">
-              <div>
-                <span className="font-black text-slate-950 block">Pemberlakuan Wi-Fi Wajib</span>
-                <span className="text-[11px] text-slate-700 block mt-0.5 font-bold">
-                  Jika aktif, staf mutlak wajib terhubung ke Wi-Fi outlet. Jika mati, absensi di luar Wi-Fi tetap tercatat namun berstatus "Off-Network".
-                </span>
-              </div>
-              <input
-                type="checkbox"
-                checked={enforceWifi}
-                onChange={(e) => setEnforceWifi(e.target.checked)}
-                className="w-5 h-5 accent-blue-600 cursor-pointer rounded ml-3"
               />
             </div>
           </div>

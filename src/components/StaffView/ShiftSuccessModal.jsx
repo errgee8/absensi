@@ -57,9 +57,9 @@ export default function ShiftSuccessModal({ shift, type = 'checkin', onClose }) 
           )}
 
           <div className="flex justify-between items-center">
-            <span className="text-slate-400">Status Wi-Fi:</span>
-            <span className={`font-semibold ${shift.checkin_wifi_pass ? 'text-emerald-400' : 'text-amber-400'}`}>
-              {shift.checkin_wifi_pass ? 'Terverifikasi (Jaringan Outlet)' : 'Off-Network'}
+            <span className="text-slate-400">Verifikasi GPS Geofence:</span>
+            <span className="font-semibold text-emerald-400">
+              {shift.checkin_distance != null ? `${shift.checkin_distance}m dari Venue (Valid)` : 'Terverifikasi (Geofence)'}
             </span>
           </div>
 

@@ -1791,24 +1791,17 @@ router.get('/stats', async (req, res) => {
   const completedCount = todayShifts.filter(s => s.status === 'COMPLETED').length;
 
   let totalFlags = 0;
-  let wifiMatchPasses = 0;
-  let totalEvents = 0;
+  let outsideGeofenceCount = 0;
 
   for (const s of todayShifts) {
     const flags = JSON.parse(s.flags || '[]');
     totalFlags += flags.length;
-
-    if (s.checkin_wifi_pass != null) {
-      totalEvents++;
-      if (s.checkin_wifi_pass === 1) wifiMatchPasses++;
-    }
-    if (s.checkout_wifi_pass != null) {
-      totalEvents++;
-      if (s.checkout_wifi_pass === 1) wifiMatchPasses++;
+    if (flags.includes('FLAG_OUTSIDE_GEOFENCE')) {
+      outsideGeofenceCount++;
     }
   }
 
-  const wifiComplianceRate = totalEvents > 0 ? Math.round((wifiMatchPasses / totalEvents) * 100) : 100;
+  const gpsComplianceRate = todayShifts.length > 0 ? Math.round(((todayShifts.length - outsideGeofenceCount) / todayShifts.length) * 100) : 100;
 
   res.json({
     todayDate: todayStr,
@@ -1817,7 +1810,8 @@ router.get('/stats', async (req, res) => {
     onBreakShifts: onBreakCount,
     completedShifts: completedCount,
     flaggedAnomalies: totalFlags,
-    wifiComplianceRate,
+    gpsComplianceRate,
+    wifiComplianceRate: gpsComplianceRate,
     venueName: getSetting('venue_name')
   });
 });

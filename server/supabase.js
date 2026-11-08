@@ -559,24 +559,17 @@ export const cloudDb = {
     const completedCount = list.filter(s => s.status === 'COMPLETED').length;
 
     let totalFlags = 0;
-    let wifiMatchPasses = 0;
-    let totalEvents = 0;
+    let outsideGeofenceCount = 0;
 
     for (const s of list) {
       const flags = Array.isArray(s.flags) ? s.flags : (typeof s.flags === 'string' ? JSON.parse(s.flags || '[]') : []);
       totalFlags += flags.length;
-
-      if (s.check_in_wifi_pass != null) {
-        totalEvents++;
-        if (s.check_in_wifi_pass) wifiMatchPasses++;
-      }
-      if (s.check_out_wifi_pass != null) {
-        totalEvents++;
-        if (s.check_out_wifi_pass) wifiMatchPasses++;
+      if (flags.includes('FLAG_OUTSIDE_GEOFENCE')) {
+        outsideGeofenceCount++;
       }
     }
 
-    const wifiComplianceRate = totalEvents > 0 ? Math.round((wifiMatchPasses / totalEvents) * 100) : 100;
+    const gpsComplianceRate = list.length > 0 ? Math.round(((list.length - outsideGeofenceCount) / list.length) * 100) : 100;
 
     return {
       todayDate: todayStr,
@@ -585,7 +578,8 @@ export const cloudDb = {
       onBreakShifts: onBreakCount,
       completedShifts: completedCount,
       flaggedAnomalies: totalFlags,
-      wifiComplianceRate
+      gpsComplianceRate,
+      wifiComplianceRate: gpsComplianceRate
     };
   }
 };

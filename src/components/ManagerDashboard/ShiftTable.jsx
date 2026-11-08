@@ -1,5 +1,5 @@
 import React from 'react';
-import { Wifi, WifiOff, Eye, AlertTriangle, CheckCircle, Clock, Coffee } from 'lucide-react';
+import { Eye, AlertTriangle, CheckCircle, Clock, Coffee, MapPin } from 'lucide-react';
 import { formatWitaTimeOnly, formatWitaDateOnly, formatDuration } from '../../utils/time';
 import { resolveShift } from '../../utils/shiftResolver';
 
@@ -74,7 +74,6 @@ export default function ShiftTable({ shifts = [], schedules = [], onInspectPhoto
               <th className="py-3.5 px-3">Pulang</th>
               <th className="py-3.5 px-2 text-center">Foto Pulang</th>
               <th className="py-3.5 px-2">Durasi</th>
-              <th className="py-3.5 px-2">Wi-Fi</th>
               <th className="py-3.5 px-2">Jarak GPS</th>
               <th className="py-3.5 px-3">Status / Anomali</th>
               <th className="py-3.5 px-2 text-right">Detail</th>
@@ -84,7 +83,6 @@ export default function ShiftTable({ shifts = [], schedules = [], onInspectPhoto
           <tbody className="divide-y-2 divide-slate-100 font-bold">
             {shifts.map((shift) => {
               const hasFlags = shift.flags && shift.flags.length > 0;
-              const isWifiPass = shift.checkin_wifi_pass === 1;
               const shiftInfo = resolveShift(shift, schedules);
               const isActive = !shift.checkout_time || shift.status === 'IN_PROGRESS' || shift.status === 'ON_DUTY' || shift.status === 'ON_BREAK';
 
@@ -229,20 +227,6 @@ export default function ShiftTable({ shifts = [], schedules = [], onInspectPhoto
                   {/* Duration */}
                   <td className="py-3 px-2 whitespace-nowrap font-mono text-slate-950 font-bold">
                     {formatDuration(shift.duration_minutes)}
-                  </td>
-
-                  {/* Wi-Fi Match Pass/Fail */}
-                  <td className="py-3 px-2 whitespace-nowrap">
-                    <span
-                      className={`inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-[9px] font-black border ${
-                        isWifiPass
-                          ? 'bg-emerald-100 text-emerald-950 border-emerald-300'
-                          : 'bg-rose-100 text-rose-950 border-rose-300'
-                      }`}
-                    >
-                      {isWifiPass ? <Wifi className="w-2.5 h-2.5 stroke-[2.5]" /> : <WifiOff className="w-2.5 h-2.5 stroke-[2.5]" />}
-                      <span>{isWifiPass ? 'PASS' : 'FAIL'}</span>
-                    </span>
                   </td>
 
                   {/* GPS Distance */}

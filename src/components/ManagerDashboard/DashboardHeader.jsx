@@ -1,5 +1,5 @@
 import React from 'react';
-import { Users, Clock, AlertTriangle, ShieldCheck, Printer, Settings, FileSpreadsheet } from 'lucide-react';
+import { Users, Clock, AlertTriangle, MapPin, Printer, Settings, FileSpreadsheet } from 'lucide-react';
 
 export default function DashboardHeader({
   stats,
@@ -34,9 +34,9 @@ export default function DashboardHeader({
       iconBg: stats?.flaggedAnomalies > 0 ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-700'
     },
     {
-      label: 'Wi-Fi Match Rate',
-      value: `${stats?.wifiComplianceRate ?? 100}%`,
-      icon: ShieldCheck,
+      label: 'GPS Geofence Match',
+      value: `${stats?.gpsComplianceRate ?? stats?.wifiComplianceRate ?? 100}%`,
+      icon: MapPin,
       color: 'text-indigo-700',
       border: 'border-indigo-200',
       iconBg: 'bg-indigo-100 text-indigo-700'

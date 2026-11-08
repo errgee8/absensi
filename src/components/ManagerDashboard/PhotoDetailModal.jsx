@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, MapPin, Wifi, ShieldAlert, CheckCircle, Calendar, Clock, User, Coffee, LogIn, LogOut, Camera } from 'lucide-react';
+import { X, MapPin, ShieldAlert, CheckCircle, Calendar, Clock, User, Coffee, LogIn, LogOut, Camera, ShieldCheck } from 'lucide-react';
 import { formatWitaDateTime, formatDuration } from '../../utils/time';
 
 export default function PhotoDetailModal({ shift, type = 'in', onClose }) {
@@ -42,7 +42,6 @@ export default function PhotoDetailModal({ shift, type = 'in', onClose }) {
   const lng = isCheckout ? shift.checkout_lng : shift.checkin_lng;
   const dist = isCheckout ? shift.checkout_distance : shift.checkin_distance;
   const ip = isCheckout ? shift.checkout_ip : shift.checkin_ip;
-  const wifiPass = isCheckout ? shift.checkout_wifi_pass : shift.checkin_wifi_pass;
 
   const hasCheckin = Boolean(shift.checkin_photo);
   const hasBreak = Boolean(shift.break_end_photo || shift.break_start_photo);
@@ -175,13 +174,13 @@ export default function PhotoDetailModal({ shift, type = 'in', onClose }) {
 
             <div className="bg-slate-50 p-3.5 rounded-2xl border-2 border-slate-200">
               <span className="text-[10px] text-slate-700 uppercase font-black block mb-1">
-                Koneksi Wi-Fi Outlet
+                Validasi Geofence GPS
               </span>
               <div className="flex items-center space-x-2">
-                <span className={`font-black ${wifiPass ? 'text-emerald-700' : 'text-slate-700'}`}>
-                  {wifiPass ? 'TERVERIFIKASI (PASS)' : (ip ? 'OFF-NETWORK' : 'N/A')}
+                <span className={`font-black ${dist != null && dist <= 150 ? 'text-emerald-700' : 'text-rose-700'}`}>
+                  {dist != null && dist <= 150 ? 'DALAM GEOFENCE (VALID)' : (dist != null ? 'DI LUAR GEOFENCE' : 'GPS AKTIF')}
                 </span>
-                <span className="text-slate-700 font-mono text-[11px] font-bold">[{ip || 'N/A'}]</span>
+                <span className="text-slate-700 font-mono text-[11px] font-bold">[{dist != null ? `${dist}m` : 'N/A'}]</span>
               </div>
             </div>
 
