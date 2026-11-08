@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import KioskLoginScreen from './KioskLoginScreen';
 import KioskPortalScreen from './KioskPortalScreen';
 import KioskActionScreen from './KioskActionScreen';
@@ -6,6 +6,7 @@ import KioskCameraModal from './KioskCameraModal';
 import ToiletScannerModal from '../ToiletChecklist/ToiletScannerModal';
 import ToiletChecklistForm from '../ToiletChecklist/ToiletChecklistForm';
 import { verifyStaffPin } from '../../utils/api';
+import { RESTROOM_LOCATIONS } from '../../utils/toiletService';
 import { CheckCircle2 } from 'lucide-react';
 
 export default function StaffView({
@@ -33,6 +34,29 @@ export default function StaffView({
   const [toiletChecklistOpen, setToiletChecklistOpen] = useState(false);
   const [selectedToiletLocation, setSelectedToiletLocation] = useState(null);
   const [toiletSuccessAlert, setToiletSuccessAlert] = useState(null);
+  const [directToiletLocation, setDirectToiletLocation] = useState(null);
+
+  // Auto-detect direct scan QR token from URL parameters
+  useEffect(() => {
+    try {
+      const urlParams = new URLSearchParams(window.location.search);
+      let token = urlParams.get('toilet') || urlParams.get('scan') || urlParams.get('qr');
+      if (!token && window.location.pathname.includes('/inspect/')) {
+        token = window.location.pathname.split('/inspect/')[1].split('/')[0];
+      }
+      if (token) {
+        const clean = token.trim().toUpperCase();
+        const matched = RESTROOM_LOCATIONS.find(
+          (l) => l.qr_token.toUpperCase() === clean || l.id.toUpperCase() === clean
+        );
+        if (matched) {
+          setDirectToiletLocation(matched);
+        }
+      }
+    } catch (e) {
+      console.warn('URL token parse note:', e);
+    }
+  }, []);
 
   // Handle PIN submission on Screen 1
   const handleLogin = async (overridePin) => {
@@ -48,6 +72,12 @@ export default function StaffView({
 
       setLoggedInStaff(data.staff);
       setActiveShift(data.activeShift);
+
+      // If staff arrived via a direct QR scan link, open that restroom checklist immediately!
+      if (directToiletLocation) {
+        setSelectedToiletLocation(directToiletLocation);
+        setToiletChecklistOpen(true);
+      }
       setStep('PORTAL');
     } catch (err) {
       setError(err.message || 'PIN tidak terdaftar. Periksa kembali PIN Anda.');
