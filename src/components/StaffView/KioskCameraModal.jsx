@@ -9,6 +9,7 @@ export default function KioskCameraModal({
   staff,
   activeShift,
   actionType = 'checkin', // 'checkin' | 'checkout' | 'break_start' | 'break_end'
+  confirmedShift = null,
   venueSettings,
   onCompleteAndAutoLogout,
   onClose
@@ -170,7 +171,8 @@ export default function KioskCameraModal({
         lng: currentLng,
         accuracy: userLocation?.accuracy ?? 10,
         photoBase64: watermarkedBase64,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        confirmedShift: confirmedShift || null
       };
 
       let res;

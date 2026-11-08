@@ -22,6 +22,7 @@ export default function StaffView({
   // Camera modal state
   const [cameraModalOpen, setCameraModalOpen] = useState(false);
   const [cameraActionType, setCameraActionType] = useState('checkin');
+  const [confirmedShift, setConfirmedShift] = useState(null);
 
   // Handle PIN submission on Screen 1
   const handleLogin = async (overridePin) => {
@@ -54,6 +55,7 @@ export default function StaffView({
     setPin('');
     setActiveShift(null);
     setError(null);
+    setConfirmedShift(null);
   };
 
   return (
@@ -73,8 +75,9 @@ export default function StaffView({
         <KioskActionScreen
           staff={loggedInStaff}
           activeShift={activeShift}
-          onTriggerCamera={(type) => {
+          onTriggerCamera={(type, shift) => {
             setCameraActionType(type);
+            setConfirmedShift(shift || null);
             setCameraModalOpen(true);
           }}
           onLogout={handleResetToLogin}
@@ -87,6 +90,7 @@ export default function StaffView({
           staff={loggedInStaff}
           activeShift={activeShift}
           actionType={cameraActionType}
+          confirmedShift={confirmedShift}
           venueSettings={venueSettings}
           onCompleteAndAutoLogout={handleResetToLogin}
           onClose={() => setCameraModalOpen(false)}

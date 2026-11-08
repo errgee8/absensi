@@ -6,7 +6,7 @@ import { calculateDistanceMeters, isWithinGeofence } from './geofence.js';
 import { getClientIp, validateClientNetwork } from './network.js';
 import { evaluateCheckinFlags, evaluateCheckoutFlags, evaluateBreakFlags, auditOpenShifts, FLAG_TYPES } from './flags.js';
 import { isSupabaseConfigured, uploadPhotoToSupabase, cloudDb, supabase } from './supabase.js';
-import { detectShiftSchedule } from './shifts.js';
+import { detectShiftSchedule, getBreakCutoff, isBreakAllowedNow, getWitaTimeString } from './shifts.js';
 
 const router = express.Router();
 
@@ -291,8 +291,7 @@ router.post('/staff/verify-pin', async (req, res) => {
     } catch (e) {}
   }
 
-  // Auto-detect shift schedule dynamically (staff is NOT bound to a fixed shift)
-  const isLuckyCat = Boolean(staff.venue && staff.venue.toLowerCase().includes('lucky'));
+  // Fetch schedules for staff member's venue & division
   const schedules = db.prepare(`
     SELECT * FROM shift_schedules 
     WHERE venue = ? AND division = ?
@@ -300,17 +299,35 @@ router.post('/staff/verify-pin', async (req, res) => {
   `).all(staff.venue, staff.division);
 
   let detectedShift = null;
+  let breakAllowed = false;
+  let breakCutoffTime = '20:00';
+  let isWithin2HoursOfEnd = false;
+
   if (activeShift && activeShift.scheduled_start) {
+    const shiftEnd = activeShift.scheduled_end || '22:00';
+    const shiftStart = activeShift.scheduled_start || '13:00';
+    const cutoff = getBreakCutoff(shiftEnd);
+    breakCutoffTime = cutoff.cutoffTimeStr;
+
     detectedShift = schedules.find((s) => s.start_time === activeShift.scheduled_start) || {
       name: 'Shift Aktif',
       shift_number: 1,
-      start_time: activeShift.scheduled_start,
-      end_time: activeShift.scheduled_end,
-      max_break_end: activeShift.scheduled_start?.startsWith('18') ? '01:00' : '16:00',
-      allows_break: isLuckyCat ? 1 : 0
+      start_time: shiftStart,
+      end_time: shiftEnd,
+      max_break_end: cutoff.cutoffTimeStr,
+      allows_break: 1
     };
+
+    const timeAllowed = isBreakAllowedNow(shiftStart, shiftEnd, new Date());
+    isWithin2HoursOfEnd = !timeAllowed;
+    const breakCount = activeShift.break_count || 0;
+    const isCompletedBreak = activeShift.break_status === 'COMPLETED';
+    const isOnBreak = activeShift.break_status === 'ON_BREAK';
+
+    // Break is allowed: 1 break per shift, must be finished 2 hours before shift ends
+    breakAllowed = !isOnBreak && breakCount === 0 && !isCompletedBreak && timeAllowed;
   } else {
-    // Dynamically detect which shift the employee is checking into based on current WITA time
+    // 30-minute auto-detect candidate
     detectedShift = detectShiftSchedule(schedules, new Date());
   }
 
@@ -326,8 +343,11 @@ router.post('/staff/verify-pin', async (req, res) => {
       shift_start: detectedShift?.start_time || staff.shift_start || '13:00',
       shift_end: detectedShift?.end_time || staff.shift_end || '22:00',
       standard_hours: staff.standard_hours,
-      allows_break: isLuckyCat ? 1 : 0,
-      max_break_end: detectedShift?.max_break_end || (detectedShift?.start_time?.startsWith('18') ? '01:00' : '16:00'),
+      allows_break: 1,
+      max_break_end: breakCutoffTime,
+      breakAllowed,
+      breakCutoffTime,
+      isWithin2HoursOfEnd,
       detectedShift: detectedShift || null,
       availableSchedules: schedules
     },
@@ -457,7 +477,7 @@ router.put('/staff/:id/status', async (req, res) => {
 
 // 10. Staff Check-In
 router.post('/checkin', async (req, res) => {
-  const { staffId, pin, lat, lng, accuracy, photoBase64, timestamp } = req.body;
+  const { staffId, pin, lat, lng, accuracy, photoBase64, timestamp, confirmedShift } = req.body;
 
   if (!staffId) return res.status(400).json({ error: 'Karyawan wajib dipilih.' });
   if (!photoBase64) return res.status(400).json({ error: 'Foto selfie langsung wajib diambil.' });
@@ -489,16 +509,21 @@ router.post('/checkin', async (req, res) => {
   const dateStr = now.toISOString().split('T')[0];
   const checkinTime = timestamp || now.toISOString();
 
-  // Auto-detect shift dynamically based on actual check-in time (staff is NOT bound to fixed shift)
-  const schedules = db.prepare(`
-    SELECT * FROM shift_schedules 
-    WHERE venue = ? AND division = ?
-    ORDER BY shift_number ASC
-  `).all(staff.venue, staff.division);
+  // Shift schedule determination (from staff confirmation dialog or 30-min window detection)
+  let scheduledStart = confirmedShift?.start_time;
+  let scheduledEnd = confirmedShift?.end_time;
 
-  const matchedSchedule = detectShiftSchedule(schedules, checkinTime);
-  const scheduledStart = matchedSchedule ? matchedSchedule.start_time : (staff.shift_start || '13:00');
-  const scheduledEnd = matchedSchedule ? matchedSchedule.end_time : (staff.shift_end || '22:00');
+  if (!scheduledStart) {
+    const schedules = db.prepare(`
+      SELECT * FROM shift_schedules 
+      WHERE venue = ? AND division = ?
+      ORDER BY shift_number ASC
+    `).all(staff.venue, staff.division);
+
+    const matchedSchedule = detectShiftSchedule(schedules, checkinTime);
+    scheduledStart = matchedSchedule ? matchedSchedule.start_time : (staff.shift_start || '13:00');
+    scheduledEnd = matchedSchedule ? matchedSchedule.end_time : (staff.shift_end || '22:00');
+  }
 
   const flags = evaluateCheckinFlags({
     clientIp,
@@ -576,17 +601,12 @@ router.post('/checkin', async (req, res) => {
   });
 });
 
-// 11. Staff Start Break (LuckyCat Only)
+// 11. Staff Start Break
 router.post('/break/start', async (req, res) => {
   const { shiftId, staffId, pin, photoBase64, timestamp, lat, lng } = req.body;
 
   const staff = db.prepare('SELECT * FROM staff WHERE id = ?').get(staffId);
   if (!staff) return res.status(404).json({ error: 'Karyawan tidak ditemukan.' });
-
-  // STRICT RULE: No break for JP Karaoke staff
-  if (staff.venue === 'JP Karaoke') {
-    return res.status(403).json({ error: 'Karyawan JP Karaoke tidak memiliki waktu istirahat.' });
-  }
 
   let shift;
   if (shiftId) {
@@ -597,9 +617,20 @@ router.post('/break/start', async (req, res) => {
 
   if (!shift) return res.status(404).json({ error: 'Shift aktif tidak ditemukan.' });
 
-  // STRICT RULE: Break only allowed once per shift
-  if (shift.break_count >= 1 || shift.break_start_time) {
+  // STRICT RULE 1: Break only allowed once per shift
+  if (shift.break_count >= 1 || shift.break_start_time || shift.break_status === 'COMPLETED' || shift.break_status === 'ON_BREAK') {
     return res.status(400).json({ error: 'Istirahat hanya diperbolehkan 1 kali per shift dan sudah pernah diambil.' });
+  }
+
+  // STRICT RULE 2: Break must be finished 2 hours before shift ends
+  const shiftStart = shift.scheduled_start || '13:00';
+  const shiftEnd = shift.scheduled_end || '22:00';
+  const breakAllowed = isBreakAllowedNow(shiftStart, shiftEnd, timestamp || new Date());
+  if (!breakAllowed) {
+    const { cutoffTimeStr } = getBreakCutoff(shiftEnd);
+    return res.status(400).json({
+      error: `Waktu istirahat tidak diperbolehkan kurang dari 2 jam sebelum shift berakhir (Batas maksimal istirahat: Pukul ${cutoffTimeStr} WITA).`
+    });
   }
 
   if (!photoBase64) return res.status(400).json({ error: 'Foto selfie mulai istirahat wajib diambil.' });

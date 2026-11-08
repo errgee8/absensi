@@ -1,6 +1,92 @@
 /**
- * Auto-detects which shift schedule matches a staff member's check-in event.
- * Eliminates hardcoded shift-binding so staff (e.g. Ica) can work Shift 1 or Shift 2 seamlessly.
+ * Shift Schedule Intelligence & Break Policy Utilities
+ * Timezone: WITA (Asia/Makassar, UTC+8)
+ */
+
+export function getWitaTimeString(date = new Date()) {
+  const d = new Date(date);
+  const formatter = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Makassar',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  });
+  const parts = formatter.formatToParts(d);
+  const curH = parts.find((p) => p.type === 'hour')?.value || '00';
+  const curM = parts.find((p) => p.type === 'minute')?.value || '00';
+  return `${curH}:${curM}`;
+}
+
+export function toMinutes(timeStr) {
+  if (!timeStr || !timeStr.includes(':')) return 780;
+  const [h, m] = timeStr.split(':').map(Number);
+  return h * 60 + m;
+}
+
+export function circularDiffMinutes(m1, m2) {
+  let diff = Math.abs(m1 - m2);
+  if (diff > 720) diff = 1440 - diff;
+  return diff;
+}
+
+/**
+ * Calculates the break cutoff time (strictly 2 hours before shift ends).
+ * Example:
+ *  - 22:00 -> cutoff 20:00
+ *  - 03:00 -> cutoff 01:00
+ *  - 19:00 -> cutoff 17:00
+ *  - 03:30 -> cutoff 01:30
+ */
+export function getBreakCutoff(endTimeStr) {
+  if (!endTimeStr || !endTimeStr.includes(':')) {
+    return { cutoffMinutes: 1200, cutoffTimeStr: '20:00' };
+  }
+  const endMinutes = toMinutes(endTimeStr);
+  const cutoffMinutes = (endMinutes - 120 + 1440) % 1440;
+  const cutoffH = Math.floor(cutoffMinutes / 60);
+  const cutoffM = cutoffMinutes % 60;
+  return {
+    cutoffMinutes,
+    cutoffTimeStr: `${String(cutoffH).padStart(2, '0')}:${String(cutoffM).padStart(2, '0')}`
+  };
+}
+
+/**
+ * Checks whether staff is currently allowed to start a break.
+ * Rule: Break must be finished 2 hours before shift ends (no break allowed within 2 hours of shift end).
+ */
+export function isBreakAllowedNow(startTimeStr, endTimeStr, checkTime = new Date()) {
+  if (!startTimeStr || !endTimeStr) return true;
+
+  const curTimeStr = typeof checkTime === 'string' && checkTime.includes(':') && !checkTime.includes('T')
+    ? checkTime
+    : getWitaTimeString(checkTime);
+
+  const startM = toMinutes(startTimeStr);
+  const endM = toMinutes(endTimeStr);
+  const curM = toMinutes(curTimeStr);
+  const { cutoffMinutes } = getBreakCutoff(endTimeStr);
+
+  const isOvernight = endM < startM;
+  if (!isOvernight) {
+    // Normal daytime shift (e.g. 13:00 - 22:00, cutoff 20:00)
+    return curM <= cutoffMinutes;
+  } else {
+    // Overnight shift (e.g. 18:30 - 03:00, cutoff 01:00, end 03:00)
+    // Between cutoff (01:00) and end (03:00) is the forbidden window!
+    if (curM > cutoffMinutes && curM < endM) {
+      return false;
+    }
+    return true;
+  }
+}
+
+/**
+ * Auto-detects shift schedule only within a strict 30-minute window
+ * before and after the shift's scheduled start time.
+ *
+ * If outside ±30 mins, returns the closest schedule with autoDetected = false,
+ * prompting the user to confirm/choose the correct shift.
  */
 export function detectShiftSchedule(schedules, checkinTime = new Date()) {
   if (!schedules || schedules.length === 0) {
@@ -10,51 +96,47 @@ export function detectShiftSchedule(schedules, checkinTime = new Date()) {
       start_time: '13:00',
       end_time: '22:00',
       is_flexible_checkout: 0,
-      allows_break: 0,
-      max_break_end: null
+      allows_break: 1,
+      max_break_end: '20:00',
+      autoDetected: false
     };
   }
 
-  if (schedules.length === 1) {
-    return schedules[0];
-  }
+  const curTimeStr = getWitaTimeString(checkinTime);
+  const curM = toMinutes(curTimeStr);
 
-  // Extract WITA (UTC+8) time components
-  const d = new Date(checkinTime);
-  const formatter = new Intl.DateTimeFormat('en-GB', {
-    timeZone: 'Asia/Makassar',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false
-  });
-  const parts = formatter.formatToParts(d);
-  const curH = parseInt(parts.find((p) => p.type === 'hour')?.value || '0', 10);
-  const curM = parseInt(parts.find((p) => p.type === 'minute')?.value || '0', 10);
-  const curTotalM = curH * 60 + curM;
-
-  const toMinutes = (timeStr) => {
-    if (!timeStr || !timeStr.includes(':')) return 780;
-    const [h, m] = timeStr.split(':').map(Number);
-    return h * 60 + m;
-  };
-
-  const circularDiff = (m1, m2) => {
-    let diff = Math.abs(m1 - m2);
-    if (diff > 720) diff = 1440 - diff;
-    return diff;
-  };
-
-  let bestMatch = schedules[0];
-  let minDiff = 999999;
-
+  // 1. Strict ±30 minutes check
   for (const sched of schedules) {
-    const schedStartM = toMinutes(sched.start_time);
-    const diff = circularDiff(curTotalM, schedStartM);
-    if (diff < minDiff) {
-      minDiff = diff;
-      bestMatch = sched;
+    const sM = toMinutes(sched.start_time);
+    const diff = circularDiffMinutes(curM, sM);
+    if (diff <= 30) {
+      const { cutoffTimeStr } = getBreakCutoff(sched.end_time);
+      return {
+        ...sched,
+        autoDetected: true,
+        diffMinutes: diff,
+        max_break_end: cutoffTimeStr
+      };
     }
   }
 
-  return bestMatch;
+  // 2. Outside ±30 minutes window -> find closest schedule as default selection
+  let best = schedules[0];
+  let minDiff = 999999;
+  for (const sched of schedules) {
+    const sM = toMinutes(sched.start_time);
+    const diff = circularDiffMinutes(curM, sM);
+    if (diff < minDiff) {
+      minDiff = diff;
+      best = sched;
+    }
+  }
+
+  const { cutoffTimeStr } = getBreakCutoff(best.end_time);
+  return {
+    ...best,
+    autoDetected: false,
+    diffMinutes: minDiff,
+    max_break_end: cutoffTimeStr
+  };
 }
