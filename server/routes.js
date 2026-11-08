@@ -6,6 +6,7 @@ import { calculateDistanceMeters, isWithinGeofence } from './geofence.js';
 import { getClientIp, validateClientNetwork } from './network.js';
 import { evaluateCheckinFlags, evaluateCheckoutFlags, evaluateBreakFlags, auditOpenShifts, FLAG_TYPES } from './flags.js';
 import { isSupabaseConfigured, uploadPhotoToSupabase, cloudDb, supabase } from './supabase.js';
+import { detectShiftSchedule } from './shifts.js';
 
 const router = express.Router();
 
@@ -290,13 +291,28 @@ router.post('/staff/verify-pin', async (req, res) => {
     } catch (e) {}
   }
 
-  // Check schedule permissions for break
+  // Auto-detect shift schedule dynamically (staff is NOT bound to a fixed shift)
   const isLuckyCat = Boolean(staff.venue && staff.venue.toLowerCase().includes('lucky'));
-  const schedule = db.prepare(`
+  const schedules = db.prepare(`
     SELECT * FROM shift_schedules 
-    WHERE venue = ? AND division = ? AND (start_time = ? OR shift_number = 1)
-    LIMIT 1
-  `).get(staff.venue, staff.division, staff.shift_start);
+    WHERE venue = ? AND division = ?
+    ORDER BY shift_number ASC
+  `).all(staff.venue, staff.division);
+
+  let detectedShift = null;
+  if (activeShift && activeShift.scheduled_start) {
+    detectedShift = schedules.find((s) => s.start_time === activeShift.scheduled_start) || {
+      name: 'Shift Aktif',
+      shift_number: 1,
+      start_time: activeShift.scheduled_start,
+      end_time: activeShift.scheduled_end,
+      max_break_end: activeShift.scheduled_start?.startsWith('18') ? '01:00' : '16:00',
+      allows_break: isLuckyCat ? 1 : 0
+    };
+  } else {
+    // Dynamically detect which shift the employee is checking into based on current WITA time
+    detectedShift = detectShiftSchedule(schedules, new Date());
+  }
 
   res.json({
     success: true,
@@ -307,11 +323,13 @@ router.post('/staff/verify-pin', async (req, res) => {
       division: staff.division,
       role: staff.role,
       department: staff.department,
-      shift_start: staff.shift_start,
-      shift_end: staff.shift_end,
+      shift_start: detectedShift?.start_time || staff.shift_start || '13:00',
+      shift_end: detectedShift?.end_time || staff.shift_end || '22:00',
       standard_hours: staff.standard_hours,
       allows_break: isLuckyCat ? 1 : 0,
-      max_break_end: schedule?.max_break_end || (staff.shift_start?.startsWith('18') ? '01:00' : '16:00')
+      max_break_end: detectedShift?.max_break_end || (detectedShift?.start_time?.startsWith('18') ? '01:00' : '16:00'),
+      detectedShift: detectedShift || null,
+      availableSchedules: schedules
     },
     activeShift: activeShift || null
   });
@@ -471,6 +489,17 @@ router.post('/checkin', async (req, res) => {
   const dateStr = now.toISOString().split('T')[0];
   const checkinTime = timestamp || now.toISOString();
 
+  // Auto-detect shift dynamically based on actual check-in time (staff is NOT bound to fixed shift)
+  const schedules = db.prepare(`
+    SELECT * FROM shift_schedules 
+    WHERE venue = ? AND division = ?
+    ORDER BY shift_number ASC
+  `).all(staff.venue, staff.division);
+
+  const matchedSchedule = detectShiftSchedule(schedules, checkinTime);
+  const scheduledStart = matchedSchedule ? matchedSchedule.start_time : (staff.shift_start || '13:00');
+  const scheduledEnd = matchedSchedule ? matchedSchedule.end_time : (staff.shift_end || '22:00');
+
   const flags = evaluateCheckinFlags({
     clientIp,
     lat: userLat,
@@ -478,7 +507,7 @@ router.post('/checkin', async (req, res) => {
     distance,
     wifiPass: wifiValidation.isMatch,
     geofenceRadius,
-    scheduledStart: staff.shift_start,
+    scheduledStart,
     checkinTime
   });
 
@@ -497,8 +526,8 @@ router.post('/checkin', async (req, res) => {
   `).run(
     staffId,
     dateStr,
-    staff.shift_start,
-    staff.shift_end,
+    scheduledStart,
+    scheduledEnd,
     checkinTime,
     userLat,
     userLng,
@@ -629,9 +658,14 @@ router.post('/break/end', async (req, res) => {
   const startTime = new Date(shift.break_start_time).getTime();
   const durationMinutes = Math.max(0, Math.round((new Date(endTime).getTime() - startTime) / (1000 * 60)));
 
-  // Determine max break end for this shift (16:00 for shift 1, 01:00 for shift 2)
-  const isShift2 = shift.shift_start && shift.shift_start.startsWith('18');
-  const maxBreakEnd = isShift2 ? '01:00' : '16:00';
+  // Determine max break end for this auto-detected shift
+  const schedule = db.prepare(`
+    SELECT max_break_end FROM shift_schedules 
+    WHERE venue = ? AND division = ? AND start_time = ?
+    LIMIT 1
+  `).get(shift.venue, shift.division, shift.scheduled_start);
+
+  const maxBreakEnd = schedule?.max_break_end || (shift.scheduled_start?.startsWith('18') ? '01:00' : '16:00');
 
   let flags = [];
   try {

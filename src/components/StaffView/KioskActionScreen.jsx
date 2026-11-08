@@ -19,9 +19,16 @@ export default function KioskActionScreen({
   const breakCount = activeShift?.break_count || 0;
   const breakAllowed = isLuckyCat && isCheckedIn && breakCount === 0 && !isOnBreak;
 
-  // Max break end calculation
-  const isShift2 = staff?.shift_start && staff.shift_start.startsWith('18');
-  const maxBreakEndTime = isShift2 ? '01:00 WITA' : '16:00 WITA';
+  // Dynamic Auto-Detected Shift calculations (staff is NOT bound to a fixed shift)
+  const detectedShift = staff?.detectedShift;
+  const currentShiftName = activeShift?.scheduled_start
+    ? (detectedShift?.name || 'Shift Aktif')
+    : (detectedShift?.name || 'Shift');
+  const shiftStart = activeShift?.scheduled_start || detectedShift?.start_time || staff?.shift_start || '13:00';
+  const shiftEnd = activeShift?.scheduled_end || detectedShift?.end_time || staff?.shift_end || '22:00';
+  const maxBreakEndTime = detectedShift?.max_break_end 
+    ? `${detectedShift.max_break_end} WITA` 
+    : (shiftStart.startsWith('18') ? '01:00 WITA' : '16:00 WITA');
 
   // Live timer for active shift
   useEffect(() => {
@@ -96,7 +103,14 @@ export default function KioskActionScreen({
           <h2 className="text-2xl font-black text-white tracking-tight">
             Halo, {staff.name}!
           </h2>
-          <p className="text-xs text-slate-400 mt-0.5">{staff.role}</p>
+          <div className="flex flex-wrap items-center gap-2 mt-1">
+            <span className="text-xs text-slate-400 font-medium">{staff.role}</span>
+            <span className="text-slate-600">•</span>
+            <span className="text-[11px] text-cyan-300 font-bold bg-cyan-950/60 border border-cyan-800/60 px-2.5 py-0.5 rounded-lg flex items-center space-x-1.5 shadow-sm">
+              <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse"></span>
+              <span>Auto-Detect: {currentShiftName} ({shiftStart} - {shiftEnd})</span>
+            </span>
+          </div>
         </div>
 
         {/* Break in Progress Box */}
@@ -229,7 +243,10 @@ export default function KioskActionScreen({
 
         {/* Shift details footer */}
         <div className="mt-6 pt-4 border-t border-slate-800 text-[11px] text-slate-400 flex flex-col sm:flex-row sm:items-center justify-between gap-1">
-          <span>Jadwal: {staff.shift_start || '13:00'} - {staff.shift_end || '22:00'}</span>
+          <span className="flex items-center space-x-1.5">
+            <span className="inline-block w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></span>
+            <span>Shift Terdeteksi: <strong>{currentShiftName} ({shiftStart} - {shiftEnd})</strong></span>
+          </span>
           <span className="text-emerald-400 font-medium">Toleransi Grace Period: 10 Menit</span>
         </div>
       </div>

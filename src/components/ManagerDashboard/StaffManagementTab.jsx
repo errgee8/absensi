@@ -219,7 +219,7 @@ export default function StaffManagementTab({ onStaffUpdated }) {
                 <th className="py-3.5 px-3">Role</th>
                 <th className="py-3.5 px-3">Assigned PIN</th>
                 <th className="py-3.5 px-3">Status</th>
-                <th className="py-3.5 px-3">Shift Hours</th>
+                <th className="py-3.5 px-3">Shift Schedule</th>
                 <th className="py-3.5 px-3 text-right">Actions</th>
               </tr>
             </thead>
@@ -292,8 +292,10 @@ export default function StaffManagementTab({ onStaffUpdated }) {
                     </td>
 
                     {/* Shift Pattern */}
-                    <td className="py-3 px-3 text-slate-400 text-[11px] font-mono">
-                      {staff.shift_start} - {staff.shift_end}
+                    <td className="py-3 px-3 text-[11px] font-mono">
+                      <span className="text-cyan-300 bg-cyan-950/60 border border-cyan-800/50 px-2 py-0.5 rounded-md font-bold">
+                        Auto-Detect (Fleksibel)
+                      </span>
                     </td>
 
                     {/* Actions */}

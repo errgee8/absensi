@@ -28,17 +28,27 @@ export function evaluateCheckinFlags({ clientIp, lat, lng, distance, wifiPass, g
     flags.push(FLAG_TYPES.OUTSIDE_GEOFENCE);
   }
 
-  // 10-Minute Grace Period check for shift check-in
+  // 10-Minute Grace Period check for shift check-in (WITA timezone UTC+8)
   if (scheduledStart && checkinTime && scheduledStart.includes(':')) {
     try {
-      const checkinDate = new Date(checkinTime);
+      const d = new Date(checkinTime);
+      const formatter = new Intl.DateTimeFormat('en-GB', {
+        timeZone: 'Asia/Makassar',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      });
+      const parts = formatter.formatToParts(d);
+      const curH = parseInt(parts.find((p) => p.type === 'hour')?.value || '0', 10);
+      const curM = parseInt(parts.find((p) => p.type === 'minute')?.value || '0', 10);
+      const curTotalM = curH * 60 + curM;
+
       const [schedH, schedM] = scheduledStart.split(':').map(Number);
+      const schedTotalM = schedH * 60 + schedM;
 
-      // Create scheduled time for the same day
-      const schedDate = new Date(checkinDate);
-      schedDate.setHours(schedH, schedM, 0, 0);
-
-      const diffMinutes = Math.round((checkinDate.getTime() - schedDate.getTime()) / (1000 * 60));
+      let diffMinutes = curTotalM - schedTotalM;
+      if (diffMinutes < -720) diffMinutes += 1440;
+      if (diffMinutes > 720) diffMinutes -= 1440;
 
       // If check-in is later than scheduled start + 10 minutes grace period
       if (diffMinutes > GRACE_PERIOD_MINUTES) {
