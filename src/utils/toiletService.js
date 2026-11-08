@@ -146,7 +146,8 @@ export async function submitRestroomInspection({
     taskTitle: t.title,
     status: taskStatuses[t.id] || 'pass',
     isAdhoc: false,
-    priority: 'normal'
+    priority: 'normal',
+    photo_url: t.photo_url || uploadedPhotoUrl
   }));
 
   const allPassed = taskResults.every((t) => t.status === 'pass');

@@ -1,5 +1,22 @@
 import React, { useState, useEffect } from 'react';
-import { Building2, Sparkles, RefreshCw, CheckCircle2, AlertTriangle, Clock, User, Camera, ShieldCheck, Eye, X, BellRing } from 'lucide-react';
+import {
+  Building2,
+  Sparkles,
+  RefreshCw,
+  CheckCircle2,
+  AlertTriangle,
+  Clock,
+  User,
+  Camera,
+  ShieldCheck,
+  Eye,
+  X,
+  BellRing,
+  ChevronLeft,
+  ChevronRight,
+  Maximize2,
+  Image as ImageIcon
+} from 'lucide-react';
 import { getToiletLocations, getRecentToiletInspections } from '../../utils/toiletService';
 
 export default function ToiletInspectionTab() {
@@ -7,8 +24,15 @@ export default function ToiletInspectionTab() {
   const [inspections, setInspections] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedInspection, setSelectedInspection] = useState(null);
+  const [selectedTaskIndex, setSelectedTaskIndex] = useState(0);
+  const [fullscreenPhoto, setFullscreenPhoto] = useState(null);
   const [currentTime, setCurrentTime] = useState(Date.now());
   const [targetIntervalMinutes, setTargetIntervalMinutes] = useState(60); // Standar inspeksi toilet: tiap 60 menit (1 jam)
+
+  const handleOpenInspection = (ins, initialTaskIdx = 0) => {
+    setSelectedInspection(ins);
+    setSelectedTaskIndex(initialTaskIdx);
+  };
 
   const loadData = async () => {
     setLoading(true);
@@ -354,20 +378,24 @@ export default function ToiletInspectionTab() {
                       </td>
 
                       <td className="py-3 px-2">
-                        {ins.photo_url ? (
+                        {ins.photo_url || ins.task_results?.some((t) => t.photo_url) ? (
                           <button
                             type="button"
-                            onClick={() => setSelectedInspection(ins)}
-                            className="relative w-12 h-10 rounded-xl overflow-hidden border-2 border-slate-300 hover:border-blue-600 transition shadow-sm group inline-block"
+                            onClick={() => handleOpenInspection(ins, 0)}
+                            className="relative w-14 h-11 rounded-xl overflow-hidden border-2 border-slate-300 hover:border-blue-600 transition shadow-sm group inline-block"
+                            title="Klik untuk melihat semua foto checklist toilet"
                           >
                             <img
-                              src={ins.photo_url}
+                              src={ins.task_results?.find((t) => t.photo_url)?.photo_url || ins.photo_url}
                               alt="Toilet inspection"
-                              className="w-full h-full object-cover"
+                              className="w-full h-full object-cover group-hover:scale-105 transition"
                             />
-                            <div className="absolute inset-0 bg-blue-950/40 group-hover:bg-transparent flex items-center justify-center">
+                            <div className="absolute inset-0 bg-blue-950/30 group-hover:bg-transparent flex items-center justify-center">
                               <Eye className="w-3.5 h-3.5 text-white stroke-[2.5]" />
                             </div>
+                            <span className="absolute bottom-0.5 right-0.5 bg-blue-950/90 text-white text-[9px] font-black px-1 rounded shadow">
+                              {ins.task_results?.filter((t) => t.photo_url)?.length || 1} 📷
+                            </span>
                           </button>
                         ) : (
                           <span className="text-slate-400 text-xs font-bold">Tidak ada foto</span>
@@ -377,10 +405,10 @@ export default function ToiletInspectionTab() {
                       <td className="py-3 px-2 text-right">
                         <button
                           type="button"
-                          onClick={() => setSelectedInspection(ins)}
+                          onClick={() => handleOpenInspection(ins, 0)}
                           className="px-3 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-black border border-blue-200 transition shadow-sm"
                         >
-                          Lihat
+                          Lihat ({ins.task_results?.filter((t) => t.photo_url)?.length || 0} Foto)
                         </button>
                       </td>
                     </tr>
@@ -393,80 +421,331 @@ export default function ToiletInspectionTab() {
       </div>
 
       {/* Inspection Detail Modal */}
-      {selectedInspection && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl border-2 border-slate-300 max-h-[85vh] flex flex-col">
-            <div className="p-4 sm:p-5 bg-blue-600 text-white flex items-center justify-between">
-              <div>
-                <h3 className="font-black text-base text-white">Detail Laporan Checklist Toilet</h3>
-                <p className="text-xs text-blue-100 font-bold mt-0.5">
-                  {selectedInspection.qr_token} • Petugas: {selectedInspection.staff_name}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setSelectedInspection(null)}
-                className="p-1.5 rounded-xl bg-white/20 hover:bg-white/30 text-white transition"
-              >
-                <X className="w-5 h-5 stroke-[2.5]" />
-              </button>
-            </div>
+      {selectedInspection && (() => {
+        const tasks = selectedInspection.task_results || [];
+        const activeTask = tasks[selectedTaskIndex] || tasks[0] || null;
+        const activePhoto = activeTask?.photo_url || selectedInspection.photo_url;
+        const totalPhotos = tasks.filter((t) => t.photo_url).length || (selectedInspection.photo_url ? 1 : 0);
+        const isPass = activeTask?.status === 'pass';
 
-            <div className="p-5 space-y-4 overflow-y-auto text-xs">
-              {/* Photo Preview if available */}
-              {selectedInspection.photo_url && (
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in">
+            <div className="bg-white rounded-3xl max-w-2xl w-full overflow-hidden shadow-2xl border-2 border-slate-300 max-h-[92vh] flex flex-col">
+              {/* Modal Header */}
+              <div className="p-4 sm:p-5 bg-blue-600 text-white flex items-center justify-between shadow-md">
                 <div>
-                  <label className="font-black text-slate-950 block mb-1">Foto Bukti Kondisi Toilet:</label>
-                  <div className="rounded-2xl overflow-hidden border-2 border-slate-300 aspect-video bg-slate-950 shadow-sm">
-                    <img
-                      src={selectedInspection.photo_url}
-                      alt="Inspection detail"
-                      className="w-full h-full object-cover"
-                    />
+                  <div className="flex items-center space-x-2">
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-white/20 text-white border border-white/30">
+                      Checklist {selectedInspection.qr_token}
+                    </span>
+                    <span className="text-[11px] font-black text-blue-100">
+                      {totalPhotos} Foto Tersedia
+                    </span>
                   </div>
+                  <h3 className="font-black text-lg text-white mt-1">
+                    Detail Checklist Toilet: {selectedInspection.qr_token}
+                  </h3>
+                  <p className="text-xs text-blue-100 font-bold mt-0.5">
+                    Petugas: <strong className="text-white underline">{selectedInspection.staff_name}</strong> •{' '}
+                    {new Date(selectedInspection.created_at).toLocaleDateString('id-ID', {
+                      day: 'numeric',
+                      month: 'short',
+                      year: 'numeric'
+                    })}{' '}
+                    pkl{' '}
+                    {new Date(selectedInspection.created_at).toLocaleTimeString('id-ID', {
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })}{' '}
+                    WITA
+                  </p>
                 </div>
-              )}
+                <button
+                  type="button"
+                  onClick={() => setSelectedInspection(null)}
+                  className="p-2 rounded-2xl bg-white/20 hover:bg-white/30 text-white transition shrink-0"
+                >
+                  <X className="w-5 h-5 stroke-[2.5]" />
+                </button>
+              </div>
 
-              {/* Task Results */}
-              <div>
-                <label className="font-black text-slate-950 block mb-2">Hasil Pengecekan ({selectedInspection.task_results?.length || 0} Poin):</label>
-                <div className="grid grid-cols-2 gap-2">
-                  {(selectedInspection.task_results || []).map((t, idx) => {
-                    const isPass = t.status === 'pass';
-                    return (
-                      <div
-                        key={idx}
-                        className={`p-2.5 rounded-xl border-2 flex items-center justify-between text-xs font-black ${
+              {/* Modal Body */}
+              <div className="p-4 sm:p-5 space-y-4 overflow-y-auto text-xs">
+                {/* Active Photo Evidence Viewer */}
+                <div>
+                  <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                    <div className="flex items-center space-x-2">
+                      <span className="px-2.5 py-1 rounded-xl bg-blue-600 text-white text-xs font-black shadow-sm">
+                        Foto {selectedTaskIndex + 1} dari {tasks.length}
+                      </span>
+                      <h4 className="text-sm font-black text-slate-950">
+                        {activeTask?.taskTitle || activeTask?.taskId || 'Foto Bukti Toilet'}
+                      </h4>
+                    </div>
+
+                    <div className="flex items-center space-x-2">
+                      <span
+                        className={`inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[10px] font-black border ${
                           isPass
-                            ? 'bg-emerald-50 border-emerald-300 text-emerald-950'
-                            : 'bg-amber-50 border-amber-300 text-amber-950'
+                            ? 'bg-emerald-100 text-emerald-950 border-emerald-300'
+                            : 'bg-amber-100 text-amber-950 border-amber-400'
                         }`}
                       >
-                        <span className="truncate mr-1">{t.taskTitle || t.taskId}</span>
-                        <span>{isPass ? '✓ OK' : '⚠️ Cek'}</span>
+                        {isPass ? (
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-700" />
+                        ) : (
+                          <AlertTriangle className="w-3.5 h-3.5 text-amber-700" />
+                        )}
+                        <span>{isPass ? 'Kondisi: Bersih / OK' : 'Kondisi: Perlu Perhatian'}</span>
+                      </span>
+
+                      {activePhoto && (
+                        <button
+                          type="button"
+                          onClick={() => setFullscreenPhoto(activePhoto)}
+                          className="px-2.5 py-1 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-[11px] font-black border border-slate-300 flex items-center space-x-1 transition"
+                          title="Perbesar Layar Penuh"
+                        >
+                          <Maximize2 className="w-3.5 h-3.5" />
+                          <span className="hidden sm:inline">Perbesar</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Photo Frame with Navigation Chevrons */}
+                  <div className="relative aspect-video bg-slate-950 rounded-2xl overflow-hidden border-2 border-slate-300 shadow-md group">
+                    {activePhoto ? (
+                      <>
+                        <img
+                          src={activePhoto}
+                          alt={activeTask?.taskTitle || 'Toilet inspection'}
+                          className="w-full h-full object-contain bg-slate-950"
+                        />
+
+                        {/* Prev Button */}
+                        {selectedTaskIndex > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => setSelectedTaskIndex((prev) => Math.max(0, prev - 1))}
+                            className="absolute left-2.5 top-1/2 -translate-y-1/2 p-2.5 rounded-full bg-slate-950/70 hover:bg-blue-600 text-white shadow-lg backdrop-blur-sm transition"
+                            title="Foto Sebelumnya"
+                          >
+                            <ChevronLeft className="w-5 h-5 stroke-[2.5]" />
+                          </button>
+                        )}
+
+                        {/* Next Button */}
+                        {selectedTaskIndex < tasks.length - 1 && (
+                          <button
+                            type="button"
+                            onClick={() => setSelectedTaskIndex((prev) => Math.min(tasks.length - 1, prev + 1))}
+                            className="absolute right-2.5 top-1/2 -translate-y-1/2 p-2.5 rounded-full bg-slate-950/70 hover:bg-blue-600 text-white shadow-lg backdrop-blur-sm transition"
+                            title="Foto Berikutnya"
+                          >
+                            <ChevronRight className="w-5 h-5 stroke-[2.5]" />
+                          </button>
+                        )}
+
+                        {/* Bottom Overlay Label */}
+                        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-slate-950/90 via-slate-950/60 to-transparent p-3 text-white flex items-center justify-between text-xs">
+                          <span className="font-black drop-shadow">
+                            📍 {activeTask?.taskTitle || activeTask?.taskId}
+                          </span>
+                          <span className="text-[10px] font-mono font-bold text-slate-300 drop-shadow">
+                            {selectedTaskIndex + 1} / {tasks.length}
+                          </span>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="w-full h-full flex flex-col items-center justify-center text-slate-400 space-y-2">
+                        <ImageIcon className="w-10 h-10 text-slate-500 stroke-[1.5]" />
+                        <span className="font-bold text-xs">Tidak ada foto spesifik untuk tugas ini.</span>
                       </div>
-                    );
-                  })}
+                    )}
+                  </div>
+
+                  {/* Horizontal Thumbnail Slider / Quick Switcher */}
+                  {tasks.length > 0 && (
+                    <div className="flex items-center space-x-2 overflow-x-auto py-2.5 mt-1 no-scrollbar">
+                      {tasks.map((t, idx) => {
+                        const isCurrent = idx === selectedTaskIndex;
+                        const hasThumb = Boolean(t.photo_url || selectedInspection.photo_url);
+                        return (
+                          <button
+                            key={idx}
+                            type="button"
+                            onClick={() => setSelectedTaskIndex(idx)}
+                            className={`shrink-0 w-16 h-12 rounded-xl overflow-hidden border-2 transition relative ${
+                              isCurrent
+                                ? 'border-blue-600 ring-2 ring-blue-500 scale-105 shadow-md shadow-blue-500/30'
+                                : 'border-slate-300 opacity-70 hover:opacity-100 hover:border-slate-400'
+                            }`}
+                            title={`Tugas ${idx + 1}: ${t.taskTitle || t.taskId}`}
+                          >
+                            {hasThumb ? (
+                              <img
+                                src={t.photo_url || selectedInspection.photo_url}
+                                alt={t.taskTitle}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <div className="w-full h-full bg-slate-200 flex items-center justify-center text-[10px] font-black text-slate-700">
+                                #{idx + 1}
+                              </div>
+                            )}
+                            <span
+                              className={`absolute bottom-0.5 right-0.5 px-1 rounded text-[8px] font-black ${
+                                t.status === 'pass'
+                                  ? 'bg-emerald-600 text-white'
+                                  : 'bg-amber-600 text-white'
+                              }`}
+                            >
+                              {idx + 1}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
+
+                {/* 10 Checklist Tasks Grid - Interactive Buttons */}
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="font-black text-slate-950 text-xs uppercase tracking-wider block">
+                      Daftar 10 Poin Checklist (Klik Setiap Tugas untuk Ganti Foto):
+                    </label>
+                    <span className="text-[11px] font-black text-blue-700">
+                      Pilih tugas di bawah ↓
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {tasks.map((t, idx) => {
+                      const isTaskPass = t.status === 'pass';
+                      const isCurrent = idx === selectedTaskIndex;
+                      const thumb = t.photo_url || selectedInspection.photo_url;
+
+                      return (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => setSelectedTaskIndex(idx)}
+                          className={`p-2.5 rounded-2xl border-2 transition-all text-left flex items-center justify-between group touch-press select-none ${
+                            isCurrent
+                              ? 'bg-blue-50 border-blue-600 ring-2 ring-blue-500 shadow-md shadow-blue-600/20 scale-[1.01]'
+                              : isTaskPass
+                              ? 'bg-white border-emerald-300 hover:bg-emerald-50/60 shadow-sm'
+                              : 'bg-white border-amber-400 hover:bg-amber-50/60 shadow-sm'
+                          }`}
+                        >
+                          <div className="flex items-center space-x-2.5 min-w-0">
+                            {/* Thumbnail or Icon */}
+                            {thumb ? (
+                              <div className="w-9 h-9 rounded-xl overflow-hidden border border-slate-300 shrink-0 relative bg-slate-900">
+                                <img
+                                  src={thumb}
+                                  alt={t.taskTitle}
+                                  className="w-full h-full object-cover"
+                                />
+                                {isCurrent && (
+                                  <div className="absolute inset-0 bg-blue-600/40 flex items-center justify-center">
+                                    <Eye className="w-3 h-3 text-white stroke-[3]" />
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              <div
+                                className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 font-black text-xs ${
+                                  isTaskPass ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+                                }`}
+                              >
+                                {idx + 1}
+                              </div>
+                            )}
+
+                            <div className="min-w-0">
+                              <span className={`text-xs block truncate ${isCurrent ? 'font-black text-blue-950' : 'font-extrabold text-slate-950'}`}>
+                                {idx + 1}. {t.taskTitle || t.taskId}
+                              </span>
+                              <span className="text-[10px] text-slate-500 font-bold flex items-center space-x-1">
+                                {isCurrent ? (
+                                  <span className="text-blue-700 font-black flex items-center space-x-1">
+                                    <Eye className="w-3 h-3" />
+                                    <span>Sedang Ditampilkan</span>
+                                  </span>
+                                ) : (
+                                  <span>Klik untuk lihat foto</span>
+                                )}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="shrink-0 ml-2">
+                            <span
+                              className={`px-2 py-0.5 rounded-lg text-[10px] font-black uppercase ${
+                                isTaskPass
+                                  ? 'bg-emerald-100 text-emerald-950 border border-emerald-300'
+                                  : 'bg-amber-100 text-amber-950 border border-amber-400'
+                              }`}
+                            >
+                              {isTaskPass ? '✓ OK' : '⚠️ Cek'}
+                            </span>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Inspection Notes */}
+                {selectedInspection.notes && (
+                  <div className="p-3.5 bg-slate-50 rounded-2xl border-2 border-slate-200">
+                    <span className="font-black text-slate-950 block mb-1">Catatan Tambahan Petugas:</span>
+                    <p className="text-slate-800 font-bold">{selectedInspection.notes}</p>
+                  </div>
+                )}
               </div>
 
-              {selectedInspection.notes && (
-                <div className="p-3.5 bg-slate-50 rounded-2xl border-2 border-slate-200">
-                  <span className="font-black text-slate-950 block mb-1">Catatan Tambahan:</span>
-                  <p className="text-slate-800 font-bold">{selectedInspection.notes}</p>
-                </div>
-              )}
+              {/* Modal Footer */}
+              <div className="p-4 bg-slate-50 border-t-2 border-slate-200 flex items-center justify-between">
+                <span className="text-xs text-slate-600 font-bold">
+                  Menampilkan foto {selectedTaskIndex + 1} dari {tasks.length} item checklist
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setSelectedInspection(null)}
+                  className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-black text-xs shadow-md shadow-blue-600/30 transition"
+                >
+                  Tutup
+                </button>
+              </div>
             </div>
+          </div>
+        );
+      })()}
 
-            <div className="p-4 bg-slate-50 border-t-2 border-slate-200 flex justify-end">
-              <button
-                type="button"
-                onClick={() => setSelectedInspection(null)}
-                className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-black text-xs shadow-md shadow-blue-600/30 transition"
-              >
-                Tutup
-              </button>
-            </div>
+      {/* Fullscreen Photo Lightbox Modal */}
+      {fullscreenPhoto && (
+        <div
+          onClick={() => setFullscreenPhoto(null)}
+          className="fixed inset-0 z-60 bg-slate-950/95 flex flex-col items-center justify-center p-4 backdrop-blur-md animate-fade-in"
+        >
+          <div className="relative max-w-4xl w-full max-h-[90vh] flex flex-col items-center">
+            <button
+              type="button"
+              onClick={() => setFullscreenPhoto(null)}
+              className="absolute -top-12 right-0 p-2 rounded-2xl bg-white/20 hover:bg-white/30 text-white transition flex items-center space-x-1"
+            >
+              <X className="w-5 h-5 stroke-[2.5]" />
+              <span className="text-xs font-black">Tutup</span>
+            </button>
+            <img
+              src={fullscreenPhoto}
+              alt="Toilet Evidence Fullscreen"
+              className="max-h-[85vh] w-auto max-w-full rounded-2xl object-contain shadow-2xl border border-white/20"
+            />
           </div>
         </div>
       )}
