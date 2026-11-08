@@ -79,15 +79,16 @@ export default function Navigation({
                 </button>
               </div>
             ) : (
-              /* In Staff View: Discreet lock trigger for manager */
+              /* In Staff View: Visible lock trigger for manager and assistant manager */
               <button
                 type="button"
                 onClick={onOpenAdminAuth}
-                className="p-2 text-slate-600 hover:text-blue-700 rounded-xl hover:bg-slate-100 border border-slate-300 transition"
-                title="Akses Khusus Manager"
-                aria-label="Akses Khusus Manager"
+                className="flex items-center space-x-1.5 px-3 py-1.5 text-slate-800 hover:text-blue-700 bg-white hover:bg-slate-100 rounded-xl border-2 border-slate-300 transition shadow-sm"
+                title="Akses Khusus Manager & Assistant Manager (View Only)"
+                aria-label="Akses Khusus Manager & Assistant Manager"
               >
-                <Lock className="w-4 h-4 stroke-[2.2]" />
+                <Lock className="w-3.5 h-3.5 text-blue-600 stroke-[2.5]" />
+                <span className="text-xs font-black">Login Manager</span>
               </button>
             )}
           </div>

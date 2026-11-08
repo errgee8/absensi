@@ -199,34 +199,37 @@ export default function KioskPortalScreen({
           <button
             type="button"
             onClick={onOpenMonitoring}
-            className="w-full bg-blue-50/70 hover:bg-blue-50 rounded-3xl p-5 border-2 border-blue-300 hover:border-blue-500 shadow-sm transition-all text-left flex flex-col justify-between group touch-press"
+            className="w-full bg-gradient-to-r from-blue-50 to-indigo-50 hover:from-blue-100 hover:to-indigo-100 rounded-3xl p-5 border-2 border-blue-400 hover:border-blue-600 shadow-md transition-all text-left flex flex-col justify-between group touch-press"
           >
             <div>
               <div className="flex items-center justify-between mb-2">
-                <span className="inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-blue-200 text-blue-900 border border-blue-400">
-                  <Eye className="w-3.5 h-3.5 text-blue-700" />
-                  <span>3. Khusus Assistant Manager / Pengawas</span>
+                <span className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full text-[11px] font-black uppercase tracking-wider bg-blue-600 text-white shadow-sm">
+                  <Eye className="w-3.5 h-3.5" />
+                  <span>3. Akses Khusus: {staff.name} ({staff.role})</span>
+                </span>
+                <span className="text-[11px] font-black text-blue-700">
+                  Buka Monitoring →
                 </span>
               </div>
 
-              <div className="flex items-start space-x-3.5">
-                <div className="w-11 h-11 rounded-2xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-md shadow-blue-600/30">
-                  <Eye className="w-5 h-5 stroke-[2.5]" />
+              <div className="flex items-start space-x-3.5 mt-2">
+                <div className="w-12 h-12 rounded-2xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-md shadow-blue-600/30 group-hover:scale-105 transition">
+                  <Eye className="w-6 h-6 stroke-[2.5]" />
                 </div>
                 <div className="flex-1">
-                  <h3 className="text-base font-black text-blue-950 group-hover:text-blue-800 transition">
-                    Pantau Absensi &amp; Toilet (View Only)
+                  <h3 className="text-base sm:text-lg font-black text-blue-950 group-hover:text-blue-900 transition">
+                    Buka Dashboard View Only (Laporan Absensi &amp; Toilet)
                   </h3>
-                  <p className="text-xs text-blue-900/80 font-bold mt-0.5 leading-relaxed">
-                    Lihat live riwayat absensi staf, foto selfie kehadiran, jam masuk/pulang, dan checklist kebersihan toilet.
+                  <p className="text-xs text-blue-900/80 font-bold mt-1 leading-relaxed">
+                    Masuk langsung ke laporan riwayat absen anak-anak, foto selfie kehadiran, dan checklist kebersihan toilet tanpa perlu memasukkan PIN lagi.
                   </p>
                 </div>
               </div>
             </div>
 
-            <div className="pt-3 mt-3 border-t border-blue-200 flex items-center justify-between text-xs font-black text-blue-800 group-hover:text-blue-950">
-              <span>Buka Laporan Monitoring</span>
-              <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition stroke-[2.5]" />
+            <div className="pt-3 mt-3 border-t border-blue-200/80 flex items-center justify-between text-xs font-black text-blue-800 group-hover:text-blue-950">
+              <span>Buka Laporan Monitoring Sekarang</span>
+              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition stroke-[2.5]" />
             </div>
           </button>
         )}

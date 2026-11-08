@@ -50,19 +50,21 @@ export default function AdminPinModal({ isOpen, onClose, onSuccess }) {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="text-xs text-slate-900 font-extrabold block mb-1">
-              Masukkan PIN Manajer
+            <label className="text-xs text-slate-950 font-black block mb-1">
+              Masukkan PIN Anda
             </label>
-            <p className="text-[10px] text-slate-600 font-bold mb-2">
-              Ketik PIN Manajer Utama atau PIN Assistant Manager untuk memantau absensi.
+            <p className="text-[11px] text-slate-600 font-bold mb-2">
+              Ketik PIN Manajer Utama atau PIN Assistant Manager Anda (misal: Sherly) untuk membuka laporan absensi &amp; toilet.
             </p>
             <input
               type="password"
+              inputMode="numeric"
+              pattern="[0-9]*"
               maxLength={8}
               value={pin}
               onChange={(e) => setPin(e.target.value)}
               placeholder="••••"
-              className="w-full bg-slate-50 border-2 border-slate-300 rounded-xl px-3 py-2.5 text-center text-xl font-mono tracking-widest text-slate-950 font-black focus:outline-none focus:border-blue-600 focus:bg-white"
+              className="w-full bg-slate-50 border-2 border-slate-300 rounded-xl px-3 py-2.5 text-center text-2xl font-mono tracking-widest text-slate-950 font-black focus:outline-none focus:border-blue-600 focus:bg-white"
               autoFocus
             />
           </div>

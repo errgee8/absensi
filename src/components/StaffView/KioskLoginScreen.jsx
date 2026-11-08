@@ -5,6 +5,7 @@ export default function KioskLoginScreen({
   pin,
   setPin,
   onLogin,
+  onOpenAdminAuth,
   loading,
   error
 }) {
@@ -154,6 +155,20 @@ export default function KioskLoginScreen({
             <span>MASUK KE STAFF PORTAL</span>
           )}
         </button>
+
+        {/* Shortcut to Manager / Assistant Manager View Only */}
+        {onOpenAdminAuth && (
+          <div className="pt-2 text-center border-t border-slate-100">
+            <button
+              type="button"
+              onClick={onOpenAdminAuth}
+              className="text-xs font-black text-blue-700 hover:text-blue-900 flex items-center justify-center space-x-1.5 mx-auto py-1 px-3 rounded-xl hover:bg-blue-50 transition"
+            >
+              <Lock className="w-3.5 h-3.5 text-blue-600" />
+              <span>Login Khusus Manajer / Assistant Manager (View Only) →</span>
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

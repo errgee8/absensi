@@ -128,6 +128,7 @@ export default function App() {
           <StaffView
             venueSettings={venueSettings}
             onOpenViewOnly={handleOpenViewOnly}
+            onOpenAdminAuth={() => setAdminModalOpen(true)}
           />
         ) : (
           <ManagerDashboard
