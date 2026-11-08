@@ -110,6 +110,8 @@ export function evaluateBreakFlags({ durationMinutes, maxBreakEnd, breakEndTime,
 export function evaluateCheckoutFlags({
   checkinTime,
   checkoutTime,
+  scheduledStart,
+  scheduledEnd,
   scheduledHours,
   isFlexibleCheckout = 0,
   clientIp,
@@ -128,17 +130,67 @@ export function evaluateCheckoutFlags({
     flags.add(FLAG_TYPES.OUTSIDE_GEOFENCE);
   }
 
-  // Only check early checkout if NOT a flexible checkout shift and NOT Management
+  // Early Check-Out:
+  // Only evaluate if shift is NOT flexible checkout and division is NOT Management
   if (!isFlexibleCheckout && division !== 'Management') {
-    const start = new Date(checkinTime).getTime();
-    const end = new Date(checkoutTime).getTime();
-    const diffHours = (end - start) / (1000 * 60 * 60);
+    if (scheduledEnd && scheduledEnd.includes(':')) {
+      try {
+        // 1. Get checkout clock time in WITA
+        const d = new Date(checkoutTime);
+        const formatter = new Intl.DateTimeFormat('en-GB', {
+          timeZone: 'Asia/Makassar',
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: false
+        });
+        const parts = formatter.formatToParts(d);
+        const outH = parseInt(parts.find((p) => p.type === 'hour')?.value || '0', 10);
+        const outM = parseInt(parts.find((p) => p.type === 'minute')?.value || '0', 10);
+        const outTotalM = outH * 60 + outM;
 
-    const targetHours = scheduledHours || 8.0;
-    // 10-minute grace period (10 / 60 = 0.1667 hours)
-    const graceHours = GRACE_PERIOD_MINUTES / 60;
-    if (diffHours < (targetHours - graceHours)) {
-      flags.add(FLAG_TYPES.EARLY_CHECKOUT);
+        // 2. Parse scheduledEnd into minutes
+        const [endH, endM] = scheduledEnd.split(':').map(Number);
+        const schedEndTotalM = endH * 60 + endM;
+
+        // 3. Detect overnight shifts (e.g. 18:30 - 03:00)
+        let isOvernight = false;
+        if (scheduledStart && scheduledStart.includes(':')) {
+          const [startH, startM] = scheduledStart.split(':').map(Number);
+          const schedStartTotalM = startH * 60 + startM;
+          if (schedEndTotalM < schedStartTotalM) {
+            isOvernight = true;
+          }
+        }
+
+        let diffMinutes = 0;
+        if (!isOvernight) {
+          // Normal daytime shift (e.g., scheduledEnd = 22:00 = 1320m)
+          // If outTotalM = 22:36 (1356m) -> diffMinutes = +36 (normal / OT)
+          // If outTotalM = 21:40 (1300m) -> diffMinutes = -20 (Early checkout)
+          diffMinutes = outTotalM - schedEndTotalM;
+        } else {
+          // Overnight shift: adjust PM hours
+          const adjustedOutM = outTotalM >= 720 ? outTotalM - 1440 : outTotalM;
+          diffMinutes = adjustedOutM - schedEndTotalM;
+        }
+
+        // If clock out is MORE THAN 10 minutes BEFORE scheduledEnd:
+        if (diffMinutes < -GRACE_PERIOD_MINUTES) {
+          flags.add(FLAG_TYPES.EARLY_CHECKOUT);
+        }
+      } catch (err) {
+        console.warn('Early checkout calculation error:', err);
+      }
+    } else {
+      // Fallback if scheduledEnd is missing: check duration against scheduledHours
+      const start = new Date(checkinTime).getTime();
+      const end = new Date(checkoutTime).getTime();
+      const diffHours = (end - start) / (1000 * 60 * 60);
+      const targetHours = scheduledHours || 8.0;
+      const graceHours = GRACE_PERIOD_MINUTES / 60;
+      if (diffHours < (targetHours - graceHours)) {
+        flags.add(FLAG_TYPES.EARLY_CHECKOUT);
+      }
     }
   }
 

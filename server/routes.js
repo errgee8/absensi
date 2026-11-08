@@ -1545,18 +1545,28 @@ router.post('/checkout', async (req, res) => {
   }
 
   let isFlexible = shift.division === 'Management' ? 1 : 0;
+  let scheduledStart = shift.scheduled_start;
+  let scheduledEnd = shift.scheduled_end;
+
   try {
     const schedule = db.prepare(`
-      SELECT is_flexible_checkout FROM shift_schedules 
+      SELECT is_flexible_checkout, start_time, end_time FROM shift_schedules 
       WHERE venue = ? AND division = ? AND start_time = ?
       LIMIT 1
     `).get(shift.venue, shift.division, shift.scheduled_start);
-    isFlexible = schedule?.is_flexible_checkout || (shift.scheduled_end === '03:00' ? 1 : isFlexible);
+    if (schedule) {
+      isFlexible = schedule.is_flexible_checkout;
+      if (schedule.end_time) scheduledEnd = schedule.end_time;
+    } else if (shift.scheduled_end === '03:00' || shift.scheduled_end === '03:30') {
+      isFlexible = 1;
+    }
   } catch {}
 
   const finalFlags = evaluateCheckoutFlags({
     checkinTime: shift.checkin_time,
     checkoutTime,
+    scheduledStart,
+    scheduledEnd,
     scheduledHours: shift.standard_hours || 8.5,
     isFlexibleCheckout: isFlexible,
     clientIp,

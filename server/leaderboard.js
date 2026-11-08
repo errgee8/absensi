@@ -174,7 +174,9 @@ export async function computeLeaderboard(targetMonthStr) {
         earlySecs = (schedEndSecs + 24 * 3600) - checkOutSecs;
       }
 
-      if (hasEarlyFlag || (earlySecs > 600 && earlySecs < 12 * 3600)) {
+      // Early checkout is only counted if they actually clocked out MORE than 10 minutes (600s) before scheduled end
+      // If earlySecs <= 0 (e.g. clocked out at 22:36 when shift ends at 22:00), they did NOT checkout early!
+      if (earlySecs > 600 && earlySecs < 12 * 3600) {
         staffStats[sId].earlyCheckoutCount++;
         staffStats[sId].totalEarlyCheckoutSeconds += Math.max(0, earlySecs);
       }
