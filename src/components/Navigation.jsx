@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { ShieldCheck, Clock, Lock, LogOut } from 'lucide-react';
+import { ShieldCheck, Clock, Lock, LogOut, Eye, ShieldAlert } from 'lucide-react';
 import { formatWitaTimeOnly } from '../utils/time';
 
 export default function Navigation({
   currentView,
   setView,
   networkStatus,
+  adminAuth,
   onOpenAdminAuth,
   onAdminLogout
 }) {
@@ -53,6 +54,16 @@ export default function Navigation({
             {/* In Manager View: Show Switcher to Return to Kiosk or Lock */}
             {currentView === 'manager' ? (
               <div className="flex items-center space-x-2">
+                {adminAuth?.role === 'VIEW_ONLY' ? (
+                  <span className="hidden sm:inline-flex items-center space-x-1 px-2.5 py-1 rounded-xl bg-blue-100 text-blue-900 border border-blue-300 text-xs font-black">
+                    <Eye className="w-3.5 h-3.5 text-blue-700" />
+                    <span>View Only ({adminAuth?.staffName || 'Asst. Mgr'})</span>
+                  </span>
+                ) : (
+                  <span className="hidden sm:inline-flex items-center space-x-1 px-2.5 py-1 rounded-xl bg-slate-100 text-slate-800 border border-slate-300 text-xs font-black">
+                    <span>👑 Manager Full</span>
+                  </span>
+                )}
                 <button
                   onClick={() => setView('staff')}
                   className="px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-xs font-black text-white shadow-sm transition"

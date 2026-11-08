@@ -16,11 +16,11 @@ export default function AdminPinModal({ isOpen, onClose, onSuccess }) {
     setError(null);
 
     try {
-      await verifyAdminPin(pin);
+      const authData = await verifyAdminPin(pin);
       setPin('');
-      onSuccess();
+      onSuccess(authData);
     } catch (err) {
-      setError('PIN Manager salah. Akses ditolak.');
+      setError('PIN Manager / Assistant Manager salah. Akses ditolak.');
       setPin('');
     } finally {
       setLoading(false);
@@ -35,7 +35,10 @@ export default function AdminPinModal({ isOpen, onClose, onSuccess }) {
             <div className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-sm">
               <Lock className="w-4 h-4 stroke-[2.5]" />
             </div>
-            <h3 className="text-sm font-black text-slate-950">Akses Khusus Manager</h3>
+            <div>
+              <h3 className="text-sm font-black text-slate-950">Akses Manajer / Pengawas</h3>
+              <p className="text-[10px] text-slate-600 font-bold">Full Access &amp; View Only</p>
+            </div>
           </div>
           <button
             onClick={onClose}
@@ -47,9 +50,12 @@ export default function AdminPinModal({ isOpen, onClose, onSuccess }) {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="text-xs text-slate-900 font-extrabold block mb-1.5">
-              Masukkan PIN Manager
+            <label className="text-xs text-slate-900 font-extrabold block mb-1">
+              Masukkan PIN Manajer
             </label>
+            <p className="text-[10px] text-slate-600 font-bold mb-2">
+              Ketik PIN Manajer Utama atau PIN Assistant Manager untuk memantau absensi.
+            </p>
             <input
               type="password"
               maxLength={8}

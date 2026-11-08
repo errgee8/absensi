@@ -75,20 +75,83 @@ async function savePhoto(dataUrl, prefix = 'photo') {
   return saveBase64Photo(dataUrl, prefix);
 }
 
-// 1. Admin PIN Verification Endpoint (PIN: 8080)
-router.post('/admin/verify', (req, res) => {
+// 1. Admin PIN Verification Endpoint (Full Manager PIN: 8080 | Assistant Manager / View Only PIN: 7070 or Management Staff PIN)
+router.post('/admin/verify', async (req, res) => {
   const { pin } = req.body;
-  const adminPin = getSetting('admin_pin') || '8080';
-
-  if (!pin || pin.trim() !== adminPin.trim()) {
-    return res.status(401).json({ error: 'Invalid Manager PIN' });
+  if (!pin || !pin.trim()) {
+    return res.status(400).json({ error: 'PIN wajib diisi.' });
   }
 
-  res.json({
-    success: true,
-    message: 'Manager authenticated successfully',
-    token: 'admin-authorized-session-token'
-  });
+  const cleanPin = pin.trim();
+  const adminPin = getSetting('admin_pin') || '8080';
+  const supervisorPin = getSetting('supervisor_pin') || '7070';
+
+  // 1. Full Manager Check (PIN 8080)
+  if (cleanPin === adminPin.trim()) {
+    return res.json({
+      success: true,
+      role: 'MANAGER',
+      canEdit: true,
+      message: 'Manager Full Access authenticated successfully',
+      token: 'admin-authorized-session-token'
+    });
+  }
+
+  // 2. Supervisor View-Only PIN (PIN 7070)
+  if (cleanPin === supervisorPin.trim()) {
+    return res.json({
+      success: true,
+      role: 'VIEW_ONLY',
+      canEdit: false,
+      staffName: 'Assistant Manager',
+      message: 'Assistant Manager (View Only) authenticated successfully',
+      token: 'viewonly-authorized-session-token'
+    });
+  }
+
+  // 3. Check if PIN belongs to any Management / Assistant Manager staff in Supabase
+  if (isSupabaseConfigured) {
+    try {
+      const { data: mgmtStaff } = await supabase
+        .from('staff')
+        .select('name, role, division')
+        .eq('pin', cleanPin)
+        .eq('is_active', true)
+        .maybeSingle();
+
+      if (mgmtStaff && (mgmtStaff.division === 'Management' || (mgmtStaff.role && mgmtStaff.role.toLowerCase().includes('manager')))) {
+        return res.json({
+          success: true,
+          role: 'VIEW_ONLY',
+          canEdit: false,
+          staffName: mgmtStaff.name,
+          message: `${mgmtStaff.name} (Assistant Manager View Only) authenticated successfully`,
+          token: 'viewonly-authorized-session-token'
+        });
+      }
+    } catch (e) {
+      console.warn('Supabase mgmt admin check note:', e.message);
+    }
+  }
+
+  // 4. Check SQLite fallback for Management staff
+  const localMgmt = db.prepare(`
+    SELECT name, role, division FROM staff 
+    WHERE pin = ? AND is_active = 1 AND (division = 'Management' OR LOWER(role) LIKE '%manager%')
+  `).get(cleanPin);
+
+  if (localMgmt) {
+    return res.json({
+      success: true,
+      role: 'VIEW_ONLY',
+      canEdit: false,
+      staffName: localMgmt.name,
+      message: `${localMgmt.name} (Assistant Manager View Only) authenticated successfully`,
+      token: 'viewonly-authorized-session-token'
+    });
+  }
+
+  return res.status(401).json({ error: 'PIN Manager / Assistant Manager salah. Akses ditolak.' });
 });
 
 // 2. Network Status Check

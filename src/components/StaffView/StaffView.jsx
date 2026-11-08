@@ -10,7 +10,8 @@ import { RESTROOM_LOCATIONS } from '../../utils/toiletService';
 import { CheckCircle2 } from 'lucide-react';
 
 export default function StaffView({
-  venueSettings
+  venueSettings,
+  onOpenViewOnly
 }) {
   // Navigation step in Shared Kiosk: 'LOGIN' | 'PORTAL' | 'ATTENDANCE'
   const [step, setStep] = useState('LOGIN');
@@ -134,13 +135,18 @@ export default function StaffView({
         />
       )}
 
-      {/* STEP 2: ONE-GATE PORTAL (Absensi Kerja OR Scan QR Toilet) */}
+      {/* STEP 2: ONE-GATE PORTAL (Absensi Kerja OR Scan QR Toilet OR View Only Monitoring) */}
       {step === 'PORTAL' && loggedInStaff && (
         <KioskPortalScreen
           staff={loggedInStaff}
           activeShift={activeShift}
           onSelectAttendance={() => setStep('ATTENDANCE')}
           onSelectToilet={() => setToiletScannerOpen(true)}
+          onOpenMonitoring={() => {
+            if (onOpenViewOnly) {
+              onOpenViewOnly(loggedInStaff);
+            }
+          }}
           onLogout={handleResetToLogin}
         />
       )}

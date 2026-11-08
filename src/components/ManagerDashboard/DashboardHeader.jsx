@@ -5,7 +5,8 @@ export default function DashboardHeader({
   stats,
   onPrint,
   onExportCsv,
-  onOpenSettings
+  onOpenSettings,
+  isReadOnly = false
 }) {
   const cards = [
     {
@@ -75,14 +76,16 @@ export default function DashboardHeader({
             <span>Print / Export PDF</span>
           </button>
 
-          {/* Settings Modal Button */}
-          <button
-            onClick={onOpenSettings}
-            className="p-2 bg-white hover:bg-slate-100 text-slate-800 rounded-xl border-2 border-slate-300 transition shadow-sm"
-            title="Venue & Gatekeeper Settings"
-          >
-            <Settings className="w-4 h-4 stroke-[2.5]" />
-          </button>
+          {/* Settings Modal Button - Only accessible for Full Manager */}
+          {!isReadOnly && (
+            <button
+              onClick={onOpenSettings}
+              className="p-2 bg-white hover:bg-slate-100 text-slate-800 rounded-xl border-2 border-slate-300 transition shadow-sm"
+              title="Venue & Gatekeeper Settings"
+            >
+              <Settings className="w-4 h-4 stroke-[2.5]" />
+            </button>
+          )}
         </div>
       </div>
 

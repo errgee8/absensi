@@ -17,6 +17,7 @@ export default function App() {
   // Admin PIN Protection State
   const [adminModalOpen, setAdminModalOpen] = useState(false);
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
+  const [adminAuth, setAdminAuth] = useState(null); // { role: 'MANAGER'|'VIEW_ONLY', canEdit: boolean, staffName?: string }
 
   const loadAppData = async () => {
     try {
@@ -63,15 +64,27 @@ export default function App() {
     }
   };
 
-  const handleAdminSuccess = () => {
+  const handleAdminSuccess = (authData) => {
+    setAdminAuth(authData || { role: 'MANAGER', canEdit: true });
     setIsAdminAuthenticated(true);
     setAdminModalOpen(false);
     setView('manager');
   };
 
   const handleAdminLogout = () => {
+    setAdminAuth(null);
     setIsAdminAuthenticated(false);
     setView('staff');
+  };
+
+  const handleOpenViewOnly = (staff) => {
+    setAdminAuth({
+      role: 'VIEW_ONLY',
+      canEdit: false,
+      staffName: staff?.name || 'Assistant Manager'
+    });
+    setIsAdminAuthenticated(true);
+    setView('manager');
   };
 
   return (
@@ -104,6 +117,7 @@ export default function App() {
           }
         }}
         networkStatus={networkStatus}
+        adminAuth={adminAuth}
         onOpenAdminAuth={() => setAdminModalOpen(true)}
         onAdminLogout={handleAdminLogout}
       />
@@ -113,11 +127,14 @@ export default function App() {
         {currentView === 'staff' ? (
           <StaffView
             venueSettings={venueSettings}
+            onOpenViewOnly={handleOpenViewOnly}
           />
         ) : (
           <ManagerDashboard
             venueSettings={venueSettings}
             refreshSettings={loadAppData}
+            adminAuth={adminAuth}
+            isReadOnly={adminAuth?.role === 'VIEW_ONLY' || !adminAuth?.canEdit}
           />
         )}
       </main>

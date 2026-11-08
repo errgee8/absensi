@@ -1,15 +1,17 @@
 import React from 'react';
-import { Camera, Sparkles, QrCode, LogOut, CheckCircle, Clock, Building2, User, Coffee, ArrowRight, ShieldCheck, Star } from 'lucide-react';
+import { Camera, Sparkles, QrCode, LogOut, CheckCircle, Clock, Building2, User, Coffee, ArrowRight, ShieldCheck, Star, Eye } from 'lucide-react';
 
 export default function KioskPortalScreen({
   staff,
   activeShift,
   onSelectAttendance,
   onSelectToilet,
+  onOpenMonitoring,
   onLogout
 }) {
   const isCheckedIn = Boolean(activeShift);
   const isOnBreak = activeShift?.break_status === 'ON_BREAK';
+  const isManagement = staff.division === 'Management' || (staff.role && staff.role.toLowerCase().includes('manager'));
 
   return (
     <div className="max-w-xl mx-auto space-y-5 animate-fade-in py-2">
@@ -191,6 +193,43 @@ export default function KioskPortalScreen({
             <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition stroke-[2.5]" />
           </div>
         </button>
+
+        {/* CARD 3: KHUSUS ASSISTANT MANAGER / MANAGEMENT - PANTAU LAPORAN (VIEW ONLY) */}
+        {isManagement && (
+          <button
+            type="button"
+            onClick={onOpenMonitoring}
+            className="w-full bg-blue-50/70 hover:bg-blue-50 rounded-3xl p-5 border-2 border-blue-300 hover:border-blue-500 shadow-sm transition-all text-left flex flex-col justify-between group touch-press"
+          >
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-blue-200 text-blue-900 border border-blue-400">
+                  <Eye className="w-3.5 h-3.5 text-blue-700" />
+                  <span>3. Khusus Assistant Manager / Pengawas</span>
+                </span>
+              </div>
+
+              <div className="flex items-start space-x-3.5">
+                <div className="w-11 h-11 rounded-2xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-md shadow-blue-600/30">
+                  <Eye className="w-5 h-5 stroke-[2.5]" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-base font-black text-blue-950 group-hover:text-blue-800 transition">
+                    Pantau Absensi &amp; Toilet (View Only)
+                  </h3>
+                  <p className="text-xs text-blue-900/80 font-bold mt-0.5 leading-relaxed">
+                    Lihat live riwayat absensi staf, foto selfie kehadiran, jam masuk/pulang, dan checklist kebersihan toilet.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-3 mt-3 border-t border-blue-200 flex items-center justify-between text-xs font-black text-blue-800 group-hover:text-blue-950">
+              <span>Buka Laporan Monitoring</span>
+              <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition stroke-[2.5]" />
+            </div>
+          </button>
+        )}
       </div>
 
       <div className="text-center pt-2">
