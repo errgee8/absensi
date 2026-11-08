@@ -164,12 +164,14 @@ export function evaluateCheckoutFlags({
 
         let diffMinutes = 0;
         if (!isOvernight) {
-          // Normal daytime shift (e.g., scheduledEnd = 22:00 = 1320m)
-          // If outTotalM = 22:36 (1356m) -> diffMinutes = +36 (normal / OT)
-          // If outTotalM = 21:40 (1300m) -> diffMinutes = -20 (Early checkout)
-          diffMinutes = outTotalM - schedEndTotalM;
+          // Daytime shift (e.g. 13:00 - 22:00 = 780m - 1320m)
+          // If staff stayed past midnight (e.g. clocked out at 01:30 AM < schedStartTotalM):
+          // they worked overtime past midnight, so adjust by +1440m
+          const effectiveOutM = (scheduledStart && outTotalM < schedStartTotalM) ? outTotalM + 1440 : outTotalM;
+          diffMinutes = effectiveOutM - schedEndTotalM;
         } else {
-          // Overnight shift: adjust PM hours
+          // Overnight shift (e.g. 18:30 - 03:00 = 1110m - 180m)
+          // PM hours before midnight (e.g. 23:00 = 1380m) are adjusted to negative (-60m)
           const adjustedOutM = outTotalM >= 720 ? outTotalM - 1440 : outTotalM;
           diffMinutes = adjustedOutM - schedEndTotalM;
         }

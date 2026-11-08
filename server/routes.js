@@ -1555,12 +1555,30 @@ router.post('/checkout', async (req, res) => {
       LIMIT 1
     `).get(shift.venue, shift.division, shift.scheduled_start);
     if (schedule) {
-      isFlexible = schedule.is_flexible_checkout;
+      isFlexible = schedule.is_flexible_checkout ? 1 : 0;
       if (schedule.end_time) scheduledEnd = schedule.end_time;
-    } else if (shift.scheduled_end === '03:00' || shift.scheduled_end === '03:30') {
-      isFlexible = 1;
     }
   } catch {}
+
+  if (isSupabaseConfigured) {
+    try {
+      const { data: supaSched } = await supabase
+        .from('shift_schedules')
+        .select('is_flexible_checkout, end_time, start_time')
+        .eq('venue', shift.venue)
+        .eq('division', shift.division)
+        .eq('start_time', scheduledStart)
+        .maybeSingle();
+      if (supaSched) {
+        isFlexible = supaSched.is_flexible_checkout ? 1 : 0;
+        if (supaSched.end_time) scheduledEnd = supaSched.end_time;
+      }
+    } catch {}
+  }
+
+  if (scheduledEnd === '03:00' || scheduledEnd === '03:30' || shift.division === 'Management') {
+    isFlexible = 1;
+  }
 
   const finalFlags = evaluateCheckoutFlags({
     checkinTime: shift.checkin_time,
