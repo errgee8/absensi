@@ -10,9 +10,9 @@ import ShiftSchedulesTab from './ShiftSchedulesTab';
 import ToiletInspectionTab from './ToiletInspectionTab';
 import { exportTimesheetToExcel } from '../../utils/excelExport';
 import { getShifts, getStats, subscribeRealtimeEvents } from '../../utils/api';
-import { LayoutDashboard, Users, Clock, Radio, Building2, Sparkles, Eye, ShieldAlert } from 'lucide-react';
+import { LayoutDashboard, Users, Clock, Radio, Building2, Sparkles, Eye, ShieldAlert, Trophy } from 'lucide-react';
 
-export default function ManagerDashboard({ venueSettings, refreshSettings, adminAuth, isReadOnly = false }) {
+export default function ManagerDashboard({ venueSettings, refreshSettings, adminAuth, isReadOnly = false, onOpenLeaderboard }) {
   // Tabs: 'AUDIT' | 'SCHEDULES' | 'STAFF' | 'TOILET'
   const [activeTab, setActiveTab] = useState('AUDIT');
 
@@ -179,6 +179,18 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
               <Sparkles className="w-4 h-4 stroke-[2.5]" />
               <span>Kebersihan Toilet (QR Live)</span>
             </button>
+
+            {onOpenLeaderboard && (
+              <button
+                type="button"
+                onClick={onOpenLeaderboard}
+                className="flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-black bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-500 hover:from-amber-300 hover:to-yellow-400 text-slate-950 shadow-md shadow-amber-500/20 transition active:scale-95"
+                title="Buka Peringkat Kinerja Staf Terajin & Bonus Bulanan"
+              >
+                <Trophy className="w-4 h-4 text-slate-950 stroke-[2.5]" />
+                <span>🏆 Leaderboard Bonus</span>
+              </button>
+            )}
 
             {!isReadOnly && (
               <>

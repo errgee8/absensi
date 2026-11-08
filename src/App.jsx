@@ -3,6 +3,7 @@ import Navigation from './components/Navigation';
 import StaffView from './components/StaffView/StaffView';
 import ManagerDashboard from './components/ManagerDashboard/ManagerDashboard';
 import AdminPinModal from './components/ManagerDashboard/AdminPinModal';
+import LeaderboardModal from './components/Leaderboard/LeaderboardModal';
 import { getNetworkStatus, getStaffList, getSettings } from './utils/api';
 import { Smartphone, Download } from 'lucide-react';
 
@@ -18,6 +19,9 @@ export default function App() {
   const [adminModalOpen, setAdminModalOpen] = useState(false);
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
   const [adminAuth, setAdminAuth] = useState(null); // { role: 'MANAGER'|'VIEW_ONLY', canEdit: boolean, staffName?: string }
+
+  // Staff Monthly Performance Leaderboard State
+  const [leaderboardOpen, setLeaderboardOpen] = useState(false);
 
   const loadAppData = async () => {
     try {
@@ -120,6 +124,7 @@ export default function App() {
         adminAuth={adminAuth}
         onOpenAdminAuth={() => setAdminModalOpen(true)}
         onAdminLogout={handleAdminLogout}
+        onOpenLeaderboard={() => setLeaderboardOpen(true)}
       />
 
       {/* Main Content View */}
@@ -129,6 +134,7 @@ export default function App() {
             venueSettings={venueSettings}
             onOpenViewOnly={handleOpenViewOnly}
             onOpenAdminAuth={() => setAdminModalOpen(true)}
+            onOpenLeaderboard={() => setLeaderboardOpen(true)}
           />
         ) : (
           <ManagerDashboard
@@ -136,6 +142,7 @@ export default function App() {
             refreshSettings={loadAppData}
             adminAuth={adminAuth}
             isReadOnly={adminAuth?.role === 'VIEW_ONLY' || !adminAuth?.canEdit}
+            onOpenLeaderboard={() => setLeaderboardOpen(true)}
           />
         )}
       </main>
@@ -152,6 +159,12 @@ export default function App() {
         isOpen={adminModalOpen}
         onClose={() => setAdminModalOpen(false)}
         onSuccess={handleAdminSuccess}
+      />
+
+      {/* Real-time Monthly Staff Leaderboard Modal */}
+      <LeaderboardModal
+        isOpen={leaderboardOpen}
+        onClose={() => setLeaderboardOpen(false)}
       />
     </div>
   );

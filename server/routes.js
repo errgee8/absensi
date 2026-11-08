@@ -7,6 +7,7 @@ import { getClientIp, validateClientNetwork } from './network.js';
 import { evaluateCheckinFlags, evaluateCheckoutFlags, evaluateBreakFlags, auditOpenShifts, FLAG_TYPES } from './flags.js';
 import { isSupabaseConfigured, uploadPhotoToSupabase, cloudDb, supabase, findStaffInSupabase } from './supabase.js';
 import { detectShiftSchedule, getBreakCutoff, isBreakAllowedNow, getWitaTimeString } from './shifts.js';
+import { computeLeaderboard } from './leaderboard.js';
 
 const router = express.Router();
 
@@ -1840,6 +1841,18 @@ router.put('/settings', async (req, res) => {
 
   broadcastEvent('SETTINGS_UPDATE', { message: 'Settings modified' });
   res.json({ success: true, message: 'Venue settings updated' });
+});
+
+// Real-Time Monthly Staff Leaderboard (Attendance & Restroom Inspection)
+router.get('/leaderboard', async (req, res) => {
+  try {
+    const { month } = req.query;
+    const data = await computeLeaderboard(month);
+    res.json(data);
+  } catch (err) {
+    console.error('Error fetching leaderboard:', err);
+    res.status(500).json({ error: 'Gagal memuat data leaderboard: ' + err.message });
+  }
 });
 
 export default router;

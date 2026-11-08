@@ -1,11 +1,12 @@
 import React from 'react';
-import { Lock, Delete, AlertCircle, Loader2 } from 'lucide-react';
+import { Lock, Delete, AlertCircle, Loader2, Trophy } from 'lucide-react';
 
 export default function KioskLoginScreen({
   pin,
   setPin,
   onLogin,
   onOpenAdminAuth,
+  onOpenLeaderboard,
   loading,
   error
 }) {
@@ -49,6 +50,32 @@ export default function KioskLoginScreen({
           One Gate System: Absensi Kerja &amp; Checklist QR Toilet
         </p>
       </div>
+
+      {/* Luxurious Real-time Leaderboard Teaser Banner */}
+      {onOpenLeaderboard && (
+        <button
+          type="button"
+          onClick={onOpenLeaderboard}
+          className="w-full mb-4 p-3.5 rounded-3xl bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-500 hover:from-amber-300 hover:to-yellow-200 text-slate-950 font-black shadow-lg shadow-amber-500/25 border-2 border-amber-300 transition-all active:scale-[0.98] flex items-center justify-between group"
+        >
+          <div className="flex items-center space-x-3 text-left">
+            <div className="w-10 h-10 rounded-2xl bg-slate-950 text-amber-300 flex items-center justify-center shrink-0 shadow-md">
+              <Trophy className="w-5 h-5 stroke-[2.5]" />
+            </div>
+            <div>
+              <span className="text-[10px] uppercase font-black tracking-wider text-slate-900 block leading-tight">
+                🏆 Papan Peringkat Prestasi
+              </span>
+              <span className="text-xs sm:text-sm font-black text-slate-950 leading-tight block">
+                Leaderboard Staf Terajin (Bonus Bulanan) →
+              </span>
+            </div>
+          </div>
+          <span className="px-2.5 py-1 rounded-full bg-slate-950 text-amber-300 text-[10px] font-black shrink-0 hidden sm:inline shadow-sm">
+            Live Top 5
+          </span>
+        </button>
+      )}
 
       <div className="bg-white border-2 border-slate-200 rounded-3xl p-6 sm:p-7 shadow-xl shadow-slate-300/40 space-y-6">
         {/* PIN Prompt & Visual Indicator Dots */}

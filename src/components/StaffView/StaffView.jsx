@@ -12,7 +12,8 @@ import { CheckCircle2 } from 'lucide-react';
 export default function StaffView({
   venueSettings,
   onOpenViewOnly,
-  onOpenAdminAuth
+  onOpenAdminAuth,
+  onOpenLeaderboard
 }) {
   // Navigation step in Shared Kiosk: 'LOGIN' | 'PORTAL' | 'ATTENDANCE'
   const [step, setStep] = useState('LOGIN');
@@ -132,6 +133,7 @@ export default function StaffView({
           }}
           onLogin={handleLogin}
           onOpenAdminAuth={onOpenAdminAuth}
+          onOpenLeaderboard={onOpenLeaderboard}
           loading={loading}
           error={error}
         />
@@ -144,6 +146,7 @@ export default function StaffView({
           activeShift={activeShift}
           onSelectAttendance={() => setStep('ATTENDANCE')}
           onSelectToilet={() => setToiletScannerOpen(true)}
+          onOpenLeaderboard={onOpenLeaderboard}
           onOpenMonitoring={() => {
             if (onOpenViewOnly) {
               onOpenViewOnly(loggedInStaff);

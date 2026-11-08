@@ -1,11 +1,12 @@
 import React from 'react';
-import { Camera, Sparkles, QrCode, LogOut, CheckCircle, Clock, Building2, User, Coffee, ArrowRight, ShieldCheck, Star, Eye } from 'lucide-react';
+import { Camera, Sparkles, QrCode, LogOut, CheckCircle, Clock, Building2, User, Coffee, ArrowRight, ShieldCheck, Star, Eye, Trophy } from 'lucide-react';
 
 export default function KioskPortalScreen({
   staff,
   activeShift,
   onSelectAttendance,
   onSelectToilet,
+  onOpenLeaderboard,
   onOpenMonitoring,
   onLogout
 }) {
@@ -193,6 +194,46 @@ export default function KioskPortalScreen({
             <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition stroke-[2.5]" />
           </div>
         </button>
+
+        {/* CARD 3: LEADERBOARD STAF TERAJIN (KANDIDAT BONUS BULANAN) */}
+        {onOpenLeaderboard && (
+          <button
+            type="button"
+            onClick={onOpenLeaderboard}
+            className="w-full bg-gradient-to-r from-amber-50 via-yellow-50 to-amber-100/80 hover:from-amber-100 hover:to-yellow-100 rounded-3xl p-5 border-2 border-amber-400 hover:border-amber-500 shadow-md transition-all text-left flex flex-col justify-between group touch-press"
+          >
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-gradient-to-r from-amber-500 to-yellow-500 text-slate-950 shadow-sm">
+                  <Trophy className="w-3.5 h-3.5" />
+                  <span>3. Prestasi &amp; Bonus Bulanan</span>
+                </span>
+                <span className="text-[11px] font-black text-amber-900 animate-pulse">
+                  Lihat Peringkat Staf →
+                </span>
+              </div>
+
+              <div className="flex items-start space-x-3.5 mt-2">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-400 to-yellow-500 text-slate-950 flex items-center justify-center shrink-0 shadow-md shadow-amber-500/30 group-hover:scale-105 transition">
+                  <Trophy className="w-6 h-6 stroke-[2.5]" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-base sm:text-lg font-black text-slate-950 group-hover:text-amber-950 transition">
+                    Leaderboard Staf Terajin (Top 5)
+                  </h3>
+                  <p className="text-xs text-slate-700 font-bold mt-1 leading-relaxed">
+                    Pantau posisi peringkat kehadiran absensi tepat waktu dan checklist toilet harian untuk penentuan bonus bulanan.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-3 mt-3 border-t border-amber-300/80 flex items-center justify-between text-xs font-black text-amber-950 group-hover:text-black">
+              <span>Buka Leaderboard Real-Time</span>
+              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition stroke-[2.5]" />
+            </div>
+          </button>
+        )}
 
         {/* CARD 3: KHUSUS ASSISTANT MANAGER / MANAGEMENT - PANTAU LAPORAN (VIEW ONLY) */}
         {isManagement && (
