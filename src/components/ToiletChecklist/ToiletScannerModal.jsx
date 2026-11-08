@@ -22,7 +22,6 @@ export default function ToiletScannerModal({ isOpen, onClose, onLocationSelected
     scannerRef.current = html5QrCode;
 
     const qrCodeSuccessCallback = (decodedText) => {
-      // Parse token from decoded text (supports full URL or plain token)
       let token = decodedText.trim();
       if (token.includes('/inspect/')) {
         const parts = token.split('/inspect/');
@@ -32,7 +31,6 @@ export default function ToiletScannerModal({ isOpen, onClose, onLocationSelected
         token = urlParams.get('token') || token;
       }
 
-      // Find matching location
       const matched = RESTROOM_LOCATIONS.find(
         (loc) => loc.qr_token.toUpperCase() === token.toUpperCase() || loc.id.toLowerCase() === token.toLowerCase()
       );
@@ -60,9 +58,8 @@ export default function ToiletScannerModal({ isOpen, onClose, onLocationSelected
       qrCodeSuccessCallback,
       () => {}
     ).catch((err) => {
-      console.warn('Camera scanner error:', err);
-      setScannerError('Tidak dapat mengakses kamera. Silakan pilih lokasi toilet secara manual di bawah.');
-      setActiveTab('manual');
+      console.warn('QR camera start failed:', err);
+      setScannerError('Tidak dapat membuka kamera QR. Anda dapat beralih ke tab "Pilih Lokasi Toilet" di atas.');
     });
 
     return () => {
@@ -77,52 +74,51 @@ export default function ToiletScannerModal({ isOpen, onClose, onLocationSelected
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
-      <div className="bg-white rounded-3xl max-w-md w-full overflow-hidden shadow-2xl border border-slate-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-fade-in">
+      <div className="bg-white border-2 border-slate-300 rounded-3xl max-w-md w-full overflow-hidden shadow-2xl">
         {/* Header */}
-        <div className="p-4 sm:p-5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white flex items-center justify-between">
+        <div className="p-4 sm:p-5 border-b-2 border-slate-200 flex items-center justify-between">
           <div className="flex items-center space-x-2.5">
-            <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center">
-              <QrCode className="w-5 h-5 text-white" />
+            <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-sm">
+              <QrCode className="w-5 h-5 stroke-[2.5]" />
             </div>
             <div>
-              <h3 className="text-base font-bold text-white">Scan QR Toilet</h3>
-              <p className="text-[11px] text-blue-100">Arahkan kamera ke stiker QR di toilet</p>
+              <h3 className="text-base font-black text-slate-950">Scan QR Toilet</h3>
+              <p className="text-xs text-slate-700 font-bold">Checklist Kebersihan Toilet Berkala</p>
             </div>
           </div>
           <button
-            type="button"
             onClick={onClose}
-            className="p-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white transition"
+            className="p-1.5 rounded-xl text-slate-500 hover:text-slate-950 hover:bg-slate-100 transition"
           >
-            <X className="w-4 h-4" />
+            <X className="w-5 h-5 stroke-[2.5]" />
           </button>
         </div>
 
-        {/* Tab Switcher */}
-        <div className="p-3 bg-slate-50 border-b border-slate-200 flex space-x-2">
+        {/* Tab Switcher - High Contrast */}
+        <div className="p-3 bg-slate-100 border-b-2 border-slate-200 flex space-x-2">
           <button
             type="button"
             onClick={() => setActiveTab('camera')}
-            className={`flex-1 py-2 rounded-xl text-xs font-bold transition flex items-center justify-center space-x-1.5 ${
+            className={`flex-1 py-2.5 rounded-xl text-xs font-black transition flex items-center justify-center space-x-1.5 ${
               activeTab === 'camera'
-                ? 'bg-blue-600 text-white shadow-sm'
-                : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
+                ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
+                : 'bg-white text-slate-800 border-2 border-slate-300 hover:bg-slate-50'
             }`}
           >
-            <Camera className="w-3.5 h-3.5" />
+            <Camera className="w-4 h-4 stroke-[2.5]" />
             <span>Kamera Scanner</span>
           </button>
           <button
             type="button"
             onClick={() => setActiveTab('manual')}
-            className={`flex-1 py-2 rounded-xl text-xs font-bold transition flex items-center justify-center space-x-1.5 ${
+            className={`flex-1 py-2.5 rounded-xl text-xs font-black transition flex items-center justify-center space-x-1.5 ${
               activeTab === 'manual'
-                ? 'bg-blue-600 text-white shadow-sm'
-                : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
+                ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
+                : 'bg-white text-slate-800 border-2 border-slate-300 hover:bg-slate-50'
             }`}
           >
-            <MapPin className="w-3.5 h-3.5" />
+            <MapPin className="w-4 h-4 stroke-[2.5]" />
             <span>Pilih Lokasi Toilet</span>
           </button>
         </div>
@@ -133,23 +129,22 @@ export default function ToiletScannerModal({ isOpen, onClose, onLocationSelected
             <div className="space-y-4">
               <div
                 id="toilet-qr-reader"
-                className="w-full aspect-square bg-slate-900 rounded-2xl overflow-hidden shadow-inner flex items-center justify-center"
+                className="w-full aspect-square bg-slate-950 rounded-2xl overflow-hidden shadow-inner flex items-center justify-center"
               />
 
               {scannerError && (
-                <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl text-xs flex items-start space-x-2">
-                  <span className="font-semibold">Perhatian:</span>
+                <div className="p-3 bg-rose-50 border-2 border-rose-300 text-rose-900 rounded-xl text-xs flex items-start space-x-2 font-bold">
                   <span>{scannerError}</span>
                 </div>
               )}
 
-              <p className="text-center text-[11px] text-slate-500">
-                Posisikan QR Code stiker toilet di dalam kotak scanner.
+              <p className="text-center text-xs text-slate-700 font-bold">
+                Arahkan kamera ke stiker QR resmi yang tertempel di toilet.
               </p>
             </div>
           ) : (
             <div className="space-y-3">
-              <p className="text-xs text-slate-600 font-semibold mb-2">
+              <p className="text-xs text-slate-900 font-black mb-2">
                 Pilih toilet yang baru selesai Anda bersihkan:
               </p>
 
@@ -159,20 +154,20 @@ export default function ToiletScannerModal({ isOpen, onClose, onLocationSelected
                     key={loc.id}
                     type="button"
                     onClick={() => onLocationSelected(loc)}
-                    className="p-3.5 bg-slate-50 hover:bg-blue-50 border border-slate-200 hover:border-blue-400 rounded-2xl flex items-center justify-between text-left transition group"
+                    className="p-3.5 bg-white hover:bg-blue-50 border-2 border-slate-300 hover:border-blue-500 rounded-2xl flex items-center justify-between text-left transition group shadow-sm"
                   >
                     <div className="flex items-center space-x-3">
-                      <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center group-hover:scale-105 transition">
-                        <Building2 className="w-5 h-5" />
+                      <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center group-hover:scale-105 transition font-black">
+                        <Building2 className="w-5 h-5 stroke-[2.5]" />
                       </div>
                       <div>
-                        <div className="font-bold text-slate-800 text-sm">{loc.name}</div>
-                        <div className="text-[11px] text-slate-500">
+                        <div className="font-black text-slate-950 text-sm">{loc.name}</div>
+                        <div className="text-xs text-slate-700 font-bold">
                           {loc.building} • {loc.floor}
                         </div>
                       </div>
                     </div>
-                    <span className="px-2.5 py-1 bg-blue-600 text-white rounded-lg text-xs font-bold shadow-sm">
+                    <span className="px-3 py-1.5 bg-blue-600 text-white rounded-xl text-xs font-black shadow-sm group-hover:bg-blue-700 transition">
                       Pilih
                     </span>
                   </button>

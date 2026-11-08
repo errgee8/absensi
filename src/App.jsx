@@ -4,7 +4,7 @@ import StaffView from './components/StaffView/StaffView';
 import ManagerDashboard from './components/ManagerDashboard/ManagerDashboard';
 import AdminPinModal from './components/ManagerDashboard/AdminPinModal';
 import { getNetworkStatus, getStaffList, getSettings } from './utils/api';
-import { Smartphone, Download, Check } from 'lucide-react';
+import { Smartphone, Download } from 'lucide-react';
 
 export default function App() {
   const [currentView, setView] = useState('staff'); // 'staff' | 'manager'
@@ -75,19 +75,19 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-800 flex flex-col font-sans">
-      {/* PWA Home Screen Banner - Clean White & Blue */}
+    <div className="min-h-screen bg-slate-100 text-slate-900 flex flex-col font-sans">
+      {/* PWA Home Screen Banner - High Contrast Royal Blue */}
       {!isInstalled && (
-        <div className="no-print bg-blue-600 text-white px-4 py-2.5 flex items-center justify-between text-xs font-bold shadow-md">
+        <div className="no-print bg-blue-600 text-white px-4 py-2.5 flex items-center justify-between text-xs font-black shadow-md">
           <div className="flex items-center space-x-2">
             <Smartphone className="w-4 h-4 shrink-0" />
             <span>Pasang Staff Portal PWA di HP staf untuk akses cepat 1-klik</span>
           </div>
           <button
             onClick={handleInstallPwa}
-            className="px-3.5 py-1 bg-white text-blue-700 rounded-xl text-xs font-extrabold hover:bg-blue-50 active:scale-95 transition flex items-center space-x-1.5 shadow-sm shrink-0 ml-2"
+            className="px-3.5 py-1 bg-white text-blue-900 rounded-xl text-xs font-black hover:bg-blue-50 active:scale-95 transition flex items-center space-x-1.5 shadow-sm shrink-0 ml-2"
           >
-            <Download className="w-3.5 h-3.5" />
+            <Download className="w-3.5 h-3.5 stroke-[2.5]" />
             <span>Download PWA</span>
           </button>
         </div>
@@ -123,8 +123,8 @@ export default function App() {
       </main>
 
       {/* Footer Branding */}
-      <footer className="no-print border-t border-slate-200 py-4 text-center text-xs text-slate-500 bg-white">
-        <p className="font-medium">
+      <footer className="no-print border-t-2 border-slate-200 py-4 text-center text-xs text-slate-700 bg-white font-bold">
+        <p>
           Staff Portal by Ryan Gerrit • Lucky Cat &amp; JP Executive Karaoke
         </p>
       </footer>

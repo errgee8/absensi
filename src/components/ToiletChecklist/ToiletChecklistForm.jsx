@@ -67,13 +67,25 @@ export default function ToiletChecklistForm({ location, staff, onClose, onSucces
 
   const takePhoto = () => {
     if (!videoRef.current) return;
-    const video = videoRef.current;
     const canvas = document.createElement('canvas');
-    canvas.width = video.videoWidth || 640;
-    canvas.height = video.videoHeight || 480;
+    canvas.width = videoRef.current.videoWidth || 1280;
+    canvas.height = videoRef.current.videoHeight || 720;
     const ctx = canvas.getContext('2d');
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+    ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
+
+    // Watermark on toilet photo
+    const timestampStr = new Date().toLocaleString('id-ID', {
+      timeZone: 'Asia/Makassar',
+      dateStyle: 'medium',
+      timeStyle: 'medium'
+    });
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+    ctx.fillRect(0, canvas.height - 40, canvas.width, 40);
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 16px sans-serif';
+    ctx.fillText(`${location.name} • ${staff.name} • ${timestampStr} WITA`, 16, canvas.height - 15);
+
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.75);
     setPhotoBase64(dataUrl);
     stopCamera();
   };
@@ -93,33 +105,31 @@ export default function ToiletChecklistForm({ location, staff, onClose, onSucces
       });
 
       confetti({
-        particleCount: 80,
+        particleCount: 50,
         spread: 60,
-        origin: { y: 0.6 }
+        origin: { y: 0.7 }
       });
 
-      if (onSuccess) onSuccess();
+      onSuccess();
     } catch (err) {
-      setErrorMsg('Gagal mengirim checklist: ' + err.message);
-    } finally {
+      console.error('Submit inspection failed:', err);
+      setErrorMsg(err.message || 'Gagal menyimpan checklist toilet. Coba periksa koneksi internet.');
       setSubmitting(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/70 backdrop-blur-sm overflow-y-auto animate-fade-in">
-      <div className="bg-white rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl border border-slate-200 my-auto">
-        {/* Header */}
-        <div className="p-4 sm:p-5 bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 text-white flex items-center justify-between">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-fade-in">
+      <div className="bg-white border-2 border-slate-300 rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+        {/* Header - Vivid Royal Blue */}
+        <div className="p-4 sm:p-5 bg-blue-600 text-white flex items-center justify-between">
           <div>
-            <div className="flex items-center space-x-2">
-              <span className="text-xs uppercase tracking-wider font-extrabold bg-white/20 px-2 py-0.5 rounded-full">
-                Checklist Kebersihan Toilet
-              </span>
-            </div>
-            <h3 className="text-lg font-black text-white mt-1">{location.name}</h3>
-            <p className="text-xs text-blue-100 flex items-center space-x-1.5 mt-0.5">
-              <Building2 className="w-3.5 h-3.5" />
+            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-white/20 text-white">
+              Checklist Kebersihan Toilet
+            </span>
+            <h3 className="text-xl font-black text-white mt-1">{location.name}</h3>
+            <p className="text-xs text-blue-100 flex items-center space-x-1.5 mt-0.5 font-bold">
+              <Building2 className="w-4 h-4 stroke-[2.5]" />
               <span>{location.building} • {location.floor}</span>
             </p>
           </div>
@@ -129,27 +139,27 @@ export default function ToiletChecklistForm({ location, staff, onClose, onSucces
               stopCamera();
               onClose();
             }}
-            className="p-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white transition"
+            className="p-2 rounded-xl bg-white/20 hover:bg-white/30 text-white transition"
           >
-            <X className="w-5 h-5" />
+            <X className="w-5 h-5 stroke-[2.5]" />
           </button>
         </div>
 
-        {/* Staff Identity Bar */}
-        <div className="p-3 bg-blue-50/70 border-b border-blue-100 flex items-center justify-between text-xs px-5">
-          <div className="flex items-center space-x-2 text-slate-700">
-            <User className="w-4 h-4 text-blue-600" />
-            <span>Petugas Inspeksi: <strong className="text-blue-900">{staff.name}</strong></span>
+        {/* Staff Identity Bar - High Contrast */}
+        <div className="p-3 bg-blue-50 border-b-2 border-blue-200 flex items-center justify-between text-xs px-5">
+          <div className="flex items-center space-x-2 text-slate-800 font-extrabold">
+            <User className="w-4 h-4 text-blue-700 stroke-[2.5]" />
+            <span>Petugas Inspeksi: <strong className="text-blue-900 font-black">{staff.name}</strong></span>
           </div>
-          <span className="text-[11px] font-mono text-blue-600 font-bold bg-white px-2 py-0.5 rounded-md border border-blue-200">
-            Token: {location.qr_token}
+          <span className="text-xs font-mono text-blue-950 font-black bg-white px-2.5 py-1 rounded-lg border-2 border-blue-300">
+            {location.qr_token}
           </span>
         </div>
 
         <form onSubmit={handleSubmit} className="p-5 space-y-5 text-xs max-h-[75vh] overflow-y-auto">
           {errorMsg && (
-            <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl text-xs flex items-center space-x-2">
-              <AlertTriangle className="w-4 h-4 shrink-0 text-rose-500" />
+            <div className="p-3.5 bg-rose-50 border-2 border-rose-300 text-rose-900 rounded-xl text-xs flex items-center space-x-2 font-bold">
+              <AlertTriangle className="w-4 h-4 shrink-0 text-rose-600 stroke-[2.5]" />
               <span>{errorMsg}</span>
             </div>
           )}
@@ -157,10 +167,10 @@ export default function ToiletChecklistForm({ location, staff, onClose, onSucces
           {/* Checklist Tasks List */}
           <div>
             <div className="flex items-center justify-between mb-2">
-              <label className="text-slate-800 font-bold text-xs uppercase tracking-wider">
+              <label className="text-slate-950 font-black text-xs uppercase tracking-wider">
                 Daftar Pengecekan Standar ({applicableTasks.length} Poin)
               </label>
-              <span className="text-[10px] text-slate-500">Klik item untuk ubah status</span>
+              <span className="text-[11px] text-slate-700 font-bold">Klik item untuk ubah status</span>
             </div>
 
             <div className="space-y-2">
@@ -170,28 +180,28 @@ export default function ToiletChecklistForm({ location, staff, onClose, onSucces
                   <div
                     key={task.id}
                     onClick={() => toggleTask(task.id)}
-                    className={`p-3 rounded-2xl border transition-all cursor-pointer flex items-center justify-between select-none ${
+                    className={`p-3.5 rounded-2xl border-2 transition-all cursor-pointer flex items-center justify-between select-none ${
                       isPass
-                        ? 'bg-emerald-50/60 border-emerald-200 hover:bg-emerald-100/60'
-                        : 'bg-amber-50 border-amber-300 hover:bg-amber-100/60'
+                        ? 'bg-emerald-50 border-emerald-300 hover:bg-emerald-100/70 shadow-sm'
+                        : 'bg-amber-50 border-amber-400 hover:bg-amber-100/70 shadow-sm'
                     }`}
                   >
                     <div className="flex items-center space-x-2.5">
                       {isPass ? (
-                        <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
+                        <CheckCircle className="w-5 h-5 text-emerald-700 shrink-0 stroke-[2.5]" />
                       ) : (
-                        <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                        <AlertTriangle className="w-5 h-5 text-amber-700 shrink-0 stroke-[2.5]" />
                       )}
-                      <span className={`font-bold ${isPass ? 'text-slate-800' : 'text-amber-900'}`}>
+                      <span className={`text-sm font-black ${isPass ? 'text-slate-950' : 'text-amber-950'}`}>
                         {task.title}
                       </span>
                     </div>
 
                     <span
-                      className={`px-2.5 py-1 rounded-xl text-[10px] font-extrabold uppercase tracking-wider ${
+                      className={`px-3 py-1 rounded-xl text-xs font-black uppercase tracking-wider shadow-sm ${
                         isPass
-                          ? 'bg-emerald-600 text-white shadow-sm'
-                          : 'bg-amber-500 text-white shadow-sm'
+                          ? 'bg-emerald-700 text-white'
+                          : 'bg-amber-600 text-white'
                       }`}
                     >
                       {isPass ? 'Bersih / OK' : 'Perlu Perhatian'}
@@ -204,7 +214,7 @@ export default function ToiletChecklistForm({ location, staff, onClose, onSucces
 
           {/* Photo Capture Section */}
           <div>
-            <label className="text-slate-800 font-bold text-xs uppercase tracking-wider block mb-2">
+            <label className="text-slate-950 font-black text-xs uppercase tracking-wider block mb-2">
               Foto Bukti Kondisi Toilet (Langsung dari Kamera)
             </label>
 
@@ -220,25 +230,25 @@ export default function ToiletChecklistForm({ location, staff, onClose, onSucces
                   <button
                     type="button"
                     onClick={switchCamera}
-                    className="absolute top-2 right-2 p-2 rounded-xl bg-black/60 text-white hover:bg-black/80"
+                    className="absolute top-2 right-2 p-2 rounded-xl bg-black/70 text-white hover:bg-black/90 shadow"
                     title="Putar Kamera"
                   >
-                    <RefreshCw className="w-4 h-4" />
+                    <RefreshCw className="w-4 h-4 stroke-[2.5]" />
                   </button>
                 </div>
                 <div className="flex space-x-2">
                   <button
                     type="button"
                     onClick={takePhoto}
-                    className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-xs shadow-md shadow-blue-500/20 flex items-center justify-center space-x-2"
+                    className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-black text-xs shadow-md shadow-blue-600/30 flex items-center justify-center space-x-2"
                   >
-                    <Camera className="w-4 h-4" />
+                    <Camera className="w-4 h-4 stroke-[2.5]" />
                     <span>Jepret Foto</span>
                   </button>
                   <button
                     type="button"
                     onClick={stopCamera}
-                    className="px-4 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl font-bold text-xs"
+                    className="px-4 py-3 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-xl font-black text-xs"
                   >
                     Batal
                   </button>
@@ -246,22 +256,22 @@ export default function ToiletChecklistForm({ location, staff, onClose, onSucces
               </div>
             ) : photoBase64 ? (
               <div className="space-y-2">
-                <div className="relative aspect-video rounded-2xl overflow-hidden border border-slate-200 shadow-sm">
+                <div className="relative aspect-video rounded-2xl overflow-hidden border-2 border-slate-300 shadow-sm">
                   <img
                     src={photoBase64}
                     alt="Toilet Evidence"
                     className="w-full h-full object-cover"
                   />
-                  <span className="absolute bottom-2 left-2 px-2 py-0.5 rounded-lg bg-emerald-600 text-white text-[10px] font-bold">
+                  <span className="absolute bottom-2 left-2 px-2.5 py-1 rounded-lg bg-emerald-700 text-white text-xs font-black">
                     ✓ Foto Siap Dikirim
                   </span>
                 </div>
                 <button
                   type="button"
                   onClick={() => startCamera('environment')}
-                  className="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-xs border border-slate-200 flex items-center justify-center space-x-1.5"
+                  className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-900 rounded-xl font-black text-xs border-2 border-slate-300 flex items-center justify-center space-x-1.5 transition"
                 >
-                  <Camera className="w-3.5 h-3.5" />
+                  <Camera className="w-4 h-4 stroke-[2.5]" />
                   <span>Ambil Ulang Foto</span>
                 </button>
               </div>
@@ -269,20 +279,20 @@ export default function ToiletChecklistForm({ location, staff, onClose, onSucces
               <button
                 type="button"
                 onClick={() => startCamera('environment')}
-                className="w-full py-3.5 px-4 bg-slate-50 hover:bg-blue-50 border-2 border-dashed border-slate-300 hover:border-blue-400 rounded-2xl flex flex-col items-center justify-center space-y-1.5 text-slate-600 transition"
+                className="w-full py-4 px-4 bg-white hover:bg-blue-50 border-2 border-dashed border-slate-400 hover:border-blue-600 rounded-2xl flex flex-col items-center justify-center space-y-1.5 text-slate-800 transition"
               >
-                <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center">
-                  <Camera className="w-5 h-5" />
+                <div className="w-12 h-12 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center">
+                  <Camera className="w-6 h-6 stroke-[2.5]" />
                 </div>
-                <span className="font-bold text-xs text-slate-800">Buka Kamera & Ambil Foto Toilet</span>
-                <span className="text-[10px] text-slate-400">Bukti kebersihan visual untuk laporan manajemen</span>
+                <span className="font-black text-sm text-slate-950">Buka Kamera &amp; Ambil Foto Toilet</span>
+                <span className="text-xs text-slate-600 font-bold">Bukti kebersihan visual untuk laporan manajemen</span>
               </button>
             )}
           </div>
 
           {/* Notes */}
           <div>
-            <label className="text-slate-800 font-bold text-xs uppercase tracking-wider block mb-1">
+            <label className="text-slate-950 font-black text-xs uppercase tracking-wider block mb-1">
               Catatan Tambahan (Opsional)
             </label>
             <textarea
@@ -290,26 +300,26 @@ export default function ToiletChecklistForm({ location, staff, onClose, onSucces
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="Contoh: Kran wastafel kiri agak longgar, sabun sisa 1/4 botol..."
-              className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:border-blue-500 text-xs"
+              className="w-full p-3 bg-slate-50 border-2 border-slate-300 rounded-xl text-slate-950 font-bold focus:outline-none focus:border-blue-600 text-xs"
             />
           </div>
 
           {/* Footer Submit Buttons */}
-          <div className="pt-2 border-t border-slate-200 flex space-x-2">
+          <div className="pt-2 border-t-2 border-slate-200 flex space-x-2">
             <button
               type="button"
               onClick={() => {
                 stopCamera();
                 onClose();
               }}
-              className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-xs transition"
+              className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl font-black text-xs transition"
             >
               Batal
             </button>
             <button
               type="submit"
               disabled={submitting}
-              className="flex-2 py-3 px-6 bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 hover:from-blue-500 hover:to-indigo-500 text-white rounded-xl font-extrabold text-xs shadow-lg shadow-blue-600/25 active:scale-[0.98] transition flex items-center justify-center space-x-2"
+              className="flex-2 py-3 px-6 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-black text-xs shadow-lg shadow-blue-600/30 active:scale-[0.98] transition flex items-center justify-center space-x-2"
             >
               {submitting ? (
                 <>
@@ -318,7 +328,7 @@ export default function ToiletChecklistForm({ location, staff, onClose, onSucces
                 </>
               ) : (
                 <>
-                  <Send className="w-4 h-4" />
+                  <Send className="w-4 h-4 stroke-[2.5]" />
                   <span>Kirim Checklist Toilet</span>
                 </>
               )}
