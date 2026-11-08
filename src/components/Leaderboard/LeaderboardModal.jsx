@@ -102,22 +102,31 @@ function LeaderboardColumn({
 
   const isAttendance = type === 'attendance';
 
-  const themeGradient =
-    themeColor === 'amber'
-      ? 'from-amber-400 via-yellow-300 to-amber-500'
-      : 'from-cyan-400 via-sky-300 to-blue-500';
+  // Distinct rich luxury gradient backgrounds (different from Zombie zone)
+  const columnBg = isAttendance
+    ? 'bg-gradient-to-br from-indigo-950/85 via-slate-950/95 to-amber-950/70 border-2 border-amber-400/50 shadow-2xl shadow-amber-500/10'
+    : 'bg-gradient-to-br from-cyan-950/85 via-slate-950/95 to-emerald-950/70 border-2 border-cyan-400/50 shadow-2xl shadow-cyan-500/10';
 
-  const headerBorder =
-    themeColor === 'amber' ? 'border-amber-500/30' : 'border-cyan-500/30';
+  const themeGradient = isAttendance
+    ? 'from-amber-400 via-yellow-300 to-amber-500'
+    : 'from-cyan-400 via-sky-300 to-emerald-400';
+
+  const headerBorder = isAttendance ? 'border-amber-500/30' : 'border-cyan-500/30';
+
+  const ambientGlow = isAttendance
+    ? 'from-amber-500/20 via-yellow-500/10 to-transparent'
+    : 'from-cyan-500/20 via-emerald-500/10 to-transparent';
+
+  const podiumBg = isAttendance
+    ? 'bg-gradient-to-b from-slate-950/90 via-indigo-950/40 to-slate-950/90 border-amber-500/30'
+    : 'bg-gradient-to-b from-slate-950/90 via-cyan-950/40 to-slate-950/90 border-cyan-500/30';
 
   return (
-    <div className="bg-slate-950/80 border-2 border-slate-800/90 hover:border-slate-700/80 rounded-3xl p-4 sm:p-5 flex flex-col justify-between shadow-xl relative overflow-hidden backdrop-blur-sm">
+    <div className={`${columnBg} rounded-3xl p-4 sm:p-5 flex flex-col justify-between shadow-2xl relative overflow-hidden backdrop-blur-md transition-all duration-200 hover:border-opacity-80`}>
       
       {/* Top ambient column glow */}
       <div
-        className={`absolute top-0 right-0 w-60 h-32 bg-gradient-to-b ${
-          themeColor === 'amber' ? 'from-amber-500/10' : 'from-cyan-500/10'
-        } to-transparent blur-2xl pointer-events-none`}
+        className={`absolute top-0 right-0 w-64 h-36 bg-gradient-to-b ${ambientGlow} blur-3xl pointer-events-none`}
       />
 
       <div>
@@ -139,9 +148,9 @@ function LeaderboardColumn({
 
           <span
             className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border ${
-              themeColor === 'amber'
-                ? 'bg-amber-400/15 text-amber-300 border-amber-400/30'
-                : 'bg-cyan-400/15 text-cyan-300 border-cyan-400/30'
+              isAttendance
+                ? 'bg-amber-400/15 text-amber-300 border-amber-400/40 shadow-sm'
+                : 'bg-cyan-400/15 text-cyan-300 border-cyan-400/40 shadow-sm'
             }`}
           >
             Top 5
@@ -155,7 +164,7 @@ function LeaderboardColumn({
         ) : (
           <>
             {/* MINI PODIUM (Top 3) */}
-            <div className="bg-slate-900/70 border border-slate-800/80 rounded-2xl p-3 sm:p-4 mb-4">
+            <div className={`${podiumBg} border rounded-2xl p-3 sm:p-4 mb-4 shadow-inner`}>
               <div className="grid grid-cols-3 gap-2 items-end pt-3">
                 
                 {/* #2 SILVER (Kiri) */}
@@ -395,7 +404,7 @@ function NeedsImprovementSpotlight({ staff }) {
             </h4>
             
             <p className="text-xs text-amber-300/90 font-bold mt-0.5">
-              "Paling butuh kopi &amp; semangat bulan ini! Yuk bangkit, datang lebih awal, dan keluar dari zona ini!" ⚡
+              "Waduh bro, asupan kopi lagi defisit nih! Santai, anggap aja alarm biar gak mager lagi. Gass besok dateng 15 menit lebih awal biar langsung cabut dari goa zombie! 🔥☕"
             </p>
           </div>
         </div>
@@ -430,13 +439,13 @@ function NeedsImprovementSpotlight({ staff }) {
 
       </div>
 
-      {/* Motivational Bottom Bar */}
+      {/* Motivational Bottom Bar - Gaul & Semangat */}
       <div className="mt-3.5 pt-2.5 border-t border-purple-500/30 text-[11px] text-slate-300 flex flex-col sm:flex-row sm:items-center justify-between gap-1 font-bold">
         <span className="text-purple-300/90 flex items-center space-x-1.5">
           <span>🎯</span>
-          <span>Bukan untuk mencela, tapi bahan evaluasi diri agar besok bisa datang 15 menit lebih awal dan raih bonus!</span>
+          <span>Bukan buat nge-roast kok! Misi minggu ini: Gaspol dateng awal &amp; sikat checklist toilet biar naik ke panggung juara!</span>
         </span>
-        <span className="text-amber-300 font-black">Target: Keluar dari Zona Zombie! 🚀</span>
+        <span className="text-amber-300 font-black">Target: Cabut dari Goa Zombie! 🏃💨</span>
       </div>
     </div>
   );
@@ -502,7 +511,7 @@ export default function LeaderboardModal({ isOpen, onClose }) {
         .anim-zombie { animation: zombie-wobble 4s ease-in-out infinite; }
       `}</style>
 
-      <div className="bg-slate-900 border-2 border-amber-400/40 rounded-3xl max-w-5xl w-full overflow-hidden shadow-2xl shadow-amber-500/10 flex flex-col max-h-[94vh] text-white relative">
+      <div className="bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 border-2 border-amber-400/50 rounded-3xl max-w-5xl w-full overflow-hidden shadow-2xl shadow-amber-500/15 flex flex-col max-h-[94vh] text-white relative">
         
         {/* Festive Ambient Background Accents */}
         <div className="absolute top-0 left-1/4 w-80 h-32 bg-amber-500/15 blur-3xl pointer-events-none anim-shimmer" />
@@ -609,7 +618,7 @@ export default function LeaderboardModal({ isOpen, onClose }) {
               )}
 
               {/* Informative Fair Play Footer Banner */}
-              <div className="p-3.5 sm:p-4 rounded-2xl bg-gradient-to-r from-amber-500/10 via-yellow-500/5 to-slate-900 border border-amber-400/30 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-slate-300 font-bold">
+              <div className="p-3.5 sm:p-4 rounded-2xl bg-gradient-to-r from-blue-950/70 via-slate-950/90 to-amber-950/60 border border-amber-400/40 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-slate-300 font-bold shadow-md">
                 <div className="flex items-center space-x-2 text-amber-300 font-black">
                   <Info className="w-4 h-4 shrink-0" />
                   <span>Kriteria Penilaian Bonus:</span>
