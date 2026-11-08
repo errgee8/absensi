@@ -6,14 +6,14 @@
   }
 }
 
-/* Universal crisp typography & fine outline for high legibility across all screens & backgrounds */
+/* Universal crisp typography & fine outline for high legibility across all screens, cards, & tables */
 *, *::before, *::after {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
 }
 
-/* 1. Outline tipis untuk teks putih (pada tombol warna-warni, header, badge) */
+/* 1. Outline tipis untuk teks putih (pada tombol warna-warni, header, badge, banner) */
 .text-white,
 [class*="text-white"],
 button.text-white,
@@ -23,6 +23,8 @@ h1.text-white,
 h2.text-white,
 h3.text-white,
 h4.text-white,
+th.text-white,
+td.text-white,
 button[class*="bg-blue"],
 button[class*="bg-emerald"],
 button[class*="bg-rose"],
@@ -50,7 +52,7 @@ span[class*="bg-sky-7"],
      0.5px -0.5px 0 rgba(0, 0, 0, 0.75),
     -0.5px  0.5px 0 rgba(0, 0, 0, 0.75),
      0.5px  0.5px 0 rgba(0, 0, 0, 0.75),
-     0 1px 2px rgba(0, 0, 0, 0.4);
+     0 1px 2px rgba(0, 0, 0, 0.35);
   -webkit-text-stroke: 0.25px rgba(0, 0, 0, 0.4);
 }
 
@@ -59,33 +61,66 @@ span[class*="bg-sky-7"],
 .text-slate-900,
 .text-slate-800,
 .text-slate-700,
+.text-slate-600,
+.text-slate-500,
 .text-blue-950,
 .text-blue-900,
 .text-blue-800,
 .text-blue-700,
+.text-blue-600,
 .text-emerald-950,
 .text-emerald-900,
+.text-emerald-800,
+.text-emerald-700,
 .text-amber-950,
 .text-amber-900,
+.text-amber-800,
+.text-amber-700,
 .text-sky-950,
 .text-sky-900,
+.text-sky-800,
+.text-sky-700,
 .text-rose-950,
 .text-rose-900,
+.text-rose-800,
+.text-rose-700,
+.text-indigo-950,
+.text-indigo-900,
+.text-indigo-800,
+.text-indigo-700,
 button.text-slate-950,
 button.text-slate-900,
+button.text-slate-800,
+button.text-slate-700,
 span.text-slate-950,
-span.text-slate-900 {
-  -webkit-text-stroke: 0.25px currentColor;
+span.text-slate-900,
+span.text-slate-800,
+span.text-slate-700,
+th,
+td,
+label,
+input,
+select,
+option {
+  -webkit-text-stroke: 0.2px currentColor;
   text-shadow: 
-    -0.35px -0.35px 0 rgba(255, 255, 255, 0.7),
-     0.35px -0.35px 0 rgba(255, 255, 255, 0.7),
-    -0.35px  0.35px 0 rgba(255, 255, 255, 0.7),
-     0.35px  0.35px 0 rgba(255, 255, 255, 0.7);
+    -0.3px -0.3px 0 rgba(255, 255, 255, 0.65),
+     0.3px -0.3px 0 rgba(255, 255, 255, 0.65),
+    -0.3px  0.3px 0 rgba(255, 255, 255, 0.65),
+     0.3px  0.3px 0 rgba(255, 255, 255, 0.65);
 }
 
 /* 3. Universal text spacing */
 p, span, label, h1, h2, h3, h4, h5, h6, button, a {
   letter-spacing: -0.01em;
+}
+
+th {
+  font-weight: 900 !important;
+}
+
+td {
+  font-weight: 700;
 }
 
 /* Custom utility class for explicit text outline */

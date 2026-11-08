@@ -120,60 +120,60 @@ export default function ManagerDashboard({ venueSettings, refreshSettings }) {
       <div className="no-print space-y-6">
         {/* Navigation Tabs Bar - Clean White & Blue Theme */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-4">
-          <div className="flex flex-wrap bg-white p-1.5 rounded-2xl border border-slate-200 shadow-sm gap-1">
+          <div className="flex flex-wrap bg-white p-1.5 rounded-2xl border-2 border-slate-200 shadow-sm gap-1.5">
             <button
               onClick={() => setActiveTab('AUDIT')}
-              className={`flex items-center space-x-2 px-3.5 py-2 rounded-xl text-xs font-bold transition ${
+              className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-black transition ${
                 activeTab === 'AUDIT'
-                  ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                  ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
+                  : 'text-slate-800 hover:text-blue-700 hover:bg-slate-100'
               }`}
             >
-              <LayoutDashboard className="w-4 h-4" />
-              <span>Riwayat & Audit Shift</span>
+              <LayoutDashboard className="w-4 h-4 stroke-[2.5]" />
+              <span>Riwayat &amp; Audit Shift</span>
             </button>
 
             <button
               onClick={() => setActiveTab('TOILET')}
-              className={`flex items-center space-x-2 px-3.5 py-2 rounded-xl text-xs font-bold transition ${
+              className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-black transition ${
                 activeTab === 'TOILET'
-                  ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                  ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
+                  : 'text-slate-800 hover:text-blue-700 hover:bg-slate-100'
               }`}
             >
-              <Sparkles className="w-4 h-4" />
+              <Sparkles className="w-4 h-4 stroke-[2.5]" />
               <span>Kebersihan Toilet (QR Live)</span>
             </button>
 
             <button
               onClick={() => setActiveTab('SCHEDULES')}
-              className={`flex items-center space-x-2 px-3.5 py-2 rounded-xl text-xs font-bold transition ${
+              className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-black transition ${
                 activeTab === 'SCHEDULES'
-                  ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                  ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
+                  : 'text-slate-800 hover:text-blue-700 hover:bg-slate-100'
               }`}
             >
-              <Clock className="w-4 h-4" />
-              <span>Pengaturan Divisi & Jam Kerja</span>
+              <Clock className="w-4 h-4 stroke-[2.5]" />
+              <span>Pengaturan Divisi &amp; Jam Kerja</span>
             </button>
 
             <button
               onClick={() => setActiveTab('STAFF')}
-              className={`flex items-center space-x-2 px-3.5 py-2 rounded-xl text-xs font-bold transition ${
+              className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-black transition ${
                 activeTab === 'STAFF'
-                  ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                  ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
+                  : 'text-slate-800 hover:text-blue-700 hover:bg-slate-100'
               }`}
             >
-              <Users className="w-4 h-4" />
-              <span>Pengaturan Staff & PIN</span>
+              <Users className="w-4 h-4 stroke-[2.5]" />
+              <span>Pengaturan Staff &amp; PIN</span>
             </button>
           </div>
 
           {/* SSE Realtime Indicator */}
-          <div className="flex items-center space-x-2 px-3 py-1.5 rounded-xl bg-white border border-slate-200 shadow-sm text-xs font-mono font-bold text-emerald-600">
-            <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-ping" />
-            <Radio className="w-3.5 h-3.5 text-emerald-500" />
+          <div className="flex items-center space-x-2 px-3.5 py-2 rounded-xl bg-white border-2 border-slate-200 shadow-sm text-xs font-mono font-black text-emerald-800">
+            <span className="flex h-2.5 w-2.5 rounded-full bg-emerald-600 animate-ping" />
+            <Radio className="w-4 h-4 text-emerald-700 stroke-[2.5]" />
             <span>Realtime Live Sync Active</span>
           </div>
         </div>

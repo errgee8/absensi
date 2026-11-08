@@ -5,10 +5,10 @@ import { formatWitaTimeOnly, formatWitaDateOnly, formatDuration } from '../../ut
 export default function ShiftTable({ shifts = [], onInspectPhoto }) {
   if (shifts.length === 0) {
     return (
-      <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-12 text-center">
-        <Clock className="w-10 h-10 text-slate-500 mx-auto mb-3" />
-        <h3 className="text-sm font-bold text-slate-300">No shift records matching your filter</h3>
-        <p className="text-xs text-slate-500 mt-1">Try switching date range or division.</p>
+      <div className="bg-white border-2 border-slate-200 rounded-3xl p-12 text-center shadow-sm">
+        <Clock className="w-10 h-10 text-slate-400 mx-auto mb-3" />
+        <h3 className="text-base font-black text-slate-950">Tidak ada riwayat shift yang cocok dengan filter</h3>
+        <p className="text-xs text-slate-700 font-bold mt-1">Coba ganti filter tanggal, venue, atau divisi.</p>
       </div>
     );
   }
@@ -16,36 +16,39 @@ export default function ShiftTable({ shifts = [], onInspectPhoto }) {
   const renderFlagBadges = (flags = []) => {
     if (!flags || flags.length === 0) {
       return (
-        <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/25">
-          <CheckCircle className="w-2.5 h-2.5" />
+        <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-950 border border-emerald-300">
+          <CheckCircle className="w-2.5 h-2.5 text-emerald-700 stroke-[2.5]" />
           <span>Clean</span>
         </span>
       );
     }
 
     const flagLabels = {
-      'FLAG: Late Check-In (>10m Grace)': { text: 'Late (>10m Grace)', color: 'bg-rose-500/20 text-rose-300 border-rose-500/40' },
-      'FLAG: Unverified Network': { text: 'Unverified Network', color: 'bg-rose-500/20 text-rose-300 border-rose-500/40' },
-      FLAG_UNVERIFIED_NETWORK: { text: 'Unverified Network', color: 'bg-rose-500/20 text-rose-300 border-rose-500/40' },
-      'FLAG: Break Exceeded 1 Hour': { text: 'Break > 1 Hr', color: 'bg-amber-500/20 text-amber-300 border-amber-500/40' },
-      'FLAG: Break Past Allowed Window': { text: 'Late Break Window', color: 'bg-amber-500/20 text-amber-300 border-amber-500/40' },
-      FLAG_MISSING_CHECKOUT: { text: 'Missing Out (>12h)', color: 'bg-rose-500/15 text-rose-300 border-rose-500/30' },
-      FLAG_EARLY_CHECKOUT: { text: 'Early Check-Out', color: 'bg-amber-500/15 text-amber-300 border-amber-500/30' },
-      FLAG_NETWORK_MISMATCH: { text: 'Network Mismatch', color: 'bg-purple-500/15 text-purple-300 border-purple-500/30' },
-      FLAG_OFF_NETWORK: { text: 'Off-Network Attempt', color: 'bg-rose-500/15 text-rose-300 border-rose-500/30' },
-      FLAG_OUTSIDE_GEOFENCE: { text: 'Outside Geofence', color: 'bg-orange-500/15 text-orange-300 border-orange-500/30' }
+      'FLAG: Late Check-In (>10m Grace)': { text: 'Late (>10m Grace)', color: 'bg-rose-100 text-rose-950 border-rose-300' },
+      'FLAG: Unverified Network': { text: 'Unverified Network', color: 'bg-rose-100 text-rose-950 border-rose-300' },
+      FLAG_UNVERIFIED_NETWORK: { text: 'Unverified Network', color: 'bg-rose-100 text-rose-950 border-rose-300' },
+      'FLAG: Break Exceeded 1 Hour': { text: 'Break > 1 Hr', color: 'bg-amber-100 text-amber-950 border-amber-300' },
+      'FLAG: Break Past Allowed Window': { text: 'Late Break Window', color: 'bg-amber-100 text-amber-950 border-amber-300' },
+      FLAG_MISSING_CHECKOUT: { text: 'Missing Out (>12h)', color: 'bg-rose-100 text-rose-950 border-rose-300' },
+      FLAG_EARLY_CHECKOUT: { text: 'Early Check-Out', color: 'bg-amber-100 text-amber-950 border-amber-300' },
+      FLAG_NETWORK_MISMATCH: { text: 'Network Mismatch', color: 'bg-purple-100 text-purple-950 border-purple-300' },
+      FLAG_OFF_NETWORK: { text: 'Off-Network Attempt', color: 'bg-rose-100 text-rose-950 border-rose-300' },
+      FLAG_OUTSIDE_GEOFENCE: { text: 'Outside Geofence', color: 'bg-orange-100 text-orange-950 border-orange-300' }
     };
 
     return (
       <div className="flex flex-wrap gap-1">
         {flags.map((f, idx) => {
-          const conf = flagLabels[f] || { text: f.replace('FLAG_', '').replace('FLAG: ', ''), color: 'bg-amber-500/15 text-amber-300 border-amber-500/30' };
+          const conf = flagLabels[f] || {
+            text: f.replace('FLAG_', '').replace('FLAG: ', ''),
+            color: 'bg-amber-100 text-amber-950 border-amber-300'
+          };
           return (
             <span
               key={idx}
-              className={`inline-flex items-center space-x-1 px-1.5 py-0.5 rounded-md text-[9px] font-bold border ${conf.color}`}
+              className={`inline-flex items-center space-x-1 px-1.5 py-0.5 rounded-md text-[9px] font-black border ${conf.color}`}
             >
-              <AlertTriangle className="w-2.5 h-2.5" />
+              <AlertTriangle className="w-2.5 h-2.5 stroke-[2.5]" />
               <span>{conf.text}</span>
             </span>
           );
@@ -55,28 +58,28 @@ export default function ShiftTable({ shifts = [], onInspectPhoto }) {
   };
 
   return (
-    <div className="bg-slate-900/80 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+    <div className="bg-white border-2 border-slate-200 rounded-3xl overflow-hidden shadow-md">
       <div className="overflow-x-auto">
-        <table className="w-full text-left text-xs text-slate-300 border-collapse">
-          <thead className="bg-slate-950/80 text-slate-400 uppercase text-[10px] tracking-wider font-bold border-b border-slate-800">
+        <table className="w-full text-left text-xs text-slate-900 border-collapse">
+          <thead className="bg-slate-100 text-slate-950 uppercase text-[10px] tracking-wider font-black border-b-2 border-slate-200">
             <tr>
-              <th className="py-3.5 px-3">Date</th>
-              <th className="py-3.5 px-3">Staff Name</th>
-              <th className="py-3.5 px-3">Outlet & Division</th>
-              <th className="py-3.5 px-3">In Time</th>
-              <th className="py-3.5 px-2 text-center">In Photo</th>
-              <th className="py-3.5 px-3">1-Hr Break</th>
-              <th className="py-3.5 px-3">Out Time</th>
-              <th className="py-3.5 px-2 text-center">Out Photo</th>
-              <th className="py-3.5 px-2">Duration</th>
+              <th className="py-3.5 px-3">Tanggal</th>
+              <th className="py-3.5 px-3">Nama Staff</th>
+              <th className="py-3.5 px-3">Outlet &amp; Divisi</th>
+              <th className="py-3.5 px-3">Masuk</th>
+              <th className="py-3.5 px-2 text-center">Foto Masuk</th>
+              <th className="py-3.5 px-3">Istirahat</th>
+              <th className="py-3.5 px-3">Pulang</th>
+              <th className="py-3.5 px-2 text-center">Foto Pulang</th>
+              <th className="py-3.5 px-2">Durasi</th>
               <th className="py-3.5 px-2">Wi-Fi</th>
-              <th className="py-3.5 px-2">Distance</th>
-              <th className="py-3.5 px-3">Status Flags</th>
-              <th className="py-3.5 px-2 text-right">Inspect</th>
+              <th className="py-3.5 px-2">Jarak GPS</th>
+              <th className="py-3.5 px-3">Status / Anomali</th>
+              <th className="py-3.5 px-2 text-right">Detail</th>
             </tr>
           </thead>
 
-          <tbody className="divide-y divide-slate-800/60 font-medium">
+          <tbody className="divide-y-2 divide-slate-100 font-bold">
             {shifts.map((shift) => {
               const hasFlags = shift.flags && shift.flags.length > 0;
               const isWifiPass = shift.checkin_wifi_pass === 1;
@@ -84,33 +87,33 @@ export default function ShiftTable({ shifts = [], onInspectPhoto }) {
               return (
                 <tr
                   key={shift.id}
-                  className={`hover:bg-slate-800/40 transition-colors ${
-                    hasFlags ? 'bg-amber-950/5' : ''
+                  className={`hover:bg-blue-50/40 transition-colors ${
+                    hasFlags ? 'bg-amber-50/30' : ''
                   }`}
                 >
                   {/* Date */}
-                  <td className="py-3 px-3 font-mono text-slate-400 whitespace-nowrap">
+                  <td className="py-3 px-3 font-mono text-slate-950 font-bold whitespace-nowrap">
                     {formatWitaDateOnly(shift.checkin_time)}
                   </td>
 
                   {/* Staff Name & ID */}
                   <td className="py-3 px-3 whitespace-nowrap">
-                    <div className="font-bold text-white">{shift.staff_name}</div>
-                    <div className="text-[10px] text-slate-500 font-mono">{shift.staff_id}</div>
+                    <div className="font-black text-slate-950 text-sm">{shift.staff_name}</div>
+                    <div className="text-[10px] text-slate-600 font-mono font-bold">{shift.staff_id}</div>
                   </td>
 
                   {/* Outlet & Division */}
                   <td className="py-3 px-3 whitespace-nowrap">
-                    <div className="font-semibold text-slate-200">
+                    <div className="font-black text-slate-950">
                       {shift.staff_venue === 'JP Karaoke' ? '🎤 JP Karaoke' : '🐱 LuckyCat'}
                     </div>
-                    <div className="text-[10px] text-emerald-400 font-medium">
+                    <div className="text-[10px] text-blue-800 font-black">
                       {shift.staff_division || shift.staff_role}
                     </div>
                   </td>
 
                   {/* In Time */}
-                  <td className="py-3 px-3 font-mono text-emerald-400 whitespace-nowrap">
+                  <td className="py-3 px-3 font-mono text-emerald-800 font-black whitespace-nowrap">
                     {formatWitaTimeOnly(shift.checkin_time)}
                   </td>
 
@@ -119,57 +122,57 @@ export default function ShiftTable({ shifts = [], onInspectPhoto }) {
                     {shift.checkin_photo ? (
                       <button
                         onClick={() => onInspectPhoto(shift, 'in')}
-                        className="group relative inline-block rounded-lg overflow-hidden border border-slate-700 hover:border-emerald-500 transition shadow-sm"
-                        title="View Check-In Photo"
+                        className="group relative inline-block rounded-xl overflow-hidden border-2 border-slate-300 hover:border-blue-600 transition shadow-sm"
+                        title="Lihat Foto Masuk"
                       >
                         <img
                           src={shift.checkin_photo}
                           alt="Check-in Selfie"
-                          className="w-9 h-9 object-cover group-hover:scale-110 transition duration-200"
+                          className="w-10 h-10 object-cover group-hover:scale-110 transition duration-200"
                         />
-                        <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition">
-                          <Eye className="w-3 h-3 text-white" />
+                        <div className="absolute inset-0 bg-blue-950/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition">
+                          <Eye className="w-3.5 h-3.5 text-white stroke-[2.5]" />
                         </div>
                       </button>
                     ) : (
-                      <span className="text-[10px] text-slate-600 font-mono">-</span>
+                      <span className="text-[10px] text-slate-400 font-mono">-</span>
                     )}
                   </td>
 
                   {/* Break Status / Duration */}
                   <td className="py-3 px-3 whitespace-nowrap">
                     {shift.staff_venue === 'JP Karaoke' ? (
-                      <span className="text-[10px] text-slate-500 font-mono">No Break (JP)</span>
+                      <span className="text-[10px] text-slate-500 font-mono font-bold">No Break (JP)</span>
                     ) : shift.break_status === 'ON_BREAK' ? (
-                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-sky-500/15 text-sky-300 border border-sky-500/30 animate-pulse">
-                        On Break
+                      <span className="px-2 py-0.5 rounded-lg text-[10px] font-black bg-sky-100 text-sky-950 border border-sky-300 animate-pulse">
+                        Sedang Istirahat
                       </span>
                     ) : shift.break_duration_minutes != null ? (
                       <div>
-                        <span className="font-mono text-sky-400 font-bold">
-                          {shift.break_duration_minutes}m break
+                        <span className="font-mono text-sky-900 font-black">
+                          {shift.break_duration_minutes}m istirahat
                         </span>
                         {shift.break_end_photo && (
                           <button
                             onClick={() => onInspectPhoto(shift, 'break')}
-                            className="ml-1 text-[10px] text-sky-300 hover:underline inline-flex items-center"
+                            className="ml-1 text-[10px] text-blue-700 hover:underline inline-flex items-center font-bold"
                           >
-                            <Coffee className="w-2.5 h-2.5 mr-0.5" /> Photo
+                            <Coffee className="w-2.5 h-2.5 mr-0.5 stroke-[2.5]" /> Foto
                           </button>
                         )}
                       </div>
                     ) : (
-                      <span className="text-[10px] text-slate-500 font-mono">Not Taken</span>
+                      <span className="text-[10px] text-slate-500 font-mono font-bold">Belum Diambil</span>
                     )}
                   </td>
 
                   {/* Out Time */}
                   <td className="py-3 px-3 font-mono whitespace-nowrap">
                     {shift.checkout_time ? (
-                      <span className="text-indigo-400">{formatWitaTimeOnly(shift.checkout_time)}</span>
+                      <span className="text-indigo-900 font-black">{formatWitaTimeOnly(shift.checkout_time)}</span>
                     ) : (
-                      <span className="inline-block px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                        Active
+                      <span className="inline-block px-2 py-0.5 rounded-lg text-[10px] font-black bg-emerald-100 text-emerald-950 border border-emerald-300">
+                        Aktif Bertugas
                       </span>
                     )}
                   </td>
@@ -179,46 +182,46 @@ export default function ShiftTable({ shifts = [], onInspectPhoto }) {
                     {shift.checkout_photo ? (
                       <button
                         onClick={() => onInspectPhoto(shift, 'out')}
-                        className="group relative inline-block rounded-lg overflow-hidden border border-slate-700 hover:border-indigo-500 transition shadow-sm"
-                        title="View Check-Out Photo"
+                        className="group relative inline-block rounded-xl overflow-hidden border-2 border-slate-300 hover:border-blue-600 transition shadow-sm"
+                        title="Lihat Foto Pulang"
                       >
                         <img
                           src={shift.checkout_photo}
                           alt="Checkout Selfie"
-                          className="w-9 h-9 object-cover group-hover:scale-110 transition duration-200"
+                          className="w-10 h-10 object-cover group-hover:scale-110 transition duration-200"
                         />
-                        <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition">
-                          <Eye className="w-3 h-3 text-white" />
+                        <div className="absolute inset-0 bg-blue-950/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition">
+                          <Eye className="w-3.5 h-3.5 text-white stroke-[2.5]" />
                         </div>
                       </button>
                     ) : (
-                      <span className="text-[10px] text-slate-600 font-mono">-</span>
+                      <span className="text-[10px] text-slate-400 font-mono">-</span>
                     )}
                   </td>
 
                   {/* Duration */}
-                  <td className="py-3 px-2 whitespace-nowrap font-mono text-slate-300">
+                  <td className="py-3 px-2 whitespace-nowrap font-mono text-slate-950 font-bold">
                     {formatDuration(shift.duration_minutes)}
                   </td>
 
                   {/* Wi-Fi Match Pass/Fail */}
                   <td className="py-3 px-2 whitespace-nowrap">
                     <span
-                      className={`inline-flex items-center space-x-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold border ${
+                      className={`inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-[9px] font-black border ${
                         isWifiPass
-                          ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                          : 'bg-rose-500/10 text-rose-400 border-rose-500/20'
+                          ? 'bg-emerald-100 text-emerald-950 border-emerald-300'
+                          : 'bg-rose-100 text-rose-950 border-rose-300'
                       }`}
                     >
-                      {isWifiPass ? <Wifi className="w-2.5 h-2.5" /> : <WifiOff className="w-2.5 h-2.5" />}
+                      {isWifiPass ? <Wifi className="w-2.5 h-2.5 stroke-[2.5]" /> : <WifiOff className="w-2.5 h-2.5 stroke-[2.5]" />}
                       <span>{isWifiPass ? 'PASS' : 'FAIL'}</span>
                     </span>
                   </td>
 
                   {/* GPS Distance */}
-                  <td className="py-3 px-2 whitespace-nowrap font-mono text-[10px]">
+                  <td className="py-3 px-2 whitespace-nowrap font-mono text-[10px] font-bold">
                     <span
-                      className={shift.checkin_distance > 150 ? 'text-rose-400 font-bold' : 'text-slate-300'}
+                      className={shift.checkin_distance > 150 ? 'text-rose-700 font-black' : 'text-slate-950'}
                     >
                       {shift.checkin_distance != null ? `${shift.checkin_distance}m` : '-'}
                     </span>
@@ -231,10 +234,10 @@ export default function ShiftTable({ shifts = [], onInspectPhoto }) {
                   <td className="py-3 px-2 text-right">
                     <button
                       onClick={() => onInspectPhoto(shift, shift.checkout_photo ? 'out' : 'in')}
-                      className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition"
-                      title="Inspect shift details"
+                      className="p-2 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 transition shadow-sm"
+                      title="Lihat detail audit shift"
                     >
-                      <Eye className="w-3.5 h-3.5" />
+                      <Eye className="w-4 h-4 stroke-[2.5]" />
                     </button>
                   </td>
                 </tr>
