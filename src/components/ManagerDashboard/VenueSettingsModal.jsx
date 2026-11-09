@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { X, Save, MapPin, Shield, RefreshCw, Clock, ArrowRight } from 'lucide-react';
+import { X, Save, MapPin, Shield, RefreshCw, Clock, ArrowRight, Trash2 } from 'lucide-react';
 import { updateSettings } from '../../utils/api';
+import WipeLeaderboardModal from '../Leaderboard/WipeLeaderboardModal';
 
 export default function VenueSettingsModal({ settings, onClose, onSaved, onGoToSchedules }) {
   const [venueName, setVenueName] = useState(settings?.venue_name || 'JP Karaoke & LuckyCat Outlets');
@@ -11,6 +12,7 @@ export default function VenueSettingsModal({ settings, onClose, onSaved, onGoToS
     Array.isArray(settings?.allowed_subnets) ? settings.allowed_subnets.join('\n') : ''
   );
   const [saving, setSaving] = useState(false);
+  const [wipeModalOpen, setWipeModalOpen] = useState(false);
 
   useEffect(() => {
     if (settings) {
@@ -188,6 +190,29 @@ export default function VenueSettingsModal({ settings, onClose, onSaved, onGoToS
                 className="w-full bg-slate-50 border-2 border-slate-300 rounded-xl p-2.5 text-slate-950 font-mono font-bold text-xs focus:outline-none focus:border-blue-600 focus:bg-white"
               />
             </div>
+
+            {/* Trial Data Management / Reset Leaderboard */}
+            <div className="pt-3 border-t-2 border-slate-200">
+              <div className="p-3.5 bg-rose-50 border-2 border-rose-200 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <div className="flex items-center space-x-1.5 text-rose-950 font-black text-xs">
+                    <Trash2 className="w-4 h-4 text-rose-600 stroke-[2.5]" />
+                    <span>Reset Data Trial Leaderboard</span>
+                  </div>
+                  <p className="text-[11px] text-rose-800 font-bold mt-0.5">
+                    Kosongkan riwayat absensi atau inspeksi selama masa uji coba.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setWipeModalOpen(true)}
+                  className="px-3.5 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-black transition flex items-center justify-center space-x-1.5 shadow-md shadow-rose-600/20 shrink-0"
+                >
+                  <Trash2 className="w-3.5 h-3.5 stroke-[2.5]" />
+                  <span>Wipe Data Trial</span>
+                </button>
+              </div>
+            </div>
           </div>
 
           {/* Footer */}
@@ -209,6 +234,14 @@ export default function VenueSettingsModal({ settings, onClose, onSaved, onGoToS
             </button>
           </div>
         </form>
+
+        <WipeLeaderboardModal
+          isOpen={wipeModalOpen}
+          onClose={() => setWipeModalOpen(false)}
+          onSuccess={() => {
+            if (onSaved) onSaved();
+          }}
+        />
       </div>
     </div>
   );

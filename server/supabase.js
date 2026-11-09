@@ -608,5 +608,68 @@ export const cloudDb = {
       gpsComplianceRate,
       wifiComplianceRate: gpsComplianceRate
     };
+  },
+
+  async wipeLeaderboardData({ scope = 'all', targetMonth = null } = {}) {
+    if (!supabase) return { attendanceDeleted: 0, toiletDeleted: 0 };
+
+    let attendanceDeleted = 0;
+    let toiletDeleted = 0;
+
+    // 1. Wipe Attendance & Break Logs (Supabase Cloud)
+    if (scope === 'attendance' || scope === 'all') {
+      try {
+        // Delete child break logs first
+        let breakQuery = supabase.from('break_logs').delete();
+        if (targetMonth && /^\d{4}-\d{2}$/.test(targetMonth)) {
+          breakQuery = breakQuery.gte('created_at', `${targetMonth}-01T00:00:00Z`).lte('created_at', `${targetMonth}-31T23:59:59Z`);
+        } else {
+          breakQuery = breakQuery.not('id', 'is', null);
+        }
+        await breakQuery;
+
+        // Delete parent attendance logs
+        let attQuery = supabase.from('attendance_logs').delete();
+        if (targetMonth && /^\d{4}-\d{2}$/.test(targetMonth)) {
+          attQuery = attQuery.gte('shift_date', `${targetMonth}-01`).lte('shift_date', `${targetMonth}-31`);
+        } else {
+          attQuery = attQuery.not('id', 'is', null);
+        }
+        const { error: attErr } = await attQuery;
+        if (attErr) throw attErr;
+        attendanceDeleted = 1;
+      } catch (err) {
+        console.error('Error wiping attendance logs from Supabase:', err);
+        throw err;
+      }
+    }
+
+    // 2. Wipe Toilet Inspections if scope is 'toilet' or 'all'
+    if (scope === 'toilet' || scope === 'all') {
+      try {
+        const TOILET_SUPABASE_URL = 'https://nrrhkylpgitezjocgune.supabase.co';
+        const TOILET_SUPABASE_ANON_KEY = 'sb_publishable_GRzOFx-NzqaaBPCl3Oqr2A_1f8xpUNj';
+        const toiletClient = createClient(TOILET_SUPABASE_URL, TOILET_SUPABASE_ANON_KEY, {
+          auth: { persistSession: false }
+        });
+
+        let toiletQuery = toiletClient.from('inspections').delete();
+        if (targetMonth && /^\d{4}-\d{2}$/.test(targetMonth)) {
+          toiletQuery = toiletQuery.gte('created_at', `${targetMonth}-01T00:00:00Z`).lte('created_at', `${targetMonth}-31T23:59:59Z`);
+        } else {
+          toiletQuery = toiletQuery.not('id', 'is', null);
+        }
+        const { error: tErr } = await toiletQuery;
+        if (tErr) {
+          console.warn('Toilet inspection wipe note:', tErr.message);
+        } else {
+          toiletDeleted = 1;
+        }
+      } catch (err) {
+        console.warn('Error wiping toilet inspections:', err.message);
+      }
+    }
+
+    return { success: true, scope, attendanceDeleted, toiletDeleted };
   }
 };

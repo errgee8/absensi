@@ -1891,4 +1891,59 @@ router.get('/leaderboard', async (req, res) => {
   }
 });
 
+// Manager-Only Leaderboard & Trial Data Wipe Endpoint
+router.post('/admin/wipe-leaderboard', async (req, res) => {
+  const { pin, scope = 'all', targetMonth = null } = req.body || {};
+
+  const cleanPin = (pin || '').trim();
+  const adminPin = (getSetting('admin_pin') || '8080').trim();
+
+  // Strictly check Manager PIN (8080)
+  if (!cleanPin || cleanPin !== adminPin) {
+    return res.status(403).json({
+      success: false,
+      error: 'Akses ditolak: PIN Manager tidak valid. Hanya Full Manager yang dapat menghapus data leaderboard.'
+    });
+  }
+
+  try {
+    // 1. Wipe SQLite tables if scope includes attendance
+    if (scope === 'attendance' || scope === 'all') {
+      try {
+        if (db) {
+          db.prepare('DELETE FROM shifts').run();
+          try {
+            db.prepare('DELETE FROM breaks').run();
+          } catch (e) {}
+        }
+      } catch (sqliteErr) {
+        console.warn('SQLite shifts wipe note:', sqliteErr.message);
+      }
+    }
+
+    // 2. Wipe Supabase Cloud tables
+    let result = { success: true };
+    if (isSupabaseConfigured) {
+      result = await cloudDb.wipeLeaderboardData({ scope, targetMonth });
+    }
+
+    // 3. Broadcast real-time update events
+    broadcastEvent('SHIFT_UPDATE');
+    broadcastEvent('LEADERBOARD_UPDATE');
+
+    return res.json({
+      success: true,
+      message: 'Data riwayat trial berhasil di-wipe. Leaderboard telah di-reset dan dimulai bersih dari nol.',
+      scope,
+      result
+    });
+  } catch (err) {
+    console.error('Failed to wipe leaderboard data:', err);
+    return res.status(500).json({
+      success: false,
+      error: 'Gagal melakukan wipe data: ' + err.message
+    });
+  }
+});
+
 export default router;
