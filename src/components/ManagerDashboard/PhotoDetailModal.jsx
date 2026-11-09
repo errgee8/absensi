@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, MapPin, ShieldAlert, CheckCircle, Calendar, Clock, User, Coffee, LogIn, LogOut, Camera, ShieldCheck, Check, AlertTriangle, MessageSquare, Lock, RefreshCw, Eye } from 'lucide-react';
 import { formatWitaDateTime, formatDuration } from '../../utils/time';
 import { reviewLateCheckin } from '../../utils/api';
+import ZoomableImage from '../Common/ZoomableImage';
 
 export default function PhotoDetailModal({ shift, type = 'in', onClose, onShiftUpdated, adminAuth }) {
   if (!shift) return null;
@@ -165,14 +166,13 @@ export default function PhotoDetailModal({ shift, type = 'in', onClose, onShiftU
 
         {/* Modal Body */}
         <div className="p-5 overflow-y-auto space-y-5 text-xs">
-          {/* Watermarked Photo Preview */}
+          {/* Watermarked Photo Preview with Zoom & Pan */}
           <div className="relative rounded-2xl overflow-hidden border-2 border-slate-300 bg-slate-950 shadow-inner">
             {photo && !imgError ? (
-              <img
+              <ZoomableImage
                 src={photo}
                 alt="Audit Biometric Selfie"
-                onError={() => setImgError(true)}
-                className="w-full h-auto max-h-96 object-contain mx-auto"
+                maxHeight="max-h-[50vh]"
               />
             ) : (
               <div className="p-12 text-center text-slate-300 text-xs font-bold space-y-2">
@@ -437,11 +437,11 @@ export default function PhotoDetailModal({ shift, type = 'in', onClose, onShiftU
                 <X className="w-4 h-4" />
               </button>
             </div>
-            <div className="max-h-[70vh] overflow-auto flex items-center justify-center">
-              <img
+            <div className="max-h-[70vh] flex items-center justify-center">
+              <ZoomableImage
                 src={shift.late_photo_url}
                 alt="Foto Bukti Telat"
-                className="max-h-[65vh] w-auto rounded-xl object-contain shadow-lg"
+                maxHeight="max-h-[65vh]"
               />
             </div>
             <div className="text-center pt-2">

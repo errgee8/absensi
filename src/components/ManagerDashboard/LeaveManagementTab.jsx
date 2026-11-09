@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { getLeaveRequests, reviewLeaveRequest } from '../../utils/api';
 import { formatWitaDateOnly, formatWitaDateTime } from '../../utils/time';
+import ZoomableImage from '../Common/ZoomableImage';
 
 export default function LeaveManagementTab({ adminAuth, onRefreshData }) {
   const [requests, setRequests] = useState([]);
@@ -691,8 +692,8 @@ export default function LeaveManagementTab({ adminAuth, onRefreshData }) {
                 <X className="w-4 h-4" />
               </button>
             </div>
-            <div className="p-2 max-h-[80vh] overflow-auto flex items-center justify-center">
-              <img src={selectedPhoto} alt="Bukti Foto" className="max-w-full max-h-[75vh] object-contain rounded-xl" />
+            <div className="p-2 max-h-[80vh] flex items-center justify-center">
+              <ZoomableImage src={selectedPhoto} alt="Bukti Foto" maxHeight="max-h-[75vh]" />
             </div>
           </div>
         </div>

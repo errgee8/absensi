@@ -18,6 +18,7 @@ import {
   Image as ImageIcon
 } from 'lucide-react';
 import { getToiletLocations, getRecentToiletInspections } from '../../utils/toiletService';
+import ZoomableImage from '../Common/ZoomableImage';
 
 export default function ToiletInspectionTab() {
   const [locations, setLocations] = useState([]);
@@ -517,10 +518,11 @@ export default function ToiletInspectionTab() {
                   <div className="relative aspect-video bg-slate-950 rounded-2xl overflow-hidden border-2 border-slate-300 shadow-md group">
                     {activePhoto ? (
                       <>
-                        <img
+                        <ZoomableImage
                           src={activePhoto}
                           alt={activeTask?.taskTitle || 'Toilet inspection'}
-                          className="w-full h-full object-contain bg-slate-950"
+                          maxHeight="max-h-full"
+                          className="w-full h-full"
                         />
 
                         {/* Prev Button */}
@@ -741,10 +743,11 @@ export default function ToiletInspectionTab() {
               <X className="w-5 h-5 stroke-[2.5]" />
               <span className="text-xs font-black">Tutup</span>
             </button>
-            <img
+            <ZoomableImage
               src={fullscreenPhoto}
               alt="Toilet Evidence Fullscreen"
-              className="max-h-[85vh] w-auto max-w-full rounded-2xl object-contain shadow-2xl border border-white/20"
+              maxHeight="max-h-[85vh]"
+              className="rounded-2xl border border-white/20 shadow-2xl"
             />
           </div>
         </div>

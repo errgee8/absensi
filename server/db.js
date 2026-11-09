@@ -200,6 +200,7 @@ ensureColumn('leave_requests', 'document_url', 'TEXT');
 ensureColumn('leave_requests', 'departure_time', 'TEXT');
 ensureColumn('leave_requests', 'active_shift_id', 'TEXT');
 ensureColumn('announcements', 'expires_at', 'TEXT');
+ensureColumn('announcements', 'images', 'TEXT');
 
 // Settings Helper
 export const getSetting = (key) => {

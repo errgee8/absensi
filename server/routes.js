@@ -2629,17 +2629,32 @@ router.get('/announcements', async (req, res) => {
       });
     }
 
-    // Filter by target venue
+    // Filter by target venue (case-insensitive & supports JP/LuckyCat partial matching)
     if (venue && venue !== 'ALL') {
-      announcements = announcements.filter(a => !a.target_venue || a.target_venue === 'ALL' || a.target_venue === venue);
+      const vLow = venue.toLowerCase();
+      announcements = announcements.filter(a => {
+        if (!a.target_venue || a.target_venue === 'ALL') return true;
+        const tLow = a.target_venue.toLowerCase();
+        if (tLow === vLow) return true;
+        if (vLow.includes('jp') && tLow.includes('jp')) return true;
+        if (vLow.includes('lucky') && tLow.includes('lucky')) return true;
+        return false;
+      });
     }
 
     // If staffId is provided, attach reader info
     const enriched = announcements.map(a => {
       const staffRead = staffId ? reads.find(r => String(r.announcement_id) === String(a.id) && String(r.staff_id) === String(staffId)) : null;
       const totalReads = reads.filter(r => String(r.announcement_id) === String(a.id)).length;
+      let parsedImages = [];
+      if (Array.isArray(a.images)) {
+        parsedImages = a.images;
+      } else if (typeof a.images === 'string') {
+        try { parsedImages = JSON.parse(a.images || '[]'); } catch { parsedImages = []; }
+      }
       return {
         ...a,
+        images: parsedImages,
         isRead: Boolean(staffRead),
         readAt: staffRead ? staffRead.read_at : null,
         totalReads
@@ -2655,7 +2670,7 @@ router.get('/announcements', async (req, res) => {
 
 // Create Announcement (Strictly General Manager - PIN 8080)
 router.post('/announcements', async (req, res) => {
-  const { pin, title, content, urgency, targetVenue, expiresAt } = req.body || {};
+  const { pin, title, content, urgency, targetVenue, expiresAt, images } = req.body || {};
 
   const auth = await verifyManagementAuth(pin);
   if (!auth.authorized || (auth.role !== 'FULL_ADMIN' && auth.role !== 'MANAGER')) {
@@ -2668,6 +2683,22 @@ router.post('/announcements', async (req, res) => {
   const now = new Date().toISOString();
   const announcementId = `ann_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
 
+  // Process flyer / promo images
+  let savedImages = [];
+  if (Array.isArray(images) && images.length > 0) {
+    for (let i = 0; i < images.length; i++) {
+      const img = images[i];
+      if (typeof img === 'string') {
+        if (img.startsWith('data:image')) {
+          const url = await savePhoto(img, `ann_${announcementId}_${i}`);
+          savedImages.push(url || img);
+        } else {
+          savedImages.push(img);
+        }
+      }
+    }
+  }
+
   const newAnnouncement = {
     id: announcementId,
     title: title.trim(),
@@ -2676,6 +2707,7 @@ router.post('/announcements', async (req, res) => {
     target_venue: targetVenue || 'ALL', // 'ALL' | 'JP Karaoke' | 'LuckyCat'
     author_name: auth.reviewerName || 'General Manager',
     expires_at: expiresAt || null,
+    images: savedImages,
     is_active: 1,
     created_at: now,
     updated_at: now
@@ -2688,8 +2720,8 @@ router.post('/announcements', async (req, res) => {
 
     try {
       db.prepare(`
-        INSERT INTO announcements (id, title, content, urgency, target_venue, author_name, expires_at, is_active, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
+        INSERT INTO announcements (id, title, content, urgency, target_venue, author_name, expires_at, images, is_active, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
       `).run(
         newAnnouncement.id,
         newAnnouncement.title,
@@ -2698,6 +2730,7 @@ router.post('/announcements', async (req, res) => {
         newAnnouncement.target_venue,
         newAnnouncement.author_name,
         newAnnouncement.expires_at,
+        JSON.stringify(savedImages),
         now,
         now
       );
@@ -2721,7 +2754,7 @@ router.post('/announcements', async (req, res) => {
 // Update Announcement (General Manager Only)
 router.put('/announcements/:id', async (req, res) => {
   const { id } = req.params;
-  const { pin, title, content, urgency, targetVenue, expiresAt, isActive } = req.body || {};
+  const { pin, title, content, urgency, targetVenue, expiresAt, isActive, images } = req.body || {};
 
   const auth = await verifyManagementAuth(pin);
   if (!auth.authorized || (auth.role !== 'FULL_ADMIN' && auth.role !== 'MANAGER')) {
@@ -2741,6 +2774,22 @@ router.put('/announcements/:id', async (req, res) => {
     }
     if (!existing) return res.status(404).json({ error: 'Pengumuman tidak ditemukan.' });
 
+    let savedImages = existing.images || [];
+    if (images !== undefined && Array.isArray(images)) {
+      savedImages = [];
+      for (let i = 0; i < images.length; i++) {
+        const img = images[i];
+        if (typeof img === 'string') {
+          if (img.startsWith('data:image')) {
+            const url = await savePhoto(img, `ann_${id}_${i}`);
+            savedImages.push(url || img);
+          } else {
+            savedImages.push(img);
+          }
+        }
+      }
+    }
+
     const updated = {
       ...existing,
       title: title !== undefined ? title.trim() : existing.title,
@@ -2749,6 +2798,7 @@ router.put('/announcements/:id', async (req, res) => {
       target_venue: targetVenue !== undefined ? targetVenue : existing.target_venue,
       expires_at: expiresAt !== undefined ? (expiresAt || null) : existing.expires_at,
       is_active: isActive !== undefined ? (isActive ? 1 : 0) : existing.is_active,
+      images: savedImages,
       updated_at: now
     };
 
@@ -2759,7 +2809,7 @@ router.put('/announcements/:id', async (req, res) => {
     try {
       db.prepare(`
         UPDATE announcements
-        SET title = ?, content = ?, urgency = ?, target_venue = ?, is_active = ?, updated_at = ?
+        SET title = ?, content = ?, urgency = ?, target_venue = ?, is_active = ?, images = ?, updated_at = ?
         WHERE id = ?
       `).run(
         updated.title,
@@ -2767,6 +2817,7 @@ router.put('/announcements/:id', async (req, res) => {
         updated.urgency,
         updated.target_venue,
         updated.is_active ? 1 : 0,
+        JSON.stringify(savedImages),
         now,
         id
       );
@@ -2778,6 +2829,14 @@ router.put('/announcements/:id', async (req, res) => {
 
     return res.json({
       success: true,
+      message: 'Pengumuman berhasil diperbarui.',
+      announcement: updated
+    });
+  } catch (err) {
+    console.error('Error updating announcement:', err);
+    return res.status(500).json({ error: 'Gagal memperbarui pengumuman: ' + err.message });
+  }
+});
       message: 'Pengumuman berhasil diperbarui.',
       announcement: updated
     });

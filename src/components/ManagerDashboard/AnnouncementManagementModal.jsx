@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Megaphone,
   X,
@@ -14,10 +14,14 @@ import {
   Check,
   Lock,
   Archive,
-  ArrowRight
+  ArrowRight,
+  Image as ImageIcon,
+  Camera,
+  Trash2
 } from 'lucide-react';
 import { getAnnouncements, createAnnouncement, updateAnnouncement, getAnnouncementReaders } from '../../utils/api';
 import { formatWitaDateTime } from '../../utils/time';
+import ZoomableImage from '../Common/ZoomableImage';
 
 export default function AnnouncementManagementModal({
   isOpen,
@@ -44,6 +48,31 @@ export default function AnnouncementManagementModal({
   const [pin, setPin] = useState(adminAuth?.pin || (adminAuth?.role === 'MANAGER' ? '8080' : ''));
   const [submitting, setSubmitting] = useState(false);
   const [formSuccess, setFormSuccess] = useState(null);
+
+  // Attached Images / Flyers State
+  const fileInputRef = useRef(null);
+  const [images, setImages] = useState([]);
+  const [zoomPhoto, setZoomPhoto] = useState(null);
+
+  const handleImageUpload = (e) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+
+    files.forEach((file) => {
+      if (!file.type.startsWith('image/')) return;
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const dataUrl = event.target.result;
+        setImages((prev) => [...prev, dataUrl]);
+      };
+      reader.readAsDataURL(file);
+    });
+    e.target.value = '';
+  };
+
+  const handleRemoveImage = (indexToRemove) => {
+    setImages((prev) => prev.filter((_, idx) => idx !== indexToRemove));
+  };
 
   // Readers Report State
   const [selectedAnnouncement, setSelectedAnnouncement] = useState(null);
@@ -121,12 +150,14 @@ export default function AnnouncementManagementModal({
         content: content.trim(),
         urgency,
         targetVenue,
-        expiresAt: computedExpiry
+        expiresAt: computedExpiry,
+        images
       });
 
       setFormSuccess('Pengumuman resmi berhasil diterbitkan ke semua portal staf!');
       setTitle('');
       setContent('');
+      setImages([]);
       setExpiryPreset('FOREVER');
       setCustomExpiresAt('');
       await loadData();
@@ -342,6 +373,29 @@ export default function AnnouncementManagementModal({
                       <p className="text-xs text-slate-700 font-medium mt-1 line-clamp-2 whitespace-pre-line">
                         {ann.content}
                       </p>
+
+                      {/* Attached Promo Flyers / Images Thumbnails */}
+                      {Array.isArray(ann.images) && ann.images.length > 0 && (
+                        <div className="flex flex-wrap items-center gap-2 pt-2">
+                          {ann.images.map((imgUrl, i) => (
+                            <button
+                              key={i}
+                              type="button"
+                              onClick={() => setZoomPhoto(imgUrl)}
+                              className="w-14 h-14 rounded-xl overflow-hidden border-2 border-slate-300 hover:border-blue-600 bg-slate-950 shadow-sm relative group cursor-pointer transition"
+                              title="Klik untuk zoom / perbesar flyer"
+                            >
+                              <img src={imgUrl} alt={`Flyer ${i + 1}`} className="w-full h-full object-cover group-hover:scale-105 transition" />
+                              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white transition">
+                                <Eye className="w-4 h-4" />
+                              </div>
+                            </button>
+                          ))}
+                          <span className="text-[10px] text-blue-700 font-bold bg-blue-50 px-2 py-1 rounded-lg border border-blue-200">
+                            📎 {ann.images.length} Flyer / Gambar Promo
+                          </span>
+                        </div>
+                      )}
                     </div>
 
                     {/* Footer / Read Receipts Bar & Actions */}
@@ -529,10 +583,70 @@ export default function AnnouncementManagementModal({
                   rows={6}
                   value={content}
                   onChange={(e) => setContent(e.target.value)}
-                  placeholder="Tuliskan instruksi, arahan, atau SOP lengkap untuk staf..."
+                  placeholder="Tuliskan instruksi, arahan, ketentuan promo, atau SOP lengkap untuk staf..."
                   required
                   className="w-full bg-slate-50 border-2 border-slate-300 rounded-xl p-3 text-xs font-medium text-slate-950 focus:outline-none focus:border-blue-600 focus:bg-white leading-relaxed"
                 />
+              </div>
+
+              {/* Lampiran Foto / Flyer Promo (Bisa Lebih dari 1) */}
+              <div className="bg-slate-50 p-3.5 rounded-2xl border-2 border-slate-200 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-1.5">
+                    <ImageIcon className="w-4 h-4 text-blue-600" />
+                    <label className="text-xs font-black text-slate-900">
+                      Lampiran Foto / Flyer Promo (Opsional):
+                    </label>
+                  </div>
+                  <span className="text-[10px] text-slate-500 font-bold">
+                    Bisa unggah lebih dari 1 gambar
+                  </span>
+                </div>
+
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  accept="image/*"
+                  multiple
+                  onChange={handleImageUpload}
+                  className="hidden"
+                />
+
+                <div className="flex flex-wrap gap-2.5 items-center">
+                  {images.map((imgUrl, idx) => (
+                    <div
+                      key={idx}
+                      className="relative group w-20 h-20 sm:w-24 sm:h-24 rounded-xl border-2 border-slate-300 overflow-hidden bg-slate-900 shadow-sm cursor-pointer"
+                      onClick={() => setZoomPhoto(imgUrl)}
+                      title="Klik untuk memperbesar / zoom"
+                    >
+                      <img src={imgUrl} alt={`Flyer ${idx + 1}`} className="w-full h-full object-cover" />
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRemoveImage(idx);
+                        }}
+                        className="absolute top-1 right-1 p-1 rounded-full bg-rose-600 hover:bg-rose-700 text-white shadow-md transition"
+                        title="Hapus gambar"
+                      >
+                        <X className="w-3 h-3 stroke-[2.5]" />
+                      </button>
+                      <div className="absolute bottom-0 inset-x-0 bg-black/60 text-white text-[9px] font-bold text-center py-0.5">
+                        Foto {idx + 1}
+                      </div>
+                    </div>
+                  ))}
+
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="w-20 h-20 sm:w-24 sm:h-24 rounded-xl border-2 border-dashed border-blue-400 hover:border-blue-600 bg-blue-50/60 hover:bg-blue-100/60 flex flex-col items-center justify-center text-blue-700 transition p-2 text-center"
+                  >
+                    <Camera className="w-5 h-5 mb-1" />
+                    <span className="text-[10px] font-black leading-tight">Tambah Flyer / Foto</span>
+                  </button>
+                </div>
               </div>
 
               <div>
@@ -703,6 +817,32 @@ export default function AnnouncementManagementModal({
         </div>
 
       </div>
+
+      {/* Fullscreen Zoomable Flyer Lightbox Modal */}
+      {zoomPhoto && (
+        <div
+          className="fixed inset-0 z-60 bg-slate-950/95 flex flex-col items-center justify-center p-3 sm:p-4 backdrop-blur-md animate-fade-in"
+          onClick={() => setZoomPhoto(null)}
+        >
+          <div className="relative max-w-4xl w-full max-h-[92vh] flex flex-col items-center" onClick={(e) => e.stopPropagation()}>
+            <div className="w-full flex items-center justify-between text-white pb-2 mb-2 border-b border-white/20">
+              <span className="text-xs font-black flex items-center space-x-1.5">
+                <ImageIcon className="w-4 h-4 text-amber-300" />
+                <span>Pratinjau Flyer / Dokumen Pengumuman</span>
+              </span>
+              <button
+                type="button"
+                onClick={() => setZoomPhoto(null)}
+                className="p-1.5 rounded-xl bg-white/20 hover:bg-white/30 text-white transition flex items-center space-x-1"
+              >
+                <X className="w-4 h-4 stroke-[2.5]" />
+                <span className="text-xs font-black">Tutup</span>
+              </button>
+            </div>
+            <ZoomableImage src={zoomPhoto} alt="Flyer Promo Pengumuman" maxHeight="max-h-[82vh]" className="rounded-2xl border border-white/20" />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

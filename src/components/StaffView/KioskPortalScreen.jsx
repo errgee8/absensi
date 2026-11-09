@@ -104,11 +104,13 @@ export default function KioskPortalScreen({
           }`}
         >
           <div className="flex items-center space-x-3 min-w-0">
-            <div className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 text-white ${
-              unreadAnnouncementsCount > 0
-                ? 'bg-gradient-to-br from-rose-600 to-amber-600 shadow-md shadow-rose-600/30'
-                : 'bg-slate-800'
-            }`}>
+            <div
+              className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 text-white ${
+                unreadAnnouncementsCount > 0
+                  ? 'bg-gradient-to-br from-rose-600 to-amber-600 shadow-md shadow-rose-600/30'
+                  : 'bg-slate-800'
+              }`}
+            >
               <Megaphone className="w-5 h-5 text-amber-300" />
             </div>
             <div className="min-w-0">
@@ -118,17 +120,38 @@ export default function KioskPortalScreen({
                 </span>
                 {unreadAnnouncementsCount > 0 ? (
                   <span className="px-2 py-0.5 rounded-full text-[9px] font-black bg-rose-600 text-white animate-pulse">
-                    {unreadAnnouncementsCount} Baru (Wajib Baca)
+                    {unreadAnnouncementsCount} Belum Disetujui
                   </span>
                 ) : (
                   <span className="px-2 py-0.5 rounded-full text-[9px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300">
-                    Sudah Dibaca ✓
+                    Semua Disetujui ✓
                   </span>
                 )}
               </div>
               <h4 className="text-xs sm:text-sm font-black text-slate-950 truncate mt-0.5">
-                {announcements[0]?.title}
+                {announcements.length === 1
+                  ? announcements[0]?.title
+                  : `${announcements.length} Pengumuman Resmi Tersedia`}
               </h4>
+              {announcements.length > 1 && (
+                <div className="flex flex-wrap gap-1.5 mt-1.5">
+                  {announcements.map((a, i) => (
+                    <span
+                      key={a.id}
+                      className={`text-[9px] font-black px-2 py-0.5 rounded-full border ${
+                        a.isRead
+                          ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                          : a.urgency === 'URGENT'
+                          ? 'bg-rose-100 text-rose-900 border-rose-300 animate-pulse'
+                          : 'bg-amber-100 text-amber-900 border-amber-300'
+                      }`}
+                    >
+                      {a.urgency === 'URGENT' ? '🚨 ' : '📢 '}
+                      {a.title} {a.isRead ? '✓' : ''}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
@@ -136,7 +159,7 @@ export default function KioskPortalScreen({
             type="button"
             className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-black shrink-0 shadow-sm"
           >
-            Buka
+            Buka ({announcements.length})
           </button>
         </div>
       )}
