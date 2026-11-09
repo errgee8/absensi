@@ -1528,13 +1528,27 @@ router.post('/break/end', async (req, res) => {
       if (cloudShift) {
         let parsedNotes = {};
         try { parsedNotes = JSON.parse(cloudShift.notes || '{}'); } catch {}
+
+        // Query active break record to get true break_start time!
+        let supaBreakStart = null;
+        try {
+          const { data: activeBrk } = await supabase
+            .from('break_logs')
+            .select('break_start')
+            .eq('attendance_id', cloudShift.id)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          if (activeBrk?.break_start) supaBreakStart = activeBrk.break_start;
+        } catch {}
+
         shift = {
           id: cloudShift.id,
           supabase_id: cloudShift.id,
           staff_id: staff?.id || staffId,
           status: cloudShift.status,
           break_status: 'ON_BREAK',
-          break_start_time: cloudShift.created_at,
+          break_start_time: supaBreakStart || cloudShift.break_start_time || null,
           flags: JSON.stringify(cloudShift.flags || []),
           venue: staff?.venue || 'JP Karaoke',
           division: staff?.division || 'Server and Cashier'
@@ -1563,13 +1577,25 @@ router.post('/break/end', async (req, res) => {
         .maybeSingle();
 
       if (data) {
+        let supaBreakStart = null;
+        try {
+          const { data: activeBrk } = await supabase
+            .from('break_logs')
+            .select('break_start')
+            .eq('attendance_id', data.id)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          if (activeBrk?.break_start) supaBreakStart = activeBrk.break_start;
+        } catch {}
+
         shift = {
           id: data.id,
           supabase_id: data.id,
           staff_id: staff.id,
           status: data.status,
           break_status: 'ON_BREAK',
-          break_start_time: data.created_at,
+          break_start_time: supaBreakStart || data.break_start_time || null,
           flags: JSON.stringify(data.flags || []),
           venue: staff.venue,
           division: staff.division

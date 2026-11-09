@@ -358,20 +358,50 @@ export const cloudDb = {
 
     if (!targetLogId) return null;
     const endTime = new Date().toISOString();
-    const excess = Math.max(0, (durationMinutes || 0) - 60);
 
-    const { data, error } = await supabase
-      .from('break_logs')
-      .update({
-        break_end: endTime,
-        break_end_photo_url: photoUrl,
-        duration_minutes: durationMinutes,
-        excess_minutes: excess,
-        status: 'COMPLETED'
-      })
-      .eq('attendance_id', targetLogId)
-      .select()
-      .maybeSingle();
+    // Fetch the break record to calculate accurate duration strictly from actual break_start
+    let calculatedDuration = durationMinutes;
+    let targetBreakId = null;
+    try {
+      const { data: brk } = await supabase
+        .from('break_logs')
+        .select('*')
+        .eq('attendance_id', targetLogId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (brk) {
+        targetBreakId = brk.id;
+        if (brk.break_start) {
+          const startMs = new Date(brk.break_start).getTime();
+          const endMs = new Date(endTime).getTime();
+          calculatedDuration = Math.max(0, Math.round((endMs - startMs) / (1000 * 60)));
+        }
+      }
+    } catch (e) {
+      console.warn('Error fetching break record for duration calculation:', e.message);
+    }
+
+    const excess = Math.max(0, (calculatedDuration || 0) - 60);
+
+    const updateQuery = targetBreakId
+      ? supabase.from('break_logs').update({
+          break_end: endTime,
+          break_end_photo_url: photoUrl,
+          duration_minutes: calculatedDuration,
+          excess_minutes: excess,
+          status: 'COMPLETED'
+        }).eq('id', targetBreakId)
+      : supabase.from('break_logs').update({
+          break_end: endTime,
+          break_end_photo_url: photoUrl,
+          duration_minutes: calculatedDuration,
+          excess_minutes: excess,
+          status: 'COMPLETED'
+        }).eq('attendance_id', targetLogId);
+
+    const { data, error } = await updateQuery.select().maybeSingle();
 
     if (error) throw error;
 
@@ -526,7 +556,9 @@ export const cloudDb = {
         break_start_photo: brk?.break_start_photo_url || null,
         break_end_time: brk?.break_end || null,
         break_end_photo: brk?.break_end_photo_url || null,
-        break_duration_minutes: brk?.duration_minutes || null,
+        break_duration_minutes: (brk?.break_start && brk?.break_end)
+          ? Math.max(0, Math.round((new Date(brk.break_end).getTime() - new Date(brk.break_start).getTime()) / (1000 * 60)))
+          : (brk?.duration_minutes || null),
         break_count: row.break_logs ? row.break_logs.length : 0,
         checkout_time: row.check_out_time,
         checkout_lat: row.check_out_lat,

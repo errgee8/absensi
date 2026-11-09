@@ -264,15 +264,19 @@ export default function PhotoDetailModal({ shift, type = 'in', onClose, onShiftU
           )}
 
           {/* Break Details if break was taken */}
-          {shift.break_duration_minutes != null && (
+          {(shift.break_duration_minutes != null || (shift.break_start_time && shift.break_end_time)) && (
             <div className="bg-sky-50 border-2 border-sky-300 rounded-2xl p-4 text-xs space-y-1 text-sky-950">
               <span className="text-sky-950 font-black block mb-1">
-                Log Istirahat 1 Jam LuckyCat:
+                Log Istirahat 1 Jam {shift.staff_venue || shift.venue || 'LuckyCat'}:
               </span>
               <div className="grid grid-cols-2 gap-2 text-slate-900 font-mono text-xs font-bold">
                 <div>Mulai: {formatWitaDateTime(shift.break_start_time)}</div>
                 <div>Selesai: {formatWitaDateTime(shift.break_end_time)}</div>
-                <div>Durasi: <strong className="text-slate-950 font-black">{shift.break_duration_minutes} menit</strong></div>
+                <div>Durasi: <strong className="text-slate-950 font-black">{
+                  (shift.break_start_time && shift.break_end_time)
+                    ? Math.max(0, Math.round((new Date(shift.break_end_time).getTime() - new Date(shift.break_start_time).getTime()) / (1000 * 60)))
+                    : (shift.break_duration_minutes || 0)
+                } menit</strong></div>
                 <div>Batas Maksimal: 60 menit</div>
               </div>
             </div>
