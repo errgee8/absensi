@@ -1,6 +1,9 @@
-import webpush from 'web-push';
+import { createRequire } from 'module';
 import { db, getSetting, setSetting } from './db.js';
 import { isSupabaseConfigured, cloudDb } from './supabase.js';
+
+const require = createRequire(import.meta.url);
+const webpush = require('web-push');
 
 let vapidKeys = null;
 
