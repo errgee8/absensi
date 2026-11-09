@@ -11,6 +11,7 @@ import ToiletInspectionTab from './ToiletInspectionTab';
 import LeaveManagementTab from './LeaveManagementTab';
 import AnnouncementManagementModal from './AnnouncementManagementModal';
 import WipeLeaderboardModal from '../Leaderboard/WipeLeaderboardModal';
+import SystemRecoveryModal from './SystemRecoveryModal';
 import { exportMonthlyPayrollReport, exportTimesheetToExcel } from '../../utils/excelExport';
 import { getShifts, getStats, getShiftSchedules, getStaffList, getLeaveRequests, getAnnouncements, getAnnouncementReaders, subscribeRealtimeEvents } from '../../utils/api';
 import { getOperationalDateYMD, getOperationalYesterdayYMD, getWitaDateYMD, getAppNow, formatWitaDateTime } from '../../utils/time';
@@ -45,6 +46,7 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
   const [announcementInitialTab, setAnnouncementInitialTab] = useState('LIST');
   const [activeAnnouncement, setActiveAnnouncement] = useState(null);
   const [announcementCompliance, setAnnouncementCompliance] = useState(null);
+  const [recoveryModalOpen, setRecoveryModalOpen] = useState(false);
 
   const departments = [
     'Server and Cashier',
@@ -371,6 +373,7 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
               isExporting={isExporting}
               onOpenSettings={() => setSettingsOpen(true)}
               onOpenResetLeaderboard={() => setWipeModalOpen(true)}
+              onOpenRecovery={() => setRecoveryModalOpen(true)}
               isReadOnly={isReadOnly}
             />
 
@@ -542,6 +545,16 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
             onAnnouncementChanged={() => {
               loadActiveAnnouncement();
             }}
+          />
+        )}
+
+        {/* Modal: Disaster Recovery, Backups & Fault Switch */}
+        {!isReadOnly && recoveryModalOpen && (
+          <SystemRecoveryModal
+            isOpen={recoveryModalOpen}
+            onClose={() => setRecoveryModalOpen(false)}
+            adminAuth={adminAuth}
+            venueSettings={venueSettings}
           />
         )}
       </div>

@@ -5,6 +5,7 @@ import { captureAndWatermark, watermarkFile } from '../../utils/watermark';
 import { checkIn, checkOut, startBreak, endBreak } from '../../utils/api';
 import { isWithinGeofence, calculateDistanceMeters } from '../../utils/distance';
 import { getAppNow } from '../../utils/time';
+import { enqueueOfflineAction } from '../../utils/offlineQueue';
 
 export default function KioskCameraModal({
   staff,
@@ -322,6 +323,44 @@ export default function KioskCameraModal({
       }, 1200);
 
     } catch (err) {
+      // Check if user is offline or fetch failed due to connectivity drop
+      if (!navigator.onLine || err.message?.includes('Failed to fetch') || err.message?.includes('NetworkError')) {
+        try {
+          const endpointUrl = `/api/${actionType === 'checkout' ? 'checkout' : actionType.startsWith('break') ? (actionType === 'break_start' ? 'break/start' : 'break/end') : 'checkin'}`;
+          await enqueueOfflineAction({
+            url: endpointUrl,
+            method: 'POST',
+            payload,
+            staffName: staff.name,
+            actionType: config.watermarkStatus
+          });
+
+          setSuccessMessage('⚠️ Anda Sedang Offline. Absensi telah diamankan di memori HP dan otomatis terkirim begitu internet pulih!');
+          setFlashing(false);
+          setSubmitting(false);
+          setSubmitSuccess(true);
+
+          confetti({
+            particleCount: 50,
+            spread: 55,
+            origin: { y: 0.6 }
+          });
+
+          let count = 3;
+          const timer = setInterval(() => {
+            count -= 1;
+            setCountdown(count);
+            if (count <= 0) {
+              clearInterval(timer);
+              onCompleteAndAutoLogout();
+            }
+          }, 1000);
+          return;
+        } catch (offlineErr) {
+          console.error('Offline enqueue error:', offlineErr);
+        }
+      }
+
       setFlashing(false);
       setSubmitting(false);
       setSubmitError(err.message || 'Gagal memproses absensi.');

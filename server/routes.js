@@ -9,6 +9,7 @@ import { isSupabaseConfigured, uploadPhotoToSupabase, cloudDb, supabase, findSta
 import { detectShiftSchedule, getBreakCutoff, isBreakAllowedNow, getWitaTimeString, getWitaDateYMD, getOperationalDateYMD, getOperationalYesterdayYMD } from './shifts.js';
 import { computeLeaderboard } from './leaderboard.js';
 import { getVapidPublicKey, savePushSubscription, sendPushNotification } from './push.js';
+import { createSystemSnapshot, listSystemBackups, restoreSystemSnapshot } from './backup.js';
 
 const router = express.Router();
 
@@ -89,6 +90,151 @@ router.post('/push/test', async (req, res) => {
     res.json({ success: true, result });
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+// ==========================================
+// SYSTEM HEALTH & DISASTER RECOVERY ROUTES
+// ==========================================
+
+// 1. Health Check Endpoint
+router.get('/health', async (req, res) => {
+  const isSupaAlive = isSupabaseConfigured && Boolean(supabase);
+  res.json({
+    status: 'healthy',
+    timestamp: new Date().toISOString(),
+    supabase: isSupaAlive,
+    uptime: process.uptime(),
+    venueName: getSetting('venue_name') || 'JP Karaoke & LuckyCat Outlets'
+  });
+});
+
+// 2. List Disaster Recovery Backups
+router.get('/admin/backups', async (req, res) => {
+  try {
+    const backups = await listSystemBackups();
+    res.json({ success: true, backups });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// 3. Create Backup Snapshot (Manager Pin Required)
+router.post('/admin/backups/snapshot', async (req, res) => {
+  const { pin, createdBy } = req.body || {};
+  const auth = await verifyManagementAuth(pin);
+  if (!auth.authorized) {
+    return res.status(403).json({ error: 'Akses ditolak: PIN Manager salah.' });
+  }
+  try {
+    const snapshot = await createSystemSnapshot(createdBy || auth.reviewerName);
+    res.json(snapshot);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// 4. Restore Backup Snapshot (Manager Pin Required)
+router.post('/admin/backups/restore', async (req, res) => {
+  const { pin, backupId } = req.body || {};
+  const auth = await verifyManagementAuth(pin);
+  if (!auth.authorized) {
+    return res.status(403).json({ error: 'Akses ditolak: PIN Manager salah.' });
+  }
+  try {
+    const result = await restoreSystemSnapshot(backupId);
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// 5. Emergency Bypass / Fault Switch Check-in (Kamera / Hardware Rusak)
+router.post('/admin/emergency-bypass', async (req, res) => {
+  const { pin, staffId, actionType, reason, reviewerName } = req.body || {};
+  const auth = await verifyManagementAuth(pin);
+  if (!auth.authorized) {
+    return res.status(403).json({ error: 'Akses ditolak: PIN Manager salah.' });
+  }
+
+  try {
+    let staff = null;
+    if (isSupabaseConfigured) {
+      staff = await findStaffInSupabase(staffId);
+    }
+    if (!staff) {
+      staff = db.prepare('SELECT * FROM staff WHERE id = ? OR name LIKE ?').get(staffId, `%${staffId}%`);
+    }
+    if (!staff) return res.status(404).json({ error: 'Staf tidak ditemukan.' });
+
+    const now = new Date();
+    const bypassFlags = ['FLAG_MANUAL_ADMIN_OVERRIDE'];
+    const notes = {
+      is_manual_override: true,
+      override_reason: reason || 'Kamera/Hardware staf bermasalah',
+      authorized_by: reviewerName || auth.reviewerName,
+      authorized_at: now.toISOString()
+    };
+
+    if (actionType === 'checkout') {
+      db.prepare(`
+        UPDATE shifts
+        SET checkout_time = ?, status = 'COMPLETED', flags = ?, notes = ?, updated_at = ?
+        WHERE staff_id = ? AND status != 'COMPLETED'
+      `).run(now.toISOString(), JSON.stringify(bypassFlags), JSON.stringify(notes), now.toISOString(), staff.id);
+
+      if (isSupabaseConfigured && supabase) {
+        await supabase
+          .from('attendance_logs')
+          .update({
+            checkout_time: now.toISOString(),
+            status: 'COMPLETED',
+            flags: bypassFlags,
+            notes: JSON.stringify(notes),
+            updated_at: now.toISOString()
+          })
+          .eq('staff_id', staff.uuid || staff.id)
+          .neq('status', 'COMPLETED');
+      }
+    } else {
+      const dateStr = getOperationalDateYMD(now.toISOString());
+      db.prepare(`
+        INSERT INTO shifts (staff_id, date, checkin_time, checkin_lat, checkin_lng, status, flags, notes, created_at)
+        VALUES (?, ?, ?, ?, ?, 'IN_PROGRESS', ?, ?, ?)
+      `).run(
+        staff.id,
+        dateStr,
+        now.toISOString(),
+        getSetting('venue_lat') || -8.780981,
+        getSetting('venue_lng') || 115.176863,
+        JSON.stringify(bypassFlags),
+        JSON.stringify(notes),
+        now.toISOString()
+      );
+
+      if (isSupabaseConfigured && supabase) {
+        await supabase.from('attendance_logs').insert([{
+          staff_id: staff.uuid || staff.id,
+          date: dateStr,
+          checkin_time: now.toISOString(),
+          checkin_lat: getSetting('venue_lat') || -8.780981,
+          checkin_lng: getSetting('venue_lng') || 115.176863,
+          status: 'IN_PROGRESS',
+          flags: bypassFlags,
+          notes: JSON.stringify(notes)
+        }]);
+      }
+    }
+
+    broadcastEvent('SHIFT_UPDATE', { action: 'BYPASS_PUNCH', staffId: staff.id });
+
+    return res.json({
+      success: true,
+      message: `Otorisasi darurat (${actionType}) untuk ${staff.name} berhasil dicatat.`,
+      staff: staff.name
+    });
+  } catch (err) {
+    return res.status(500).json({ error: 'Gagal memproses bypass: ' + err.message });
   }
 });
 
@@ -1023,17 +1169,27 @@ router.post('/checkin', async (req, res) => {
   const clientIp = getClientIp(req);
   const wifiValidation = { isMatch: true, matchedSubnet: 'ALL_NETWORKS' };
 
-  // Geofence Check
+  // Geofence Check & Input Sanitization
   const venueLat = getSetting('venue_lat');
   const venueLng = getSetting('venue_lng');
   const geofenceRadius = getSetting('geofence_radius') || 150;
-  const userLat = lat != null ? parseFloat(lat) : null;
-  const userLng = lng != null ? parseFloat(lng) : null;
+  let userLat = lat != null ? parseFloat(lat) : null;
+  let userLng = lng != null ? parseFloat(lng) : null;
+  // Sanitize coordinates against out-of-range spoofing
+  if (isNaN(userLat) || userLat < -90 || userLat > 90) userLat = null;
+  if (isNaN(userLng) || userLng < -180 || userLng > 180) userLng = null;
   const distance = calculateDistanceMeters(userLat, userLng, venueLat, venueLng);
 
   const photoUrl = await savePhoto(photoBase64, `in_${staff.id}`);
   const now = new Date();
-  const checkinTime = timestamp || now.toISOString();
+  // Enforce server-authoritative timestamp if client timestamp drifts by > 5 minutes
+  let checkinTime = now.toISOString();
+  if (timestamp) {
+    const clientTs = new Date(timestamp).getTime();
+    if (!isNaN(clientTs) && Math.abs(now.getTime() - clientTs) <= 5 * 60 * 1000) {
+      checkinTime = timestamp;
+    }
+  }
   const dateStr = getOperationalDateYMD(checkinTime);
 
   // Shift schedule determination (from staff confirmation dialog or 30-min window detection)
@@ -1605,16 +1761,26 @@ router.post('/checkout', async (req, res) => {
   const clientIp = getClientIp(req);
   const wifiValidation = { isMatch: true, matchedSubnet: 'ALL_NETWORKS' };
 
-  // Geofence Check
+  // Geofence Check & Input Sanitization
   const venueLat = getSetting('venue_lat');
   const venueLng = getSetting('venue_lng');
   const geofenceRadius = getSetting('geofence_radius') || 150;
-  const userLat = lat != null ? parseFloat(lat) : null;
-  const userLng = lng != null ? parseFloat(lng) : null;
+  let userLat = lat != null ? parseFloat(lat) : null;
+  let userLng = lng != null ? parseFloat(lng) : null;
+  // Sanitize coordinates against out-of-range spoofing
+  if (isNaN(userLat) || userLat < -90 || userLat > 90) userLat = null;
+  if (isNaN(userLng) || userLng < -180 || userLng > 180) userLng = null;
   const distance = calculateDistanceMeters(userLat, userLng, venueLat, venueLng);
 
-  // Time & Duration
-  const checkoutTime = timestamp || new Date().toISOString();
+  // Time & Duration with Server-Authoritative Drift Protection (5m tolerance)
+  const now = new Date();
+  let checkoutTime = now.toISOString();
+  if (timestamp) {
+    const clientTs = new Date(timestamp).getTime();
+    if (!isNaN(clientTs) && Math.abs(now.getTime() - clientTs) <= 5 * 60 * 1000) {
+      checkoutTime = timestamp;
+    }
+  }
   const startTime = new Date(shift.checkin_time).getTime();
   const endTime = new Date(checkoutTime).getTime();
   const durationMinutes = Math.max(0, Math.round((endTime - startTime) / (1000 * 60)));

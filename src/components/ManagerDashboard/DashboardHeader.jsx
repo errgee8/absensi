@@ -1,5 +1,5 @@
 import React from 'react';
-import { Users, Clock, AlertTriangle, MapPin, Printer, Settings, FileSpreadsheet, RotateCcw } from 'lucide-react';
+import { Users, Clock, AlertTriangle, MapPin, Printer, Settings, FileSpreadsheet, RotateCcw, Shield } from 'lucide-react';
 
 export default function DashboardHeader({
   stats,
@@ -8,6 +8,7 @@ export default function DashboardHeader({
   isExporting = false,
   onOpenSettings,
   onOpenResetLeaderboard,
+  onOpenRecovery,
   isReadOnly = false
 }) {
   const cards = [
@@ -90,6 +91,18 @@ export default function DashboardHeader({
             >
               <RotateCcw className="w-3.5 h-3.5 text-amber-300 stroke-[2.5]" />
               <span>Reset Leaderboard</span>
+            </button>
+          )}
+
+          {/* Disaster Recovery & Fault Switch Button - Manager Only */}
+          {!isReadOnly && onOpenRecovery && (
+            <button
+              onClick={onOpenRecovery}
+              className="px-3.5 py-2 bg-gradient-to-r from-blue-700 to-indigo-800 hover:from-blue-800 hover:to-indigo-900 text-white rounded-xl text-xs font-black flex items-center space-x-1.5 shadow-md shadow-blue-700/20 transition"
+              title="Disaster Recovery Snapshot, Fault Switch & Server Health"
+            >
+              <Shield className="w-3.5 h-3.5 text-blue-300 stroke-[2.5]" />
+              <span>Recovery &amp; Fault Switch</span>
             </button>
           )}
 
