@@ -21,7 +21,7 @@ import {
 import { getLeaveRequests, getStaffLeaveBalance, submitLeaveRequest } from '../../utils/api';
 import { getOperationalDateYMD, formatWitaDateOnly } from '../../utils/time';
 
-export default function StaffLeaveModal({ isOpen, onClose, staff, onRefreshShifts, onMarkViewed }) {
+export default function StaffLeaveModal({ isOpen, onClose, staff, onRefreshShifts, onMarkViewed, activeShift, initialCategory }) {
   const [activeTab, setActiveTab] = useState('HISTORY'); // 'HISTORY' | 'CUTI' | 'IZIN'
   const [requests, setRequests] = useState([]);
   const [balance, setBalance] = useState({ maxQuota: 12, usedDays: 0, remainingDays: 12 });
@@ -35,10 +35,11 @@ export default function StaffLeaveModal({ isOpen, onClose, staff, onRefreshShift
   const [cutiReason, setCutiReason] = useState('');
   const [cutiSelfie, setCutiSelfie] = useState(null);
 
-  // Form State: Izin Sakit
-  const [izinCategory, setIzinCategory] = useState('SAKIT'); // 'SAKIT' | 'IZIN_DARURAT'
+  // Form State: Izin Sakit / Pulang Awal
+  const [izinCategory, setIzinCategory] = useState('SAKIT'); // 'SAKIT' | 'IZIN_DARURAT' | 'IZIN_PULANG_AWAL'
   const [izinStart, setIzinStart] = useState('');
   const [izinEnd, setIzinEnd] = useState('');
+  const [departureTime, setDepartureTime] = useState('');
   const [izinReason, setIzinReason] = useState('');
   const [izinSelfie, setIzinSelfie] = useState(null);
   const [izinDocPhoto, setIzinDocPhoto] = useState(null);
@@ -87,6 +88,28 @@ export default function StaffLeaveModal({ isOpen, onClose, staff, onRefreshShift
       stopCamera();
     };
   }, [isOpen, staff]);
+
+  useEffect(() => {
+    if (isOpen) {
+      if (initialCategory === 'IZIN_PULANG_AWAL') {
+        setActiveTab('IZIN');
+        setIzinCategory('IZIN_PULANG_AWAL');
+        setIzinStart(todayStr);
+        setIzinEnd(todayStr);
+        try {
+          const nowWita = new Intl.DateTimeFormat('id-ID', {
+            timeZone: 'Asia/Makassar',
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false
+          }).format(new Date()).replace('.', ':');
+          setDepartureTime(nowWita);
+        } catch {
+          setDepartureTime('15:00');
+        }
+      }
+    }
+  }, [isOpen, initialCategory, todayStr]);
 
   useEffect(() => {
     if (isOpen && activeTab === 'HISTORY' && staff?.id) {
@@ -214,11 +237,27 @@ export default function StaffLeaveModal({ isOpen, onClose, staff, onRefreshShift
     setError(null);
     setSuccessMsg(null);
 
-    const days = calculateDays(izinStart, izinEnd);
-    if (days <= 0) {
-      setError('Tanggal selesai tidak boleh lebih awal dari tanggal mulai.');
-      return;
+    const isPulangAwal = izinCategory === 'IZIN_PULANG_AWAL';
+    let days = 1;
+    let finalStart = izinStart;
+    let finalEnd = izinEnd;
+
+    if (isPulangAwal) {
+      if (!departureTime) {
+        setError('Jam rencana pulang wajib diisi.');
+        return;
+      }
+      finalStart = todayStr;
+      finalEnd = todayStr;
+      days = 1;
+    } else {
+      days = calculateDays(izinStart, izinEnd);
+      if (days <= 0) {
+        setError('Tanggal selesai tidak boleh lebih awal dari tanggal mulai.');
+        return;
+      }
     }
+
     if (!izinSelfie) {
       setError('Foto selfie pemohon wajib diambil untuk verifikasi biometrik.');
       return;
@@ -231,17 +270,20 @@ export default function StaffLeaveModal({ isOpen, onClose, staff, onRefreshShift
         pin: staff.pin,
         type: 'IZIN',
         category: izinCategory,
-        startDate: izinStart,
-        endDate: izinEnd,
+        startDate: finalStart,
+        endDate: finalEnd,
         requestedDays: days,
         reason: izinReason,
         photoBase64: izinSelfie,
-        documentBase64: izinDocPhoto || null
+        documentBase64: izinDocPhoto || null,
+        departureTime: isPulangAwal ? departureTime : null,
+        activeShiftId: isPulangAwal ? (activeShift?.id || null) : null
       });
 
       setSuccessMsg(res.message || 'Permohonan izin berhasil dikirim ke management.');
       setIzinStart('');
       setIzinEnd('');
+      setDepartureTime('');
       setIzinReason('');
       setIzinSelfie(null);
       setIzinDocPhoto(null);
@@ -417,12 +459,22 @@ export default function StaffLeaveModal({ isOpen, onClose, staff, onRefreshShift
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex items-center space-x-2">
                             <span className={`px-2 py-0.5 rounded-lg text-[10px] font-black uppercase ${
-                              isCuti ? 'bg-blue-100 text-blue-900 border border-blue-300' : 'bg-purple-100 text-purple-900 border border-purple-300'
+                              isCuti
+                                ? 'bg-blue-100 text-blue-900 border border-blue-300'
+                                : r.category === 'IZIN_PULANG_AWAL'
+                                ? 'bg-amber-100 text-amber-950 border border-amber-300'
+                                : 'bg-purple-100 text-purple-900 border border-purple-300'
                             }`}>
-                              {isCuti ? '🌴 CUTI' : `🏥 ${r.category || 'IZIN'}`}
+                              {isCuti
+                                ? '🌴 CUTI'
+                                : r.category === 'IZIN_PULANG_AWAL'
+                                ? '🏃 IZIN PULANG AWAL'
+                                : `🏥 ${r.category || 'IZIN'}`}
                             </span>
                             <span className="font-mono text-xs text-slate-900 font-black">
-                              {formatWitaDateOnly(r.start_date)} s/d {formatWitaDateOnly(r.end_date)}
+                              {r.category === 'IZIN_PULANG_AWAL' && r.departure_time
+                                ? `${formatWitaDateOnly(r.start_date)} • Jam ${r.departure_time} WITA`
+                                : `${formatWitaDateOnly(r.start_date)} s/d ${formatWitaDateOnly(r.end_date)}`}
                             </span>
                           </div>
 
@@ -679,65 +731,143 @@ export default function StaffLeaveModal({ isOpen, onClose, staff, onRefreshShift
               {/* Category */}
               <div>
                 <label className="block text-xs font-black text-slate-900 mb-1">Kategori Izin:</label>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                   <button
                     type="button"
                     onClick={() => setIzinCategory('SAKIT')}
                     className={`py-2 px-3 rounded-xl border-2 font-black text-xs transition ${
                       izinCategory === 'SAKIT'
-                        ? 'bg-rose-50 border-rose-500 text-rose-950'
+                        ? 'bg-rose-50 border-rose-500 text-rose-950 shadow-sm'
                         : 'bg-slate-50 border-slate-200 text-slate-700'
                     }`}
                   >
-                    🏥 Sakit (Surat Dokter / Resep)
+                    🏥 Sakit (Dokter/Resep)
                   </button>
                   <button
                     type="button"
                     onClick={() => setIzinCategory('IZIN_DARURAT')}
                     className={`py-2 px-3 rounded-xl border-2 font-black text-xs transition ${
                       izinCategory === 'IZIN_DARURAT'
-                        ? 'bg-purple-50 border-purple-500 text-purple-950'
+                        ? 'bg-purple-50 border-purple-500 text-purple-950 shadow-sm'
                         : 'bg-slate-50 border-slate-200 text-slate-700'
                     }`}
                   >
-                    🚨 Izin Darurat / Keluarga
+                    🚨 Izin Darurat
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIzinCategory('IZIN_PULANG_AWAL');
+                      setIzinStart(todayStr);
+                      setIzinEnd(todayStr);
+                      if (!departureTime) {
+                        try {
+                          const nowWita = new Intl.DateTimeFormat('id-ID', {
+                            timeZone: 'Asia/Makassar',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            hour12: false
+                          }).format(new Date()).replace('.', ':');
+                          setDepartureTime(nowWita);
+                        } catch {
+                          setDepartureTime('15:00');
+                        }
+                      }
+                    }}
+                    className={`py-2 px-3 rounded-xl border-2 font-black text-xs transition ${
+                      izinCategory === 'IZIN_PULANG_AWAL'
+                        ? 'bg-amber-50 border-amber-500 text-amber-950 shadow-sm ring-2 ring-amber-400/20'
+                        : 'bg-slate-50 border-slate-200 text-slate-700'
+                    }`}
+                  >
+                    🏃 Pulang Awal (On Duty)
                   </button>
                 </div>
               </div>
 
-              {/* Dates */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-black text-slate-900 mb-1">Dari Tanggal:</label>
-                  <input
-                    type="date"
-                    value={izinStart}
-                    onChange={(e) => {
-                      setIzinStart(e.target.value);
-                      if (!izinEnd || e.target.value > izinEnd) setIzinEnd(e.target.value);
-                    }}
-                    required
-                    className="w-full bg-slate-50 border-2 border-slate-300 rounded-xl px-3 py-2 text-xs font-black text-slate-950 focus:outline-none focus:border-purple-600 focus:bg-white"
-                  />
-                </div>
+              {/* Conditional Timing / Dates */}
+              {izinCategory === 'IZIN_PULANG_AWAL' ? (
+                <div className="space-y-3 bg-amber-50/70 border-2 border-amber-300 rounded-2xl p-3.5">
+                  <div className="flex items-start space-x-2">
+                    <div className="w-7 h-7 rounded-xl bg-amber-200 text-amber-950 flex items-center justify-center font-black text-sm shrink-0">
+                      🏃
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-black text-amber-950">Izin Pulang di Tengah Shift Berjalan (On Duty)</h4>
+                      <p className="text-[11px] text-amber-900 leading-tight mt-0.5">
+                        Digunakan jika Anda sedang on-duty namun harus segera pulang karena sakit mendadak atau urusan darurat.
+                        Jika disetujui Management, shift akan diselesaikan tanpa penalti early checkout.
+                      </p>
+                    </div>
+                  </div>
 
-                <div>
-                  <label className="block text-xs font-black text-slate-900 mb-1">Hingga Tanggal:</label>
-                  <input
-                    type="date"
-                    min={izinStart || todayStr}
-                    value={izinEnd}
-                    onChange={(e) => setIzinEnd(e.target.value)}
-                    required
-                    className="w-full bg-slate-50 border-2 border-slate-300 rounded-xl px-3 py-2 text-xs font-black text-slate-950 focus:outline-none focus:border-purple-600 focus:bg-white"
-                  />
-                  {izinStart && izinEnd && (
-                    <span className="text-[10px] text-purple-800 font-black block mt-0.5">
-                      Durasi izin: {calculateDays(izinStart, izinEnd)} Hari
-                    </span>
+                  {activeShift && (
+                    <div className="p-2.5 bg-white rounded-xl border border-amber-300 flex items-center justify-between text-xs font-black text-slate-800">
+                      <span>Shift Aktif:</span>
+                      <span className="text-blue-700 font-mono">
+                        {activeShift.scheduled_start || '13:00'} - {activeShift.scheduled_end || '22:00'} WITA
+                      </span>
+                    </div>
                   )}
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                    <div>
+                      <label className="block text-xs font-black text-slate-900 mb-1">Tanggal Hari Ini:</label>
+                      <input
+                        type="text"
+                        value={formatWitaDateOnly(todayStr)}
+                        disabled
+                        className="w-full bg-slate-100 border-2 border-slate-300 rounded-xl px-3 py-2 text-xs font-black text-slate-700"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-black text-slate-900 mb-1">
+                        Jam Rencana Pulang (WITA): <span className="text-rose-600">*</span>
+                      </label>
+                      <input
+                        type="time"
+                        value={departureTime}
+                        onChange={(e) => setDepartureTime(e.target.value)}
+                        required
+                        className="w-full bg-white border-2 border-amber-400 rounded-xl px-3 py-2 text-xs font-black text-slate-950 focus:outline-none focus:border-blue-600"
+                      />
+                    </div>
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-black text-slate-900 mb-1">Dari Tanggal:</label>
+                    <input
+                      type="date"
+                      value={izinStart}
+                      onChange={(e) => {
+                        setIzinStart(e.target.value);
+                        if (!izinEnd || e.target.value > izinEnd) setIzinEnd(e.target.value);
+                      }}
+                      required
+                      className="w-full bg-slate-50 border-2 border-slate-300 rounded-xl px-3 py-2 text-xs font-black text-slate-950 focus:outline-none focus:border-purple-600 focus:bg-white"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-black text-slate-900 mb-1">Hingga Tanggal:</label>
+                    <input
+                      type="date"
+                      min={izinStart || todayStr}
+                      value={izinEnd}
+                      onChange={(e) => setIzinEnd(e.target.value)}
+                      required
+                      className="w-full bg-slate-50 border-2 border-slate-300 rounded-xl px-3 py-2 text-xs font-black text-slate-950 focus:outline-none focus:border-purple-600 focus:bg-white"
+                    />
+                    {izinStart && izinEnd && (
+                      <span className="text-[10px] text-purple-800 font-black block mt-0.5">
+                        Durasi izin: {calculateDays(izinStart, izinEnd)} Hari
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {/* Reason */}
               <div>
@@ -874,8 +1004,17 @@ export default function StaffLeaveModal({ isOpen, onClose, staff, onRefreshShift
               <div className="pt-2">
                 <button
                   type="submit"
-                  disabled={loading || !izinStart || !izinEnd || !izinReason.trim() || !izinSelfie}
-                  className="w-full py-3 bg-purple-700 hover:bg-purple-800 active:bg-purple-900 text-white font-black text-xs uppercase tracking-wider rounded-2xl shadow-md shadow-purple-700/30 transition flex items-center justify-center space-x-2 disabled:opacity-50"
+                  disabled={
+                    loading ||
+                    !izinReason.trim() ||
+                    !izinSelfie ||
+                    (izinCategory === 'IZIN_PULANG_AWAL' ? !departureTime : (!izinStart || !izinEnd))
+                  }
+                  className={`w-full py-3 text-white font-black text-xs uppercase tracking-wider rounded-2xl shadow-md transition flex items-center justify-center space-x-2 disabled:opacity-50 ${
+                    izinCategory === 'IZIN_PULANG_AWAL'
+                      ? 'bg-amber-600 hover:bg-amber-700 active:bg-amber-800 shadow-amber-600/30'
+                      : 'bg-purple-700 hover:bg-purple-800 active:bg-purple-900 shadow-purple-700/30'
+                  }`}
                 >
                   {loading ? (
                     <>
@@ -884,8 +1023,14 @@ export default function StaffLeaveModal({ isOpen, onClose, staff, onRefreshShift
                     </>
                   ) : (
                     <>
-                      <HeartPulse className="w-4 h-4 text-rose-300" />
-                      <span>Kirim Permohonan Ke Management</span>
+                      {izinCategory === 'IZIN_PULANG_AWAL' ? (
+                        <span>🏃 Ajukan Izin Pulang Ke Management</span>
+                      ) : (
+                        <>
+                          <HeartPulse className="w-4 h-4 text-rose-300" />
+                          <span>Kirim Permohonan Ke Management</span>
+                        </>
+                      )}
                     </>
                   )}
                 </button>

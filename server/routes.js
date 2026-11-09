@@ -2245,7 +2245,9 @@ router.post('/leave-requests', async (req, res) => {
     requestedDays,
     reason,
     photoBase64,
-    documentBase64
+    documentBase64,
+    departureTime,
+    activeShiftId
   } = req.body || {};
 
   if (!staffId) return res.status(400).json({ error: 'ID Staf wajib dicantumkan.' });
@@ -2312,7 +2314,7 @@ router.post('/leave-requests', async (req, res) => {
     }
   }
 
-  // Rule checks for IZIN (Sakit / Izin Darurat)
+  // Rule checks for IZIN (Sakit / Izin Darurat / Izin Pulang di Tengah Shift)
   if (type === 'IZIN') {
     // Selfie wajib untuk verifikasi pemohon
     if (!photoBase64) {
@@ -2345,6 +2347,8 @@ router.post('/leave-requests', async (req, res) => {
       start_date: startDate,
       end_date: endDate,
       requested_days: requestedDays ? Number(requestedDays) : 1,
+      departure_time: departureTime || null,
+      active_shift_id: activeShiftId || null,
       approved_days: null,
       approved_start_date: null,
       approved_end_date: null,
@@ -2369,11 +2373,11 @@ router.post('/leave-requests', async (req, res) => {
       db.prepare(`
         INSERT INTO leave_requests (
           id, staff_id, staff_name, staff_role, staff_venue, staff_division,
-          type, category, start_date, end_date, requested_days,
+          type, category, start_date, end_date, requested_days, departure_time, active_shift_id,
           reason, photo_url, document_url, status, year, created_at, updated_at
         ) VALUES (
           ?, ?, ?, ?, ?, ?,
-          ?, ?, ?, ?, ?,
+          ?, ?, ?, ?, ?, ?, ?,
           ?, ?, ?, 'PENDING', ?, ?, ?
         )
       `).run(
@@ -2388,6 +2392,8 @@ router.post('/leave-requests', async (req, res) => {
         newRequest.start_date,
         newRequest.end_date,
         newRequest.requested_days,
+        newRequest.departure_time,
+        newRequest.active_shift_id,
         newRequest.reason,
         newRequest.photo_url,
         newRequest.document_url,
@@ -2403,7 +2409,9 @@ router.post('/leave-requests', async (req, res) => {
 
     return res.json({
       success: true,
-      message: type === 'CUTI' ? 'Pengajuan cuti berhasil dikirim ke management.' : 'Permohonan izin berhasil dikirim ke management.',
+      message: type === 'CUTI'
+        ? 'Pengajuan cuti berhasil dikirim ke management.'
+        : (category === 'IZIN_PULANG_AWAL' ? 'Permohonan izin pulang awal berhasil dikirim ke management.' : 'Permohonan izin berhasil dikirim ke management.'),
       request: newRequest
     });
   } catch (err) {
@@ -2440,12 +2448,12 @@ router.post('/leave-requests/:id/review', async (req, res) => {
     }
 
     // Also update SQLite
-    try {
-      const now = new Date().toISOString();
-      let status = 'APPROVED';
-      if (action === 'ADJUST') status = 'ADJUSTED';
-      if (action === 'REJECT') status = 'REJECTED';
+    const now = new Date().toISOString();
+    let status = 'APPROVED';
+    if (action === 'ADJUST') status = 'ADJUSTED';
+    if (action === 'REJECT') status = 'REJECTED';
 
+    try {
       db.prepare(`
         UPDATE leave_requests
         SET status = ?, approved_days = ?, approved_start_date = ?, approved_end_date = ?,
@@ -2466,12 +2474,106 @@ router.post('/leave-requests/:id/review', async (req, res) => {
       console.warn('SQLite leave review sync note:', e.message);
     }
 
+    // SPECIAL HANDLING: If Early Departure Request (IZIN_PULANG_AWAL) is APPROVED
+    // Automatically close open shift or waive penalty on already checked-out shift!
+    if (action === 'APPROVE' && updated?.category === 'IZIN_PULANG_AWAL') {
+      try {
+        const staffId = updated.staff_id;
+        const activeShiftId = updated.active_shift_id;
+
+        // 1. Cloud Supabase shift update
+        if (isSupabaseConfigured) {
+          let query = supabase.from('attendance_logs').select('*');
+          if (activeShiftId) {
+            query = query.eq('id', activeShiftId);
+          } else {
+            query = query.eq('staff_id', staffId).order('created_at', { ascending: false }).limit(1);
+          }
+          const { data: supaShift } = await query.maybeSingle();
+
+          if (supaShift) {
+            let flags = Array.isArray(supaShift.flags) ? supaShift.flags : (typeof supaShift.flags === 'string' ? JSON.parse(supaShift.flags || '[]') : []);
+            // Remove any early checkout penalty flag and replace with early checkout approved flag
+            flags = flags.filter(f => !String(f).includes('EARLY_CHECKOUT'));
+            flags.push('FLAG_EARLY_CHECKOUT_APPROVED');
+
+            let notes = {};
+            try {
+              if (typeof supaShift.notes === 'string') notes = JSON.parse(supaShift.notes);
+              else if (supaShift.notes) notes = supaShift.notes;
+            } catch {}
+            notes.early_checkout_status = 'APPROVED';
+            notes.early_checkout_reviewed_by = auth.reviewerName;
+            notes.early_checkout_reason = updated.reason;
+
+            const updatePayload = {
+              flags,
+              notes: JSON.stringify(notes)
+            };
+            // If shift is still open, close it right now!
+            if (supaShift.status !== 'COMPLETED') {
+              updatePayload.check_out_time = now;
+              updatePayload.status = 'COMPLETED';
+            }
+
+            await supabase.from('attendance_logs').update(updatePayload).eq('id', supaShift.id);
+            broadcastEvent('SHIFT_UPDATE', { id: supaShift.id, action: 'EARLY_CHECKOUT_APPROVED' });
+          }
+        }
+
+        // 2. Local SQLite shift update
+        try {
+          let localShift = null;
+          if (activeShiftId) {
+            localShift = db.prepare('SELECT * FROM shifts WHERE id = ? OR supabase_id = ?').get(activeShiftId, activeShiftId);
+          }
+          if (!localShift) {
+            localShift = db.prepare('SELECT * FROM shifts WHERE staff_id = ? ORDER BY id DESC LIMIT 1').get(staffId);
+          }
+
+          if (localShift) {
+            let localFlags = JSON.parse(localShift.flags || '[]');
+            localFlags = localFlags.filter(f => !String(f).includes('EARLY_CHECKOUT'));
+            localFlags.push('FLAG_EARLY_CHECKOUT_APPROVED');
+
+            let localNotes = {};
+            try {
+              localNotes = JSON.parse(localShift.notes || '{}');
+            } catch {}
+            localNotes.early_checkout_status = 'APPROVED';
+            localNotes.early_checkout_reviewed_by = auth.reviewerName;
+            localNotes.early_checkout_reason = updated.reason;
+
+            const checkOutTime = localShift.checkout_time || now;
+            const status = 'COMPLETED';
+
+            db.prepare(`
+              UPDATE shifts
+              SET checkout_time = ?, status = ?, flags = ?, notes = ?, updated_at = ?
+              WHERE id = ?
+            `).run(
+              checkOutTime,
+              status,
+              JSON.stringify(localFlags),
+              JSON.stringify(localNotes),
+              now,
+              localShift.id
+            );
+          }
+        } catch (e) {
+          console.warn('SQLite local shift update for early departure note:', e.message);
+        }
+      } catch (errEarly) {
+        console.warn('Note while approving early checkout shift:', errEarly.message);
+      }
+    }
+
     broadcastEvent('LEAVE_UPDATE', { action: 'REVIEWED', request: updated });
 
     return res.json({
       success: true,
       message: action === 'APPROVE'
-        ? 'Pengajuan berhasil disetujui (ACC Penuh).'
+        ? (updated?.category === 'IZIN_PULANG_AWAL' ? 'Izin pulang awal disetujui. Shift otomatis ditutup & penalti ditiadakan.' : 'Pengajuan berhasil disetujui (ACC Penuh).')
         : (action === 'ADJUST' ? 'Pengajuan berhasil disesuaikan (ACC Sebagian).' : 'Pengajuan ditolak.'),
       request: updated
     });

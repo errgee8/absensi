@@ -34,6 +34,7 @@ export default function StaffView({
   const [cameraActionType, setCameraActionType] = useState('checkin');
   const [confirmedShift, setConfirmedShift] = useState(null);
   const [leaveModalOpen, setLeaveModalOpen] = useState(false);
+  const [leaveModalInitialCategory, setLeaveModalInitialCategory] = useState(null);
 
   // Notifications & Announcements state
   const [announcements, setAnnouncements] = useState([]);
@@ -217,7 +218,10 @@ export default function StaffView({
           onSelectAttendance={() => setStep('ATTENDANCE')}
           onSelectToilet={() => setToiletScannerOpen(true)}
           onOpenLeaderboard={onOpenLeaderboard}
-          onOpenStaffLeaveModal={() => setLeaveModalOpen(true)}
+          onOpenStaffLeaveModal={() => {
+            setLeaveModalInitialCategory(null);
+            setLeaveModalOpen(true);
+          }}
           onOpenMonitoring={() => {
             if (onOpenViewOnly) {
               onOpenViewOnly(loggedInStaff);
@@ -240,6 +244,10 @@ export default function StaffView({
             setCameraActionType(type);
             setConfirmedShift(shift || null);
             setCameraModalOpen(true);
+          }}
+          onOpenEarlyDeparture={() => {
+            setLeaveModalInitialCategory('IZIN_PULANG_AWAL');
+            setLeaveModalOpen(true);
           }}
           onLogout={handleResetToLogin}
           onBackToPortal={() => setStep('PORTAL')}
@@ -296,6 +304,8 @@ export default function StaffView({
           isOpen={leaveModalOpen}
           onClose={() => setLeaveModalOpen(false)}
           staff={loggedInStaff}
+          activeShift={activeShift}
+          initialCategory={leaveModalInitialCategory}
           onRefreshShifts={() => handleLogin(pin)}
           onMarkViewed={() => setLeaveUpdateCount(0)}
         />

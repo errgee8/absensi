@@ -254,10 +254,26 @@ export default function LeaveManagementTab({ adminAuth, onRefreshData }) {
                     <span className={`px-2.5 py-1 rounded-xl text-[10px] font-black uppercase flex items-center space-x-1 ${
                       isCuti
                         ? 'bg-blue-100 text-blue-900 border border-blue-300'
+                        : req.category === 'IZIN_PULANG_AWAL'
+                        ? 'bg-amber-100 text-amber-950 border border-amber-300'
                         : 'bg-purple-100 text-purple-900 border border-purple-300'
                     }`}>
-                      {isCuti ? <Palmtree className="w-3 h-3 text-amber-500" /> : <HeartPulse className="w-3 h-3 text-rose-500" />}
-                      <span>{isCuti ? 'Cuti Tahunan (12h/thn)' : req.category === 'SAKIT' ? 'Izin Sakit' : 'Izin Darurat'}</span>
+                      {isCuti ? (
+                        <Palmtree className="w-3 h-3 text-amber-500" />
+                      ) : req.category === 'IZIN_PULANG_AWAL' ? (
+                        <span className="text-xs">🏃</span>
+                      ) : (
+                        <HeartPulse className="w-3 h-3 text-rose-500" />
+                      )}
+                      <span>
+                        {isCuti
+                          ? 'Cuti Tahunan (12h/thn)'
+                          : req.category === 'SAKIT'
+                          ? 'Izin Sakit'
+                          : req.category === 'IZIN_PULANG_AWAL'
+                          ? 'Izin Pulang di Tengah Shift'
+                          : 'Izin Darurat'}
+                      </span>
                     </span>
 
                     <span className={`px-2.5 py-1 rounded-xl text-[10px] font-black uppercase tracking-wider ${
@@ -327,15 +343,22 @@ export default function LeaveManagementTab({ adminAuth, onRefreshData }) {
                       <p className="text-[11px] text-slate-600 font-bold">
                         {req.staff_venue} • {req.staff_division}
                       </p>
-                      <div className="mt-1 flex items-center space-x-1.5 text-xs font-mono font-black text-blue-900">
-                        <Calendar className="w-3.5 h-3.5 text-blue-600" />
-                        <span>
-                          {formatWitaDateOnly(req.start_date)} s/d {formatWitaDateOnly(req.end_date)}
-                        </span>
-                        <span className="text-[10px] text-slate-500 font-bold">
-                          ({req.requested_days} Hari)
-                        </span>
-                      </div>
+                      {req.category === 'IZIN_PULANG_AWAL' ? (
+                        <div className="mt-1 flex items-center space-x-1.5 text-xs font-mono font-black text-amber-950 bg-amber-50 px-2 py-0.5 rounded-lg border border-amber-300">
+                          <Clock className="w-3.5 h-3.5 text-amber-700" />
+                          <span>Rencana Pulang: {req.departure_time || '-'} WITA ({formatWitaDateOnly(req.start_date)})</span>
+                        </div>
+                      ) : (
+                        <div className="mt-1 flex items-center space-x-1.5 text-xs font-mono font-black text-blue-900">
+                          <Calendar className="w-3.5 h-3.5 text-blue-600" />
+                          <span>
+                            {formatWitaDateOnly(req.start_date)} s/d {formatWitaDateOnly(req.end_date)}
+                          </span>
+                          <span className="text-[10px] text-slate-500 font-bold">
+                            ({req.requested_days} Hari)
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -468,7 +491,14 @@ export default function LeaveManagementTab({ adminAuth, onRefreshData }) {
                   <div>
                     <div className="text-slate-950 font-black text-sm">{targetRequest.staff_name}</div>
                     <div className="text-slate-600 text-[11px]">
-                      {targetRequest.type === 'CUTI' ? '🌴 Cuti Tahunan' : '🏥 Izin Sakit'} • {formatWitaDateOnly(targetRequest.start_date)} s/d {formatWitaDateOnly(targetRequest.end_date)} ({targetRequest.requested_days} Hari)
+                      {targetRequest.type === 'CUTI'
+                        ? '🌴 Cuti Tahunan'
+                        : targetRequest.category === 'IZIN_PULANG_AWAL'
+                        ? '🏃 Izin Pulang Lebih Awal'
+                        : '🏥 Izin Sakit'} •{' '}
+                      {targetRequest.category === 'IZIN_PULANG_AWAL'
+                        ? `${formatWitaDateOnly(targetRequest.start_date)} (Jam ${targetRequest.departure_time || '-'} WITA)`
+                        : `${formatWitaDateOnly(targetRequest.start_date)} s/d ${formatWitaDateOnly(targetRequest.end_date)} (${targetRequest.requested_days} Hari)`}
                     </div>
                   </div>
                   <div className="flex items-center space-x-2">
@@ -500,6 +530,19 @@ export default function LeaveManagementTab({ adminAuth, onRefreshData }) {
                   Alasan: "{targetRequest.reason}"
                 </div>
               </div>
+
+              {/* Special notice for early departure approval */}
+              {targetRequest.category === 'IZIN_PULANG_AWAL' && reviewAction === 'APPROVE' && (
+                <div className="p-3 bg-emerald-50 border-2 border-emerald-300 rounded-2xl text-emerald-950 font-bold text-xs space-y-1">
+                  <div className="flex items-center space-x-1.5 font-black text-emerald-900">
+                    <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span>Otomatisasi Shift &amp; Leaderboard:</span>
+                  </div>
+                  <p className="text-[11px] leading-relaxed">
+                    Menyetujui permohonan ini akan otomatis menutup shift berjalan staf dengan catatan resmi <strong>"DIMAJUKAN RESMI DENGAN IZIN"</strong>, serta <strong>bebas dari penalti early checkout di leaderboard</strong>.
+                  </p>
+                </div>
+              )}
 
               {actionError && (
                 <div className="p-3 bg-rose-50 border border-rose-300 rounded-xl text-rose-900 font-bold flex items-center space-x-1.5">

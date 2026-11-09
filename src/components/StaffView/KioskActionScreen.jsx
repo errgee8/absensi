@@ -7,7 +7,8 @@ export default function KioskActionScreen({
   activeShift,
   onTriggerCamera,
   onLogout,
-  onBackToPortal
+  onBackToPortal,
+  onOpenEarlyDeparture
 }) {
   const isCheckedIn = Boolean(activeShift);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
@@ -251,6 +252,23 @@ export default function KioskActionScreen({
                       <strong>Pengingat Selesai Kerja:</strong> Pastikan seragam sudah dilepas dan operan shift selesai.
                     </span>
                   </div>
+                </div>
+              )}
+
+              {/* Shortcut: Request Early Departure (Sakit Mendadak / Urusan Darurat On Duty) */}
+              {onOpenEarlyDeparture && (
+                <div className="pt-2 border-t border-slate-200">
+                  <button
+                    type="button"
+                    onClick={onOpenEarlyDeparture}
+                    className="w-full py-3 px-4 bg-purple-50 hover:bg-purple-100 border-2 border-purple-300 rounded-2xl text-xs font-black text-purple-950 flex items-center justify-center space-x-2 transition shadow-sm active:scale-[0.99]"
+                  >
+                    <span className="text-base">🏃</span>
+                    <span>Izin Pulang Lebih Awal (Sakit Mendadak / On Duty)</span>
+                  </button>
+                  <p className="text-[10px] text-slate-500 font-bold text-center mt-1">
+                    Memerlukan persetujuan Management agar shift ditutup tanpa penalti early checkout.
+                  </p>
                 </div>
               )}
             </div>

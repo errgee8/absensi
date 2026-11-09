@@ -197,6 +197,7 @@ export async function computeLeaderboard(targetMonthStr) {
         ? log.flags
         : (typeof log.flags === 'string' ? JSON.parse(log.flags || '[]') : []);
       const hasEarlyFlag = flagsArr.some(f => String(f).includes('EARLY_CHECKOUT'));
+      const isEarlyCheckoutApproved = flagsArr.includes('FLAG_EARLY_CHECKOUT_APPROVED') || parsedLogNotes?.early_checkout_status === 'APPROVED';
 
       const dOut = new Date(log.check_out_time);
       const witaOutStr = dOut.toLocaleTimeString('en-GB', { timeZone: 'Asia/Makassar', hour12: false });
@@ -215,8 +216,10 @@ export async function computeLeaderboard(targetMonthStr) {
       // Early checkout is only counted if they actually clocked out MORE than 10 minutes (600s) before scheduled end
       // If earlySecs <= 0 (e.g. clocked out at 22:36 when shift ends at 22:00), they did NOT checkout early!
       if (earlySecs > 600 && earlySecs < 12 * 3600) {
-        staffStats[sId].earlyCheckoutCount++;
-        staffStats[sId].totalEarlyCheckoutSeconds += Math.max(0, earlySecs);
+        if (!isEarlyCheckoutApproved) {
+          staffStats[sId].earlyCheckoutCount++;
+          staffStats[sId].totalEarlyCheckoutSeconds += Math.max(0, earlySecs);
+        }
       }
     }
   }

@@ -197,6 +197,8 @@ ensureColumn('shifts', 'break_end_photo', 'TEXT');
 ensureColumn('shifts', 'break_duration_minutes', 'INTEGER');
 ensureColumn('shifts', 'break_count', 'INTEGER DEFAULT 0');
 ensureColumn('leave_requests', 'document_url', 'TEXT');
+ensureColumn('leave_requests', 'departure_time', 'TEXT');
+ensureColumn('leave_requests', 'active_shift_id', 'TEXT');
 
 // Settings Helper
 export const getSetting = (key) => {
