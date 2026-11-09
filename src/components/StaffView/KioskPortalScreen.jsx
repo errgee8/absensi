@@ -433,7 +433,7 @@ export default function KioskPortalScreen({
                     Pengajuan Cuti &amp; Izin ({staff.name})
                   </h3>
                   <p className="text-xs text-slate-700 font-bold mt-1 leading-relaxed">
-                    Ajukan cuti tahunan (H-14), izin biasa/dispensasi (wisuda, acara resmi), atau izin sakit/darurat, serta pantau status persetujuan dari management.
+                    Ajukan cuti tahunan (H-14), izin, atau izin sakit/darurat, serta pantau status persetujuan dari management.
                   </p>
                 </div>
               </div>

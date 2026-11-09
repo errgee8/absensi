@@ -264,7 +264,7 @@ export default function LeaveManagementTab({ adminAuth, onRefreshData }) {
                       {isCuti ? (
                         <Palmtree className="w-3 h-3 text-amber-500" />
                       ) : req.category === 'IZIN_BIASA' ? (
-                        <span className="text-xs">🎓</span>
+                        <span className="text-xs">📋</span>
                       ) : req.category === 'IZIN_PULANG_AWAL' ? (
                         <span className="text-xs">🏃</span>
                       ) : (
@@ -274,7 +274,7 @@ export default function LeaveManagementTab({ adminAuth, onRefreshData }) {
                         {isCuti
                           ? 'Cuti Tahunan (12h/thn)'
                           : req.category === 'IZIN_BIASA'
-                          ? 'Izin Biasa (Wisuda dll)'
+                          ? 'Izin'
                           : req.category === 'SAKIT'
                           ? 'Izin Sakit'
                           : req.category === 'IZIN_PULANG_AWAL'

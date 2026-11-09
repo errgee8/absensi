@@ -155,7 +155,7 @@ export default function StaffLeaveModal({ isOpen, onClose, staff, onRefreshShift
       const statusText = isCuti
         ? 'Selfie Pengajuan Cuti Tahunan'
         : izinCategory === 'IZIN_BIASA'
-        ? 'Selfie Izin Biasa / Wisuda'
+        ? 'Selfie Permohonan Izin'
         : izinCategory === 'IZIN_PULANG_AWAL'
         ? 'Selfie Izin Pulang di Tengah Shift'
         : izinCategory === 'SAKIT'
@@ -514,7 +514,7 @@ export default function StaffLeaveModal({ isOpen, onClose, staff, onRefreshShift
                               {isCuti
                                 ? '🌴 CUTI'
                                 : r.category === 'IZIN_BIASA'
-                                ? '🎓 IZIN BIASA (WISUDA)'
+                                ? '📋 IZIN'
                                 : r.category === 'IZIN_PULANG_AWAL'
                                 ? '🏃 IZIN PULANG AWAL'
                                 : `🏥 ${r.category === 'SAKIT' ? 'IZIN SAKIT' : (r.category || 'IZIN')}`}
@@ -769,14 +769,14 @@ export default function StaffLeaveModal({ isOpen, onClose, staff, onRefreshShift
               {izinCategory === 'IZIN_BIASA' ? (
                 <div className="p-3.5 bg-gradient-to-r from-indigo-50 via-blue-50 to-indigo-50 border-2 border-indigo-300 rounded-2xl text-indigo-950 font-bold space-y-1 shadow-sm">
                   <div className="flex items-center space-x-2 font-black text-xs text-indigo-950">
-                    <span className="text-base">🎓</span>
-                    <span>Ketentuan Izin Biasa / Dispensasi (Wisuda dll):</span>
+                    <span className="text-base">📋</span>
+                    <span>Ketentuan Izin:</span>
                   </div>
                   <p className="text-[11px] text-indigo-900 leading-relaxed">
                     • <strong>TIDAK memotong jatah cuti tahunan</strong> dan <strong>TIDAK memerlukan surat sakit dokter</strong>.<br />
-                    • Diperuntukkan untuk keperluan penting seperti <strong>Wisuda</strong>, acara penting keluarga, atau dispensasi resmi lainnya.<br />
+                    • Diperuntukkan untuk keperluan pribadi yang sah atau urusan penting lainnya.<br />
                     • <strong>Foto selfie pemohon WAJIB diambil</strong> untuk verifikasi biometrik pemohon.<br />
-                    • Dokumen pendukung (undangan wisuda / jadwal kegiatan) bersifat <strong>opsional</strong>.
+                    • Dokumen pendukung (surat/bukti keterangan jika ada) bersifat <strong>opsional</strong>.
                   </p>
                 </div>
               ) : izinCategory === 'SAKIT' ? (
@@ -816,8 +816,8 @@ export default function StaffLeaveModal({ isOpen, onClose, staff, onRefreshShift
                         : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
                     }`}
                   >
-                    <span className="text-base">🎓</span>
-                    <span>Izin Biasa (Wisuda)</span>
+                    <span className="text-base">📋</span>
+                    <span>Izin</span>
                   </button>
 
                   <button
@@ -966,7 +966,7 @@ export default function StaffLeaveModal({ isOpen, onClose, staff, onRefreshShift
               <div>
                 <label className="block text-xs font-black text-slate-900 mb-1">
                   {izinCategory === 'IZIN_BIASA'
-                    ? 'Keperluan Izin (misal: Wisuda):'
+                    ? 'Alasan / Keperluan Izin:'
                     : izinCategory === 'SAKIT'
                     ? 'Gejala / Keluhan Sakit:'
                     : izinCategory === 'IZIN_PULANG_AWAL'
@@ -979,7 +979,7 @@ export default function StaffLeaveModal({ isOpen, onClose, staff, onRefreshShift
                   onChange={(e) => setIzinReason(e.target.value)}
                   placeholder={
                     izinCategory === 'IZIN_BIASA'
-                      ? 'Tulis keperluan izin secara jelas (contoh: Menghadiri Wisuda S1 di Kampus X, Acara penting keluarga, dll)...'
+                      ? 'Tulis keperluan izin secara jelas...'
                       : izinCategory === 'SAKIT'
                       ? 'Jelaskan kondisi atau keluhan sakit yang dialami...'
                       : izinCategory === 'IZIN_PULANG_AWAL'
@@ -1064,11 +1064,11 @@ export default function StaffLeaveModal({ isOpen, onClose, staff, onRefreshShift
                 <div className="bg-slate-50 p-3 rounded-2xl border-2 border-slate-200 flex flex-col justify-between">
                   <div>
                     <label className="block text-xs font-black text-slate-900 mb-0.5">
-                      2. {izinCategory === 'IZIN_BIASA' ? 'Undangan / Bukti Acara' : 'Dokumen Pendukung'}: <span className="text-slate-500 font-normal">(Opsional)</span>
+                      2. Dokumen Pendukung: <span className="text-slate-500 font-normal">(Opsional)</span>
                     </label>
                     <p className="text-[10px] text-slate-500 font-bold mb-2">
                       {izinCategory === 'IZIN_BIASA'
-                        ? 'Lampirkan foto undangan wisuda / surat kegiatan jika ada.'
+                        ? 'Lampirkan foto surat keterangan / bukti jika ada.'
                         : 'Surat dokter / resep / bukti (jika ada).'}
                     </p>
                   </div>
