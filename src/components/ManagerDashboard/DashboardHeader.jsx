@@ -5,6 +5,7 @@ export default function DashboardHeader({
   stats,
   onPrint,
   onExportCsv,
+  isExporting = false,
   onOpenSettings,
   onOpenResetLeaderboard,
   isReadOnly = false
@@ -61,11 +62,14 @@ export default function DashboardHeader({
           {/* Export Excel (.xlsx) */}
           <button
             onClick={onExportCsv}
-            className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black flex items-center space-x-1.5 transition shadow-md shadow-emerald-600/20"
-            title="Export color-coded executive Excel (.xlsx) file"
+            disabled={isExporting}
+            className={`px-3.5 py-2 ${
+              isExporting ? 'bg-emerald-800 opacity-80 cursor-wait' : 'bg-emerald-600 hover:bg-emerald-700'
+            } text-white rounded-xl text-xs font-black flex items-center space-x-1.5 transition shadow-md shadow-emerald-600/20`}
+            title="Export Rekap Gaji Bulanan Excel (.xlsx) seluruh staff"
           >
-            <FileSpreadsheet className="w-4 h-4 stroke-[2.5]" />
-            <span>Export Excel (.xlsx)</span>
+            <FileSpreadsheet className={`w-4 h-4 stroke-[2.5] ${isExporting ? 'animate-pulse' : ''}`} />
+            <span>{isExporting ? 'Menyiapkan Rekap Gaji...' : 'Export Excel (.xlsx)'}</span>
           </button>
 
           {/* Print / Export PDF */}

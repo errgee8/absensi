@@ -11,9 +11,9 @@ import ToiletInspectionTab from './ToiletInspectionTab';
 import LeaveManagementTab from './LeaveManagementTab';
 import AnnouncementManagementModal from './AnnouncementManagementModal';
 import WipeLeaderboardModal from '../Leaderboard/WipeLeaderboardModal';
-import { exportTimesheetToExcel } from '../../utils/excelExport';
-import { getShifts, getStats, getShiftSchedules, getLeaveRequests, getAnnouncements, getAnnouncementReaders, subscribeRealtimeEvents } from '../../utils/api';
-import { getOperationalDateYMD, getOperationalYesterdayYMD, getWitaDateYMD } from '../../utils/time';
+import { exportMonthlyPayrollReport, exportTimesheetToExcel } from '../../utils/excelExport';
+import { getShifts, getStats, getShiftSchedules, getStaffList, getLeaveRequests, getAnnouncements, getAnnouncementReaders, subscribeRealtimeEvents } from '../../utils/api';
+import { getOperationalDateYMD, getOperationalYesterdayYMD, getWitaDateYMD, getAppNow, formatWitaDateTime } from '../../utils/time';
 import { resolveShift } from '../../utils/shiftResolver';
 import { LayoutDashboard, Users, Clock, Radio, Building2, Sparkles, Eye, ShieldAlert, Trophy, FileText, Megaphone } from 'lucide-react';
 
@@ -25,6 +25,7 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
   const [schedules, setSchedules] = useState([]);
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [isExporting, setIsExporting] = useState(false);
   const [pendingLeaveCount, setPendingLeaveCount] = useState(0);
 
   // Filters - Default to TODAY's operational shift cycle (07:00 AM cutoff)
@@ -189,15 +190,41 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
   }, [shifts, shiftFilter, schedules]);
 
   const handleExportCsv = async () => {
-    if (displayedShifts.length === 0) return alert('No records to export');
+    setIsExporting(true);
     try {
-      await exportTimesheetToExcel({
-        shifts: displayedShifts,
-        venueName: venueSettings?.venue_name || 'JP Karaoke & LuckyCat Outlets'
+      const nowApp = getAppNow();
+      const todayYmd = getOperationalDateYMD(nowApp);
+      const [curYear, curMonth] = todayYmd.split('-');
+      const startOfMonth = `${curYear}-${curMonth}-01`;
+      const exportTimestamp = formatWitaDateTime(nowApp.toISOString());
+
+      // Fetch month-to-date data in parallel: shifts, staff roster, and approved leave
+      const [monthShifts, allStaffList, allLeaveRequests] = await Promise.all([
+        getShifts({ startDate: startOfMonth, endDate: todayYmd }),
+        getStaffList('ALL'),
+        getLeaveRequests({ year: curYear }).catch(() => [])
+      ]);
+
+      // Strictly filter completed shifts only (strictly exclude ON_DUTY / IN_PROGRESS)
+      const completedShifts = (monthShifts || []).filter(
+        (s) =>
+          (s.status === 'COMPLETED' || (s.checkout_time && s.status !== 'IN_PROGRESS' && s.status !== 'ON_DUTY')) &&
+          s.checkin_time
+      );
+
+      await exportMonthlyPayrollReport({
+        shifts: completedShifts,
+        allStaff: allStaffList || [],
+        leaveRequests: allLeaveRequests || [],
+        periodStart: startOfMonth,
+        periodEnd: todayYmd,
+        exportTimestamp
       });
     } catch (err) {
-      console.error('Failed to export Excel:', err);
-      alert('Gagal mengekspor file Excel: ' + err.message);
+      console.error('Failed to export Excel payroll recap:', err);
+      alert('Gagal mengekspor Rekap Gaji Excel: ' + (err.message || 'Terjadi kesalahan sistem'));
+    } finally {
+      setIsExporting(false);
     }
   };
 
@@ -341,6 +368,7 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
               stats={stats}
               onPrint={handlePrint}
               onExportCsv={handleExportCsv}
+              isExporting={isExporting}
               onOpenSettings={() => setSettingsOpen(true)}
               onOpenResetLeaderboard={() => setWipeModalOpen(true)}
               isReadOnly={isReadOnly}
