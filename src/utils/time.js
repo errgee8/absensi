@@ -31,30 +31,91 @@ export function formatWitaTimeOnly(isoString) {
   }).format(date) + ' WITA';
 }
 
-export function formatWitaDateOnly(isoString) {
-  if (!isoString) return '-';
-  const date = new Date(isoString);
-  
-  return new Intl.DateTimeFormat('en-GB', {
-    timeZone: 'Asia/Makassar',
-    year: 'numeric',
-    month: 'short',
-    day: '2-digit'
-  }).format(date);
-}
+/**
+ * Operational Business Day Cutoff Hour in WITA (07:00 AM).
+ * Venue operates from 08:00 AM to 05:00 AM next morning.
+ * After 07:00 AM, a brand new operational business day begins,
+ * archiving yesterday's operational shifts.
+ */
+export const OPERATIONAL_DAY_CUTOFF_HOUR = 7;
 
-export function getWitaDateYMD(date = new Date()) {
+/**
+ * Returns the Operational Business Date in YYYY-MM-DD format (WITA Asia/Makassar).
+ * - Shifts between 07:00 AM today and 06:59 AM tomorrow belong to today's operational day.
+ * - Clock times from 00:00 to 06:59 AM WITA belong to previous calendar day's operational day.
+ */
+export function getOperationalDateYMD(date = new Date(), cutoffHour = OPERATIONAL_DAY_CUTOFF_HOUR) {
   if (!date) return '';
   const d = typeof date === 'string' ? new Date(date) : date;
   if (isNaN(d.getTime())) return '';
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Asia/Makassar'
-  }).format(d);
+
+  const formatter = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Makassar',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  });
+  const parts = formatter.formatToParts(d);
+  const hour = parseInt(parts.find((p) => p.type === 'hour')?.value || '0', 10);
+  const day = parseInt(parts.find((p) => p.type === 'day')?.value || '1', 10);
+  const month = parseInt(parts.find((p) => p.type === 'month')?.value || '1', 10);
+  const year = parseInt(parts.find((p) => p.type === 'year')?.value || '2026', 10);
+
+  const baseDate = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
+  if (hour < cutoffHour) {
+    baseDate.setUTCDate(baseDate.getUTCDate() - 1);
+  }
+
+  const resY = baseDate.getUTCFullYear();
+  const resM = String(baseDate.getUTCMonth() + 1).padStart(2, '0');
+  const resD = String(baseDate.getUTCDate()).padStart(2, '0');
+  return `${resY}-${resM}-${resD}`;
+}
+
+/**
+ * Returns Yesterday's Operational Business Date in YYYY-MM-DD format.
+ */
+export function getOperationalYesterdayYMD(date = new Date(), cutoffHour = OPERATIONAL_DAY_CUTOFF_HOUR) {
+  const currentOp = getOperationalDateYMD(date, cutoffHour);
+  const [y, m, d] = currentOp.split('-').map(Number);
+  const prevDate = new Date(Date.UTC(y, m - 1, d - 1, 12, 0, 0));
+  const resY = prevDate.getUTCFullYear();
+  const resM = String(prevDate.getUTCMonth() + 1).padStart(2, '0');
+  const resD = String(prevDate.getUTCDate()).padStart(2, '0');
+  return `${resY}-${resM}-${resD}`;
+}
+
+export function formatWitaDateOnly(isoString) {
+  if (!isoString) return '-';
+  if (typeof isoString === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(isoString)) {
+    const [y, m, d] = isoString.split('-');
+    return `${d}/${m}/${y}`;
+  }
+  const date = new Date(isoString);
+  if (isNaN(date.getTime())) return '-';
+  
+  // Use operational business date so overnight shifts reflect their operational cycle
+  const opDate = getOperationalDateYMD(date);
+  const [y, m, d] = opDate.split('-');
+  return `${d}/${m}/${y}`;
+}
+
+export function getWitaDateYMD(date = new Date()) {
+  return getOperationalDateYMD(date);
 }
 
 export function formatWitaDateFull(isoString) {
   if (!isoString) return '-';
-  const date = new Date(isoString);
+  let date;
+  if (typeof isoString === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(isoString)) {
+    const [y, m, d] = isoString.split('-').map(Number);
+    date = new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
+  } else {
+    date = new Date(isoString);
+  }
   if (isNaN(date.getTime())) return '-';
   return new Intl.DateTimeFormat('id-ID', {
     timeZone: 'Asia/Makassar',

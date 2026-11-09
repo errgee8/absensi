@@ -95,7 +95,7 @@ export default function ShiftTable({ shifts = [], schedules = [], onInspectPhoto
                 >
                   {/* Date */}
                   <td className="py-3 px-3 font-mono text-slate-950 font-bold whitespace-nowrap">
-                    {formatWitaDateOnly(shift.checkin_time)}
+                    {formatWitaDateOnly(shift.shift_date || shift.date || shift.checkin_time)}
                   </td>
 
                   {/* Staff Name & ID */}

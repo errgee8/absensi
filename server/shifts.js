@@ -17,13 +17,51 @@ export function getWitaTimeString(date = new Date()) {
   return `${curH}:${curM}`;
 }
 
-export function getWitaDateYMD(date = new Date()) {
+export const OPERATIONAL_DAY_CUTOFF_HOUR = 7;
+
+export function getOperationalDateYMD(date = new Date(), cutoffHour = OPERATIONAL_DAY_CUTOFF_HOUR) {
   if (!date) return '';
   const d = typeof date === 'string' ? new Date(date) : date;
   if (isNaN(d.getTime())) return '';
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Asia/Makassar'
-  }).format(d);
+
+  const formatter = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Makassar',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  });
+  const parts = formatter.formatToParts(d);
+  const hour = parseInt(parts.find((p) => p.type === 'hour')?.value || '0', 10);
+  const day = parseInt(parts.find((p) => p.type === 'day')?.value || '1', 10);
+  const month = parseInt(parts.find((p) => p.type === 'month')?.value || '1', 10);
+  const year = parseInt(parts.find((p) => p.type === 'year')?.value || '2026', 10);
+
+  const baseDate = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
+  if (hour < cutoffHour) {
+    baseDate.setUTCDate(baseDate.getUTCDate() - 1);
+  }
+
+  const resY = baseDate.getUTCFullYear();
+  const resM = String(baseDate.getUTCMonth() + 1).padStart(2, '0');
+  const resD = String(baseDate.getUTCDate()).padStart(2, '0');
+  return `${resY}-${resM}-${resD}`;
+}
+
+export function getOperationalYesterdayYMD(date = new Date(), cutoffHour = OPERATIONAL_DAY_CUTOFF_HOUR) {
+  const currentOp = getOperationalDateYMD(date, cutoffHour);
+  const [y, m, d] = currentOp.split('-').map(Number);
+  const prevDate = new Date(Date.UTC(y, m - 1, d - 1, 12, 0, 0));
+  const resY = prevDate.getUTCFullYear();
+  const resM = String(prevDate.getUTCMonth() + 1).padStart(2, '0');
+  const resD = String(prevDate.getUTCDate()).padStart(2, '0');
+  return `${resY}-${resM}-${resD}`;
+}
+
+export function getWitaDateYMD(date = new Date()) {
+  return getOperationalDateYMD(date);
 }
 
 export function toMinutes(timeStr) {

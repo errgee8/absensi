@@ -6,7 +6,7 @@ import { calculateDistanceMeters, isWithinGeofence } from './geofence.js';
 import { getClientIp, validateClientNetwork } from './network.js';
 import { evaluateCheckinFlags, evaluateCheckoutFlags, evaluateBreakFlags, auditOpenShifts, FLAG_TYPES } from './flags.js';
 import { isSupabaseConfigured, uploadPhotoToSupabase, cloudDb, supabase, findStaffInSupabase } from './supabase.js';
-import { detectShiftSchedule, getBreakCutoff, isBreakAllowedNow, getWitaTimeString, getWitaDateYMD } from './shifts.js';
+import { detectShiftSchedule, getBreakCutoff, isBreakAllowedNow, getWitaTimeString, getWitaDateYMD, getOperationalDateYMD, getOperationalYesterdayYMD } from './shifts.js';
 import { computeLeaderboard } from './leaderboard.js';
 
 const router = express.Router();
@@ -976,8 +976,8 @@ router.post('/checkin', async (req, res) => {
 
   const photoUrl = await savePhoto(photoBase64, `in_${staff.id}`);
   const now = new Date();
-  const dateStr = getWitaDateYMD(now);
   const checkinTime = timestamp || now.toISOString();
+  const dateStr = getOperationalDateYMD(checkinTime);
 
   // Shift schedule determination (from staff confirmation dialog or 30-min window detection)
   let scheduledStart = confirmedShift?.start_time;
@@ -1777,7 +1777,7 @@ router.get('/stats', async (req, res) => {
     }
   }
 
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = getOperationalDateYMD(new Date());
 
   const todayShifts = db.prepare(`
     SELECT s.*, st.venue, st.department 

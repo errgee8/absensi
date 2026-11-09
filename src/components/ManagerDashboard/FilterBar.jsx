@@ -233,8 +233,14 @@ export default function FilterBar({
               <span>Audit: {formatWitaDateFull(specificDate)}</span>
             </div>
           ) : dateRange === 'TODAY' ? (
-            <div className="text-slate-600 font-bold text-xs">
-              Menampilkan riwayat: <span className="font-black text-slate-900">Hari Ini</span>
+            <div className="flex items-center space-x-1.5 px-3 py-1 bg-blue-50 border border-blue-200 rounded-xl text-blue-950 font-black text-xs">
+              <Clock className="w-3.5 h-3.5 text-blue-700 stroke-[2.5]" />
+              <span>Lembaran Hari Ini (Siklus 08:00 - 05:00 WITA, Cutoff 07:00)</span>
+            </div>
+          ) : dateRange === 'YESTERDAY' ? (
+            <div className="flex items-center space-x-1.5 px-3 py-1 bg-slate-100 border border-slate-300 rounded-xl text-slate-900 font-black text-xs">
+              <Calendar className="w-3.5 h-3.5 text-slate-700 stroke-[2.5]" />
+              <span>Lembaran Kemarin (Tersimpan &amp; Diarsipkan)</span>
             </div>
           ) : null}
 

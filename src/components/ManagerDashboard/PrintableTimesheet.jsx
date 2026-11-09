@@ -47,7 +47,7 @@ export default function PrintableTimesheet({ shifts = [], venueName = 'JP Karaok
             const shiftInfo = resolveShift(s);
             return (
               <tr key={s.id}>
-                <td>{formatWitaDateOnly(s.checkin_time)}</td>
+                <td>{formatWitaDateOnly(s.shift_date || s.date || s.checkin_time)}</td>
                 <td>
                   <strong>{s.staff_name}</strong>
                   <div style={{ fontSize: '8pt', color: '#475569' }}>{s.staff_id}</div>

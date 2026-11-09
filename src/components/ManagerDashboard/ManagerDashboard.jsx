@@ -10,7 +10,7 @@ import ShiftSchedulesTab from './ShiftSchedulesTab';
 import ToiletInspectionTab from './ToiletInspectionTab';
 import { exportTimesheetToExcel } from '../../utils/excelExport';
 import { getShifts, getStats, getShiftSchedules, subscribeRealtimeEvents } from '../../utils/api';
-import { getWitaDateYMD } from '../../utils/time';
+import { getOperationalDateYMD, getOperationalYesterdayYMD, getWitaDateYMD } from '../../utils/time';
 import { resolveShift } from '../../utils/shiftResolver';
 import { LayoutDashboard, Users, Clock, Radio, Building2, Sparkles, Eye, ShieldAlert, Trophy } from 'lucide-react';
 
@@ -23,8 +23,8 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Filters
-  const [dateRange, setDateRange] = useState('ALL');
+  // Filters - Default to TODAY's operational shift cycle (07:00 AM cutoff)
+  const [dateRange, setDateRange] = useState('TODAY');
   const [specificDate, setSpecificDate] = useState('');
   const [shiftFilter, setShiftFilter] = useState('ALL');
   const [venue, setVenue] = useState('ALL');
@@ -61,8 +61,8 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
   const loadData = async () => {
     setLoading(true);
     try {
-      const today = new Date();
-      const todayStr = getWitaDateYMD(today);
+      const now = new Date();
+      const currentOpToday = getOperationalDateYMD(now);
       let startDate = null;
       let endDate = null;
 
@@ -70,21 +70,20 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
         startDate = specificDate;
         endDate = specificDate;
       } else if (dateRange === 'TODAY') {
-        startDate = todayStr;
-        endDate = todayStr;
+        startDate = currentOpToday;
+        endDate = currentOpToday;
       } else if (dateRange === 'YESTERDAY') {
-        const y = new Date(today);
-        y.setDate(y.getDate() - 1);
-        const yStr = getWitaDateYMD(y);
-        startDate = yStr;
-        endDate = yStr;
+        const opYesterday = getOperationalYesterdayYMD(now);
+        startDate = opYesterday;
+        endDate = opYesterday;
       } else if (dateRange === 'LAST_7_DAYS') {
-        const d = new Date(today);
-        d.setDate(d.getDate() - 7);
-        startDate = getWitaDateYMD(d);
-        endDate = todayStr;
+        const [y, m, d] = currentOpToday.split('-').map(Number);
+        const past7 = new Date(Date.UTC(y, m - 1, d - 7, 12, 0, 0));
+        const past7Str = `${past7.getUTCFullYear()}-${String(past7.getUTCMonth() + 1).padStart(2, '0')}-${String(past7.getUTCDate()).padStart(2, '0')}`;
+        startDate = past7Str;
+        endDate = currentOpToday;
       } else if (dateRange === 'THIS_MONTH') {
-        const [year, month] = todayStr.split('-');
+        const [year, month] = currentOpToday.split('-');
         startDate = `${year}-${month}-01`;
         const lastDay = new Date(Number(year), Number(month), 0).getDate();
         endDate = `${year}-${month}-${String(lastDay).padStart(2, '0')}`;
