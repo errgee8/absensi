@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { Camera, X, CheckCircle2, AlertCircle, RefreshCw, Smartphone, Loader2, SwitchCamera } from 'lucide-react';
+import { Camera, X, CheckCircle2, AlertCircle, RefreshCw, Smartphone, Loader2, SwitchCamera, Upload, AlertTriangle } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { captureAndWatermark, watermarkFile } from '../../utils/watermark';
 import { checkIn, checkOut, startBreak, endBreak } from '../../utils/api';
@@ -31,6 +31,40 @@ export default function KioskCameraModal({
   const [countdown, setCountdown] = useState(3);
 
   const [userLocation, setUserLocation] = useState(null);
+
+  // Late checkin excuse states
+  const [lateReason, setLateReason] = useState('');
+  const [latePhotoBase64, setLatePhotoBase64] = useState(null);
+  const latePhotoInputRef = useRef(null);
+
+  const schedStart = confirmedShift?.start_time || staff?.shift_start || '13:00';
+  const isCheckinLate = React.useMemo(() => {
+    if (actionType !== 'checkin') return false;
+    if (staff?.division === 'Management' || schedStart === '00:00' || schedStart === 'FLEXIBLE') return false;
+    try {
+      const now = new Date();
+      const parts = new Intl.DateTimeFormat('en-GB', {
+        timeZone: 'Asia/Makassar',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      }).formatToParts(now);
+      const h = parseInt(parts.find(p => p.type === 'hour')?.value || '0', 10);
+      const m = parseInt(parts.find(p => p.type === 'minute')?.value || '0', 10);
+      const curTotalM = (h * 60) + m;
+
+      const [sH, sM] = schedStart.split(':').map(Number);
+      const schedTotalM = (sH * 60) + sM;
+
+      let diffMinutes = curTotalM - schedTotalM;
+      if (diffMinutes < -720) diffMinutes += 1440;
+      if (diffMinutes > 720) diffMinutes -= 1440;
+
+      return diffMinutes > 10;
+    } catch {
+      return false;
+    }
+  }, [actionType, schedStart, staff?.division]);
 
   // Background GPS fetch
   useEffect(() => {
@@ -172,7 +206,9 @@ export default function KioskCameraModal({
         accuracy: userLocation?.accuracy ?? 10,
         photoBase64: watermarkedBase64,
         timestamp: new Date().toISOString(),
-        confirmedShift: confirmedShift || null
+        confirmedShift: confirmedShift || null,
+        lateReason: isCheckinLate ? lateReason.trim() : null,
+        latePhotoBase64: isCheckinLate ? latePhotoBase64 : null
       };
 
       let res;
@@ -222,6 +258,11 @@ export default function KioskCameraModal({
   const handleShutter = async () => {
     if (!videoRef.current || flashing || submitting) return;
 
+    if (isCheckinLate && !lateReason.trim()) {
+      setSubmitError('Wajib mengisi alasan keterlambatan sebelum mengambil foto check-in.');
+      return;
+    }
+
     setFlashing(true);
 
     try {
@@ -257,6 +298,11 @@ export default function KioskCameraModal({
   const handleNativeFileChange = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    if (isCheckinLate && !lateReason.trim()) {
+      setSubmitError('Wajib mengisi alasan keterlambatan sebelum memilih foto check-in.');
+      return;
+    }
 
     setFlashing(true);
     setSubmitting(true);
@@ -428,6 +474,73 @@ export default function KioskCameraModal({
                 <div className="bg-rose-500/10 border border-rose-500/30 rounded-xl p-2.5 text-rose-300 text-xs flex items-center space-x-2">
                   <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
                   <span>{submitError}</span>
+                </div>
+              )}
+
+              {/* Late check-in justification input */}
+              {isCheckinLate && !capturedPreview && (
+                <div className="p-3 bg-amber-500/15 border border-amber-500/40 rounded-2xl space-y-2 text-left animate-fade-in">
+                  <div className="flex items-center space-x-1.5 text-amber-300 font-black text-xs">
+                    <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+                    <span>Terdeteksi Terlambat (&gt;10m dari jadwal {schedStart})</span>
+                  </div>
+                  <div>
+                    <label className="block text-[11px] text-slate-300 font-bold mb-1">
+                      Alasan Terlambat: <span className="text-amber-400 font-black">*Wajib diisi</span>
+                    </label>
+                    <textarea
+                      rows={2}
+                      value={lateReason}
+                      onChange={(e) => setLateReason(e.target.value)}
+                      placeholder="Tulis alasan keterlambatan untuk di-review management..."
+                      className="w-full bg-slate-950 border border-slate-700 rounded-xl p-2 text-xs text-white font-bold focus:outline-none focus:border-amber-400"
+                    />
+                  </div>
+
+                  {/* Optional Proof Photo for Late */}
+                  <div>
+                    <label className="block text-[11px] text-slate-400 font-bold mb-1">
+                      Foto Bukti Pendukung (Opsional):
+                    </label>
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="file"
+                        ref={latePhotoInputRef}
+                        accept="image/*"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            const reader = new FileReader();
+                            reader.onload = () => setLatePhotoBase64(reader.result);
+                            reader.readAsDataURL(file);
+                          }
+                        }}
+                        className="hidden"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => latePhotoInputRef.current?.click()}
+                        className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-600 text-[11px] font-bold flex items-center space-x-1.5"
+                      >
+                        <Upload className="w-3.5 h-3.5 text-amber-400" />
+                        <span>{latePhotoBase64 ? 'Ganti Foto Bukti' : 'Lampirkan Foto Bukti'}</span>
+                      </button>
+
+                      {latePhotoBase64 && (
+                        <div className="flex items-center space-x-1 text-[11px] text-emerald-400 font-bold">
+                          <span>Foto terlampir ✓</span>
+                          <button
+                            type="button"
+                            onClick={() => setLatePhotoBase64(null)}
+                            className="text-rose-400 hover:text-rose-300 p-0.5"
+                            title="Hapus foto"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
               )}
 

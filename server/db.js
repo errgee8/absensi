@@ -98,6 +98,33 @@ db.exec(`
     updated_at TEXT DEFAULT (datetime('now')),
     FOREIGN KEY(staff_id) REFERENCES staff(id)
   );
+
+  CREATE TABLE IF NOT EXISTS leave_requests (
+    id TEXT PRIMARY KEY,
+    staff_id TEXT NOT NULL,
+    staff_name TEXT NOT NULL,
+    staff_role TEXT,
+    staff_venue TEXT,
+    staff_division TEXT,
+    type TEXT NOT NULL,
+    category TEXT,
+    start_date TEXT NOT NULL,
+    end_date TEXT NOT NULL,
+    requested_days INTEGER DEFAULT 1,
+    approved_days INTEGER,
+    approved_start_date TEXT,
+    approved_end_date TEXT,
+    reason TEXT NOT NULL,
+    photo_url TEXT,
+    status TEXT DEFAULT 'PENDING',
+    manager_notes TEXT,
+    reviewed_by TEXT,
+    reviewed_at TEXT,
+    year INTEGER NOT NULL,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(staff_id) REFERENCES staff(id)
+  );
 `);
 
 // Safe column migrations

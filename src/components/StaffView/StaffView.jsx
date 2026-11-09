@@ -5,6 +5,7 @@ import KioskActionScreen from './KioskActionScreen';
 import KioskCameraModal from './KioskCameraModal';
 import ToiletScannerModal from '../ToiletChecklist/ToiletScannerModal';
 import ToiletChecklistForm from '../ToiletChecklist/ToiletChecklistForm';
+import StaffLeaveModal from './StaffLeaveModal';
 import { verifyStaffPin } from '../../utils/api';
 import { RESTROOM_LOCATIONS } from '../../utils/toiletService';
 import { CheckCircle2 } from 'lucide-react';
@@ -31,6 +32,7 @@ export default function StaffView({
   const [cameraModalOpen, setCameraModalOpen] = useState(false);
   const [cameraActionType, setCameraActionType] = useState('checkin');
   const [confirmedShift, setConfirmedShift] = useState(null);
+  const [leaveModalOpen, setLeaveModalOpen] = useState(false);
 
   // Toilet QR Scanner & Checklist state
   const [toiletScannerOpen, setToiletScannerOpen] = useState(false);
@@ -147,6 +149,7 @@ export default function StaffView({
           onSelectAttendance={() => setStep('ATTENDANCE')}
           onSelectToilet={() => setToiletScannerOpen(true)}
           onOpenLeaderboard={onOpenLeaderboard}
+          onOpenStaffLeaveModal={() => setLeaveModalOpen(true)}
           onOpenMonitoring={() => {
             if (onOpenViewOnly) {
               onOpenViewOnly(loggedInStaff);
@@ -212,6 +215,16 @@ export default function StaffView({
               setToiletSuccessAlert(null);
             }, 6000);
           }}
+        />
+      )}
+
+      {/* Staff Personal Leave & Permission Requests Modal (Locked per Staff) */}
+      {leaveModalOpen && loggedInStaff && (
+        <StaffLeaveModal
+          isOpen={leaveModalOpen}
+          onClose={() => setLeaveModalOpen(false)}
+          staff={loggedInStaff}
+          onRefreshShifts={() => handleLogin(pin)}
         />
       )}
     </div>

@@ -155,8 +155,22 @@ export async function computeLeaderboard(targetMonthStr) {
 
       const diffSecs = checkInSecs - schedSecs;
 
+      // Check if late checkin was officially EXCUSED / WAIVED by management
+      const flagsArr = Array.isArray(log.flags)
+        ? log.flags
+        : (typeof log.flags === 'string' ? JSON.parse(log.flags || '[]') : []);
+      let parsedLogNotes = {};
+      try {
+        if (typeof log.notes === 'string') parsedLogNotes = JSON.parse(log.notes);
+        else if (log.notes) parsedLogNotes = log.notes;
+      } catch {}
+
+      const isLateExcused = flagsArr.includes('FLAG_LATE_EXCUSED') || parsedLogNotes?.late_status === 'APPROVED';
+
       if (diffSecs > 0) {
-        staffStats[sId].totalLateSeconds += diffSecs;
+        if (!isLateExcused) {
+          staffStats[sId].totalLateSeconds += diffSecs;
+        }
       } else {
         staffStats[sId].onTimeCount++;
         const early = Math.abs(diffSecs);

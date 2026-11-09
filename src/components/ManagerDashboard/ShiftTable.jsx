@@ -14,8 +14,12 @@ export default function ShiftTable({ shifts = [], schedules = [], onInspectPhoto
     );
   }
 
-  const renderFlagBadges = (flags = []) => {
-    if (!flags || flags.length === 0) {
+  const renderFlagBadges = (flags = [], shift = null) => {
+    const isLateApproved = shift?.late_status === 'APPROVED' || flags?.includes('FLAG_LATE_EXCUSED');
+    const isLatePending = shift?.late_status === 'PENDING_REVIEW' || (flags?.some(f => String(f).includes('Late Check-In')) && !shift?.late_status);
+    const isLateRejected = shift?.late_status === 'REJECTED';
+
+    if ((!flags || flags.length === 0) && !isLateApproved && !isLatePending && !isLateRejected) {
       return (
         <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-950 border border-emerald-300">
           <CheckCircle className="w-2.5 h-2.5 text-emerald-700 stroke-[2.5]" />
@@ -26,6 +30,7 @@ export default function ShiftTable({ shifts = [], schedules = [], onInspectPhoto
 
     const flagLabels = {
       'FLAG: Late Check-In (>10m Grace)': { text: 'Late (>10m Grace)', color: 'bg-rose-100 text-rose-950 border-rose-300' },
+      FLAG_LATE_EXCUSED: { text: 'Late Di-ACC (Dimaafkan)', color: 'bg-emerald-100 text-emerald-950 border-emerald-300' },
       'FLAG: Unverified Network': { text: 'Unverified Network', color: 'bg-rose-100 text-rose-950 border-rose-300' },
       FLAG_UNVERIFIED_NETWORK: { text: 'Unverified Network', color: 'bg-rose-100 text-rose-950 border-rose-300' },
       'FLAG: Break Exceeded 1 Hour': { text: 'Break > 1 Hr', color: 'bg-amber-100 text-amber-950 border-amber-300' },
@@ -39,7 +44,45 @@ export default function ShiftTable({ shifts = [], schedules = [], onInspectPhoto
 
     return (
       <div className="flex flex-wrap gap-1">
-        {flags.map((f, idx) => {
+        {/* Special Late Justification status badge */}
+        {isLateApproved && (
+          <span
+            className="inline-flex items-center space-x-1 px-1.5 py-0.5 rounded-md text-[9px] font-black border bg-emerald-100 text-emerald-950 border-emerald-300"
+            title={shift?.late_reviewed_by ? `Di-ACC oleh ${shift.late_reviewed_by}` : 'Di-ACC'}
+          >
+            <CheckCircle className="w-2.5 h-2.5 stroke-[2.5]" />
+            <span>Late Di-ACC ✓</span>
+          </span>
+        )}
+        {!isLateApproved && isLatePending && (
+          <span
+            className="inline-flex items-center space-x-1 px-1.5 py-0.5 rounded-md text-[9px] font-black border bg-amber-100 text-amber-950 border-amber-400 animate-pulse"
+            title="Keterlambatan belum direview management"
+          >
+            <Clock className="w-2.5 h-2.5 stroke-[2.5]" />
+            <span>Late: Perlu Review ⏳</span>
+          </span>
+        )}
+        {!isLateApproved && isLateRejected && (
+          <span
+            className="inline-flex items-center space-x-1 px-1.5 py-0.5 rounded-md text-[9px] font-black border bg-rose-100 text-rose-950 border-rose-300"
+            title={shift?.late_reviewed_by ? `Ditolak oleh ${shift.late_reviewed_by}` : 'Ditolak'}
+          >
+            <AlertTriangle className="w-2.5 h-2.5 stroke-[2.5]" />
+            <span>Late Ditolak ✕</span>
+          </span>
+        )}
+
+        {flags?.map((f, idx) => {
+          // If late is approved/excused, don't show the red late penalty badge again
+          if (isLateApproved && (f === 'FLAG_LATE_EXCUSED' || String(f).includes('Late Check-In'))) {
+            return null;
+          }
+          if ((isLatePending || isLateRejected) && String(f).includes('Late Check-In')) {
+            // Already represented by our specialized late badge above
+            return null;
+          }
+
           const conf = flagLabels[f] || {
             text: f.replace('FLAG_', '').replace('FLAG: ', ''),
             color: 'bg-amber-100 text-amber-950 border-amber-300'
@@ -239,7 +282,7 @@ export default function ShiftTable({ shifts = [], schedules = [], onInspectPhoto
                   </td>
 
                   {/* Flags */}
-                  <td className="py-3 px-3 max-w-xs">{renderFlagBadges(shift.flags)}</td>
+                  <td className="py-3 px-3 max-w-xs">{renderFlagBadges(shift.flags, shift)}</td>
 
                   {/* Inspect Button */}
                   <td className="py-3 px-2 text-right">

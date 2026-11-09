@@ -229,12 +229,70 @@ export async function wipeLeaderboardData({ pin, mode = 'reset_only', scope = 'a
   return data;
 }
 
+export async function getLeaveRequests(params = {}) {
+  const query = new URLSearchParams();
+  if (params.staffId) query.append('staffId', params.staffId);
+  if (params.status && params.status !== 'ALL') query.append('status', params.status);
+  if (params.type && params.type !== 'ALL') query.append('type', params.type);
+  if (params.year) query.append('year', params.year);
+
+  const res = await fetch(`${API_BASE}/leave-requests?${query.toString()}`);
+  if (!res.ok) throw new Error('Gagal memuat pengajuan cuti/izin');
+  return res.json();
+}
+
+export async function getStaffLeaveBalance(staffId, year) {
+  const q = year ? `?year=${year}` : '';
+  const res = await fetch(`${API_BASE}/leave-balance/${encodeURIComponent(staffId)}${q}`);
+  if (!res.ok) throw new Error('Gagal memuat sisa kuota cuti');
+  return res.json();
+}
+
+export async function submitLeaveRequest(payload) {
+  const res = await fetch(`${API_BASE}/leave-requests`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Gagal mengirim pengajuan cuti/izin');
+  return data;
+}
+
+export async function reviewLeaveRequest(id, payload) {
+  const res = await fetch(`${API_BASE}/leave-requests/${encodeURIComponent(id)}/review`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Gagal me-review pengajuan');
+  return data;
+}
+
+export async function reviewLateCheckin(shiftId, payload) {
+  const res = await fetch(`${API_BASE}/shifts/${encodeURIComponent(shiftId)}/review-late`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Gagal me-review keterlambatan');
+  return data;
+}
+
 export function subscribeRealtimeEvents(onEvent) {
   const eventSource = new EventSource(`${API_BASE}/events`);
 
   eventSource.addEventListener('SHIFT_UPDATE', (e) => {
     try {
       onEvent('SHIFT_UPDATE', JSON.parse(e.data));
+    } catch {}
+  });
+
+  eventSource.addEventListener('LEAVE_UPDATE', (e) => {
+    try {
+      onEvent('LEAVE_UPDATE', JSON.parse(e.data));
     } catch {}
   });
 

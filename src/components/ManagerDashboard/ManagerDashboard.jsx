@@ -8,12 +8,13 @@ import PrintableTimesheet from './PrintableTimesheet';
 import StaffManagementTab from './StaffManagementTab';
 import ShiftSchedulesTab from './ShiftSchedulesTab';
 import ToiletInspectionTab from './ToiletInspectionTab';
+import LeaveManagementTab from './LeaveManagementTab';
 import WipeLeaderboardModal from '../Leaderboard/WipeLeaderboardModal';
 import { exportTimesheetToExcel } from '../../utils/excelExport';
-import { getShifts, getStats, getShiftSchedules, subscribeRealtimeEvents } from '../../utils/api';
+import { getShifts, getStats, getShiftSchedules, getLeaveRequests, subscribeRealtimeEvents } from '../../utils/api';
 import { getOperationalDateYMD, getOperationalYesterdayYMD, getWitaDateYMD } from '../../utils/time';
 import { resolveShift } from '../../utils/shiftResolver';
-import { LayoutDashboard, Users, Clock, Radio, Building2, Sparkles, Eye, ShieldAlert, Trophy } from 'lucide-react';
+import { LayoutDashboard, Users, Clock, Radio, Building2, Sparkles, Eye, ShieldAlert, Trophy, FileText } from 'lucide-react';
 
 export default function ManagerDashboard({ venueSettings, refreshSettings, adminAuth, isReadOnly = false, onOpenLeaderboard }) {
   // Tabs: 'AUDIT' | 'SCHEDULES' | 'STAFF' | 'TOILET'
@@ -23,6 +24,7 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
   const [schedules, setSchedules] = useState([]);
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [pendingLeaveCount, setPendingLeaveCount] = useState(0);
 
   // Filters - Default to TODAY's operational shift cycle (07:00 AM cutoff)
   const [dateRange, setDateRange] = useState('TODAY');
@@ -47,6 +49,17 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
     'Management'
   ];
 
+  const loadPendingLeaveCount = async () => {
+    try {
+      const data = await getLeaveRequests({ status: 'PENDING' });
+      if (Array.isArray(data)) {
+        setPendingLeaveCount(data.length);
+      }
+    } catch (e) {
+      console.warn('Failed to load pending leave requests:', e);
+    }
+  };
+
   const loadSchedules = async () => {
     try {
       const data = await getShiftSchedules();
@@ -58,6 +71,7 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
 
   useEffect(() => {
     loadSchedules();
+    loadPendingLeaveCount();
   }, []);
 
   const loadData = async () => {
@@ -120,6 +134,9 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
     const unsubscribe = subscribeRealtimeEvents((eventType) => {
       if (eventType === 'SHIFT_UPDATE') {
         loadData();
+        loadPendingLeaveCount();
+      } else if (eventType === 'LEAVE_UPDATE') {
+        loadPendingLeaveCount();
       }
     });
 
@@ -220,6 +237,23 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
               <span>Kebersihan Toilet (QR Live)</span>
             </button>
 
+            <button
+              onClick={() => setActiveTab('LEAVE')}
+              className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-black transition relative ${
+                activeTab === 'LEAVE'
+                  ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
+                  : 'text-slate-800 hover:text-blue-700 hover:bg-slate-100'
+              }`}
+            >
+              <FileText className="w-4 h-4 stroke-[2.5]" />
+              <span>Perizinan &amp; Cuti</span>
+              {pendingLeaveCount > 0 && (
+                <span className="ml-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-rose-600 text-white animate-pulse">
+                  {pendingLeaveCount}
+                </span>
+              )}
+            </button>
+
             {onOpenLeaderboard && (
               <button
                 type="button"
@@ -310,6 +344,16 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
 
         {activeTab === 'TOILET' && <ToiletInspectionTab />}
 
+        {activeTab === 'LEAVE' && (
+          <LeaveManagementTab
+            adminAuth={adminAuth}
+            onRefreshData={() => {
+              loadData();
+              loadPendingLeaveCount();
+            }}
+          />
+        )}
+
         {!isReadOnly && activeTab === 'SCHEDULES' && <ShiftSchedulesTab />}
 
         {!isReadOnly && activeTab === 'STAFF' && (
@@ -326,6 +370,11 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
           <PhotoDetailModal
             shift={inspectData.shift}
             type={inspectData.type}
+            adminAuth={adminAuth}
+            onShiftUpdated={() => {
+              loadData();
+              loadPendingLeaveCount();
+            }}
             onClose={() => setInspectData(null)}
           />
         )}

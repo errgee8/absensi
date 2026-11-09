@@ -917,7 +917,7 @@ router.delete('/staff/:id', async (req, res) => {
 
 // 10. Staff Check-In
 router.post('/checkin', async (req, res) => {
-  const { staffId, pin, lat, lng, accuracy, photoBase64, timestamp, confirmedShift } = req.body;
+  const { staffId, pin, lat, lng, accuracy, photoBase64, timestamp, confirmedShift, lateReason, latePhotoBase64 } = req.body;
 
   if (!staffId) return res.status(400).json({ error: 'Karyawan wajib dipilih.' });
   if (!photoBase64) return res.status(400).json({ error: 'Foto selfie langsung wajib diambil.' });
@@ -1019,6 +1019,16 @@ router.post('/checkin', async (req, res) => {
     division: staff.division
   });
 
+  // Upload optional late proof photo if provided
+  let latePhotoUrl = null;
+  if (latePhotoBase64) {
+    try {
+      latePhotoUrl = await uploadPhotoToSupabase(latePhotoBase64, 'late_proof');
+    } catch (e) {
+      console.warn('Late proof photo upload note:', e.message);
+    }
+  }
+
   // Sync to Supabase Cloud if connected
   let supaShift = null;
   if (isSupabaseConfigured) {
@@ -1036,24 +1046,37 @@ router.post('/checkin', async (req, res) => {
         scheduledStart,
         scheduledEnd,
         shiftNumber,
-        shiftName
+        shiftName,
+        lateReason,
+        latePhotoUrl
       });
     } catch (e) {
       console.warn('Supabase Checkin Cloud Sync Note:', e.message);
     }
   }
 
+  const isLate = (flags || []).some(f => String(f).includes('Late') || String(f).includes('LATE'));
+  const shiftNotesJson = JSON.stringify({
+    scheduled_start: scheduledStart,
+    scheduled_end: scheduledEnd,
+    shift_number: shiftNumber,
+    shift_name: shiftName,
+    late_reason: lateReason || null,
+    late_photo_url: latePhotoUrl || null,
+    late_status: isLate ? (lateReason ? 'PENDING_REVIEW' : null) : null
+  });
+
   const result = db.prepare(`
     INSERT INTO shifts (
       staff_id, date, scheduled_start, scheduled_end,
       checkin_time, checkin_lat, checkin_lng, checkin_accuracy,
       checkin_distance, checkin_photo, checkin_ip, checkin_wifi_pass,
-      status, flags, supabase_id
+      status, flags, supabase_id, notes
     ) VALUES (
       ?, ?, ?, ?,
       ?, ?, ?, ?,
       ?, ?, ?, ?,
-      'IN_PROGRESS', ?, ?
+      'IN_PROGRESS', ?, ?, ?
     )
   `).run(
     staff.id,
@@ -1069,7 +1092,8 @@ router.post('/checkin', async (req, res) => {
     clientIp,
     wifiValidation.isMatch ? 1 : 0,
     JSON.stringify(flags),
-    supaShift?.id || null
+    supaShift?.id || null,
+    shiftNotesJson
   );
 
   const newShift = db.prepare(`
@@ -2003,6 +2027,447 @@ router.post('/admin/wipe-leaderboard', async (req, res) => {
       success: false,
       error: 'Gagal melakukan aksi: ' + err.message
     });
+  }
+});
+
+// Helper: Verify Management (Manager & Assistant Manager) Authorization
+const verifyManagementAuth = async (pin) => {
+  if (!pin) return { authorized: false };
+  const cleanPin = pin.trim();
+  const adminPin = (getSetting('admin_pin') || '8080').trim();
+  const supervisorPin = (getSetting('supervisor_pin') || '7070').trim();
+
+  // 1. Full Manager (PIN 8080)
+  if (cleanPin === adminPin) {
+    return { authorized: true, role: 'MANAGER', reviewerName: 'General Manager' };
+  }
+
+  // 2. Assistant Manager Default PIN (PIN 7070)
+  if (cleanPin === supervisorPin) {
+    return { authorized: true, role: 'ASSISTANT_MANAGER', reviewerName: 'Assistant Manager' };
+  }
+
+  // 3. Management staff member PIN check in Supabase
+  if (isSupabaseConfigured) {
+    try {
+      const { data: supaStaffList } = await supabase
+        .from('staff')
+        .select('name, role, division, is_active')
+        .eq('pin', cleanPin);
+
+      if (supaStaffList && supaStaffList.length > 0) {
+        for (const st of supaStaffList) {
+          if (!st.is_active) continue;
+          const div = (st.division || '').trim().toLowerCase();
+          const role = (st.role || '').trim().toLowerCase();
+          if (
+            div === 'management' ||
+            role.includes('manager') ||
+            role.includes('asst') ||
+            role.includes('asisten') ||
+            role.includes('supervisor') ||
+            role.includes('spv')
+          ) {
+            return { authorized: true, role: 'ASSISTANT_MANAGER', reviewerName: `Assistant Manager (${st.name})` };
+          }
+        }
+      }
+    } catch (e) {}
+  }
+
+  // 4. Management staff member PIN check in SQLite
+  try {
+    const localStaff = db.prepare('SELECT * FROM staff WHERE pin = ? AND is_active = 1').all(cleanPin);
+    for (const st of localStaff) {
+      const div = (st.division || '').trim().toLowerCase();
+      const role = (st.role || '').trim().toLowerCase();
+      if (
+        div === 'management' ||
+        role.includes('manager') ||
+        role.includes('asst') ||
+        role.includes('asisten') ||
+        role.includes('supervisor') ||
+        role.includes('spv')
+      ) {
+        return { authorized: true, role: 'ASSISTANT_MANAGER', reviewerName: `Assistant Manager (${st.name})` };
+      }
+    }
+  } catch (e) {}
+
+  return { authorized: false };
+};
+
+// 1. Review Late Check-in Anomaly (Manager & Assistant Manager)
+router.post('/shifts/:id/review-late', async (req, res) => {
+  const { id } = req.params;
+  const { pin, action, managerNotes } = req.body || {};
+
+  const auth = await verifyManagementAuth(pin);
+  if (!auth.authorized) {
+    return res.status(403).json({ error: 'Akses ditolak: Hanya Manager / Assistant Manager yang dapat me-review alasan keterlambatan.' });
+  }
+
+  if (!action || !['APPROVE', 'REJECT'].includes(action)) {
+    return res.status(400).json({ error: 'Aksi review tidak valid (wajib APPROVE atau REJECT).' });
+  }
+
+  try {
+    let updatedShift = null;
+    if (isSupabaseConfigured) {
+      updatedShift = await cloudDb.reviewLateCheckin({
+        shiftId: id,
+        action,
+        managerNotes,
+        reviewerName: auth.reviewerName
+      });
+    }
+
+    // Also update SQLite shifts table
+    try {
+      const shiftRow = db.prepare('SELECT * FROM shifts WHERE id = ? OR supabase_id = ?').get(id, id);
+      if (shiftRow) {
+        let parsedNotes = {};
+        try { parsedNotes = JSON.parse(shiftRow.notes || '{}'); } catch {}
+        parsedNotes.late_status = action === 'APPROVE' ? 'APPROVED' : 'REJECTED';
+        parsedNotes.late_reviewed_by = auth.reviewerName;
+        parsedNotes.late_reviewed_at = new Date().toISOString();
+        parsedNotes.late_manager_note = managerNotes || null;
+
+        let parsedFlags = JSON.parse(shiftRow.flags || '[]');
+        if (action === 'APPROVE') {
+          parsedFlags = parsedFlags.map(f => String(f).includes('Late') || String(f).includes('LATE') ? 'FLAG_LATE_EXCUSED' : f);
+        }
+
+        db.prepare('UPDATE shifts SET notes = ?, flags = ?, updated_at = datetime("now") WHERE id = ?').run(
+          JSON.stringify(parsedNotes),
+          JSON.stringify(parsedFlags),
+          shiftRow.id
+        );
+      }
+    } catch (e) {
+      console.warn('SQLite review late note:', e.message);
+    }
+
+    broadcastEvent('SHIFT_UPDATE');
+    broadcastEvent('LEADERBOARD_UPDATE');
+
+    return res.json({
+      success: true,
+      message: action === 'APPROVE' ? 'Alasan terlambat berhasil di-ACC (Dimaafkan).' : 'Alasan terlambat ditolak (Penalti tetap berlaku).',
+      shift: updatedShift
+    });
+  } catch (err) {
+    console.error('Error reviewing late shift:', err);
+    return res.status(500).json({ error: 'Gagal me-review keterlambatan: ' + err.message });
+  }
+});
+
+// 2. Get Staff Leave Quota Balance
+router.get('/leave-balance/:staffId', async (req, res) => {
+  const { staffId } = req.params;
+  const year = req.query.year || new Date().getFullYear();
+
+  try {
+    let balance;
+    if (isSupabaseConfigured) {
+      balance = await cloudDb.getStaffLeaveBalance(staffId, year);
+    } else {
+      const rows = db.prepare(`
+        SELECT COALESCE(SUM(COALESCE(approved_days, requested_days, 0)), 0) as used
+        FROM leave_requests 
+        WHERE staff_id = ? AND type = 'CUTI' AND status IN ('APPROVED', 'ADJUSTED') AND year = ?
+      `).get(staffId, Number(year));
+
+      const used = rows?.used || 0;
+      balance = {
+        staffId,
+        year: Number(year),
+        maxQuota: 12,
+        usedDays: used,
+        remainingDays: Math.max(0, 12 - used)
+      };
+    }
+
+    return res.json(balance);
+  } catch (err) {
+    console.error('Error getting leave balance:', err);
+    return res.status(500).json({ error: 'Gagal memuat kuota cuti: ' + err.message });
+  }
+});
+
+// 3. List Leave & Permission Requests
+router.get('/leave-requests', async (req, res) => {
+  const { staffId, status, type, year } = req.query;
+
+  try {
+    let list = [];
+    if (isSupabaseConfigured) {
+      list = await cloudDb.getLeaveRequests({ staffId, status, type, year });
+    } else {
+      let q = 'SELECT * FROM leave_requests WHERE 1=1';
+      const params = [];
+      if (staffId && staffId !== 'ALL') {
+        q += ' AND staff_id = ?';
+        params.push(staffId);
+      }
+      if (status && status !== 'ALL') {
+        q += ' AND status = ?';
+        params.push(status);
+      }
+      if (type && type !== 'ALL') {
+        q += ' AND type = ?';
+        params.push(type);
+      }
+      if (year) {
+        q += ' AND year = ?';
+        params.push(Number(year));
+      }
+      q += ' ORDER BY created_at DESC';
+      list = db.prepare(q).all(...params);
+    }
+
+    return res.json(list);
+  } catch (err) {
+    console.error('Error getting leave requests:', err);
+    return res.status(500).json({ error: 'Gagal memuat data pengajuan cuti/izin: ' + err.message });
+  }
+});
+
+// 4. Create Leave or Permission Request (Staff)
+router.post('/leave-requests', async (req, res) => {
+  const {
+    staffId,
+    pin,
+    type,
+    category,
+    startDate,
+    endDate,
+    requestedDays,
+    reason,
+    photoBase64
+  } = req.body || {};
+
+  if (!staffId) return res.status(400).json({ error: 'ID Staf wajib dicantumkan.' });
+  if (!startDate || !endDate) return res.status(400).json({ error: 'Tanggal mulai dan selesai cuti/izin wajib diisi.' });
+  if (!reason || !reason.trim()) return res.status(400).json({ error: 'Alasan permohonan cuti/izin wajib diisi.' });
+
+  // Verify staff
+  let staff = null;
+  if (isSupabaseConfigured) {
+    const supa = await findStaffInSupabase(staffId);
+    if (supa) staff = supa;
+  }
+  if (!staff) {
+    staff = db.prepare('SELECT * FROM staff WHERE id = ?').get(staffId);
+  }
+  if (!staff) return res.status(404).json({ error: 'Data staf tidak ditemukan.' });
+
+  // Verify staff PIN
+  if (pin && staff.pin && staff.pin.trim() !== pin.trim()) {
+    return res.status(401).json({ error: 'PIN Rahasia salah. Pengajuan tidak sah.' });
+  }
+
+  const currentYear = new Date().getFullYear();
+  const todayWitaStr = getOperationalDateYMD(new Date());
+
+  // Rule checks for CUTI
+  if (type === 'CUTI') {
+    // 1. Minimal 14 hari sebelumnya (H-14 rule)
+    const todayD = new Date(`${todayWitaStr}T00:00:00Z`);
+    const startD = new Date(`${startDate}T00:00:00Z`);
+    const diffTime = startD.getTime() - todayD.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    if (diffDays < 14) {
+      return res.status(400).json({
+        error: `Pengajuan cuti wajib diajukan minimal 2 minggu (14 hari) sebelumnya. Anda mengajukan H-${diffDays}.`
+      });
+    }
+
+    // 2. Kuota 12 hari/tahun
+    let balance;
+    if (isSupabaseConfigured) {
+      balance = await cloudDb.getStaffLeaveBalance(staff.legacy_code || staff.id, currentYear);
+    } else {
+      const rows = db.prepare(`
+        SELECT COALESCE(SUM(COALESCE(approved_days, requested_days, 0)), 0) as used
+        FROM leave_requests 
+        WHERE staff_id = ? AND type = 'CUTI' AND status IN ('APPROVED', 'ADJUSTED') AND year = ?
+      `).get(staff.id, currentYear);
+      const used = rows?.used || 0;
+      balance = { maxQuota: 12, usedDays: used, remainingDays: Math.max(0, 12 - used) };
+    }
+
+    const daysCount = requestedDays || 1;
+    if (daysCount > balance.remainingDays) {
+      return res.status(400).json({
+        error: `Jatah cuti tidak mencukupi. Anda mengajukan ${daysCount} hari, tetapi sisa kuota tahun ${currentYear} hanya ${balance.remainingDays} hari.`
+      });
+    }
+
+    // 3. Wajib foto selfie
+    if (!photoBase64) {
+      return res.status(400).json({ error: 'Foto selfie biometrik wajib diambil untuk pengajuan cuti.' });
+    }
+  }
+
+  // Rule checks for IZIN (Sakit / Izin Tidak Masuk)
+  if (type === 'IZIN') {
+    if (!photoBase64) {
+      return res.status(400).json({ error: 'Foto bukti (surat dokter / resep / keterangan sakit) wajib dilampirkan untuk permohonan izin.' });
+    }
+  }
+
+  try {
+    let photoUrl = null;
+    if (photoBase64) {
+      photoUrl = await uploadPhotoToSupabase(photoBase64, type === 'CUTI' ? 'leave_selfie' : 'leave_proof');
+    }
+
+    const reqId = `req_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const newRequest = {
+      id: reqId,
+      staff_id: staff.legacy_code || staff.id,
+      staff_name: staff.name,
+      staff_role: staff.role || 'Staff',
+      staff_venue: staff.venue || 'JP Karaoke',
+      staff_division: staff.division || 'Server and Cashier',
+      type: type || 'CUTI',
+      category: category || (type === 'CUTI' ? 'CUTI_TAHUNAN' : 'SAKIT'),
+      start_date: startDate,
+      end_date: endDate,
+      requested_days: requestedDays ? Number(requestedDays) : 1,
+      approved_days: null,
+      approved_start_date: null,
+      approved_end_date: null,
+      reason: reason.trim(),
+      photo_url: photoUrl,
+      status: 'PENDING',
+      manager_notes: null,
+      reviewed_by: null,
+      reviewed_at: null,
+      year: currentYear,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+
+    if (isSupabaseConfigured) {
+      await cloudDb.saveLeaveRequest(newRequest);
+    }
+
+    // Also insert to SQLite
+    try {
+      db.prepare(`
+        INSERT INTO leave_requests (
+          id, staff_id, staff_name, staff_role, staff_venue, staff_division,
+          type, category, start_date, end_date, requested_days,
+          reason, photo_url, status, year, created_at, updated_at
+        ) VALUES (
+          ?, ?, ?, ?, ?, ?,
+          ?, ?, ?, ?, ?,
+          ?, ?, 'PENDING', ?, ?, ?
+        )
+      `).run(
+        newRequest.id,
+        newRequest.staff_id,
+        newRequest.staff_name,
+        newRequest.staff_role,
+        newRequest.staff_venue,
+        newRequest.staff_division,
+        newRequest.type,
+        newRequest.category,
+        newRequest.start_date,
+        newRequest.end_date,
+        newRequest.requested_days,
+        newRequest.reason,
+        newRequest.photo_url,
+        newRequest.year,
+        newRequest.created_at,
+        newRequest.updated_at
+      );
+    } catch (e) {
+      console.warn('SQLite leave_requests insert note:', e.message);
+    }
+
+    broadcastEvent('LEAVE_UPDATE', { action: 'CREATED', request: newRequest });
+
+    return res.json({
+      success: true,
+      message: type === 'CUTI' ? 'Pengajuan cuti berhasil dikirim ke management.' : 'Permohonan izin berhasil dikirim ke management.',
+      request: newRequest
+    });
+  } catch (err) {
+    console.error('Error creating leave request:', err);
+    return res.status(500).json({ error: 'Gagal mengirim pengajuan: ' + err.message });
+  }
+});
+
+// 5. Review Leave or Permission Request (Manager & Assistant Manager)
+router.post('/leave-requests/:id/review', async (req, res) => {
+  const { id } = req.params;
+  const { pin, action, approvedDays, approvedStartDate, approvedEndDate, managerNotes } = req.body || {};
+
+  const auth = await verifyManagementAuth(pin);
+  if (!auth.authorized) {
+    return res.status(403).json({ error: 'Akses ditolak: Hanya Manager / Assistant Manager yang dapat me-review pengajuan cuti & izin.' });
+  }
+
+  if (!action || !['APPROVE', 'ADJUST', 'REJECT'].includes(action)) {
+    return res.status(400).json({ error: 'Aksi review tidak valid (APPROVE, ADJUST, atau REJECT).' });
+  }
+
+  try {
+    let updated = null;
+    if (isSupabaseConfigured) {
+      updated = await cloudDb.reviewLeaveRequest(id, {
+        action,
+        approvedDays,
+        approvedStartDate,
+        approvedEndDate,
+        managerNotes,
+        reviewerName: auth.reviewerName
+      });
+    }
+
+    // Also update SQLite
+    try {
+      const now = new Date().toISOString();
+      let status = 'APPROVED';
+      if (action === 'ADJUST') status = 'ADJUSTED';
+      if (action === 'REJECT') status = 'REJECTED';
+
+      db.prepare(`
+        UPDATE leave_requests
+        SET status = ?, approved_days = ?, approved_start_date = ?, approved_end_date = ?,
+            manager_notes = ?, reviewed_by = ?, reviewed_at = ?, updated_at = ?
+        WHERE id = ?
+      `).run(
+        status,
+        action === 'APPROVE' ? null : (approvedDays || null),
+        action === 'ADJUST' ? (approvedStartDate || null) : null,
+        action === 'ADJUST' ? (approvedEndDate || null) : null,
+        managerNotes || null,
+        auth.reviewerName,
+        now,
+        now,
+        id
+      );
+    } catch (e) {
+      console.warn('SQLite leave review sync note:', e.message);
+    }
+
+    broadcastEvent('LEAVE_UPDATE', { action: 'REVIEWED', request: updated });
+
+    return res.json({
+      success: true,
+      message: action === 'APPROVE'
+        ? 'Pengajuan berhasil disetujui (ACC Penuh).'
+        : (action === 'ADJUST' ? 'Pengajuan berhasil disesuaikan (ACC Sebagian).' : 'Pengajuan ditolak.'),
+      request: updated
+    });
+  } catch (err) {
+    console.error('Error reviewing leave request:', err);
+    return res.status(500).json({ error: 'Gagal me-review pengajuan: ' + err.message });
   }
 });
 

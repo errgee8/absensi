@@ -1,12 +1,48 @@
 import React, { useState, useEffect } from 'react';
-import { X, MapPin, ShieldAlert, CheckCircle, Calendar, Clock, User, Coffee, LogIn, LogOut, Camera, ShieldCheck } from 'lucide-react';
+import { X, MapPin, ShieldAlert, CheckCircle, Calendar, Clock, User, Coffee, LogIn, LogOut, Camera, ShieldCheck, Check, AlertTriangle, MessageSquare, Lock, RefreshCw, Eye } from 'lucide-react';
 import { formatWitaDateTime, formatDuration } from '../../utils/time';
+import { reviewLateCheckin } from '../../utils/api';
 
-export default function PhotoDetailModal({ shift, type = 'in', onClose }) {
+export default function PhotoDetailModal({ shift, type = 'in', onClose, onShiftUpdated, adminAuth }) {
   if (!shift) return null;
 
   const [activeTab, setActiveTab] = useState(type || 'in'); // 'in' | 'break' | 'out'
   const [imgError, setImgError] = useState(false);
+  const [latePin, setLatePin] = useState(adminAuth?.pin || '');
+  const [lateNotes, setLateNotes] = useState('');
+  const [submittingLate, setSubmittingLate] = useState(false);
+  const [lateReviewError, setLateReviewError] = useState(null);
+  const [lateReviewSuccess, setLateReviewSuccess] = useState(null);
+  const [viewProofPhoto, setViewProofPhoto] = useState(false);
+
+  useEffect(() => {
+    setImgError(false);
+  }, [activeTab]);
+
+  const handleReviewLate = async (action) => {
+    if (!latePin.trim()) {
+      setLateReviewError('Masukkan PIN Manager / Assistant Manager untuk otorisasi.');
+      return;
+    }
+
+    setSubmittingLate(true);
+    setLateReviewError(null);
+    setLateReviewSuccess(null);
+
+    try {
+      await reviewLateCheckin(shift.id, {
+        pin: latePin.trim(),
+        action,
+        managerNotes: lateNotes.trim()
+      });
+      setLateReviewSuccess(action === 'APPROVE' ? 'Alasan telat berhasil di-ACC (Dimaafkan)!' : 'Alasan telat ditolak.');
+      if (onShiftUpdated) onShiftUpdated();
+    } catch (err) {
+      setLateReviewError(err.message || 'Gagal me-review keterlambatan.');
+    } finally {
+      setSubmittingLate(false);
+    }
+  };
 
   useEffect(() => {
     setImgError(false);
@@ -218,6 +254,146 @@ export default function PhotoDetailModal({ shift, type = 'in', onClose }) {
             </div>
           )}
 
+          {/* Late Check-In Justification & Management Review Section */}
+          {(shift.late_reason || shift.late_status || shift.late_photo_url || shift.flags?.some(f => String(f).includes('Late'))) && (
+            <div className="bg-amber-50/70 border-2 border-amber-300 rounded-2xl p-4 text-xs space-y-3">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <div className="flex items-center space-x-2 font-black text-amber-950">
+                  <Clock className="w-4 h-4 text-amber-700 stroke-[2.5]" />
+                  <span>Klarifikasi Keterlambatan Masuk</span>
+                </div>
+                {shift.late_status === 'APPROVED' ? (
+                  <span className="px-2.5 py-1 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-900 border border-emerald-300 flex items-center space-x-1">
+                    <CheckCircle className="w-3 h-3 text-emerald-700 stroke-[2.5]" />
+                    <span>DI-ACC / DIMAAFKAN</span>
+                  </span>
+                ) : shift.late_status === 'REJECTED' ? (
+                  <span className="px-2.5 py-1 rounded-full text-[10px] font-black bg-rose-100 text-rose-900 border border-rose-300 flex items-center space-x-1">
+                    <AlertTriangle className="w-3 h-3 text-rose-700 stroke-[2.5]" />
+                    <span>DITOLAK (KENA PENALTI)</span>
+                  </span>
+                ) : (
+                  <span className="px-2.5 py-1 rounded-full text-[10px] font-black bg-amber-100 text-amber-900 border border-amber-400 animate-pulse">
+                    MENUNGGU REVIEW MANAGEMENT
+                  </span>
+                )}
+              </div>
+
+              {/* Alasan & Bukti Foto */}
+              <div className="bg-white p-3 rounded-xl border border-amber-200 space-y-2">
+                <div>
+                  <span className="text-[10px] font-black uppercase text-slate-500 block mb-0.5">
+                    Alasan dari Karyawan:
+                  </span>
+                  <p className="text-xs font-bold text-slate-900 italic">
+                    "{shift.late_reason || 'Karyawan tidak menuliskan alasan keterlambatan.'}"
+                  </p>
+                </div>
+
+                {shift.late_photo_url ? (
+                  <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <Camera className="w-4 h-4 text-blue-600" />
+                      <span className="text-[11px] font-bold text-slate-800">Lampiran Foto Bukti Keterlambatan:</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setViewProofPhoto(true)}
+                      className="px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 text-[10px] font-black transition flex items-center space-x-1"
+                    >
+                      <Eye className="w-3 h-3" />
+                      <span>Lihat Foto Bukti</span>
+                    </button>
+                  </div>
+                ) : (
+                  <div className="text-[10px] text-slate-500 font-bold italic pt-1">
+                    (Karyawan tidak menyertakan foto bukti pendukung)
+                  </div>
+                )}
+              </div>
+
+              {/* Log Reviewer jika sudah pernah di-review */}
+              {shift.late_reviewed_by && (
+                <div className="p-2.5 rounded-xl bg-slate-100 text-[11px] text-slate-700 border border-slate-200 space-y-0.5">
+                  <div>
+                    <span className="font-bold">Direview oleh:</span> <strong className="text-slate-950 font-black">{shift.late_reviewed_by}</strong> pada {formatWitaDateTime(shift.late_reviewed_at)}
+                  </div>
+                  {shift.late_manager_note && (
+                    <div>
+                      <span className="font-bold">Catatan Management:</span> <span className="italic text-slate-900 font-bold">"{shift.late_manager_note}"</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Review Form (Accessible by General Manager or Assistant Manager) */}
+              <div className="bg-white/80 p-3 rounded-xl border border-amber-300 space-y-2.5">
+                <span className="text-[11px] font-black text-slate-900 block">
+                  Keputusan Review Keterlambatan:
+                </span>
+
+                {lateReviewError && (
+                  <div className="p-2 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-[11px] font-bold">
+                    {lateReviewError}
+                  </div>
+                )}
+                {lateReviewSuccess && (
+                  <div className="p-2 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-[11px] font-bold">
+                    {lateReviewSuccess}
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-[10px] font-black text-slate-600 block mb-0.5">
+                      PIN Manager / Asst. Manager:
+                    </label>
+                    <input
+                      type="password"
+                      placeholder="PIN Otorisasi"
+                      value={latePin}
+                      onChange={(e) => setLatePin(e.target.value)}
+                      className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 text-xs font-mono font-bold focus:border-blue-500 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black text-slate-600 block mb-0.5">
+                      Catatan Keputusan (Opsional):
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Contoh: Ban bocor terverifikasi"
+                      value={lateNotes}
+                      onChange={(e) => setLateNotes(e.target.value)}
+                      className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 text-xs font-bold focus:border-blue-500 focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 pt-1">
+                  <button
+                    type="button"
+                    disabled={submittingLate}
+                    onClick={() => handleReviewLate('APPROVE')}
+                    className="flex-1 py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-black text-xs transition shadow-sm flex items-center justify-center space-x-1.5"
+                  >
+                    <Check className="w-3.5 h-3.5 stroke-[3]" />
+                    <span>ACC Telat (Hapus Penalti)</span>
+                  </button>
+                  <button
+                    type="button"
+                    disabled={submittingLate}
+                    onClick={() => handleReviewLate('REJECT')}
+                    className="flex-1 py-2 px-3 rounded-xl bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white font-black text-xs transition shadow-sm flex items-center justify-center space-x-1.5"
+                  >
+                    <X className="w-3.5 h-3.5 stroke-[3]" />
+                    <span>Tolak (Tetap Kena Penalti)</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Anomaly Flags Alert Box */}
           {shift.flags && shift.flags.length > 0 && (
             <div className="bg-amber-50 border-2 border-amber-400 rounded-2xl p-4 text-xs text-amber-950">
@@ -246,6 +422,40 @@ export default function PhotoDetailModal({ shift, type = 'in', onClose }) {
           </button>
         </div>
       </div>
+
+      {/* Proof Photo Zoom Modal */}
+      {viewProofPhoto && shift.late_photo_url && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fade-in">
+          <div className="bg-slate-900 border-2 border-slate-700 rounded-3xl max-w-xl w-full p-4 overflow-hidden flex flex-col space-y-3">
+            <div className="flex items-center justify-between text-white pb-2 border-b border-slate-800">
+              <span className="text-xs font-black">Foto Bukti Keterlambatan - {shift.staff_name}</span>
+              <button
+                type="button"
+                onClick={() => setViewProofPhoto(false)}
+                className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="max-h-[70vh] overflow-auto flex items-center justify-center">
+              <img
+                src={shift.late_photo_url}
+                alt="Foto Bukti Telat"
+                className="max-h-[65vh] w-auto rounded-xl object-contain shadow-lg"
+              />
+            </div>
+            <div className="text-center pt-2">
+              <button
+                type="button"
+                onClick={() => setViewProofPhoto(false)}
+                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-black"
+              >
+                Tutup Foto
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

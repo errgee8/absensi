@@ -232,18 +232,25 @@ export const cloudDb = {
   },
 
   // 3. Record Check-In in attendance_logs
-  async recordCheckin({ staffId, userLat, userLng, accuracy, distance, photoUrl, clientIp, wifiPass, flags, scheduledStart, scheduledEnd, shiftNumber, shiftName }) {
+  async recordCheckin({ staffId, userLat, userLng, accuracy, distance, photoUrl, clientIp, wifiPass, flags, scheduledStart, scheduledEnd, shiftNumber, shiftName, lateReason, latePhotoUrl }) {
     if (!supabase) return null;
     const staff = await findStaffInSupabase(staffId);
     if (!staff) throw new Error('Staff record not found: ' + staffId);
 
     const checkinTime = new Date().toISOString();
     const shiftDate = getWitaDateYMD(checkinTime);
+    const isLate = (flags || []).some(f => String(f).includes('Late') || String(f).includes('LATE'));
     const notesJson = JSON.stringify({
       scheduled_start: scheduledStart || staff.shift_start || '13:00',
       scheduled_end: scheduledEnd || staff.shift_end || '22:00',
       shift_number: shiftNumber != null ? Number(shiftNumber) : null,
-      shift_name: shiftName || null
+      shift_name: shiftName || null,
+      late_reason: lateReason || null,
+      late_photo_url: latePhotoUrl || null,
+      late_status: isLate ? (lateReason ? 'PENDING_REVIEW' : null) : null,
+      late_reviewed_by: null,
+      late_reviewed_at: null,
+      late_manager_note: null
     });
 
     const { data, error } = await supabase
@@ -533,6 +540,12 @@ export const cloudDb = {
         status: row.status === 'COMPLETED' ? 'COMPLETED' : (row.status === 'ON_BREAK' ? 'ON_BREAK' : 'IN_PROGRESS'),
         flags: parsedFlags,
         notes: typeof row.notes === 'string' && !row.notes.startsWith('{') ? row.notes : null,
+        late_reason: parsedNotes.late_reason || null,
+        late_photo_url: parsedNotes.late_photo_url || null,
+        late_status: parsedNotes.late_status || null,
+        late_reviewed_by: parsedNotes.late_reviewed_by || null,
+        late_reviewed_at: parsedNotes.late_reviewed_at || null,
+        late_manager_note: parsedNotes.late_manager_note || null,
         created_at: row.created_at,
         updated_at: row.updated_at
       };
@@ -671,5 +684,178 @@ export const cloudDb = {
     }
 
     return { success: true, scope, attendanceDeleted, toiletDeleted };
+  },
+
+  async reviewLateCheckin({ shiftId, action, managerNotes, reviewerName }) {
+    if (!supabase) return null;
+    const { data: log, error: fetchErr } = await supabase
+      .from('attendance_logs')
+      .select('id, flags, notes')
+      .eq('id', shiftId)
+      .maybeSingle();
+
+    if (fetchErr) throw fetchErr;
+    if (!log) throw new Error('Shift record not found: ' + shiftId);
+
+    let parsedNotes = {};
+    try {
+      if (typeof log.notes === 'string') parsedNotes = JSON.parse(log.notes);
+      else if (log.notes) parsedNotes = log.notes;
+    } catch {}
+
+    let parsedFlags = Array.isArray(log.flags)
+      ? [...log.flags]
+      : (typeof log.flags === 'string' ? JSON.parse(log.flags || '[]') : []);
+
+    const now = new Date().toISOString();
+    parsedNotes.late_status = action === 'APPROVE' ? 'APPROVED' : 'REJECTED';
+    parsedNotes.late_reviewed_by = reviewerName || 'Management';
+    parsedNotes.late_reviewed_at = now;
+    parsedNotes.late_manager_note = managerNotes || null;
+
+    if (action === 'APPROVE') {
+      parsedFlags = parsedFlags.map(f => {
+        if (String(f).includes('Late') || String(f).includes('LATE')) {
+          return 'FLAG_LATE_EXCUSED';
+        }
+        return f;
+      });
+    }
+
+    const { data: updated, error: updateErr } = await supabase
+      .from('attendance_logs')
+      .update({
+        notes: JSON.stringify(parsedNotes),
+        flags: parsedFlags,
+        updated_at: now
+      })
+      .eq('id', shiftId)
+      .select()
+      .maybeSingle();
+
+    if (updateErr) throw updateErr;
+    return updated;
+  },
+
+  async getLeaveRequests({ staffId, status, type, year } = {}) {
+    if (!supabase) return [];
+    try {
+      const { data, error } = await supabase
+        .from('app_settings')
+        .select('value')
+        .eq('key', 'leave_requests')
+        .maybeSingle();
+
+      if (error) throw error;
+      let list = Array.isArray(data?.value) ? data.value : [];
+
+      if (staffId && staffId !== 'ALL') {
+        list = list.filter(r => String(r.staff_id) === String(staffId));
+      }
+      if (status && status !== 'ALL') {
+        list = list.filter(r => r.status === status);
+      }
+      if (type && type !== 'ALL') {
+        list = list.filter(r => r.type === type);
+      }
+      if (year) {
+        list = list.filter(r => Number(r.year) === Number(year));
+      }
+
+      list.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+      return list;
+    } catch (e) {
+      console.warn('Failed to fetch leave requests:', e.message);
+      return [];
+    }
+  },
+
+  async saveLeaveRequest(newRequest) {
+    if (!supabase) return null;
+    const { data } = await supabase
+      .from('app_settings')
+      .select('value')
+      .eq('key', 'leave_requests')
+      .maybeSingle();
+
+    const list = Array.isArray(data?.value) ? data.value : [];
+    const updatedList = [newRequest, ...list];
+
+    const { error } = await supabase
+      .from('app_settings')
+      .upsert({
+        key: 'leave_requests',
+        value: updatedList,
+        description: 'Staff Leave and Permission Requests',
+        updated_at: new Date().toISOString()
+      });
+
+    if (error) throw error;
+    return newRequest;
+  },
+
+  async reviewLeaveRequest(id, { action, approvedDays, approvedStartDate, approvedEndDate, managerNotes, reviewerName }) {
+    if (!supabase) return null;
+    const { data } = await supabase
+      .from('app_settings')
+      .select('value')
+      .eq('key', 'leave_requests')
+      .maybeSingle();
+
+    const list = Array.isArray(data?.value) ? data.value : [];
+    const index = list.findIndex(r => String(r.id) === String(id));
+    if (index === -1) throw new Error('Pengajuan tidak ditemukan: ' + id);
+
+    const now = new Date().toISOString();
+    const item = { ...list[index] };
+
+    if (action === 'APPROVE') {
+      item.status = 'APPROVED';
+      item.approved_days = item.requested_days;
+      item.approved_start_date = item.start_date;
+      item.approved_end_date = item.end_date;
+    } else if (action === 'ADJUST') {
+      item.status = 'ADJUSTED';
+      item.approved_days = approvedDays != null ? Number(approvedDays) : item.requested_days;
+      item.approved_start_date = approvedStartDate || item.start_date;
+      item.approved_end_date = approvedEndDate || item.end_date;
+    } else if (action === 'REJECT') {
+      item.status = 'REJECTED';
+    }
+
+    item.manager_notes = managerNotes || null;
+    item.reviewed_by = reviewerName || 'Management';
+    item.reviewed_at = now;
+    item.updated_at = now;
+
+    list[index] = item;
+
+    const { error } = await supabase
+      .from('app_settings')
+      .upsert({
+        key: 'leave_requests',
+        value: list,
+        description: 'Staff Leave and Permission Requests',
+        updated_at: now
+      });
+
+    if (error) throw error;
+    return item;
+  },
+
+  async getStaffLeaveBalance(staffId, year = new Date().getFullYear()) {
+    const list = await this.getLeaveRequests({ staffId, type: 'CUTI', year });
+    const approvedRequests = list.filter(r => r.status === 'APPROVED' || r.status === 'ADJUSTED');
+    const usedDays = approvedRequests.reduce((sum, r) => sum + (r.approved_days || r.requested_days || 0), 0);
+    const maxQuota = 12;
+    const remainingDays = Math.max(0, maxQuota - usedDays);
+
+    return {
+      staffId,
+      year: Number(year),
+      maxQuota,
+      usedDays,
+      remainingDays
+    };
   }
 };

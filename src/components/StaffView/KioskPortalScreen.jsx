@@ -1,5 +1,5 @@
 import React from 'react';
-import { Camera, Sparkles, QrCode, LogOut, CheckCircle, Clock, Building2, User, Coffee, ArrowRight, ShieldCheck, Star, Eye, Trophy } from 'lucide-react';
+import { Camera, Sparkles, QrCode, LogOut, CheckCircle, Clock, Building2, User, Coffee, ArrowRight, ShieldCheck, Star, Eye, Trophy, Palmtree } from 'lucide-react';
 
 export default function KioskPortalScreen({
   staff,
@@ -7,6 +7,7 @@ export default function KioskPortalScreen({
   onSelectAttendance,
   onSelectToilet,
   onOpenLeaderboard,
+  onOpenStaffLeaveModal,
   onOpenMonitoring,
   onLogout
 }) {
@@ -195,7 +196,47 @@ export default function KioskPortalScreen({
           </div>
         </button>
 
-        {/* CARD 3: LEADERBOARD STAF TERAJIN (KANDIDAT BONUS BULANAN) */}
+        {/* CARD: IZIN & CUTI SAYA (TERKUNCI PER STAF) */}
+        {onOpenStaffLeaveModal && (
+          <button
+            type="button"
+            onClick={onOpenStaffLeaveModal}
+            className="w-full bg-gradient-to-r from-emerald-50 via-teal-50 to-cyan-50 hover:from-emerald-100 hover:to-teal-100 rounded-3xl p-5 border-2 border-emerald-400 hover:border-emerald-500 shadow-sm hover:shadow-md transition-all text-left flex flex-col justify-between group touch-press"
+          >
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-600 text-white shadow-sm">
+                  <Palmtree className="w-3 h-3 text-amber-300" />
+                  <span>3. Pengajuan Izin &amp; Cuti</span>
+                </span>
+                <span className="text-[11px] font-black text-emerald-800 group-hover:text-emerald-950">
+                  Kelola Cuti &amp; Izin Saya →
+                </span>
+              </div>
+
+              <div className="flex items-start space-x-3.5 mt-1">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-600 to-teal-700 text-white flex items-center justify-center shrink-0 shadow-md shadow-emerald-600/30 group-hover:scale-105 transition">
+                  <Palmtree className="w-6 h-6 stroke-[2.5]" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-base sm:text-lg font-black text-slate-950 group-hover:text-emerald-950 transition">
+                    Izin Cuti &amp; Izin Sakit ({staff.name})
+                  </h3>
+                  <p className="text-xs text-slate-700 font-bold mt-1 leading-relaxed">
+                    Ajukan cuti tahunan (minimal H-14, kuota 12 hari/tahun) atau izin sakit/darurat dengan bukti, dan cek status ACC dari management.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-3 mt-3 border-t border-emerald-200 flex items-center justify-between text-xs font-black text-emerald-900 group-hover:text-black">
+              <span>Buka Riwayat &amp; Formulir Pengajuan</span>
+              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition stroke-[2.5]" />
+            </div>
+          </button>
+        )}
+
+        {/* CARD 4: LEADERBOARD STAF TERAJIN (KANDIDAT BONUS BULANAN) */}
         {onOpenLeaderboard && (
           <button
             type="button"
@@ -206,7 +247,7 @@ export default function KioskPortalScreen({
               <div className="flex items-center justify-between mb-2">
                 <span className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-gradient-to-r from-amber-500 to-yellow-500 text-slate-950 shadow-sm">
                   <Trophy className="w-3.5 h-3.5" />
-                  <span>3. Prestasi &amp; Bonus Bulanan</span>
+                  <span>4. Prestasi &amp; Bonus Bulanan</span>
                 </span>
                 <span className="text-[11px] font-black text-amber-900 animate-pulse">
                   Lihat Peringkat Staf →
