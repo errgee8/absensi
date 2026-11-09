@@ -430,10 +430,10 @@ export default function KioskPortalScreen({
                 </div>
                 <div className="flex-1">
                   <h3 className="text-base sm:text-lg font-black text-slate-950 group-hover:text-emerald-950 transition">
-                    Izin Cuti &amp; Izin Sakit ({staff.name})
+                    Pengajuan Cuti &amp; Izin ({staff.name})
                   </h3>
                   <p className="text-xs text-slate-700 font-bold mt-1 leading-relaxed">
-                    Ajukan cuti tahunan (minimal H-14, kuota 12 hari/tahun) atau izin sakit/darurat dengan bukti, dan cek status ACC dari management.
+                    Ajukan cuti tahunan (H-14), izin biasa/dispensasi (wisuda, acara resmi), atau izin sakit/darurat, serta pantau status persetujuan dari management.
                   </p>
                 </div>
               </div>

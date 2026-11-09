@@ -257,10 +257,14 @@ export default function LeaveManagementTab({ adminAuth, onRefreshData }) {
                         ? 'bg-blue-100 text-blue-900 border border-blue-300'
                         : req.category === 'IZIN_PULANG_AWAL'
                         ? 'bg-amber-100 text-amber-950 border border-amber-300'
+                        : req.category === 'IZIN_BIASA'
+                        ? 'bg-indigo-100 text-indigo-950 border border-indigo-300'
                         : 'bg-purple-100 text-purple-900 border border-purple-300'
                     }`}>
                       {isCuti ? (
                         <Palmtree className="w-3 h-3 text-amber-500" />
+                      ) : req.category === 'IZIN_BIASA' ? (
+                        <span className="text-xs">🎓</span>
                       ) : req.category === 'IZIN_PULANG_AWAL' ? (
                         <span className="text-xs">🏃</span>
                       ) : (
@@ -269,6 +273,8 @@ export default function LeaveManagementTab({ adminAuth, onRefreshData }) {
                       <span>
                         {isCuti
                           ? 'Cuti Tahunan (12h/thn)'
+                          : req.category === 'IZIN_BIASA'
+                          ? 'Izin Biasa (Wisuda dll)'
                           : req.category === 'SAKIT'
                           ? 'Izin Sakit'
                           : req.category === 'IZIN_PULANG_AWAL'
@@ -412,7 +418,7 @@ export default function LeaveManagementTab({ adminAuth, onRefreshData }) {
                         <span>Tolak</span>
                       </button>
 
-                      {isCuti && (
+                      {(isCuti || req.category === 'IZIN_BIASA') && (
                         <button
                           type="button"
                           onClick={() => openReviewModal(req, 'ADJUST')}

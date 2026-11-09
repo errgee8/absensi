@@ -36,8 +36,8 @@ export default function StaffLeaveModal({ isOpen, onClose, staff, onRefreshShift
   const [cutiReason, setCutiReason] = useState('');
   const [cutiSelfie, setCutiSelfie] = useState(null);
 
-  // Form State: Izin Sakit / Pulang Awal
-  const [izinCategory, setIzinCategory] = useState('SAKIT'); // 'SAKIT' | 'IZIN_DARURAT' | 'IZIN_PULANG_AWAL'
+  // Form State: Izin Biasa / Sakit / Darurat / Pulang Awal
+  const [izinCategory, setIzinCategory] = useState('IZIN_BIASA'); // 'IZIN_BIASA' | 'SAKIT' | 'IZIN_DARURAT' | 'IZIN_PULANG_AWAL'
   const [izinStart, setIzinStart] = useState('');
   const [izinEnd, setIzinEnd] = useState('');
   const [departureTime, setDepartureTime] = useState('');
@@ -154,8 +154,12 @@ export default function StaffLeaveModal({ isOpen, onClose, staff, onRefreshShift
       const isCuti = cameraTarget === 'CUTI';
       const statusText = isCuti
         ? 'Selfie Pengajuan Cuti Tahunan'
+        : izinCategory === 'IZIN_BIASA'
+        ? 'Selfie Izin Biasa / Wisuda'
         : izinCategory === 'IZIN_PULANG_AWAL'
         ? 'Selfie Izin Pulang di Tengah Shift'
+        : izinCategory === 'SAKIT'
+        ? 'Selfie Izin Sakit'
         : 'Selfie Permohonan Izin';
 
       const stamped = await stampPhotoWithAppTime({
@@ -406,8 +410,8 @@ export default function StaffLeaveModal({ isOpen, onClose, staff, onRefreshShift
                 : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100'
             }`}
           >
-            <HeartPulse className="w-4 h-4 text-rose-500" />
-            <span>Izin Sakit / Darurat</span>
+            <FileText className="w-4 h-4 text-purple-600" />
+            <span>Ajukan Izin (Biasa / Sakit)</span>
           </button>
         </div>
 
@@ -501,15 +505,19 @@ export default function StaffLeaveModal({ isOpen, onClose, staff, onRefreshShift
                             <span className={`px-2 py-0.5 rounded-lg text-[10px] font-black uppercase ${
                               isCuti
                                 ? 'bg-blue-100 text-blue-900 border border-blue-300'
+                                : r.category === 'IZIN_BIASA'
+                                ? 'bg-indigo-100 text-indigo-950 border border-indigo-300'
                                 : r.category === 'IZIN_PULANG_AWAL'
                                 ? 'bg-amber-100 text-amber-950 border border-amber-300'
                                 : 'bg-purple-100 text-purple-900 border border-purple-300'
                             }`}>
                               {isCuti
                                 ? '🌴 CUTI'
+                                : r.category === 'IZIN_BIASA'
+                                ? '🎓 IZIN BIASA (WISUDA)'
                                 : r.category === 'IZIN_PULANG_AWAL'
                                 ? '🏃 IZIN PULANG AWAL'
-                                : `🏥 ${r.category || 'IZIN'}`}
+                                : `🏥 ${r.category === 'SAKIT' ? 'IZIN SAKIT' : (r.category || 'IZIN')}`}
                             </span>
                             <span className="font-mono text-xs text-slate-900 font-black">
                               {r.category === 'IZIN_PULANG_AWAL' && r.departure_time
@@ -753,47 +761,91 @@ export default function StaffLeaveModal({ isOpen, onClose, staff, onRefreshShift
             </form>
           )}
 
-          {/* TAB 3: FORM PENGAJUAN IZIN SAKIT / DARURAT */}
+          {/* TAB 3: FORM PENGAJUAN IZIN (BIASA / SAKIT / DARURAT / PULANG AWAL) */}
           {activeTab === 'IZIN' && (
             <form onSubmit={handleSubmitIzin} className="space-y-3.5">
               
-              <div className="p-3 bg-purple-50 border-2 border-purple-200 rounded-2xl text-purple-950 font-bold space-y-1">
-                <div className="flex items-center space-x-1.5 font-black text-xs text-purple-900">
-                  <HeartPulse className="w-4 h-4 text-rose-600" />
-                  <span>Ketentuan Izin Sakit &amp; Darurat:</span>
+              {/* Contextual Notice Banner depending on Category */}
+              {izinCategory === 'IZIN_BIASA' ? (
+                <div className="p-3.5 bg-gradient-to-r from-indigo-50 via-blue-50 to-indigo-50 border-2 border-indigo-300 rounded-2xl text-indigo-950 font-bold space-y-1 shadow-sm">
+                  <div className="flex items-center space-x-2 font-black text-xs text-indigo-950">
+                    <span className="text-base">🎓</span>
+                    <span>Ketentuan Izin Biasa / Dispensasi (Wisuda dll):</span>
+                  </div>
+                  <p className="text-[11px] text-indigo-900 leading-relaxed">
+                    • <strong>TIDAK memotong jatah cuti tahunan</strong> dan <strong>TIDAK memerlukan surat sakit dokter</strong>.<br />
+                    • Diperuntukkan untuk keperluan penting seperti <strong>Wisuda</strong>, acara penting keluarga, atau dispensasi resmi lainnya.<br />
+                    • <strong>Foto selfie pemohon WAJIB diambil</strong> untuk verifikasi biometrik pemohon.<br />
+                    • Dokumen pendukung (undangan wisuda / jadwal kegiatan) bersifat <strong>opsional</strong>.
+                  </p>
                 </div>
-                <p className="text-[11px] text-purple-800 leading-relaxed">
-                  • <strong>Foto selfie pemohon WAJIB diambil</strong> agar permohonan sah dan tidak disalahgunakan orang lain.<br />
-                  • <strong>Dokumen pendukung (surat dokter / resep / surat keterangan) bersifat OPSIONAL</strong> — dapat dilampirkan jika tersedia.
-                </p>
-              </div>
+              ) : izinCategory === 'SAKIT' ? (
+                <div className="p-3.5 bg-rose-50 border-2 border-rose-200 rounded-2xl text-rose-950 font-bold space-y-1 shadow-sm">
+                  <div className="flex items-center space-x-2 font-black text-xs text-rose-900">
+                    <HeartPulse className="w-4 h-4 text-rose-600" />
+                    <span>Ketentuan Izin Sakit:</span>
+                  </div>
+                  <p className="text-[11px] text-rose-900 leading-relaxed">
+                    • <strong>Foto selfie pemohon WAJIB diambil</strong> untuk verifikasi pemohon.<br />
+                    • Dokumen pendukung (surat dokter / resep / surat keterangan) bersifat <strong>opsional</strong> — dapat dilampirkan jika tersedia.
+                  </p>
+                </div>
+              ) : izinCategory === 'IZIN_DARURAT' ? (
+                <div className="p-3.5 bg-purple-50 border-2 border-purple-200 rounded-2xl text-purple-950 font-bold space-y-1 shadow-sm">
+                  <div className="flex items-center space-x-2 font-black text-xs text-purple-900">
+                    <AlertTriangle className="w-4 h-4 text-purple-600" />
+                    <span>Ketentuan Izin Darurat:</span>
+                  </div>
+                  <p className="text-[11px] text-purple-900 leading-relaxed">
+                    • Digunakan untuk situasi keluarga mendesak atau musibah mendadak.<br />
+                    • <strong>Foto selfie pemohon WAJIB diambil</strong> untuk verifikasi pemohon.
+                  </p>
+                </div>
+              ) : null}
 
               {/* Category */}
               <div>
-                <label className="block text-xs font-black text-slate-900 mb-1">Kategori Izin:</label>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <label className="block text-xs font-black text-slate-900 mb-1.5">Pilih Kategori Izin:</label>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIzinCategory('IZIN_BIASA')}
+                    className={`py-2.5 px-2.5 rounded-xl border-2 font-black text-xs transition text-center flex flex-col items-center justify-center gap-1 ${
+                      izinCategory === 'IZIN_BIASA'
+                        ? 'bg-indigo-50 border-indigo-600 text-indigo-950 shadow-sm ring-2 ring-indigo-400/30'
+                        : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+                    }`}
+                  >
+                    <span className="text-base">🎓</span>
+                    <span>Izin Biasa (Wisuda)</span>
+                  </button>
+
                   <button
                     type="button"
                     onClick={() => setIzinCategory('SAKIT')}
-                    className={`py-2 px-3 rounded-xl border-2 font-black text-xs transition ${
+                    className={`py-2.5 px-2.5 rounded-xl border-2 font-black text-xs transition text-center flex flex-col items-center justify-center gap-1 ${
                       izinCategory === 'SAKIT'
-                        ? 'bg-rose-50 border-rose-500 text-rose-950 shadow-sm'
-                        : 'bg-slate-50 border-slate-200 text-slate-700'
+                        ? 'bg-rose-50 border-rose-500 text-rose-950 shadow-sm ring-2 ring-rose-400/30'
+                        : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
                     }`}
                   >
-                    🏥 Sakit (Dokter/Resep)
+                    <span className="text-base">🏥</span>
+                    <span>Izin Sakit</span>
                   </button>
+
                   <button
                     type="button"
                     onClick={() => setIzinCategory('IZIN_DARURAT')}
-                    className={`py-2 px-3 rounded-xl border-2 font-black text-xs transition ${
+                    className={`py-2.5 px-2.5 rounded-xl border-2 font-black text-xs transition text-center flex flex-col items-center justify-center gap-1 ${
                       izinCategory === 'IZIN_DARURAT'
-                        ? 'bg-purple-50 border-purple-500 text-purple-950 shadow-sm'
-                        : 'bg-slate-50 border-slate-200 text-slate-700'
+                        ? 'bg-purple-50 border-purple-500 text-purple-950 shadow-sm ring-2 ring-purple-400/30'
+                        : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
                     }`}
                   >
-                    🚨 Izin Darurat
+                    <span className="text-base">🚨</span>
+                    <span>Izin Darurat</span>
                   </button>
+
                   <button
                     type="button"
                     onClick={() => {
@@ -814,13 +866,14 @@ export default function StaffLeaveModal({ isOpen, onClose, staff, onRefreshShift
                         }
                       }
                     }}
-                    className={`py-2 px-3 rounded-xl border-2 font-black text-xs transition ${
+                    className={`py-2.5 px-2.5 rounded-xl border-2 font-black text-xs transition text-center flex flex-col items-center justify-center gap-1 ${
                       izinCategory === 'IZIN_PULANG_AWAL'
                         ? 'bg-amber-50 border-amber-500 text-amber-950 shadow-sm ring-2 ring-amber-400/20'
-                        : 'bg-slate-50 border-slate-200 text-slate-700'
+                        : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
                     }`}
                   >
-                    🏃 Pulang Awal (On Duty)
+                    <span className="text-base">🏃</span>
+                    <span>Pulang di Shift</span>
                   </button>
                 </div>
               </div>
@@ -911,12 +964,28 @@ export default function StaffLeaveModal({ isOpen, onClose, staff, onRefreshShift
 
               {/* Reason */}
               <div>
-                <label className="block text-xs font-black text-slate-900 mb-1">Alasan Izin / Gejala Sakit:</label>
+                <label className="block text-xs font-black text-slate-900 mb-1">
+                  {izinCategory === 'IZIN_BIASA'
+                    ? 'Keperluan Izin (misal: Wisuda):'
+                    : izinCategory === 'SAKIT'
+                    ? 'Gejala / Keluhan Sakit:'
+                    : izinCategory === 'IZIN_PULANG_AWAL'
+                    ? 'Alasan Pulang Sebelum Shift Usai:'
+                    : 'Alasan Izin Darurat:'}
+                </label>
                 <textarea
                   rows={2}
                   value={izinReason}
                   onChange={(e) => setIzinReason(e.target.value)}
-                  placeholder="Jelaskan kondisi atau alasan izin..."
+                  placeholder={
+                    izinCategory === 'IZIN_BIASA'
+                      ? 'Tulis keperluan izin secara jelas (contoh: Menghadiri Wisuda S1 di Kampus X, Acara penting keluarga, dll)...'
+                      : izinCategory === 'SAKIT'
+                      ? 'Jelaskan kondisi atau keluhan sakit yang dialami...'
+                      : izinCategory === 'IZIN_PULANG_AWAL'
+                      ? 'Jelaskan alasan mendesak harus pulang lebih awal...'
+                      : 'Jelaskan alasan darurat...'
+                  }
                   required
                   className="w-full bg-slate-50 border-2 border-slate-300 rounded-xl p-2.5 text-xs font-black text-slate-950 focus:outline-none focus:border-purple-600 focus:bg-white"
                 />
@@ -995,10 +1064,12 @@ export default function StaffLeaveModal({ isOpen, onClose, staff, onRefreshShift
                 <div className="bg-slate-50 p-3 rounded-2xl border-2 border-slate-200 flex flex-col justify-between">
                   <div>
                     <label className="block text-xs font-black text-slate-900 mb-0.5">
-                      2. Dokumen Pendukung: <span className="text-slate-500 font-normal">(Opsional)</span>
+                      2. {izinCategory === 'IZIN_BIASA' ? 'Undangan / Bukti Acara' : 'Dokumen Pendukung'}: <span className="text-slate-500 font-normal">(Opsional)</span>
                     </label>
                     <p className="text-[10px] text-slate-500 font-bold mb-2">
-                      Surat dokter / resep / bukti (jika ada).
+                      {izinCategory === 'IZIN_BIASA'
+                        ? 'Lampirkan foto undangan wisuda / surat kegiatan jika ada.'
+                        : 'Surat dokter / resep / bukti (jika ada).'}
                     </p>
                   </div>
 

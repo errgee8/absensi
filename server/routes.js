@@ -2650,7 +2650,11 @@ router.post('/leave-requests', async (req, res) => {
       success: true,
       message: type === 'CUTI'
         ? 'Pengajuan cuti berhasil dikirim ke management.'
-        : (category === 'IZIN_PULANG_AWAL' ? 'Permohonan izin pulang awal berhasil dikirim ke management.' : 'Permohonan izin berhasil dikirim ke management.'),
+        : (category === 'IZIN_PULANG_AWAL'
+            ? 'Permohonan izin pulang awal berhasil dikirim ke management.'
+            : (category === 'IZIN_BIASA'
+                ? 'Permohonan izin biasa / dispensasi berhasil dikirim ke management.'
+                : 'Permohonan izin berhasil dikirim ke management.')),
       request: newRequest
     });
   } catch (err) {
