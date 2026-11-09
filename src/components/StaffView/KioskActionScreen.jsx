@@ -43,10 +43,9 @@ export default function KioskActionScreen({
   // Break policy rules
   const breakCutoffTime = staff?.breakCutoffTime || staff?.max_break_end || '20:00';
   const breakStartTime = staff?.break_start_time || null;
-  const breakAllowed = staff?.breakAllowed ?? false;
-  const shiftAllowsBreak = !isManagement && staff?.allows_break !== 0 && staff?.allows_break !== false;
-  const isWithin2HoursOfEnd = staff?.isWithin2HoursOfEnd ?? false;
-  const canTakeBreak = !isManagement && isCheckedIn && !isOnBreak && !hasTakenBreak && breakAllowed;
+  const normVenue = (staff?.venue || '').replace(/\s+/g, '').toLowerCase();
+  const shiftAllowsBreak = !isManagement && (staff?.allows_break !== 0 || normVenue === 'luckycat' || activeShift?.allows_break !== 0);
+  const canTakeBreak = !isManagement && isCheckedIn && !isOnBreak && !hasTakenBreak && shiftAllowsBreak;
 
   // Live timer for active shift
   useEffect(() => {
@@ -210,11 +209,11 @@ export default function KioskActionScreen({
                   </button>
 
                   <p className="text-xs text-slate-950 text-center font-black">
-                    Istirahat 1x per shift (maks 1 jam). Jendela istirahat: <strong>{breakStartTime ? `${breakStartTime} – ` : ''}{breakCutoffTime} WITA</strong> (maks 2 jam sebelum shift usai).
+                    Istirahat hanya diperbolehkan 1x per shift selama maksimal 1 jam (60 menit).
                   </p>
                 </div>
               ) : (
-                /* ONLY 1 BUTTON: CHECKOUT (Either break already taken, not allowed, or outside break window) */
+                /* ONLY 1 BUTTON: CHECKOUT (Either break already taken or not allowed) */
                 <div className="space-y-3">
                   <button
                     onClick={() => onTriggerCamera('checkout')}
@@ -227,22 +226,12 @@ export default function KioskActionScreen({
                   {hasTakenBreak ? (
                     <div className="p-3 bg-emerald-50 border-2 border-emerald-300 rounded-xl text-xs text-emerald-950 font-black flex items-center justify-center space-x-2">
                       <CheckCircle className="w-4 h-4 text-emerald-700 shrink-0 stroke-[2.5]" />
-                      <span>Istirahat 1x sudah diambil untuk shift ini.</span>
+                      <span>Istirahat 1x (maksimal 1 jam) sudah selesai diambil untuk shift ini.</span>
                     </div>
                   ) : !shiftAllowsBreak ? (
                     <div className="p-3 bg-slate-100 border-2 border-slate-300 rounded-xl text-xs text-slate-900 font-black flex items-center justify-center space-x-2">
                       <Coffee className="w-4 h-4 text-slate-700 shrink-0 stroke-[2.5]" />
                       <span>Shift ini diatur tanpa waktu istirahat (No Break Allowed).</span>
-                    </div>
-                  ) : isWithin2HoursOfEnd ? (
-                    <div className="p-3 bg-amber-50 border-2 border-amber-300 rounded-xl text-xs text-amber-950 font-black flex items-center justify-center space-x-2">
-                      <AlertCircle className="w-4 h-4 text-amber-700 shrink-0 stroke-[2.5]" />
-                      <span>Waktu istirahat telah berakhir (kurang dari 2 jam sebelum shift selesai).</span>
-                    </div>
-                  ) : breakStartTime ? (
-                    <div className="p-3 bg-sky-50 border-2 border-sky-300 rounded-xl text-xs text-sky-950 font-black flex items-center justify-center space-x-2">
-                      <Clock className="w-4 h-4 text-sky-700 shrink-0 stroke-[2.5]" />
-                      <span>Tombol istirahat hanya dibuka pada jam: <strong>{breakStartTime} – {breakCutoffTime} WITA</strong>.</span>
                     </div>
                   ) : null}
 

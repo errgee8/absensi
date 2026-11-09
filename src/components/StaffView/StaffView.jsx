@@ -241,6 +241,11 @@ export default function StaffView({
               onOpenViewOnly(loggedInStaff);
             }
           }}
+          onTriggerCamera={(type, shift) => {
+            setCameraActionType(type);
+            setConfirmedShift(shift || null);
+            setCameraModalOpen(true);
+          }}
           onLogout={handleResetToLogin}
           leaveUpdateCount={leaveUpdateCount}
           announcements={announcements}

@@ -1,5 +1,5 @@
-import React from 'react';
-import { Camera, Sparkles, QrCode, LogOut, CheckCircle, Clock, Building2, User, Coffee, ArrowRight, ShieldCheck, Star, Eye, Trophy, Palmtree, Megaphone } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Camera, Sparkles, QrCode, LogOut, CheckCircle, Clock, Building2, User, Coffee, ArrowRight, ShieldCheck, Star, Eye, Trophy, Palmtree, Megaphone, AlertCircle } from 'lucide-react';
 
 export default function KioskPortalScreen({
   staff,
@@ -9,6 +9,7 @@ export default function KioskPortalScreen({
   onOpenLeaderboard,
   onOpenStaffLeaveModal,
   onOpenMonitoring,
+  onTriggerCamera,
   onLogout,
   leaveUpdateCount = 0,
   announcements = [],
@@ -16,8 +17,33 @@ export default function KioskPortalScreen({
   onOpenAnnouncements
 }) {
   const isCheckedIn = Boolean(activeShift);
-  const isOnBreak = activeShift?.break_status === 'ON_BREAK';
-  const isManagement = staff.division === 'Management' || (staff.role && staff.role.toLowerCase().includes('manager'));
+  const breakStatus = activeShift?.break_status || 'NONE';
+  const isOnBreak = breakStatus === 'ON_BREAK';
+  const hasTakenBreak = (activeShift?.break_count >= 1) || (breakStatus === 'COMPLETED');
+  const isManagement = staff?.division === 'Management' || (staff?.role && staff?.role.toLowerCase().includes('manager'));
+  const normVenue = (staff?.venue || '').replace(/\s+/g, '').toLowerCase();
+  const shiftAllowsBreak = !isManagement && (staff?.allows_break !== 0 || normVenue === 'luckycat' || activeShift?.allows_break !== 0);
+  const canTakeBreak = isCheckedIn && !isOnBreak && !hasTakenBreak && shiftAllowsBreak;
+
+  const [breakSeconds, setBreakSeconds] = useState(0);
+
+  useEffect(() => {
+    if (!isOnBreak || !activeShift?.break_start_time) return;
+    const calc = () => {
+      const start = new Date(activeShift.break_start_time).getTime();
+      const diff = Math.max(0, Math.floor((Date.now() - start) / 1000));
+      setBreakSeconds(diff);
+    };
+    calc();
+    const interval = setInterval(calc, 1000);
+    return () => clearInterval(interval);
+  }, [isOnBreak, activeShift?.break_start_time]);
+
+  const formatTimerSeconds = (sec) => {
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+    return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  };
 
   return (
     <div className="max-w-xl mx-auto space-y-5 animate-fade-in py-2">
@@ -161,6 +187,108 @@ export default function KioskPortalScreen({
           >
             Buka ({announcements.length})
           </button>
+        </div>
+      )}
+
+      {/* ACTIVE BREAK BANNER: Glow, Live Timer, and Instant End Break Action */}
+      {isOnBreak && (
+        <div className="bg-gradient-to-r from-sky-50 via-blue-50 to-indigo-50 rounded-3xl p-5 sm:p-6 border-3 border-sky-400 shadow-xl shadow-sky-500/15 relative overflow-hidden animate-fade-in">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-start space-x-3.5">
+              <div className="w-14 h-14 rounded-2xl bg-sky-600 text-white flex items-center justify-center shrink-0 shadow-lg shadow-sky-600/30 animate-pulse">
+                <Coffee className="w-7 h-7 stroke-[2.5]" />
+              </div>
+              <div>
+                <div className="flex items-center space-x-2">
+                  <h3 className="text-lg sm:text-xl font-black text-slate-950">
+                    Sedang Waktu Istirahat
+                  </h3>
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-sky-200 text-sky-900 border border-sky-300">
+                    Maks 1 Jam
+                  </span>
+                </div>
+                <div className="flex items-baseline space-x-2 mt-1">
+                  <span className="text-2xl sm:text-3xl font-black font-mono text-sky-700">
+                    {formatTimerSeconds(breakSeconds)}
+                  </span>
+                  <span className="text-xs font-bold text-slate-600">
+                    / 60:00 Menit
+                  </span>
+                </div>
+                <p className="text-xs text-slate-700 font-bold mt-1">
+                  {breakSeconds > 3600 ? (
+                    <span className="text-rose-600 font-black">
+                      ⚠️ Waktu istirahat telah melebihi batas 1 jam! Segera ambil foto selesai.
+                    </span>
+                  ) : (
+                    <span>Sisa waktu: ~{Math.max(0, 60 - Math.floor(breakSeconds / 60))} menit lagi.</span>
+                  )}
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => onTriggerCamera && onTriggerCamera('break_end')}
+              className="w-full sm:w-auto px-5 py-4 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-sm rounded-2xl shadow-lg shadow-emerald-600/30 active:scale-95 transition flex items-center justify-center space-x-2.5 shrink-0"
+            >
+              <Coffee className="w-5 h-5 stroke-[2.5]" />
+              <span>AMBIL FOTO &amp; SELESAI ISTIRAHAT</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* BREAK ELIGIBILITY CARD: Prominent 1-Click Take Break Action */}
+      {canTakeBreak && (
+        <div className="bg-gradient-to-r from-amber-50 via-orange-50 to-amber-50 rounded-3xl p-5 sm:p-6 border-3 border-amber-400 shadow-xl shadow-amber-500/15 relative overflow-hidden animate-fade-in">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-start space-x-3.5">
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-amber-500 to-orange-600 text-white flex items-center justify-center shrink-0 shadow-lg shadow-amber-500/30">
+                <Coffee className="w-7 h-7 stroke-[2.5]" />
+              </div>
+              <div>
+                <div className="flex items-center space-x-2">
+                  <h3 className="text-lg sm:text-xl font-black text-slate-950">
+                    Tombol Istirahat Kerja
+                  </h3>
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-amber-200 text-amber-950 border border-amber-300">
+                    Tersedia (1 Jam)
+                  </span>
+                </div>
+                <p className="text-xs sm:text-sm text-slate-800 font-bold mt-1">
+                  Istirahat hanya diperbolehkan <strong>1x per shift</strong> selama maksimal <strong>1 jam (60 menit)</strong>.
+                </p>
+                <p className="text-[11px] text-slate-600 font-semibold mt-0.5">
+                  Wajib ambil foto selfie saat mulai istirahat &amp; saat selesai istirahat.
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => onTriggerCamera && onTriggerCamera('break_start')}
+              className="w-full sm:w-auto px-5 py-4 bg-amber-600 hover:bg-amber-700 text-white font-black text-sm rounded-2xl shadow-lg shadow-amber-600/35 active:scale-95 transition flex items-center justify-center space-x-2.5 shrink-0"
+            >
+              <Coffee className="w-5 h-5 stroke-[2.5]" />
+              <span>AMBIL FOTO &amp; MULAI ISTIRAHAT</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Break Completed Info Pill */}
+      {hasTakenBreak && isCheckedIn && !isOnBreak && (
+        <div className="bg-emerald-50 border-2 border-emerald-300 rounded-2xl px-4 py-3 flex items-center justify-between shadow-sm">
+          <div className="flex items-center space-x-2.5">
+            <CheckCircle className="w-5 h-5 text-emerald-700 shrink-0" />
+            <span className="text-xs sm:text-sm text-emerald-950 font-black">
+              Istirahat 1x (maksimal 1 jam) sudah selesai digunakan pada shift ini.
+            </span>
+          </div>
+          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-emerald-200 text-emerald-900 border border-emerald-300">
+            Selesai ✓
+          </span>
         </div>
       )}
 
