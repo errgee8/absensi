@@ -9,12 +9,13 @@ import StaffManagementTab from './StaffManagementTab';
 import ShiftSchedulesTab from './ShiftSchedulesTab';
 import ToiletInspectionTab from './ToiletInspectionTab';
 import LeaveManagementTab from './LeaveManagementTab';
+import AnnouncementManagementModal from './AnnouncementManagementModal';
 import WipeLeaderboardModal from '../Leaderboard/WipeLeaderboardModal';
 import { exportTimesheetToExcel } from '../../utils/excelExport';
-import { getShifts, getStats, getShiftSchedules, getLeaveRequests, subscribeRealtimeEvents } from '../../utils/api';
+import { getShifts, getStats, getShiftSchedules, getLeaveRequests, getAnnouncements, getAnnouncementReaders, subscribeRealtimeEvents } from '../../utils/api';
 import { getOperationalDateYMD, getOperationalYesterdayYMD, getWitaDateYMD } from '../../utils/time';
 import { resolveShift } from '../../utils/shiftResolver';
-import { LayoutDashboard, Users, Clock, Radio, Building2, Sparkles, Eye, ShieldAlert, Trophy, FileText } from 'lucide-react';
+import { LayoutDashboard, Users, Clock, Radio, Building2, Sparkles, Eye, ShieldAlert, Trophy, FileText, Megaphone } from 'lucide-react';
 
 export default function ManagerDashboard({ venueSettings, refreshSettings, adminAuth, isReadOnly = false, onOpenLeaderboard }) {
   // Tabs: 'AUDIT' | 'SCHEDULES' | 'STAFF' | 'TOILET'
@@ -39,6 +40,9 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
   const [inspectData, setInspectData] = useState(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [wipeModalOpen, setWipeModalOpen] = useState(false);
+  const [announcementsModalOpen, setAnnouncementsModalOpen] = useState(false);
+  const [activeAnnouncement, setActiveAnnouncement] = useState(null);
+  const [announcementCompliance, setAnnouncementCompliance] = useState(null);
 
   const departments = [
     'Server and Cashier',
@@ -48,6 +52,30 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
     'Kitchen',
     'Management'
   ];
+
+  const loadActiveAnnouncement = async () => {
+    try {
+      const list = await getAnnouncements({ activeOnly: true });
+      if (Array.isArray(list) && list.length > 0) {
+        const top = list[0];
+        setActiveAnnouncement(top);
+        try {
+          const report = await getAnnouncementReaders(top.id);
+          setAnnouncementCompliance({
+            readCount: report.read_count,
+            totalStaff: report.total_active_staff,
+            percentage: report.percentage,
+            readersSet: new Set(report.readers.map(r => String(r.staff_id)))
+          });
+        } catch {}
+      } else {
+        setActiveAnnouncement(null);
+        setAnnouncementCompliance(null);
+      }
+    } catch (e) {
+      console.warn('Failed to load active announcement:', e);
+    }
+  };
 
   const loadPendingLeaveCount = async () => {
     try {
@@ -72,6 +100,7 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
   useEffect(() => {
     loadSchedules();
     loadPendingLeaveCount();
+    loadActiveAnnouncement();
   }, []);
 
   const loadData = async () => {
@@ -137,6 +166,8 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
         loadPendingLeaveCount();
       } else if (eventType === 'LEAVE_UPDATE') {
         loadPendingLeaveCount();
+      } else if (eventType === 'ANNOUNCEMENT_UPDATE' || eventType === 'ANNOUNCEMENT_READ') {
+        loadActiveAnnouncement();
       }
     });
 
@@ -314,6 +345,52 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
               isReadOnly={isReadOnly}
             />
 
+            {/* Official Management Announcement Compliance Bar */}
+            <div className="bg-gradient-to-r from-blue-900 via-indigo-950 to-slate-900 border-2 border-blue-400/40 rounded-3xl p-4 text-white shadow-md flex flex-col md:flex-row md:items-center justify-between gap-3 animate-fade-in">
+              <div className="flex items-center space-x-3 min-w-0">
+                <div className="w-10 h-10 rounded-2xl bg-amber-400/20 text-amber-300 flex items-center justify-center shrink-0 border border-amber-400/30">
+                  <Megaphone className="w-5 h-5 stroke-[2.5]" />
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center space-x-2">
+                    <span className="text-[10px] font-black uppercase text-amber-300 tracking-wider">
+                      Pengumuman Management (General Manager)
+                    </span>
+                    {activeAnnouncement ? (
+                      <span className="px-2 py-0.5 rounded-full text-[9px] font-black bg-blue-500/40 text-blue-100 border border-blue-400/40">
+                        {activeAnnouncement.urgency === 'URGENT' ? '🚨 URGENT' : 'Aktif'}
+                      </span>
+                    ) : (
+                      <span className="px-2 py-0.5 rounded-full text-[9px] font-black bg-slate-800 text-slate-300">
+                        Tidak Ada Pengumuman Aktif
+                      </span>
+                    )}
+                  </div>
+                  <h4 className="text-sm font-black text-white truncate mt-0.5">
+                    {activeAnnouncement ? activeAnnouncement.title : 'Belum ada pengumuman resmi yang sedang disiarkan ke staf.'}
+                  </h4>
+                </div>
+              </div>
+
+              <div className="flex items-center space-x-2 self-start md:self-auto shrink-0">
+                {activeAnnouncement && (
+                  <div className="px-3 py-1.5 rounded-xl bg-white/10 border border-white/20 text-xs font-black text-emerald-300 flex items-center space-x-1.5">
+                    <span>{announcementCompliance?.readCount || 0}/{announcementCompliance?.totalStaff || 0} Membaca</span>
+                    <span className="text-[10px] font-bold text-white/80">({announcementCompliance?.percentage || 0}%)</span>
+                  </div>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => setAnnouncementsModalOpen(true)}
+                  className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-black shadow-md shadow-blue-600/30 transition flex items-center space-x-1.5"
+                >
+                  <Eye className="w-3.5 h-3.5" />
+                  <span>{activeAnnouncement ? 'Lihat Bukti Baca & Kelola' : '+ Buat Pengumuman (GM)'}</span>
+                </button>
+              </div>
+            </div>
+
             <FilterBar
               dateRange={dateRange}
               setDateRange={setDateRange}
@@ -337,6 +414,8 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
             <ShiftTable
               shifts={displayedShifts}
               schedules={schedules}
+              readersSet={announcementCompliance?.readersSet}
+              hasActiveAnnouncement={Boolean(activeAnnouncement)}
               onInspectPhoto={(shift, type) => setInspectData({ shift, type })}
             />
           </>
@@ -402,6 +481,19 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
             onClose={() => setWipeModalOpen(false)}
             onSuccess={() => {
               loadData();
+            }}
+          />
+        )}
+
+        {/* Modal: Management Announcements & Read Receipts */}
+        {announcementsModalOpen && (
+          <AnnouncementManagementModal
+            isOpen={announcementsModalOpen}
+            onClose={() => setAnnouncementsModalOpen(false)}
+            adminAuth={adminAuth}
+            isReadOnly={isReadOnly}
+            onAnnouncementChanged={() => {
+              loadActiveAnnouncement();
             }}
           />
         )}

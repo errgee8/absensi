@@ -21,7 +21,7 @@ import {
 import { getLeaveRequests, getStaffLeaveBalance, submitLeaveRequest } from '../../utils/api';
 import { getOperationalDateYMD, formatWitaDateOnly } from '../../utils/time';
 
-export default function StaffLeaveModal({ isOpen, onClose, staff, onRefreshShifts }) {
+export default function StaffLeaveModal({ isOpen, onClose, staff, onRefreshShifts, onMarkViewed }) {
   const [activeTab, setActiveTab] = useState('HISTORY'); // 'HISTORY' | 'CUTI' | 'IZIN'
   const [requests, setRequests] = useState([]);
   const [balance, setBalance] = useState({ maxQuota: 12, usedDays: 0, remainingDays: 12 });
@@ -87,6 +87,13 @@ export default function StaffLeaveModal({ isOpen, onClose, staff, onRefreshShift
       stopCamera();
     };
   }, [isOpen, staff]);
+
+  useEffect(() => {
+    if (isOpen && activeTab === 'HISTORY' && staff?.id) {
+      localStorage.setItem('last_viewed_leave_' + staff.id, new Date().toISOString());
+      if (onMarkViewed) onMarkViewed();
+    }
+  }, [isOpen, activeTab, staff]);
 
   // Camera Controls
   const startCamera = async (target = 'CUTI') => {

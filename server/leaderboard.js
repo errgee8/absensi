@@ -275,10 +275,10 @@ export async function computeLeaderboard(targetMonthStr) {
   // 2. Toilet Inspection Data (Optimized select to prevent statement timeout)
   const { data: inspections, error: toiletErr } = await toiletClient
     .from('inspections')
-    .select('id, staff_name, created_at, overall_status, photo_url')
+    .select('id, staff_name, created_at, overall_status, photo_url, location_id')
     .gte('created_at', `${startDate}T00:00:00Z`)
     .lte('created_at', `${endDate}T23:59:59Z`)
-    .order('created_at', { ascending: false })
+    .order('created_at', { ascending: true })
     .limit(1000);
 
   if (toiletErr) {
@@ -286,20 +286,53 @@ export async function computeLeaderboard(targetMonthStr) {
   }
 
   const toiletStats = {};
+  const lastInspectedByLoc = {}; // location_id -> Date of last inspection
+
   for (const ins of inspections || []) {
     const rawName = (ins.staff_name || '').trim();
     if (!rawName || rawName.toLowerCase() === 'test staff') continue;
 
     // If leaderboard was reset, only count inspections occurring after reset timestamp
+    const insTime = new Date(ins.created_at);
     if (leaderboardResetAt) {
-      const insTime = new Date(ins.created_at);
       if (insTime < leaderboardResetAt) continue;
+    }
+
+    // Operational hours check (WITA UTC+8: 08:00 AM to 05:00 AM next day)
+    const witaHours = (insTime.getUTCHours() + 8) % 24;
+    const isOutOfHours = (witaHours >= 5 && witaHours < 8);
+
+    // Timeliness / Interval check per restroom location (Standard: 60m + 15m grace = 75m)
+    const locId = ins.location_id || 'unknown';
+    const prevTime = lastInspectedByLoc[locId];
+    let isOntime = false;
+    let isLate = false;
+    let isSpam = false;
+
+    if (!prevTime) {
+      isOntime = !isOutOfHours;
+    } else {
+      const diffMinutes = (insTime.getTime() - prevTime.getTime()) / (1000 * 60);
+      if (diffMinutes < 15) {
+        isSpam = true; // Duplicate/rapid scan within 15 minutes
+      } else if (diffMinutes > 75) {
+        isLate = true; // Overdue inspection
+      } else {
+        isOntime = true; // Exactly on schedule
+      }
+    }
+
+    if (!isSpam) {
+      lastInspectedByLoc[locId] = insTime;
     }
 
     if (!toiletStats[rawName]) {
       toiletStats[rawName] = {
         name: rawName,
         total_inspections: 0,
+        ontime_count: 0,
+        late_count: 0,
+        out_of_hours_count: 0,
         pass_count: 0,
         fail_count: 0,
         verified_photos_count: 0,
@@ -308,6 +341,15 @@ export async function computeLeaderboard(targetMonthStr) {
     }
 
     toiletStats[rawName].total_inspections++;
+    if (isOutOfHours) {
+      toiletStats[rawName].out_of_hours_count++;
+      toiletStats[rawName].late_count++;
+    } else if (isOntime) {
+      toiletStats[rawName].ontime_count++;
+    } else if (isLate) {
+      toiletStats[rawName].late_count++;
+    }
+
     if (ins.overall_status === 'pass') {
       toiletStats[rawName].pass_count++;
     } else {
@@ -321,7 +363,7 @@ export async function computeLeaderboard(targetMonthStr) {
       }
     }
 
-    if (new Date(ins.created_at) > new Date(toiletStats[rawName].recent_inspection_at)) {
+    if (insTime > new Date(toiletStats[rawName].recent_inspection_at)) {
       toiletStats[rawName].recent_inspection_at = ins.created_at;
     }
   }
@@ -332,10 +374,18 @@ export async function computeLeaderboard(targetMonthStr) {
     const venue = matchedStaff ? matchedStaff.venue : (ts.name.startsWith('LC') ? 'LuckyCat' : 'JP Karaoke');
     const role = matchedStaff ? (matchedStaff.role || matchedStaff.division) : 'Staff Kebersihan / Service';
 
-    const passScore = ts.pass_count * 10;
-    const photoBonus = ts.verified_photos_count * 3;
+    // Strict on-time weighting:
+    // +15 pts per on-time inspection, +5 pts pass, +2 pts photo, -10 pts late penalty, -5 pts fail
+    const ontimeScore = ts.ontime_count * 15;
+    const latePenalty = ts.late_count * 10;
+    const passBonus = ts.pass_count * 5;
+    const photoBonus = ts.verified_photos_count * 2;
     const failPenalty = ts.fail_count * 5;
-    const score = Math.max(0, passScore + photoBonus - failPenalty);
+    const score = Math.max(0, ontimeScore + passBonus + photoBonus - latePenalty - failPenalty);
+
+    const ontimeRate = ts.total_inspections > 0
+      ? Math.round((ts.ontime_count / ts.total_inspections) * 100)
+      : 0;
 
     const passRate = ts.total_inspections > 0
       ? Math.round((ts.pass_count / ts.total_inspections) * 100)
@@ -349,6 +399,9 @@ export async function computeLeaderboard(targetMonthStr) {
       venue,
       photo_url: photoUrl,
       total_inspections: ts.total_inspections,
+      ontime_count: ts.ontime_count,
+      late_count: ts.late_count,
+      ontime_rate: ontimeRate,
       pass_count: ts.pass_count,
       fail_count: ts.fail_count,
       pass_rate: passRate,
@@ -356,19 +409,22 @@ export async function computeLeaderboard(targetMonthStr) {
       recent_inspection_at: ts.recent_inspection_at,
       score,
       breakdown: {
-        passScore,
+        ontimeScore,
+        latePenalty,
+        passBonus,
         photoBonus,
         failPenalty
       }
     };
   });
 
-  // Sort toilet: Score DESC, total_inspections DESC, pass_rate DESC, photos DESC
+  // Sort toilet: Score DESC, ontime_count DESC, ontime_rate DESC, total_inspections DESC
   toiletRanked.sort((a, b) => {
     if (b.score !== a.score) return b.score - a.score;
+    if (b.ontime_count !== a.ontime_count) return b.ontime_count - a.ontime_count;
+    if (b.ontime_rate !== a.ontime_rate) return b.ontime_rate - a.ontime_rate;
     if (b.total_inspections !== a.total_inspections) return b.total_inspections - a.total_inspections;
-    if (b.pass_rate !== a.pass_rate) return b.pass_rate - a.pass_rate;
-    return b.verified_photos_count - a.verified_photos_count;
+    return b.pass_rate - a.pass_rate;
   });
 
   toiletRanked.forEach((item, idx) => {

@@ -2481,4 +2481,298 @@ router.post('/leave-requests/:id/review', async (req, res) => {
   }
 });
 
+// ==========================================
+// 6. MANAGEMENT ANNOUNCEMENTS (GM ONLY EDIT)
+// ==========================================
+
+// Get Announcements (Staff & Manager)
+router.get('/announcements', async (req, res) => {
+  const { staffId, venue, activeOnly } = req.query;
+
+  try {
+    let announcements = [];
+    let reads = [];
+
+    if (isSupabaseConfigured) {
+      [announcements, reads] = await Promise.all([
+        cloudDb.getAnnouncements(),
+        cloudDb.getAnnouncementReads()
+      ]);
+    } else {
+      announcements = db.prepare('SELECT * FROM announcements ORDER BY created_at DESC').all();
+      reads = db.prepare('SELECT * FROM announcement_reads').all();
+    }
+
+    // Filter by active status
+    if (activeOnly === 'true' || activeOnly === true || activeOnly === undefined) {
+      announcements = announcements.filter(a => a.is_active !== false && a.is_active !== 0);
+    }
+
+    // Filter by target venue
+    if (venue && venue !== 'ALL') {
+      announcements = announcements.filter(a => !a.target_venue || a.target_venue === 'ALL' || a.target_venue === venue);
+    }
+
+    // If staffId is provided, attach reader info
+    const enriched = announcements.map(a => {
+      const staffRead = staffId ? reads.find(r => String(r.announcement_id) === String(a.id) && String(r.staff_id) === String(staffId)) : null;
+      const totalReads = reads.filter(r => String(r.announcement_id) === String(a.id)).length;
+      return {
+        ...a,
+        isRead: Boolean(staffRead),
+        readAt: staffRead ? staffRead.read_at : null,
+        totalReads
+      };
+    });
+
+    return res.json(enriched);
+  } catch (err) {
+    console.error('Error fetching announcements:', err);
+    return res.status(500).json({ error: 'Gagal memuat pengumuman: ' + err.message });
+  }
+});
+
+// Create Announcement (Strictly General Manager - PIN 8080)
+router.post('/announcements', async (req, res) => {
+  const { pin, title, content, urgency, targetVenue } = req.body || {};
+
+  const auth = await verifyManagementAuth(pin);
+  if (!auth.authorized || auth.role !== 'FULL_ADMIN') {
+    return res.status(403).json({ error: 'Akses ditolak: Hanya General Manager yang berwenang membuat pengumuman resmi.' });
+  }
+
+  if (!title || !title.trim()) return res.status(400).json({ error: 'Judul pengumuman wajib diisi.' });
+  if (!content || !content.trim()) return res.status(400).json({ error: 'Isi pengumuman wajib diisi.' });
+
+  const now = new Date().toISOString();
+  const announcementId = `ann_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+
+  const newAnnouncement = {
+    id: announcementId,
+    title: title.trim(),
+    content: content.trim(),
+    urgency: urgency || 'NORMAL', // 'NORMAL' | 'URGENT'
+    target_venue: targetVenue || 'ALL', // 'ALL' | 'JP Karaoke' | 'LuckyCat'
+    author_name: auth.reviewerName || 'General Manager',
+    is_active: 1,
+    created_at: now,
+    updated_at: now
+  };
+
+  try {
+    if (isSupabaseConfigured) {
+      await cloudDb.saveAnnouncement(newAnnouncement);
+    }
+
+    try {
+      db.prepare(`
+        INSERT INTO announcements (id, title, content, urgency, target_venue, author_name, is_active, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)
+      `).run(
+        newAnnouncement.id,
+        newAnnouncement.title,
+        newAnnouncement.content,
+        newAnnouncement.urgency,
+        newAnnouncement.target_venue,
+        newAnnouncement.author_name,
+        now,
+        now
+      );
+    } catch (e) {
+      console.warn('SQLite announcement insert note:', e.message);
+    }
+
+    broadcastEvent('ANNOUNCEMENT_UPDATE', { action: 'CREATED', announcement: newAnnouncement });
+
+    return res.json({
+      success: true,
+      message: 'Pengumuman resmi berhasil diterbitkan.',
+      announcement: newAnnouncement
+    });
+  } catch (err) {
+    console.error('Error creating announcement:', err);
+    return res.status(500).json({ error: 'Gagal menerbitkan pengumuman: ' + err.message });
+  }
+});
+
+// Update Announcement (General Manager Only)
+router.put('/announcements/:id', async (req, res) => {
+  const { id } = req.params;
+  const { pin, title, content, urgency, targetVenue, isActive } = req.body || {};
+
+  const auth = await verifyManagementAuth(pin);
+  if (!auth.authorized || auth.role !== 'FULL_ADMIN') {
+    return res.status(403).json({ error: 'Akses ditolak: Hanya General Manager yang berwenang mengubah pengumuman.' });
+  }
+
+  const now = new Date().toISOString();
+
+  try {
+    let existing = null;
+    if (isSupabaseConfigured) {
+      const list = await cloudDb.getAnnouncements();
+      existing = list.find(a => String(a.id) === String(id));
+    }
+    if (!existing) {
+      existing = db.prepare('SELECT * FROM announcements WHERE id = ?').get(id);
+    }
+    if (!existing) return res.status(404).json({ error: 'Pengumuman tidak ditemukan.' });
+
+    const updated = {
+      ...existing,
+      title: title !== undefined ? title.trim() : existing.title,
+      content: content !== undefined ? content.trim() : existing.content,
+      urgency: urgency !== undefined ? urgency : existing.urgency,
+      target_venue: targetVenue !== undefined ? targetVenue : existing.target_venue,
+      is_active: isActive !== undefined ? (isActive ? 1 : 0) : existing.is_active,
+      updated_at: now
+    };
+
+    if (isSupabaseConfigured) {
+      await cloudDb.saveAnnouncement(updated);
+    }
+
+    try {
+      db.prepare(`
+        UPDATE announcements
+        SET title = ?, content = ?, urgency = ?, target_venue = ?, is_active = ?, updated_at = ?
+        WHERE id = ?
+      `).run(
+        updated.title,
+        updated.content,
+        updated.urgency,
+        updated.target_venue,
+        updated.is_active ? 1 : 0,
+        now,
+        id
+      );
+    } catch (e) {
+      console.warn('SQLite announcement update note:', e.message);
+    }
+
+    broadcastEvent('ANNOUNCEMENT_UPDATE', { action: 'UPDATED', announcement: updated });
+
+    return res.json({
+      success: true,
+      message: 'Pengumuman berhasil diperbarui.',
+      announcement: updated
+    });
+  } catch (err) {
+    console.error('Error updating announcement:', err);
+    return res.status(500).json({ error: 'Gagal memperbarui pengumuman: ' + err.message });
+  }
+});
+
+// Staff Acknowledge / "Saya Mengerti"
+router.post('/announcements/:id/acknowledge', async (req, res) => {
+  const { id } = req.params;
+  const { staffId, staffName, venue, division } = req.body || {};
+
+  if (!staffId) return res.status(400).json({ error: 'ID Staf wajib dicantumkan.' });
+
+  try {
+    let receipt = null;
+    if (isSupabaseConfigured) {
+      receipt = await cloudDb.recordAnnouncementRead({
+        announcementId: id,
+        staffId,
+        staffName: staffName || 'Staff',
+        staffVenue: venue || 'JP Karaoke',
+        staffDivision: division || 'Staff'
+      });
+    }
+
+    const now = new Date().toISOString();
+    try {
+      const readId = `read_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+      db.prepare(`
+        INSERT OR IGNORE INTO announcement_reads (id, announcement_id, staff_id, staff_name, staff_venue, staff_division, read_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        receipt?.id || readId,
+        id,
+        staffId,
+        staffName || 'Staff',
+        venue || 'JP Karaoke',
+        division || 'Staff',
+        now
+      );
+    } catch (e) {
+      console.warn('SQLite announcement_reads note:', e.message);
+    }
+
+    broadcastEvent('ANNOUNCEMENT_READ', { announcementId: id, staffId, staffName });
+
+    return res.json({
+      success: true,
+      message: 'Terima kasih, konfirmasi telah tercatat.',
+      receipt
+    });
+  } catch (err) {
+    console.error('Error acknowledging announcement:', err);
+    return res.status(500).json({ error: 'Gagal mencatat konfirmasi: ' + err.message });
+  }
+});
+
+// Read Receipts Report (Manager & Assistant Manager)
+router.get('/announcements/:id/readers', async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    let reads = [];
+    let staffList = [];
+
+    if (isSupabaseConfigured) {
+      [reads, staffList] = await Promise.all([
+        cloudDb.getAnnouncementReads(),
+        cloudDb.getStaff('ALL')
+      ]);
+    } else {
+      reads = db.prepare('SELECT * FROM announcement_reads WHERE announcement_id = ?').all(id);
+      staffList = db.prepare('SELECT * FROM staff WHERE is_active = 1').all();
+    }
+
+    // Filter reads for this announcement
+    const thisReads = reads.filter(r => String(r.announcement_id) === String(id));
+    const readStaffIds = new Set(thisReads.map(r => String(r.staff_id)));
+
+    // Active operational staff pool (exclude Management)
+    const activeStaff = staffList.filter(s => s.is_active && s.division !== 'Management');
+
+    const readers = thisReads.map(r => ({
+      staff_id: r.staff_id,
+      staff_name: r.staff_name,
+      staff_venue: r.staff_venue,
+      staff_division: r.staff_division,
+      read_at: r.read_at
+    })).sort((a, b) => new Date(b.read_at) - new Date(a.read_at));
+
+    const unread = activeStaff
+      .filter(s => !readStaffIds.has(String(s.id)) && !readStaffIds.has(String(s.legacy_code)))
+      .map(s => ({
+        staff_id: s.id,
+        staff_name: s.name,
+        staff_venue: s.venue,
+        staff_division: s.division
+      }))
+      .sort((a, b) => a.staff_name.localeCompare(b.staff_name));
+
+    const totalCount = activeStaff.length;
+    const readCount = readers.length;
+    const percentage = totalCount > 0 ? Math.round((readCount / totalCount) * 100) : 0;
+
+    return res.json({
+      announcement_id: id,
+      total_active_staff: totalCount,
+      read_count: readCount,
+      percentage,
+      readers,
+      unread
+    });
+  } catch (err) {
+    console.error('Error fetching announcement readers:', err);
+    return res.status(500).json({ error: 'Gagal memuat laporan pembaca: ' + err.message });
+  }
+});
+
 export default router;

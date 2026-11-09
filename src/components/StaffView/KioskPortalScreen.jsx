@@ -1,5 +1,5 @@
 import React from 'react';
-import { Camera, Sparkles, QrCode, LogOut, CheckCircle, Clock, Building2, User, Coffee, ArrowRight, ShieldCheck, Star, Eye, Trophy, Palmtree } from 'lucide-react';
+import { Camera, Sparkles, QrCode, LogOut, CheckCircle, Clock, Building2, User, Coffee, ArrowRight, ShieldCheck, Star, Eye, Trophy, Palmtree, Megaphone } from 'lucide-react';
 
 export default function KioskPortalScreen({
   staff,
@@ -9,7 +9,11 @@ export default function KioskPortalScreen({
   onOpenLeaderboard,
   onOpenStaffLeaveModal,
   onOpenMonitoring,
-  onLogout
+  onLogout,
+  leaveUpdateCount = 0,
+  announcements = [],
+  unreadAnnouncementsCount = 0,
+  onOpenAnnouncements
 }) {
   const isCheckedIn = Boolean(activeShift);
   const isOnBreak = activeShift?.break_status === 'ON_BREAK';
@@ -88,6 +92,54 @@ export default function KioskPortalScreen({
           {isOnBreak ? 'Istirahat' : isCheckedIn ? 'On Duty' : 'Off Duty'}
         </span>
       </div>
+
+      {/* Management Announcements Banner */}
+      {announcements && announcements.length > 0 && (
+        <div
+          onClick={onOpenAnnouncements}
+          className={`p-4 rounded-3xl border-2 transition-all cursor-pointer shadow-sm hover:shadow-md flex items-center justify-between gap-3 ${
+            unreadAnnouncementsCount > 0
+              ? 'bg-gradient-to-r from-amber-500/15 via-rose-500/10 to-amber-500/20 border-amber-400 ring-2 ring-amber-400/30'
+              : 'bg-white border-slate-200'
+          }`}
+        >
+          <div className="flex items-center space-x-3 min-w-0">
+            <div className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 text-white ${
+              unreadAnnouncementsCount > 0
+                ? 'bg-gradient-to-br from-rose-600 to-amber-600 shadow-md shadow-rose-600/30'
+                : 'bg-slate-800'
+            }`}>
+              <Megaphone className="w-5 h-5 text-amber-300" />
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center space-x-2">
+                <span className="text-[10px] font-black uppercase text-slate-500 tracking-wider">
+                  Pengumuman Management
+                </span>
+                {unreadAnnouncementsCount > 0 ? (
+                  <span className="px-2 py-0.5 rounded-full text-[9px] font-black bg-rose-600 text-white animate-pulse">
+                    {unreadAnnouncementsCount} Baru (Wajib Baca)
+                  </span>
+                ) : (
+                  <span className="px-2 py-0.5 rounded-full text-[9px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300">
+                    Sudah Dibaca ✓
+                  </span>
+                )}
+              </div>
+              <h4 className="text-xs sm:text-sm font-black text-slate-950 truncate mt-0.5">
+                {announcements[0]?.title}
+              </h4>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-black shrink-0 shadow-sm"
+          >
+            Buka
+          </button>
+        </div>
+      )}
 
       {/* Action Options Prompt */}
       <div className="flex items-center justify-between px-1">
@@ -205,10 +257,17 @@ export default function KioskPortalScreen({
           >
             <div>
               <div className="flex items-center justify-between mb-2">
-                <span className="inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-600 text-white shadow-sm">
-                  <Palmtree className="w-3 h-3 text-amber-300" />
-                  <span>3. Pengajuan Izin &amp; Cuti</span>
-                </span>
+                <div className="flex items-center space-x-2">
+                  <span className="inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-600 text-white shadow-sm">
+                    <Palmtree className="w-3 h-3 text-amber-300" />
+                    <span>3. Pengajuan Izin &amp; Cuti</span>
+                  </span>
+                  {leaveUpdateCount > 0 && (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-rose-600 text-white animate-pulse shadow-sm">
+                      {leaveUpdateCount} Update Baru!
+                    </span>
+                  )}
+                </div>
                 <span className="text-[11px] font-black text-emerald-800 group-hover:text-emerald-950">
                   Kelola Cuti &amp; Izin Saya →
                 </span>

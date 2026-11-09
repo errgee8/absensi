@@ -857,5 +857,89 @@ export const cloudDb = {
       usedDays,
       remainingDays
     };
+  },
+
+  // 12. Management Announcements & Read Receipts
+  async getAnnouncements() {
+    if (!supabase) return [];
+    try {
+      const { data } = await supabase
+        .from('app_settings')
+        .select('value')
+        .eq('key', 'management_announcements')
+        .maybeSingle();
+      return Array.isArray(data?.value) ? data.value : [];
+    } catch (e) {
+      console.warn('Failed to fetch announcements from Supabase:', e.message);
+      return [];
+    }
+  },
+
+  async saveAnnouncement(announcement) {
+    if (!supabase) return announcement;
+    const list = await this.getAnnouncements();
+    const existingIdx = list.findIndex(a => a.id === announcement.id);
+    let updatedList;
+    if (existingIdx >= 0) {
+      updatedList = [...list];
+      updatedList[existingIdx] = { ...updatedList[existingIdx], ...announcement, updated_at: new Date().toISOString() };
+    } else {
+      updatedList = [announcement, ...list];
+    }
+
+    const { error } = await supabase
+      .from('app_settings')
+      .upsert({
+        key: 'management_announcements',
+        value: updatedList,
+        description: 'Official Management Announcements',
+        updated_at: new Date().toISOString()
+      });
+    if (error) throw error;
+    return announcement;
+  },
+
+  async getAnnouncementReads() {
+    if (!supabase) return [];
+    try {
+      const { data } = await supabase
+        .from('app_settings')
+        .select('value')
+        .eq('key', 'management_announcement_reads')
+        .maybeSingle();
+      return Array.isArray(data?.value) ? data.value : [];
+    } catch (e) {
+      console.warn('Failed to fetch announcement reads from Supabase:', e.message);
+      return [];
+    }
+  },
+
+  async recordAnnouncementRead({ announcementId, staffId, staffName, staffVenue, staffDivision }) {
+    if (!supabase) return null;
+    const reads = await this.getAnnouncementReads();
+    const existing = reads.find(r => r.announcement_id === announcementId && r.staff_id === staffId);
+    if (existing) return existing;
+
+    const newRecord = {
+      id: `read_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      announcement_id: announcementId,
+      staff_id: staffId,
+      staff_name: staffName,
+      staff_venue: staffVenue || 'JP Karaoke',
+      staff_division: staffDivision || 'Staff',
+      read_at: new Date().toISOString()
+    };
+
+    const updatedList = [newRecord, ...reads];
+    const { error } = await supabase
+      .from('app_settings')
+      .upsert({
+        key: 'management_announcement_reads',
+        value: updatedList,
+        description: 'Staff Read Receipts for Management Announcements',
+        updated_at: new Date().toISOString()
+      });
+    if (error) throw error;
+    return newRecord;
   }
 };

@@ -99,6 +99,29 @@ db.exec(`
     FOREIGN KEY(staff_id) REFERENCES staff(id)
   );
 
+  CREATE TABLE IF NOT EXISTS announcements (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    content TEXT NOT NULL,
+    urgency TEXT DEFAULT 'NORMAL',
+    target_venue TEXT DEFAULT 'ALL',
+    author_name TEXT DEFAULT 'General Manager',
+    is_active INTEGER DEFAULT 1,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS announcement_reads (
+    id TEXT PRIMARY KEY,
+    announcement_id TEXT NOT NULL,
+    staff_id TEXT NOT NULL,
+    staff_name TEXT NOT NULL,
+    staff_venue TEXT,
+    staff_division TEXT,
+    read_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(announcement_id) REFERENCES announcements(id)
+  );
+
   CREATE TABLE IF NOT EXISTS leave_requests (
     id TEXT PRIMARY KEY,
     staff_id TEXT NOT NULL,
@@ -125,6 +148,29 @@ db.exec(`
     created_at TEXT DEFAULT (datetime('now')),
     updated_at TEXT DEFAULT (datetime('now')),
     FOREIGN KEY(staff_id) REFERENCES staff(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS announcements (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    content TEXT NOT NULL,
+    urgency TEXT DEFAULT 'NORMAL',
+    target_venue TEXT DEFAULT 'ALL',
+    author_name TEXT DEFAULT 'General Manager',
+    is_active INTEGER DEFAULT 1,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS announcement_reads (
+    id TEXT PRIMARY KEY,
+    announcement_id TEXT NOT NULL,
+    staff_id TEXT NOT NULL,
+    staff_name TEXT NOT NULL,
+    staff_venue TEXT,
+    staff_division TEXT,
+    read_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(announcement_id) REFERENCES announcements(id)
   );
 `);
 

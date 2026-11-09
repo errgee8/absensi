@@ -3,7 +3,7 @@ import { Eye, AlertTriangle, CheckCircle, Clock, Coffee, MapPin } from 'lucide-r
 import { formatWitaTimeOnly, formatWitaDateOnly, formatDuration } from '../../utils/time';
 import { resolveShift } from '../../utils/shiftResolver';
 
-export default function ShiftTable({ shifts = [], schedules = [], onInspectPhoto }) {
+export default function ShiftTable({ shifts = [], schedules = [], onInspectPhoto, readersSet, hasActiveAnnouncement }) {
   if (shifts.length === 0) {
     return (
       <div className="bg-white border-2 border-slate-200 rounded-3xl p-12 text-center shadow-sm">
@@ -143,7 +143,28 @@ export default function ShiftTable({ shifts = [], schedules = [], onInspectPhoto
 
                   {/* Staff Name & ID */}
                   <td className="py-3 px-3 whitespace-nowrap">
-                    <div className="font-black text-slate-950 text-sm">{shift.staff_name}</div>
+                    <div className="flex items-center space-x-1.5">
+                      <span className="font-black text-slate-950 text-sm">{shift.staff_name}</span>
+                      {hasActiveAnnouncement && (
+                        readersSet?.has(String(shift.staff_id)) ? (
+                          <span
+                            title="Sudah membaca pengumuman management ✓"
+                            className="inline-flex items-center space-x-0.5 px-1.5 py-0.2 rounded text-[8px] font-black bg-emerald-100 text-emerald-900 border border-emerald-300"
+                          >
+                            <CheckCircle className="w-2.5 h-2.5 text-emerald-700 stroke-[2.5]" />
+                            <span>Paham ✓</span>
+                          </span>
+                        ) : (
+                          <span
+                            title="Belum membaca pengumuman management"
+                            className="inline-flex items-center space-x-0.5 px-1.5 py-0.2 rounded text-[8px] font-black bg-rose-100 text-rose-900 border border-rose-300"
+                          >
+                            <AlertTriangle className="w-2.5 h-2.5 text-rose-600 stroke-[2.5]" />
+                            <span>Belum Baca</span>
+                          </span>
+                        )
+                      )}
+                    </div>
                     <div className="text-[10px] text-slate-600 font-mono font-bold">{shift.staff_id}</div>
                   </td>
 

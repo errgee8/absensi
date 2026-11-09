@@ -281,6 +281,59 @@ export async function reviewLateCheckin(shiftId, payload) {
   return data;
 }
 
+// Announcements API
+export async function getAnnouncements(params = {}) {
+  const q = new URLSearchParams();
+  if (params.staffId) q.append('staffId', params.staffId);
+  if (params.venue) q.append('venue', params.venue);
+  if (params.activeOnly !== undefined) q.append('activeOnly', params.activeOnly);
+
+  const res = await fetch(`${API_BASE}/announcements?${q.toString()}`);
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Gagal memuat pengumuman');
+  return data;
+}
+
+export async function createAnnouncement(payload) {
+  const res = await fetch(`${API_BASE}/announcements`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Gagal menerbitkan pengumuman');
+  return data;
+}
+
+export async function updateAnnouncement(id, payload) {
+  const res = await fetch(`${API_BASE}/announcements/${encodeURIComponent(id)}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Gagal memperbarui pengumuman');
+  return data;
+}
+
+export async function acknowledgeAnnouncement(id, payload) {
+  const res = await fetch(`${API_BASE}/announcements/${encodeURIComponent(id)}/acknowledge`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Gagal mencatat konfirmasi');
+  return data;
+}
+
+export async function getAnnouncementReaders(id) {
+  const res = await fetch(`${API_BASE}/announcements/${encodeURIComponent(id)}/readers`);
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Gagal memuat daftar pembaca');
+  return data;
+}
+
 export function subscribeRealtimeEvents(onEvent) {
   const eventSource = new EventSource(`${API_BASE}/events`);
 
@@ -305,6 +358,18 @@ export function subscribeRealtimeEvents(onEvent) {
   eventSource.addEventListener('SCHEDULES_UPDATE', (e) => {
     try {
       onEvent('SCHEDULES_UPDATE', JSON.parse(e.data));
+    } catch {}
+  });
+
+  eventSource.addEventListener('ANNOUNCEMENT_UPDATE', (e) => {
+    try {
+      onEvent('ANNOUNCEMENT_UPDATE', JSON.parse(e.data));
+    } catch {}
+  });
+
+  eventSource.addEventListener('ANNOUNCEMENT_READ', (e) => {
+    try {
+      onEvent('ANNOUNCEMENT_READ', JSON.parse(e.data));
     } catch {}
   });
 

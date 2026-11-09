@@ -6,7 +6,8 @@ import KioskCameraModal from './KioskCameraModal';
 import ToiletScannerModal from '../ToiletChecklist/ToiletScannerModal';
 import ToiletChecklistForm from '../ToiletChecklist/ToiletChecklistForm';
 import StaffLeaveModal from './StaffLeaveModal';
-import { verifyStaffPin } from '../../utils/api';
+import StaffAnnouncementModal from './StaffAnnouncementModal';
+import { verifyStaffPin, getAnnouncements, acknowledgeAnnouncement, getLeaveRequests, subscribeRealtimeEvents } from '../../utils/api';
 import { RESTROOM_LOCATIONS } from '../../utils/toiletService';
 import { CheckCircle2 } from 'lucide-react';
 
@@ -33,6 +34,12 @@ export default function StaffView({
   const [cameraActionType, setCameraActionType] = useState('checkin');
   const [confirmedShift, setConfirmedShift] = useState(null);
   const [leaveModalOpen, setLeaveModalOpen] = useState(false);
+
+  // Notifications & Announcements state
+  const [announcements, setAnnouncements] = useState([]);
+  const [unreadAnnouncementsCount, setUnreadAnnouncementsCount] = useState(0);
+  const [announcementModalOpen, setAnnouncementModalOpen] = useState(false);
+  const [leaveUpdateCount, setLeaveUpdateCount] = useState(0);
 
   // Toilet QR Scanner & Checklist state
   const [toiletScannerOpen, setToiletScannerOpen] = useState(false);
@@ -63,6 +70,66 @@ export default function StaffView({
     }
   }, []);
 
+  // Load Staff Notifications (Leave updates and active announcements)
+  const loadStaffNotifications = async (staff) => {
+    if (!staff?.id) return;
+    try {
+      const [annData, leaveData] = await Promise.all([
+        getAnnouncements({ staffId: staff.id, venue: staff.venue, activeOnly: true }),
+        getLeaveRequests({ staffId: staff.id })
+      ]);
+
+      const annList = Array.isArray(annData) ? annData : [];
+      setAnnouncements(annList);
+      const unreadAnns = annList.filter(a => !a.isRead);
+      setUnreadAnnouncementsCount(unreadAnns.length);
+
+      // If there is any unread URGENT announcement, auto-open pop-up modal so staff sees it immediately!
+      const hasUrgentUnread = unreadAnns.some(a => a.urgency === 'URGENT');
+      if (hasUrgentUnread) {
+        setAnnouncementModalOpen(true);
+      }
+
+      // Calculate leave updates
+      const lastViewed = localStorage.getItem('last_viewed_leave_' + staff.id);
+      const newUpdates = (leaveData || []).filter(r => {
+        if (r.status === 'PENDING') return false;
+        if (!lastViewed) return true;
+        return new Date(r.updated_at || r.created_at) > new Date(lastViewed);
+      });
+      setLeaveUpdateCount(newUpdates.length);
+    } catch (e) {
+      console.warn('Failed to load staff notifications:', e);
+    }
+  };
+
+  useEffect(() => {
+    if (loggedInStaff) {
+      loadStaffNotifications(loggedInStaff);
+    }
+  }, [loggedInStaff]);
+
+  // Realtime subscription for announcements and leave requests
+  useEffect(() => {
+    const unsubscribe = subscribeRealtimeEvents((eventType) => {
+      if ((eventType === 'ANNOUNCEMENT_UPDATE' || eventType === 'ANNOUNCEMENT_READ' || eventType === 'LEAVE_UPDATE') && loggedInStaff) {
+        loadStaffNotifications(loggedInStaff);
+      }
+    });
+    return () => unsubscribe();
+  }, [loggedInStaff]);
+
+  const handleAcknowledgeAnnouncement = async (announcementId) => {
+    if (!loggedInStaff) return;
+    await acknowledgeAnnouncement(announcementId, {
+      staffId: loggedInStaff.id,
+      staffName: loggedInStaff.name,
+      venue: loggedInStaff.venue,
+      division: loggedInStaff.division
+    });
+    await loadStaffNotifications(loggedInStaff);
+  };
+
   // Handle PIN submission on Screen 1
   const handleLogin = async (overridePin) => {
     const pinToVerify = (overridePin || pin).trim();
@@ -77,6 +144,7 @@ export default function StaffView({
 
       setLoggedInStaff(data.staff);
       setActiveShift(data.activeShift);
+      loadStaffNotifications(data.staff);
 
       // If staff arrived via a direct QR scan link, open that restroom checklist immediately!
       if (directToiletLocation) {
@@ -156,6 +224,10 @@ export default function StaffView({
             }
           }}
           onLogout={handleResetToLogin}
+          leaveUpdateCount={leaveUpdateCount}
+          announcements={announcements}
+          unreadAnnouncementsCount={unreadAnnouncementsCount}
+          onOpenAnnouncements={() => setAnnouncementModalOpen(true)}
         />
       )}
 
@@ -225,6 +297,18 @@ export default function StaffView({
           onClose={() => setLeaveModalOpen(false)}
           staff={loggedInStaff}
           onRefreshShifts={() => handleLogin(pin)}
+          onMarkViewed={() => setLeaveUpdateCount(0)}
+        />
+      )}
+
+      {/* Official Management Announcement Modal */}
+      {announcementModalOpen && loggedInStaff && (
+        <StaffAnnouncementModal
+          isOpen={announcementModalOpen}
+          onClose={() => setAnnouncementModalOpen(false)}
+          announcements={announcements}
+          staff={loggedInStaff}
+          onAcknowledge={handleAcknowledgeAnnouncement}
         />
       )}
     </div>

@@ -191,7 +191,7 @@ function LeaderboardColumn({
                       <span className="text-slate-400 text-[8px] sm:text-[9px] block">
                         {isAttendance
                           ? `${top2.total_days}h • Tlt ${top2.total_late_minutes}m`
-                          : `${top2.total_inspections}x Cek (${top2.pass_rate}%)`}
+                          : `${top2.ontime_count || 0}/${top2.total_inspections}x Tepat (${top2.ontime_rate || 0}%)`}
                       </span>
                     </div>
                   </div>
@@ -219,8 +219,13 @@ function LeaderboardColumn({
                       <span className="text-slate-300 text-[9px] font-bold block mt-0.5">
                         {isAttendance
                           ? `${top1.total_days}/26 Hari • Tlt ${top1.total_late_minutes}m ${top1.late_seconds_remainder}s`
-                          : `${top1.total_inspections}x Inspeksi (${top1.pass_rate}%)`}
+                          : `${top1.ontime_count || 0}/${top1.total_inspections}x Tepat Waktu (${top1.ontime_rate || 0}%)`}
                       </span>
+                      {!isAttendance && top1.late_count > 0 && (
+                        <span className="inline-block mt-0.5 px-1.5 py-0.2 rounded-full bg-rose-500/20 text-rose-300 text-[8px] font-black">
+                          ⚠️ {top1.late_count}x Telat
+                        </span>
+                      )}
                       {isAttendance && top1.early_bird_30m_count > 0 && (
                         <span className="inline-block mt-0.5 px-1.5 py-0.2 rounded-full bg-amber-400/20 text-amber-200 text-[8px] font-black">
                           ⚡ Awal: {top1.early_bird_30m_count}x
@@ -252,7 +257,7 @@ function LeaderboardColumn({
                       <span className="text-slate-400 text-[8px] sm:text-[9px] block">
                         {isAttendance
                           ? `${top3.total_days}h • Tlt ${top3.total_late_minutes}m`
-                          : `${top3.total_inspections}x Cek (${top3.pass_rate}%)`}
+                          : `${top3.ontime_count || 0}/${top3.total_inspections}x Tepat (${top3.ontime_rate || 0}%)`}
                       </span>
                     </div>
                   </div>
@@ -313,10 +318,15 @@ function LeaderboardColumn({
                       ) : (
                         <div className="flex flex-wrap items-center gap-1 mt-0.5 text-[9px] font-bold">
                           <span className="px-1.5 py-0.2 rounded bg-cyan-950 text-cyan-300 border border-cyan-900/60 font-mono">
-                            🧹 {item.total_inspections}x
+                            ⏱️ {item.ontime_count || 0}/{item.total_inspections}x Tepat ({item.ontime_rate || 0}%)
                           </span>
+                          {item.late_count > 0 && (
+                            <span className="px-1.5 py-0.2 rounded bg-rose-950 text-rose-300 border border-rose-900/60 font-mono">
+                              ⚠️ {item.late_count}x Telat
+                            </span>
+                          )}
                           <span className="px-1.5 py-0.2 rounded bg-emerald-950 text-emerald-300 border border-emerald-900/60 font-mono">
-                            ✓ {item.pass_rate}% Pass
+                            ✓ {item.pass_rate}% Bersih
                           </span>
                         </div>
                       )}
