@@ -116,6 +116,7 @@ db.exec(`
     approved_end_date TEXT,
     reason TEXT NOT NULL,
     photo_url TEXT,
+    document_url TEXT,
     status TEXT DEFAULT 'PENDING',
     manager_notes TEXT,
     reviewed_by TEXT,
@@ -149,6 +150,7 @@ ensureColumn('shifts', 'break_end_time', 'TEXT');
 ensureColumn('shifts', 'break_end_photo', 'TEXT');
 ensureColumn('shifts', 'break_duration_minutes', 'INTEGER');
 ensureColumn('shifts', 'break_count', 'INTEGER DEFAULT 0');
+ensureColumn('leave_requests', 'document_url', 'TEXT');
 
 // Settings Helper
 export const getSetting = (key) => {

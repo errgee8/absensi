@@ -40,10 +40,12 @@ export default function StaffLeaveModal({ isOpen, onClose, staff, onRefreshShift
   const [izinStart, setIzinStart] = useState('');
   const [izinEnd, setIzinEnd] = useState('');
   const [izinReason, setIzinReason] = useState('');
-  const [izinProofPhoto, setIzinProofPhoto] = useState(null);
+  const [izinSelfie, setIzinSelfie] = useState(null);
+  const [izinDocPhoto, setIzinDocPhoto] = useState(null);
 
-  // Camera State for Cuti Selfie
+  // Camera State for Selfie
   const [cameraActive, setCameraActive] = useState(false);
+  const [cameraTarget, setCameraTarget] = useState('CUTI'); // 'CUTI' | 'IZIN'
   const [cameraError, setCameraError] = useState(null);
   const videoRef = useRef(null);
   const streamRef = useRef(null);
@@ -87,7 +89,8 @@ export default function StaffLeaveModal({ isOpen, onClose, staff, onRefreshShift
   }, [isOpen, staff]);
 
   // Camera Controls
-  const startCamera = async () => {
+  const startCamera = async (target = 'CUTI') => {
+    setCameraTarget(target);
     setCameraError(null);
     setCameraActive(true);
     try {
@@ -122,16 +125,20 @@ export default function StaffLeaveModal({ isOpen, onClose, staff, onRefreshShift
     const ctx = canvas.getContext('2d');
     ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
     const base64 = canvas.toDataURL('image/jpeg', 0.85);
-    setCutiSelfie(base64);
+    if (cameraTarget === 'IZIN') {
+      setIzinSelfie(base64);
+    } else {
+      setCutiSelfie(base64);
+    }
     stopCamera();
   };
 
-  const handleFileUpload = (e) => {
+  const handleDocUpload = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
     reader.onload = () => {
-      setIzinProofPhoto(reader.result);
+      setIzinDocPhoto(reader.result);
     };
     reader.readAsDataURL(file);
   };
@@ -205,8 +212,8 @@ export default function StaffLeaveModal({ isOpen, onClose, staff, onRefreshShift
       setError('Tanggal selesai tidak boleh lebih awal dari tanggal mulai.');
       return;
     }
-    if (!izinProofPhoto) {
-      setError('Foto bukti (surat dokter / resep / surat keterangan) wajib dilampirkan.');
+    if (!izinSelfie) {
+      setError('Foto selfie pemohon wajib diambil untuk verifikasi biometrik.');
       return;
     }
 
@@ -221,14 +228,16 @@ export default function StaffLeaveModal({ isOpen, onClose, staff, onRefreshShift
         endDate: izinEnd,
         requestedDays: days,
         reason: izinReason,
-        photoBase64: izinProofPhoto
+        photoBase64: izinSelfie,
+        documentBase64: izinDocPhoto || null
       });
 
       setSuccessMsg(res.message || 'Permohonan izin berhasil dikirim ke management.');
       setIzinStart('');
       setIzinEnd('');
       setIzinReason('');
-      setIzinProofPhoto(null);
+      setIzinSelfie(null);
+      setIzinDocPhoto(null);
       await loadStaffData();
       setActiveTab('HISTORY');
     } catch (err) {
@@ -446,19 +455,36 @@ export default function StaffLeaveModal({ isOpen, onClose, staff, onRefreshShift
                         )}
 
                         {/* Verification Photo Thumbnail */}
-                        {r.photo_url && (
-                          <div className="mt-2 flex items-center space-x-2 text-[10px] text-slate-500">
-                            <span>Bukti/Selfie:</span>
-                            <a
-                              href={r.photo_url}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="inline-block w-8 h-8 rounded-lg overflow-hidden border border-slate-300 hover:opacity-80"
-                            >
-                              <img src={r.photo_url} alt="Bukti" className="w-full h-full object-cover" />
-                            </a>
-                          </div>
-                        )}
+                        <div className="mt-2 flex items-center space-x-3 text-[10px] text-slate-500">
+                          {r.photo_url && (
+                            <div className="flex items-center space-x-1.5">
+                              <span>Selfie:</span>
+                              <a
+                                href={r.photo_url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-block w-8 h-8 rounded-lg overflow-hidden border border-slate-300 hover:opacity-80"
+                                title="Lihat Selfie Pemohon"
+                              >
+                                <img src={r.photo_url} alt="Selfie" className="w-full h-full object-cover" />
+                              </a>
+                            </div>
+                          )}
+                          {r.document_url && (
+                            <div className="flex items-center space-x-1.5">
+                              <span>Dokumen:</span>
+                              <a
+                                href={r.document_url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-block w-8 h-8 rounded-lg overflow-hidden border border-purple-300 hover:opacity-80"
+                                title="Lihat Dokumen Pendukung"
+                              >
+                                <img src={r.document_url} alt="Dokumen" className="w-full h-full object-cover" />
+                              </a>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     );
                   })}
@@ -562,7 +588,7 @@ export default function StaffLeaveModal({ isOpen, onClose, staff, onRefreshShift
                       Foto Terverifikasi ✓
                     </span>
                   </div>
-                ) : cameraActive ? (
+                ) : cameraActive && cameraTarget === 'CUTI' ? (
                   <div className="space-y-2">
                     <div className="w-full max-w-xs h-56 bg-slate-950 rounded-2xl overflow-hidden relative border-2 border-blue-500 shadow-md">
                       <video
@@ -570,7 +596,7 @@ export default function StaffLeaveModal({ isOpen, onClose, staff, onRefreshShift
                         autoPlay
                         playsInline
                         muted
-                        className="w-full h-full object-cover"
+                        className="w-full h-full object-cover scale-x-[-1]"
                       />
                       <button
                         type="button"
@@ -593,13 +619,13 @@ export default function StaffLeaveModal({ isOpen, onClose, staff, onRefreshShift
                   <div>
                     <button
                       type="button"
-                      onClick={startCamera}
+                      onClick={() => startCamera('CUTI')}
                       className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 border-2 border-dashed border-slate-300 rounded-2xl text-xs font-black text-blue-700 flex items-center space-x-2 transition"
                     >
                       <Camera className="w-4 h-4" />
                       <span>Buka Kamera Selfie Cuti</span>
                     </button>
-                    {cameraError && <p className="text-[11px] text-rose-600 mt-1">{cameraError}</p>}
+                    {cameraError && cameraTarget === 'CUTI' && <p className="text-[11px] text-rose-600 mt-1">{cameraError}</p>}
                   </div>
                 )}
               </div>
@@ -638,8 +664,8 @@ export default function StaffLeaveModal({ isOpen, onClose, staff, onRefreshShift
                   <span>Ketentuan Izin Sakit &amp; Darurat:</span>
                 </div>
                 <p className="text-[11px] text-purple-800 leading-relaxed">
-                  • Dapat diajukan pada hari H atau rentang sakit yang diperlukan.<br />
-                  • <strong>Wajib melampirkan foto bukti fisik</strong> (surat keterangan dokter, resep obat, atau surat izin tertulis) agar dapat ditinjau dan di-ACC management.
+                  • <strong>Foto selfie pemohon WAJIB diambil</strong> agar permohonan sah dan tidak disalahgunakan orang lain.<br />
+                  • <strong>Dokumen pendukung (surat dokter / resep / surat keterangan) bersifat OPSIONAL</strong> — dapat dilampirkan jika tersedia.
                 </p>
               </div>
 
@@ -719,52 +745,129 @@ export default function StaffLeaveModal({ isOpen, onClose, staff, onRefreshShift
                 />
               </div>
 
-              {/* Proof Photo Upload */}
-              <div>
-                <label className="block text-xs font-black text-slate-900 mb-1">
-                  Foto Bukti (Surat Dokter / Resep / Keterangan Sakit): <span className="text-rose-600">*Wajib</span>
-                </label>
-
-                {izinProofPhoto ? (
-                  <div className="relative inline-block border-2 border-purple-400 rounded-2xl overflow-hidden shadow-sm">
-                    <img src={izinProofPhoto} alt="Bukti Sakit" className="w-36 h-36 object-cover" />
-                    <button
-                      type="button"
-                      onClick={() => setIzinProofPhoto(null)}
-                      className="absolute top-1 right-1 p-1 bg-rose-600 text-white rounded-lg hover:bg-rose-700 shadow"
-                    >
-                      <X className="w-3.5 h-3.5 stroke-[2.5]" />
-                    </button>
-                    <span className="absolute bottom-0 inset-x-0 bg-purple-700 text-white text-[9px] font-black py-0.5 text-center">
-                      Foto Terlampir ✓
-                    </span>
-                  </div>
-                ) : (
+              {/* TWO BUTTONS: 1. Selfie Pemohon (Wajib) & 2. Upload Dokumen Pendukung (Opsional) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                
+                {/* BUTTON 1: SELFIE PEMOHON (WAJIB) */}
+                <div className="bg-slate-50 p-3 rounded-2xl border-2 border-slate-200 flex flex-col justify-between">
                   <div>
-                    <input
-                      type="file"
-                      ref={fileInputRef}
-                      accept="image/*"
-                      onChange={handleFileUpload}
-                      className="hidden"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => fileInputRef.current?.click()}
-                      className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 border-2 border-dashed border-slate-300 rounded-2xl text-xs font-black text-purple-700 flex items-center space-x-2 transition"
-                    >
-                      <Upload className="w-4 h-4" />
-                      <span>Upload / Ambil Foto Bukti Surat Dokter</span>
-                    </button>
+                    <label className="block text-xs font-black text-slate-900 mb-0.5">
+                      1. Foto Selfie Pemohon: <span className="text-rose-600">*Wajib</span>
+                    </label>
+                    <p className="text-[10px] text-slate-500 font-bold mb-2">
+                      Ambil selfie biometrik via kamera depan.
+                    </p>
                   </div>
-                )}
+
+                  {izinSelfie ? (
+                    <div className="relative inline-block border-2 border-emerald-400 rounded-2xl overflow-hidden shadow-sm self-start">
+                      <img src={izinSelfie} alt="Selfie Izin" className="w-28 h-28 object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => setIzinSelfie(null)}
+                        className="absolute top-1 right-1 p-1 bg-rose-600 text-white rounded-lg hover:bg-rose-700 shadow"
+                        title="Ambil Ulang"
+                      >
+                        <X className="w-3 h-3 stroke-[2.5]" />
+                      </button>
+                      <span className="absolute bottom-0 inset-x-0 bg-emerald-600 text-white text-[9px] font-black py-0.5 text-center">
+                        Selfie Terverifikasi ✓
+                      </span>
+                    </div>
+                  ) : cameraActive && cameraTarget === 'IZIN' ? (
+                    <div className="space-y-2">
+                      <div className="w-full h-44 bg-slate-950 rounded-xl overflow-hidden relative border border-slate-700">
+                        <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover scale-x-[-1]" />
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={captureSelfie}
+                          className="flex-1 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[11px] font-black transition flex items-center justify-center space-x-1"
+                        >
+                          <Camera className="w-3.5 h-3.5" />
+                          <span>Jepret Selfie</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={stopCamera}
+                          className="px-2.5 py-1.5 bg-slate-200 text-slate-700 rounded-lg text-[11px] font-bold"
+                        >
+                          Batal
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div>
+                      <button
+                        type="button"
+                        onClick={() => startCamera('IZIN')}
+                        className="w-full py-2.5 px-3 bg-purple-100 hover:bg-purple-200 border-2 border-purple-300 rounded-xl text-xs font-black text-purple-900 flex items-center justify-center space-x-2 transition"
+                      >
+                        <Camera className="w-4 h-4 text-purple-700" />
+                        <span>Buka Kamera Selfie</span>
+                      </button>
+                      {cameraError && cameraTarget === 'IZIN' && (
+                        <p className="text-[10px] text-rose-600 font-bold mt-1">{cameraError}</p>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* BUTTON 2: UPLOAD DOKUMEN PENDUKUNG (OPSIONAL) */}
+                <div className="bg-slate-50 p-3 rounded-2xl border-2 border-slate-200 flex flex-col justify-between">
+                  <div>
+                    <label className="block text-xs font-black text-slate-900 mb-0.5">
+                      2. Dokumen Pendukung: <span className="text-slate-500 font-normal">(Opsional)</span>
+                    </label>
+                    <p className="text-[10px] text-slate-500 font-bold mb-2">
+                      Surat dokter / resep / bukti (jika ada).
+                    </p>
+                  </div>
+
+                  {izinDocPhoto ? (
+                    <div className="relative inline-block border-2 border-purple-400 rounded-2xl overflow-hidden shadow-sm self-start">
+                      <img src={izinDocPhoto} alt="Dokumen Izin" className="w-28 h-28 object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => setIzinDocPhoto(null)}
+                        className="absolute top-1 right-1 p-1 bg-rose-600 text-white rounded-lg hover:bg-rose-700 shadow"
+                        title="Hapus Dokumen"
+                      >
+                        <X className="w-3 h-3 stroke-[2.5]" />
+                      </button>
+                      <span className="absolute bottom-0 inset-x-0 bg-purple-700 text-white text-[9px] font-black py-0.5 text-center">
+                        Dokumen Terlampir ✓
+                      </span>
+                    </div>
+                  ) : (
+                    <div>
+                      <input
+                        type="file"
+                        ref={fileInputRef}
+                        accept="image/*"
+                        onChange={handleDocUpload}
+                        className="hidden"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="w-full py-2.5 px-3 bg-white hover:bg-slate-100 border-2 border-dashed border-slate-300 rounded-xl text-xs font-black text-slate-700 flex items-center justify-center space-x-2 transition"
+                      >
+                        <Upload className="w-4 h-4 text-slate-600" />
+                        <span>Upload Dokumen (Opsional)</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+
               </div>
 
               {/* Submit Button */}
               <div className="pt-2">
                 <button
                   type="submit"
-                  disabled={loading || !izinStart || !izinEnd || !izinReason.trim() || !izinProofPhoto}
+                  disabled={loading || !izinStart || !izinEnd || !izinReason.trim() || !izinSelfie}
                   className="w-full py-3 bg-purple-700 hover:bg-purple-800 active:bg-purple-900 text-white font-black text-xs uppercase tracking-wider rounded-2xl shadow-md shadow-purple-700/30 transition flex items-center justify-center space-x-2 disabled:opacity-50"
                 >
                   {loading ? (

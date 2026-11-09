@@ -281,23 +281,43 @@ export default function LeaveManagementTab({ adminAuth, onRefreshData }) {
 
                   {/* Staff Info & Photo */}
                   <div className="flex items-start space-x-3 mb-3">
-                    {/* Selfie or Proof Photo Thumbnail */}
-                    <div className="relative shrink-0">
+                    {/* Selfie and/or Proof Photo Thumbnails */}
+                    <div className="flex items-center space-x-1.5 shrink-0">
                       {req.photo_url ? (
-                        <button
-                          type="button"
-                          onClick={() => setSelectedPhoto(req.photo_url)}
-                          className="w-14 h-14 rounded-2xl overflow-hidden border-2 border-slate-300 hover:opacity-85 shadow-sm group relative block"
-                          title="Klik untuk perbesar bukti"
-                        >
-                          <img src={req.photo_url} alt="Bukti" className="w-full h-full object-cover" />
-                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition">
-                            <Eye className="w-4 h-4 text-white" />
-                          </div>
-                        </button>
+                        <div className="flex flex-col items-center">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedPhoto(req.photo_url)}
+                            className="w-13 h-13 rounded-2xl overflow-hidden border-2 border-slate-300 hover:opacity-85 shadow-sm group relative block"
+                            title="Klik untuk perbesar selfie"
+                          >
+                            <img src={req.photo_url} alt="Selfie" className="w-full h-full object-cover" />
+                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition">
+                              <Eye className="w-3.5 h-3.5 text-white" />
+                            </div>
+                          </button>
+                          <span className="text-[9px] font-black text-slate-500 mt-0.5">Selfie</span>
+                        </div>
                       ) : (
-                        <div className="w-14 h-14 rounded-2xl bg-slate-100 border-2 border-slate-200 flex items-center justify-center font-black text-slate-600">
+                        <div className="w-13 h-13 rounded-2xl bg-slate-100 border-2 border-slate-200 flex items-center justify-center font-black text-slate-600 text-sm">
                           {req.staff_name?.charAt(0)}
+                        </div>
+                      )}
+
+                      {req.document_url && (
+                        <div className="flex flex-col items-center">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedPhoto(req.document_url)}
+                            className="w-13 h-13 rounded-2xl overflow-hidden border-2 border-purple-400 hover:opacity-85 shadow-sm group relative block"
+                            title="Klik untuk perbesar dokumen pendukung"
+                          >
+                            <img src={req.document_url} alt="Dokumen" className="w-full h-full object-cover" />
+                            <div className="absolute inset-0 bg-purple-950/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition">
+                              <Eye className="w-3.5 h-3.5 text-white" />
+                            </div>
+                          </button>
+                          <span className="text-[9px] font-black text-purple-700 mt-0.5">Dokumen</span>
                         </div>
                       )}
                     </div>
@@ -443,12 +463,40 @@ export default function LeaveManagementTab({ adminAuth, onRefreshData }) {
             <form onSubmit={handleExecuteReview} className="p-5 space-y-4 text-xs font-bold">
               
               {/* Target info preview */}
-              <div className="p-3 bg-slate-50 border border-slate-200 rounded-2xl space-y-1">
-                <div className="text-slate-950 font-black text-sm">{targetRequest.staff_name}</div>
-                <div className="text-slate-600 text-[11px]">
-                  {targetRequest.type === 'CUTI' ? '🌴 Cuti Tahunan' : '🏥 Izin Sakit'} • {formatWitaDateOnly(targetRequest.start_date)} s/d {formatWitaDateOnly(targetRequest.end_date)} ({targetRequest.requested_days} Hari)
+              <div className="p-3 bg-slate-50 border border-slate-200 rounded-2xl space-y-2">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-slate-950 font-black text-sm">{targetRequest.staff_name}</div>
+                    <div className="text-slate-600 text-[11px]">
+                      {targetRequest.type === 'CUTI' ? '🌴 Cuti Tahunan' : '🏥 Izin Sakit'} • {formatWitaDateOnly(targetRequest.start_date)} s/d {formatWitaDateOnly(targetRequest.end_date)} ({targetRequest.requested_days} Hari)
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    {targetRequest.photo_url && (
+                      <button
+                        type="button"
+                        onClick={() => setSelectedPhoto(targetRequest.photo_url)}
+                        className="w-11 h-11 rounded-xl overflow-hidden border border-slate-300 shadow-sm relative group block"
+                        title="Perbesar Selfie Pemohon"
+                      >
+                        <img src={targetRequest.photo_url} alt="Selfie" className="w-full h-full object-cover" />
+                        <span className="absolute bottom-0 inset-x-0 bg-black/60 text-white text-[8px] font-black text-center">Selfie</span>
+                      </button>
+                    )}
+                    {targetRequest.document_url && (
+                      <button
+                        type="button"
+                        onClick={() => setSelectedPhoto(targetRequest.document_url)}
+                        className="w-11 h-11 rounded-xl overflow-hidden border border-purple-400 shadow-sm relative group block"
+                        title="Perbesar Dokumen Pendukung"
+                      >
+                        <img src={targetRequest.document_url} alt="Dokumen" className="w-full h-full object-cover" />
+                        <span className="absolute bottom-0 inset-x-0 bg-purple-900/80 text-white text-[8px] font-black text-center">Dokumen</span>
+                      </button>
+                    )}
+                  </div>
                 </div>
-                <div className="text-slate-800 text-[11px] pt-1 border-t border-slate-200">
+                <div className="text-slate-800 text-[11px] pt-1.5 border-t border-slate-200">
                   Alasan: "{targetRequest.reason}"
                 </div>
               </div>

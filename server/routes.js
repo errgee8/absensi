@@ -2244,7 +2244,8 @@ router.post('/leave-requests', async (req, res) => {
     endDate,
     requestedDays,
     reason,
-    photoBase64
+    photoBase64,
+    documentBase64
   } = req.body || {};
 
   if (!staffId) return res.status(400).json({ error: 'ID Staf wajib dicantumkan.' });
@@ -2311,17 +2312,24 @@ router.post('/leave-requests', async (req, res) => {
     }
   }
 
-  // Rule checks for IZIN (Sakit / Izin Tidak Masuk)
+  // Rule checks for IZIN (Sakit / Izin Darurat)
   if (type === 'IZIN') {
+    // Selfie wajib untuk verifikasi pemohon
     if (!photoBase64) {
-      return res.status(400).json({ error: 'Foto bukti (surat dokter / resep / keterangan sakit) wajib dilampirkan untuk permohonan izin.' });
+      return res.status(400).json({ error: 'Foto selfie biometrik pemohon wajib diambil untuk verifikasi permohonan izin.' });
     }
+    // Dokumen surat dokter / bukti bersifat opsional
   }
 
   try {
     let photoUrl = null;
     if (photoBase64) {
-      photoUrl = await uploadPhotoToSupabase(photoBase64, type === 'CUTI' ? 'leave_selfie' : 'leave_proof');
+      photoUrl = await uploadPhotoToSupabase(photoBase64, 'leave_selfie');
+    }
+
+    let documentUrl = null;
+    if (documentBase64) {
+      documentUrl = await uploadPhotoToSupabase(documentBase64, 'leave_doc');
     }
 
     const reqId = `req_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
@@ -2342,6 +2350,7 @@ router.post('/leave-requests', async (req, res) => {
       approved_end_date: null,
       reason: reason.trim(),
       photo_url: photoUrl,
+      document_url: documentUrl,
       status: 'PENDING',
       manager_notes: null,
       reviewed_by: null,
@@ -2361,11 +2370,11 @@ router.post('/leave-requests', async (req, res) => {
         INSERT INTO leave_requests (
           id, staff_id, staff_name, staff_role, staff_venue, staff_division,
           type, category, start_date, end_date, requested_days,
-          reason, photo_url, status, year, created_at, updated_at
+          reason, photo_url, document_url, status, year, created_at, updated_at
         ) VALUES (
           ?, ?, ?, ?, ?, ?,
           ?, ?, ?, ?, ?,
-          ?, ?, 'PENDING', ?, ?, ?
+          ?, ?, ?, 'PENDING', ?, ?, ?
         )
       `).run(
         newRequest.id,
@@ -2381,6 +2390,7 @@ router.post('/leave-requests', async (req, res) => {
         newRequest.requested_days,
         newRequest.reason,
         newRequest.photo_url,
+        newRequest.document_url,
         newRequest.year,
         newRequest.created_at,
         newRequest.updated_at
