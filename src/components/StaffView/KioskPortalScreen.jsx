@@ -486,67 +486,6 @@ export default function KioskPortalScreen({
           </button>
         )}
 
-        {/* CARD: PENGUMUMAN MANAJEMEN & FLYER PROMO (SELALU ADA UNTUK SEMUA STAF) */}
-        {onOpenAnnouncements && (
-          <button
-            type="button"
-            onClick={onOpenAnnouncements}
-            className={`w-full rounded-3xl p-5 border-2 transition-all text-left flex flex-col justify-between group touch-press shadow-sm hover:shadow-md ${
-              unreadAnnouncementsCount > 0
-                ? 'bg-gradient-to-r from-rose-50 via-amber-50 to-orange-50 border-rose-400 ring-2 ring-rose-400/30'
-                : 'bg-white hover:bg-slate-50 border-slate-300 hover:border-slate-400'
-            }`}
-          >
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center space-x-2">
-                  <span className={`inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
-                    unreadAnnouncementsCount > 0 ? 'bg-rose-600 text-white animate-pulse' : 'bg-slate-800 text-white'
-                  }`}>
-                    <Megaphone className="w-3 h-3 text-amber-300" />
-                    <span>5. Pengumuman Manajemen</span>
-                  </span>
-                  {unreadAnnouncementsCount > 0 ? (
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-rose-600 text-white shadow-sm">
-                      {unreadAnnouncementsCount} Baru Belum Disetujui
-                    </span>
-                  ) : (
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300">
-                      Semua Disetujui ✓
-                    </span>
-                  )}
-                </div>
-                <span className="text-[11px] font-black text-blue-700 group-hover:text-blue-900">
-                  Lihat Daftar Pengumuman ({announcements?.length || 0}) →
-                </span>
-              </div>
-
-              <div className="flex items-start space-x-3.5 mt-1">
-                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 shadow-md transition group-hover:scale-105 ${
-                  unreadAnnouncementsCount > 0
-                    ? 'bg-gradient-to-br from-rose-600 to-amber-600 text-white shadow-rose-600/30'
-                    : 'bg-slate-800 text-white'
-                }`}>
-                  <Megaphone className="w-6 h-6 text-amber-300 stroke-[2.5]" />
-                </div>
-                <div className="flex-1">
-                  <h3 className="text-base sm:text-lg font-black text-slate-950 group-hover:text-blue-700 transition">
-                    Pengumuman Resmi &amp; Flyer Promo
-                  </h3>
-                  <p className="text-xs text-slate-700 font-bold mt-0.5 leading-relaxed">
-                    Lihat seluruh pengumuman aktif, aturan operasional, dan contoh flyer paket promo terbaru dari Management.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="pt-3 mt-3 border-t border-slate-200 flex items-center justify-between text-xs font-black text-slate-800 group-hover:text-blue-700">
-              <span>Buka Daftar Pengumuman &amp; Flyer ({announcements?.length || 0})</span>
-              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition stroke-[2.5]" />
-            </div>
-          </button>
-        )}
-
         {/* CARD 3: KHUSUS ASSISTANT MANAGER / MANAGEMENT - PANTAU LAPORAN (VIEW ONLY) */}
         {isManagement && (
           <button
