@@ -4,7 +4,7 @@ import StaffView from './components/StaffView/StaffView';
 import ManagerDashboard from './components/ManagerDashboard/ManagerDashboard';
 import AdminPinModal from './components/ManagerDashboard/AdminPinModal';
 import LeaderboardModal from './components/Leaderboard/LeaderboardModal';
-import { getNetworkStatus, getStaffList, getSettings } from './utils/api';
+import { getNetworkStatus, getStaffList, getSettings, getServerTime } from './utils/api';
 import { Smartphone, Download } from 'lucide-react';
 
 export default function App() {
@@ -40,6 +40,12 @@ export default function App() {
 
   useEffect(() => {
     loadAppData();
+    getServerTime();
+
+    // Periodic server-time sync every 5 minutes to continuously neutralize clock skew
+    const timeSyncInterval = setInterval(() => {
+      getServerTime();
+    }, 5 * 60 * 1000);
 
     // Check if already running standalone PWA
     if (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true) {
@@ -52,7 +58,10 @@ export default function App() {
     };
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstall);
-    return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
+    return () => {
+      clearInterval(timeSyncInterval);
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
+    };
   }, []);
 
   const handleInstallPwa = async () => {

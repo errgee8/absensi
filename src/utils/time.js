@@ -1,10 +1,45 @@
 /**
  * Time utility for WITA (Indonesia Central Time / Asia/Makassar / UTC+8)
+ * Includes Anti-Tampering Server Time Synchronization
  */
 
+let serverTimeOffsetMs = 0;
+let hasSyncedServerTime = false;
+
+/**
+ * Synchronize application time with the official server timestamp.
+ * Even if the employee tampers with their device/phone clock forward or backward,
+ * the application continues using the exact synchronized server time.
+ */
+export function syncServerTime(serverIsoOrTimestamp) {
+  if (!serverIsoOrTimestamp) return;
+  const serverMs = typeof serverIsoOrTimestamp === 'number'
+    ? serverIsoOrTimestamp
+    : new Date(serverIsoOrTimestamp).getTime();
+  if (!isNaN(serverMs)) {
+    serverTimeOffsetMs = serverMs - Date.now();
+    hasSyncedServerTime = true;
+  }
+}
+
+export function getServerTimeOffsetMs() {
+  return serverTimeOffsetMs;
+}
+
+export function isServerTimeSynced() {
+  return hasSyncedServerTime;
+}
+
+/**
+ * Returns the current application time (device time corrected by server offset).
+ */
+export function getAppNow() {
+  return new Date(Date.now() + serverTimeOffsetMs);
+}
+
 export function formatWitaDateTime(isoString) {
-  if (!isoString) return '-';
-  const date = new Date(isoString);
+  const date = isoString ? new Date(isoString) : getAppNow();
+  if (isNaN(date.getTime())) return '-';
   
   return new Intl.DateTimeFormat('en-GB', {
     timeZone: 'Asia/Makassar',
@@ -19,8 +54,8 @@ export function formatWitaDateTime(isoString) {
 }
 
 export function formatWitaTimeOnly(isoString) {
-  if (!isoString) return '-';
-  const date = new Date(isoString);
+  const date = isoString ? new Date(isoString) : getAppNow();
+  if (isNaN(date.getTime())) return '-';
   
   return new Intl.DateTimeFormat('en-GB', {
     timeZone: 'Asia/Makassar',
@@ -44,8 +79,8 @@ export const OPERATIONAL_DAY_CUTOFF_HOUR = 7;
  * - Shifts between 07:00 AM today and 06:59 AM tomorrow belong to today's operational day.
  * - Clock times from 00:00 to 06:59 AM WITA belong to previous calendar day's operational day.
  */
-export function getOperationalDateYMD(date = new Date(), cutoffHour = OPERATIONAL_DAY_CUTOFF_HOUR) {
-  if (!date) return '';
+export function getOperationalDateYMD(date = getAppNow(), cutoffHour = OPERATIONAL_DAY_CUTOFF_HOUR) {
+  if (!date) date = getAppNow();
   const d = typeof date === 'string' ? new Date(date) : date;
   if (isNaN(d.getTime())) return '';
 

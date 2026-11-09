@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { getLeaveRequests, getStaffLeaveBalance, submitLeaveRequest } from '../../utils/api';
 import { getOperationalDateYMD, formatWitaDateOnly } from '../../utils/time';
+import { stampPhotoWithAppTime } from '../../utils/watermark';
 
 export default function StaffLeaveModal({ isOpen, onClose, staff, onRefreshShifts, onMarkViewed, activeShift, initialCategory }) {
   const [activeTab, setActiveTab] = useState('HISTORY'); // 'HISTORY' | 'CUTI' | 'IZIN'
@@ -147,30 +148,69 @@ export default function StaffLeaveModal({ isOpen, onClose, staff, onRefreshShift
     setCameraActive(false);
   };
 
-  const captureSelfie = () => {
+  const captureSelfie = async () => {
     if (!videoRef.current) return;
-    const canvas = document.createElement('canvas');
-    canvas.width = videoRef.current.videoWidth || 640;
-    canvas.height = videoRef.current.videoHeight || 480;
-    const ctx = canvas.getContext('2d');
-    ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
-    const base64 = canvas.toDataURL('image/jpeg', 0.85);
-    if (cameraTarget === 'IZIN') {
-      setIzinSelfie(base64);
-    } else {
-      setCutiSelfie(base64);
+    try {
+      const isCuti = cameraTarget === 'CUTI';
+      const statusText = isCuti
+        ? 'Selfie Pengajuan Cuti Tahunan'
+        : izinCategory === 'IZIN_PULANG_AWAL'
+        ? 'Selfie Izin Pulang di Tengah Shift'
+        : 'Selfie Permohonan Izin';
+
+      const stamped = await stampPhotoWithAppTime({
+        source: videoRef.current,
+        staffName: staff?.name || 'Staff',
+        status: statusText,
+        locationName: staff?.venue || '',
+        maxWidth: 960,
+        quality: 0.82
+      });
+
+      if (cameraTarget === 'IZIN') {
+        setIzinSelfie(stamped);
+      } else {
+        setCutiSelfie(stamped);
+      }
+    } catch (err) {
+      console.error('Failed to stamp selfie:', err);
+      const canvas = document.createElement('canvas');
+      canvas.width = videoRef.current.videoWidth || 640;
+      canvas.height = videoRef.current.videoHeight || 480;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
+      const base64 = canvas.toDataURL('image/jpeg', 0.85);
+      if (cameraTarget === 'IZIN') {
+        setIzinSelfie(base64);
+      } else {
+        setCutiSelfie(base64);
+      }
+    } finally {
+      stopCamera();
     }
-    stopCamera();
   };
 
-  const handleDocUpload = (e) => {
+  const handleDocUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      setIzinDocPhoto(reader.result);
-    };
-    reader.readAsDataURL(file);
+    try {
+      const stamped = await stampPhotoWithAppTime({
+        source: file,
+        staffName: staff?.name || 'Staff',
+        status: 'Dokumen Pendukung Permohonan Izin',
+        locationName: staff?.venue || '',
+        maxWidth: 1280,
+        quality: 0.82
+      });
+      setIzinDocPhoto(stamped);
+    } catch (err) {
+      console.error('Failed to stamp uploaded doc:', err);
+      const reader = new FileReader();
+      reader.onload = () => {
+        setIzinDocPhoto(reader.result);
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   // Calculate requested days count

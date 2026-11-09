@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { X, CheckCircle, AlertTriangle, Camera, RefreshCw, Send, Loader2, Sparkles, Building2, User } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { ROUTINE_TASKS, submitRestroomInspection } from '../../utils/toiletService';
+import { stampPhotoWithAppTime } from '../../utils/watermark';
 
 export default function ToiletChecklistForm({ location, staff, onClose, onSuccess }) {
   const applicableTasks = ROUTINE_TASKS.filter(
@@ -65,29 +66,30 @@ export default function ToiletChecklistForm({ location, staff, onClose, onSucces
     startCamera(nextMode);
   };
 
-  const takePhoto = () => {
+  const takePhoto = async () => {
     if (!videoRef.current) return;
-    const canvas = document.createElement('canvas');
-    canvas.width = videoRef.current.videoWidth || 1280;
-    canvas.height = videoRef.current.videoHeight || 720;
-    const ctx = canvas.getContext('2d');
-    ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
-
-    // Watermark on toilet photo
-    const timestampStr = new Date().toLocaleString('id-ID', {
-      timeZone: 'Asia/Makassar',
-      dateStyle: 'medium',
-      timeStyle: 'medium'
-    });
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
-    ctx.fillRect(0, canvas.height - 40, canvas.width, 40);
-    ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 16px sans-serif';
-    ctx.fillText(`${location.name} • ${staff.name} • ${timestampStr} WITA`, 16, canvas.height - 15);
-
-    const dataUrl = canvas.toDataURL('image/jpeg', 0.75);
-    setPhotoBase64(dataUrl);
-    stopCamera();
+    try {
+      const watermarked = await stampPhotoWithAppTime({
+        source: videoRef.current,
+        staffName: staff?.name || 'Staff CS',
+        status: 'Inspeksi Kebersihan Toilet',
+        locationName: location?.name || 'Toilet',
+        maxWidth: 1280,
+        quality: 0.8
+      });
+      setPhotoBase64(watermarked);
+      stopCamera();
+    } catch (err) {
+      console.error('Failed to stamp toilet photo:', err);
+      // Fallback capture
+      const canvas = document.createElement('canvas');
+      canvas.width = videoRef.current.videoWidth || 1280;
+      canvas.height = videoRef.current.videoHeight || 720;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
+      setPhotoBase64(canvas.toDataURL('image/jpeg', 0.75));
+      stopCamera();
+    }
   };
 
   const handleSubmit = async (e) => {

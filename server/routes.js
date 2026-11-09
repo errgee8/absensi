@@ -180,6 +180,16 @@ router.post('/admin/verify', async (req, res) => {
   return res.status(401).json({ error: 'PIN Manager / Assistant Manager salah. Akses ditolak.' });
 });
 
+// Official Synchronized Application Time Endpoint (Prevents Phone Time Manipulation)
+router.get('/server-time', (req, res) => {
+  const now = new Date();
+  res.json({
+    serverTime: now.toISOString(),
+    timestamp: now.getTime(),
+    timezone: 'Asia/Makassar'
+  });
+});
+
 // 2. Network Status Check
 router.get('/network-status', (req, res) => {
   const clientIp = getClientIp(req);
@@ -193,7 +203,8 @@ router.get('/network-status', (req, res) => {
     matchedSubnet: validation.matchedSubnet,
     enforceWifi: Boolean(enforceWifi),
     venueName: getSetting('venue_name'),
-    allowedSubnets
+    allowedSubnets,
+    serverTime: new Date().toISOString()
   });
 });
 

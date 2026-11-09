@@ -1,4 +1,22 @@
+import { syncServerTime } from './time';
+
 const API_BASE = '/api';
+
+export async function getServerTime() {
+  try {
+    const res = await fetch(`${API_BASE}/server-time`);
+    if (res.ok) {
+      const data = await res.json();
+      if (data?.serverTime) {
+        syncServerTime(data.serverTime);
+      }
+      return data;
+    }
+  } catch (e) {
+    console.warn('Failed to sync server time:', e);
+  }
+  return null;
+}
 
 export async function verifyAdminPin(pin) {
   const res = await fetch(`${API_BASE}/admin/verify`, {
@@ -14,7 +32,11 @@ export async function verifyAdminPin(pin) {
 export async function getNetworkStatus() {
   const res = await fetch(`${API_BASE}/network-status`);
   if (!res.ok) throw new Error('Failed to check network status');
-  return res.json();
+  const data = await res.json();
+  if (data?.serverTime) {
+    syncServerTime(data.serverTime);
+  }
+  return data;
 }
 
 export async function getStaffList(venue = 'ALL') {

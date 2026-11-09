@@ -4,6 +4,7 @@ import confetti from 'canvas-confetti';
 import { captureAndWatermark, watermarkFile } from '../../utils/watermark';
 import { checkIn, checkOut, startBreak, endBreak } from '../../utils/api';
 import { isWithinGeofence } from '../../utils/distance';
+import { getAppNow } from '../../utils/time';
 
 export default function KioskCameraModal({
   staff,
@@ -42,7 +43,7 @@ export default function KioskCameraModal({
     if (actionType !== 'checkin') return false;
     if (staff?.division === 'Management' || schedStart === '00:00' || schedStart === 'FLEXIBLE') return false;
     try {
-      const now = new Date();
+      const now = getAppNow();
       const parts = new Intl.DateTimeFormat('en-GB', {
         timeZone: 'Asia/Makassar',
         hour: '2-digit',
@@ -507,12 +508,26 @@ export default function KioskCameraModal({
                         type="file"
                         ref={latePhotoInputRef}
                         accept="image/*"
-                        onChange={(e) => {
+                        onChange={async (e) => {
                           const file = e.target.files?.[0];
                           if (file) {
-                            const reader = new FileReader();
-                            reader.onload = () => setLatePhotoBase64(reader.result);
-                            reader.readAsDataURL(file);
+                            try {
+                              const stamped = await watermarkFile(file, {
+                                staffName: staff?.name || 'Staff',
+                                status: 'Bukti Keterlambatan Check-In',
+                                locationName: staff?.venue || '',
+                                lat: userLocation?.lat,
+                                lng: userLocation?.lng,
+                                maxWidth: 1080,
+                                quality: 0.8
+                              });
+                              setLatePhotoBase64(stamped);
+                            } catch (err) {
+                              console.error('Failed to stamp late photo:', err);
+                              const reader = new FileReader();
+                              reader.onload = () => setLatePhotoBase64(reader.result);
+                              reader.readAsDataURL(file);
+                            }
                           }
                         }}
                         className="hidden"
