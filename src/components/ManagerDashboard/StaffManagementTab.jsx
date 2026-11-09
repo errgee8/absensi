@@ -30,8 +30,8 @@ export default function StaffManagementTab({ onStaffUpdated }) {
       {
         role: 'Server',
         division: 'Bar, Cashier, and Server',
-        label: 'Server (2 Shift)',
-        description: 'Shift 1: 10:00 - 19:00 | Shift 2: 18:30 - 03:30 (Istirahat 1 Jam)',
+        label: 'Server (3 Shift: Shift 1, Middle, Shift 3)',
+        description: 'Shift 1: 10:00-19:00 | Middle: 14:00-23:00 | Shift 3: 18:30-03:30 (Istirahat 1 Jam)',
         start_time: '10:00',
         end_time: '19:00',
         standard_hours: 9
@@ -39,8 +39,8 @@ export default function StaffManagementTab({ onStaffUpdated }) {
       {
         role: 'Cashier',
         division: 'Bar, Cashier, and Server',
-        label: 'Cashier (2 Shift)',
-        description: 'Shift 1: 10:00 - 19:00 | Shift 2: 18:30 - 03:30 (Istirahat 1 Jam)',
+        label: 'Cashier (3 Shift: Shift 1, Middle, Shift 3)',
+        description: 'Shift 1: 10:00-19:00 | Middle: 14:00-23:00 | Shift 3: 18:30-03:30 (Istirahat 1 Jam)',
         start_time: '10:00',
         end_time: '19:00',
         standard_hours: 9
@@ -48,8 +48,8 @@ export default function StaffManagementTab({ onStaffUpdated }) {
       {
         role: 'Bar',
         division: 'Bar, Cashier, and Server',
-        label: 'Bar (2 Shift)',
-        description: 'Shift 1: 10:00 - 19:00 | Shift 2: 18:30 - 03:30 (Istirahat 1 Jam)',
+        label: 'Bar (3 Shift: Shift 1, Middle, Shift 3)',
+        description: 'Shift 1: 10:00-19:00 | Middle: 14:00-23:00 | Shift 3: 18:30-03:30 (Istirahat 1 Jam)',
         start_time: '10:00',
         end_time: '19:00',
         standard_hours: 9

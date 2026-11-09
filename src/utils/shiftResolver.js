@@ -21,9 +21,10 @@ export const DEFAULT_SHIFT_SCHEDULES = [
   // JP Karaoke - Management
   { venue: 'JP Karaoke', division: 'Management', shift_number: 1, name: 'Fleksibel (Management)', start_time: '00:00', end_time: '23:59' },
 
-  // LuckyCat - Bar, Cashier, and Server
+  // LuckyCat - Bar, Cashier, and Server (3 shifts: Shift 1, Shift 2 (Middle), Shift 3)
   { venue: 'LuckyCat', division: 'Bar, Cashier, and Server', shift_number: 1, name: 'Shift 1', start_time: '10:00', end_time: '19:00' },
-  { venue: 'LuckyCat', division: 'Bar, Cashier, and Server', shift_number: 2, name: 'Shift 2', start_time: '18:30', end_time: '03:30' },
+  { venue: 'LuckyCat', division: 'Bar, Cashier, and Server', shift_number: 2, name: 'Shift 2 (Middle)', start_time: '14:00', end_time: '23:00' },
+  { venue: 'LuckyCat', division: 'Bar, Cashier, and Server', shift_number: 3, name: 'Shift 3', start_time: '18:30', end_time: '03:30' },
 
   // LuckyCat - Kitchen
   { venue: 'LuckyCat', division: 'Kitchen', shift_number: 1, name: 'Shift 1', start_time: '09:00', end_time: '19:00' },
