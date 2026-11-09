@@ -1,9 +1,14 @@
-import { createRequire } from 'module';
 import { db, getSetting, setSetting } from './db.js';
 import { isSupabaseConfigured, cloudDb } from './supabase.js';
 
-const require = createRequire(import.meta.url);
-const webpush = require('web-push');
+let webpush = null;
+async function getWebPush() {
+  if (!webpush) {
+    const mod = await import('web-push');
+    webpush = mod.default || mod;
+  }
+  return webpush;
+}
 
 let vapidKeys = null;
 
@@ -12,6 +17,7 @@ let vapidKeys = null;
  */
 export async function initVapidKeys() {
   if (vapidKeys) return vapidKeys;
+  const wp = await getWebPush();
 
   // 1. Check process.env
   if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
@@ -33,7 +39,7 @@ export async function initVapidKeys() {
       vapidKeys = saved;
     } else {
       // 3. Generate a new permanent VAPID keypair
-      vapidKeys = webpush.generateVAPIDKeys();
+      vapidKeys = wp.generateVAPIDKeys();
       setSetting('vapid_keys', vapidKeys);
       if (isSupabaseConfigured) {
         try {
@@ -44,7 +50,7 @@ export async function initVapidKeys() {
     }
   }
 
-  webpush.setVapidDetails(
+  wp.setVapidDetails(
     'mailto:management@jplc.com',
     vapidKeys.publicKey,
     vapidKeys.privateKey
@@ -216,6 +222,7 @@ export async function sendPushNotification({ staffIds, title, body, url = '/', t
   });
 
   let sentCount = 0;
+  const wp = await getWebPush();
   const sendPromises = targetList.map(async (sub) => {
     const pushSubscription = {
       endpoint: sub.endpoint,
@@ -226,7 +233,7 @@ export async function sendPushNotification({ staffIds, title, body, url = '/', t
     };
 
     try {
-      await webpush.sendNotification(pushSubscription, payload);
+      await wp.sendNotification(pushSubscription, payload);
       sentCount++;
     } catch (err) {
       // 404 or 410 means subscription is expired or unregistered by the device
