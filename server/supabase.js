@@ -941,5 +941,39 @@ export const cloudDb = {
       });
     if (error) throw error;
     return newRecord;
+  },
+
+  async getSetting(key) {
+    if (!supabase) return null;
+    try {
+      const { data, error } = await supabase
+        .from('app_settings')
+        .select('value')
+        .eq('key', key)
+        .maybeSingle();
+      if (error) throw error;
+      return data?.value ?? null;
+    } catch (e) {
+      return null;
+    }
+  },
+
+  async saveSetting(key, value, description = '') {
+    if (!supabase) return null;
+    try {
+      const { error } = await supabase
+        .from('app_settings')
+        .upsert({
+          key,
+          value,
+          description: description || `Setting for ${key}`,
+          updated_at: new Date().toISOString()
+        });
+      if (error) throw error;
+      return value;
+    } catch (e) {
+      console.warn(`Failed to save setting ${key} to Supabase:`, e.message);
+      return null;
+    }
   }
 };

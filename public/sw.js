@@ -63,3 +63,66 @@ self.addEventListener('fetch', (event) => {
     })
   );
 });
+
+// ==========================================
+// PUSH NOTIFICATION LISTENERS (PWA Web Push)
+// ==========================================
+
+self.addEventListener('push', (event) => {
+  let data = {};
+  if (event.data) {
+    try {
+      data = event.data.json();
+    } catch (e) {
+      data = {
+        title: 'JP Karaoke & LuckyCat',
+        body: event.data.text()
+      };
+    }
+  }
+
+  const title = data.title || 'JP Karaoke & LuckyCat';
+  const options = {
+    body: data.body || 'Pemberitahuan baru dari manajemen',
+    icon: data.icon || '/favicon.svg',
+    badge: data.badge || '/favicon.svg',
+    vibrate: data.vibrate || [200, 100, 200, 100, 200], // Getar ritme pesan masuk
+    tag: data.tag || `jplc_${Date.now()}`,
+    renotify: true,
+    requireInteraction: data.requireInteraction || false,
+    data: {
+      url: data.url || '/',
+      timestamp: data.timestamp || Date.now()
+    },
+    actions: [
+      { action: 'open', title: 'Buka Aplikasi' }
+    ]
+  };
+
+  event.waitUntil(
+    self.registration.showNotification(title, options)
+  );
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+
+  const targetUrl = event.notification.data?.url || '/';
+
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      // 1. If an existing window/tab of the app is already open, focus it
+      for (const client of clientList) {
+        if ('focus' in client) {
+          if (client.url && client.url.includes(self.location.origin)) {
+            return client.focus();
+          }
+        }
+      }
+      // 2. Otherwise open a new tab/window
+      if (clients.openWindow) {
+        return clients.openWindow(targetUrl);
+      }
+    })
+  );
+});

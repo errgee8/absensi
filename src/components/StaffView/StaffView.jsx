@@ -7,6 +7,8 @@ import ToiletScannerModal from '../ToiletChecklist/ToiletScannerModal';
 import ToiletChecklistForm from '../ToiletChecklist/ToiletChecklistForm';
 import StaffLeaveModal from './StaffLeaveModal';
 import StaffAnnouncementModal from './StaffAnnouncementModal';
+import MandatoryNotificationModal from './MandatoryNotificationModal';
+import { getNotificationPermission } from '../../utils/pushNotifications';
 import { verifyStaffPin, getAnnouncements, acknowledgeAnnouncement, getLeaveRequests, subscribeRealtimeEvents } from '../../utils/api';
 import { RESTROOM_LOCATIONS } from '../../utils/toiletService';
 import { CheckCircle2 } from 'lucide-react';
@@ -40,6 +42,8 @@ export default function StaffView({
   const [announcements, setAnnouncements] = useState([]);
   const [unreadAnnouncementsCount, setUnreadAnnouncementsCount] = useState(0);
   const [announcementModalOpen, setAnnouncementModalOpen] = useState(false);
+  const [announcementInitialView, setAnnouncementInitialView] = useState('AUTO'); // 'AUTO' | 'LIST' | 'DETAIL'
+  const [showNotificationPrompt, setShowNotificationPrompt] = useState(false);
   const [leaveUpdateCount, setLeaveUpdateCount] = useState(0);
 
   // Toilet QR Scanner & Checklist state
@@ -147,6 +151,14 @@ export default function StaffView({
       setActiveShift(data.activeShift);
       loadStaffNotifications(data.staff);
 
+      // Check Mandatory Notification Permission
+      const perm = getNotificationPermission();
+      if (perm !== 'unsupported' && perm !== 'granted') {
+        setShowNotificationPrompt(true);
+        // Do not proceed to PORTAL yet, wait for mandatory permission!
+        return;
+      }
+
       // If staff arrived via a direct QR scan link, open that restroom checklist immediately!
       if (directToiletLocation) {
         setSelectedToiletLocation(directToiletLocation);
@@ -167,6 +179,8 @@ export default function StaffView({
     setToiletScannerOpen(false);
     setToiletChecklistOpen(false);
     setSelectedToiletLocation(null);
+    setShowNotificationPrompt(false);
+    setAnnouncementInitialView('AUTO');
     setStep('LOGIN');
     setLoggedInStaff(null);
     setPin('');
@@ -231,7 +245,10 @@ export default function StaffView({
           leaveUpdateCount={leaveUpdateCount}
           announcements={announcements}
           unreadAnnouncementsCount={unreadAnnouncementsCount}
-          onOpenAnnouncements={() => setAnnouncementModalOpen(true)}
+          onOpenAnnouncements={() => {
+            setAnnouncementInitialView('LIST');
+            setAnnouncementModalOpen(true);
+          }}
         />
       )}
 
@@ -311,6 +328,22 @@ export default function StaffView({
         />
       )}
 
+      {/* Mandatory Push Notification Permission Modal */}
+      {showNotificationPrompt && loggedInStaff && (
+        <MandatoryNotificationModal
+          staff={loggedInStaff}
+          onSuccess={() => {
+            setShowNotificationPrompt(false);
+            if (directToiletLocation) {
+              setSelectedToiletLocation(directToiletLocation);
+              setToiletChecklistOpen(true);
+            }
+            setStep('PORTAL');
+          }}
+          onLogout={handleResetToLogin}
+        />
+      )}
+
       {/* Official Management Announcement Modal */}
       {announcementModalOpen && loggedInStaff && (
         <StaffAnnouncementModal
@@ -318,6 +351,7 @@ export default function StaffView({
           onClose={() => setAnnouncementModalOpen(false)}
           announcements={announcements}
           staff={loggedInStaff}
+          initialView={announcementInitialView}
           onAcknowledge={handleAcknowledgeAnnouncement}
         />
       )}

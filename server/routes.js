@@ -8,6 +8,7 @@ import { evaluateCheckinFlags, evaluateCheckoutFlags, evaluateBreakFlags, auditO
 import { isSupabaseConfigured, uploadPhotoToSupabase, cloudDb, supabase, findStaffInSupabase } from './supabase.js';
 import { detectShiftSchedule, getBreakCutoff, isBreakAllowedNow, getWitaTimeString, getWitaDateYMD, getOperationalDateYMD, getOperationalYesterdayYMD } from './shifts.js';
 import { computeLeaderboard } from './leaderboard.js';
+import { getVapidPublicKey, savePushSubscription, sendPushNotification } from './push.js';
 
 const router = express.Router();
 
@@ -44,6 +45,51 @@ router.get('/events', (req, res) => {
     clearInterval(keepAlive);
     sseClients.delete(res);
   });
+});
+
+// ==========================================
+// PUSH NOTIFICATION ROUTES
+// ==========================================
+
+// 1. Get VAPID Public Key for client subscription
+router.get('/push/vapid-key', async (req, res) => {
+  try {
+    const publicKey = await getVapidPublicKey();
+    res.json({ publicKey });
+  } catch (err) {
+    res.status(500).json({ error: 'Gagal memuat kunci notifikasi: ' + err.message });
+  }
+});
+
+// 2. Subscribe staff device to push notifications
+router.post('/push/subscribe', async (req, res) => {
+  const { staffId, subscription, userAgent } = req.body;
+  if (!staffId || !subscription) {
+    return res.status(400).json({ error: 'staffId dan subscription wajib disertakan.' });
+  }
+  try {
+    const result = await savePushSubscription({ staffId, subscription, userAgent });
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 3. Send test push notification
+router.post('/push/test', async (req, res) => {
+  const { staffId } = req.body;
+  try {
+    const result = await sendPushNotification({
+      staffIds: staffId ? [String(staffId)] : 'ALL',
+      title: '🔔 Notifikasi JP & LuckyCat Aktif!',
+      body: 'Push notification berhasil terpasang di HP Anda persis seperti pesan WhatsApp.',
+      url: '/',
+      tag: 'test-notification'
+    });
+    res.json({ success: true, result });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // Helper to save base64 photo to disk
@@ -2583,6 +2629,30 @@ router.post('/leave-requests/:id/review', async (req, res) => {
 
     broadcastEvent('LEAVE_UPDATE', { action: 'REVIEWED', request: updated });
 
+    try {
+      const isApprove = action === 'APPROVE';
+      const isAdjust = action === 'ADJUST';
+      const statusTitle = isApprove ? '✅ Izin Anda Disetujui' : isAdjust ? '🟡 Izin Disetujui Sebagian' : '❌ Izin Belum Disetujui';
+      const typeLabel = updated?.type === 'SAKIT' ? 'Izin Sakit' : updated?.type === 'CUTI_TAHUNAN' ? 'Cuti Tahunan' : 'Izin Tidak Masuk';
+      const statusBody = isApprove
+        ? `Pengajuan ${typeLabel} Anda telah DISETUJUI oleh Management.`
+        : isAdjust
+        ? `Pengajuan ${typeLabel} Anda disesuaikan menjadi ${approvedDays} hari. Catatan: "${managerNotes || '-'}"`
+        : `Pengajuan ${typeLabel} Anda belum disetujui. Catatan: "${managerNotes || '-'}"`;
+
+      if (updated?.staff_id) {
+        sendPushNotification({
+          staffIds: [String(updated.staff_id)],
+          title: statusTitle,
+          body: statusBody,
+          url: '/',
+          tag: `leave_review_${id}`
+        }).catch(errPush => console.warn('Push error:', errPush.message));
+      }
+    } catch (e) {
+      console.warn('Push dispatch error for leave review:', e.message);
+    }
+
     return res.json({
       success: true,
       message: action === 'APPROVE'
@@ -2741,6 +2811,20 @@ router.post('/announcements', async (req, res) => {
     }
 
     broadcastEvent('ANNOUNCEMENT_UPDATE', { action: 'CREATED', announcement: newAnnouncement });
+
+    // Send Web Push notification to all staff
+    try {
+      const urgencyTag = newAnnouncement.urgency === 'URGENT' ? '🚨 [URGENT] ' : '📢 ';
+      sendPushNotification({
+        staffIds: 'ALL',
+        title: `${urgencyTag}Pengumuman Management: ${newAnnouncement.title}`,
+        body: newAnnouncement.content.slice(0, 120) + (newAnnouncement.content.length > 120 ? '...' : ''),
+        url: '/',
+        tag: `announcement_${newAnnouncement.id}`
+      }).catch(errPush => console.warn('Push error:', errPush.message));
+    } catch (e) {
+      console.warn('Push dispatch error for announcement:', e.message);
+    }
 
     return res.json({
       success: true,
