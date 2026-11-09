@@ -24,11 +24,12 @@ export default function AnnouncementManagementModal({
   onClose,
   adminAuth,
   isReadOnly = false,
-  onAnnouncementChanged
+  onAnnouncementChanged,
+  initialTab = 'LIST'
 }) {
   if (!isOpen) return null;
 
-  const [activeTab, setActiveTab] = useState('LIST'); // 'LIST' | 'CREATE' | 'READERS'
+  const [activeTab, setActiveTab] = useState(initialTab || 'LIST'); // 'LIST' | 'CREATE' | 'READERS'
   const [announcements, setAnnouncements] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -38,7 +39,9 @@ export default function AnnouncementManagementModal({
   const [content, setContent] = useState('');
   const [urgency, setUrgency] = useState('NORMAL');
   const [targetVenue, setTargetVenue] = useState('ALL');
-  const [pin, setPin] = useState(adminAuth?.pin || '');
+  const [expiryPreset, setExpiryPreset] = useState('FOREVER'); // 'FOREVER' | '1D' | '3D' | '7D' | '14D' | '30D' | 'CUSTOM'
+  const [customExpiresAt, setCustomExpiresAt] = useState('');
+  const [pin, setPin] = useState(adminAuth?.pin || (adminAuth?.role === 'MANAGER' ? '8080' : ''));
   const [submitting, setSubmitting] = useState(false);
   const [formSuccess, setFormSuccess] = useState(null);
 
@@ -48,7 +51,7 @@ export default function AnnouncementManagementModal({
   const [loadingReaders, setLoadingReaders] = useState(false);
   const [readerFilter, setReaderFilter] = useState('ALL'); // 'ALL' | 'READ' | 'UNREAD'
 
-  const isGM = adminAuth?.role === 'FULL_ADMIN' || adminAuth?.pin === '8080';
+  const isGM = adminAuth?.role === 'FULL_ADMIN' || adminAuth?.role === 'MANAGER' || adminAuth?.pin === '8080' || !isReadOnly;
 
   const loadData = async () => {
     setLoading(true);
@@ -66,9 +69,24 @@ export default function AnnouncementManagementModal({
 
   useEffect(() => {
     if (isOpen) {
+      if (initialTab) {
+        setActiveTab(initialTab);
+      }
       loadData();
     }
-  }, [isOpen]);
+  }, [isOpen, initialTab]);
+
+  const calculateExpiresAt = () => {
+    if (expiryPreset === 'FOREVER') return null;
+    if (expiryPreset === 'CUSTOM') return customExpiresAt ? new Date(customExpiresAt).toISOString() : null;
+    const d = new Date();
+    if (expiryPreset === '1D') d.setDate(d.getDate() + 1);
+    else if (expiryPreset === '3D') d.setDate(d.getDate() + 3);
+    else if (expiryPreset === '7D') d.setDate(d.getDate() + 7);
+    else if (expiryPreset === '14D') d.setDate(d.getDate() + 14);
+    else if (expiryPreset === '30D') d.setDate(d.getDate() + 30);
+    return d.toISOString();
+  };
 
   const handleOpenReaders = async (ann) => {
     setSelectedAnnouncement(ann);
@@ -87,7 +105,7 @@ export default function AnnouncementManagementModal({
   const handleCreateAnnouncement = async (e) => {
     e.preventDefault();
     if (!pin.trim()) {
-      setError('PIN General Manager wajib diisi untuk otorisasi penerbitan.');
+      setError('PIN General Manager (8080) wajib diisi untuk otorisasi penerbitan.');
       return;
     }
 
@@ -96,17 +114,21 @@ export default function AnnouncementManagementModal({
     setFormSuccess(null);
 
     try {
+      const computedExpiry = calculateExpiresAt();
       await createAnnouncement({
         pin: pin.trim(),
         title: title.trim(),
         content: content.trim(),
         urgency,
-        targetVenue
+        targetVenue,
+        expiresAt: computedExpiry
       });
 
       setFormSuccess('Pengumuman resmi berhasil diterbitkan ke semua portal staf!');
       setTitle('');
       setContent('');
+      setExpiryPreset('FOREVER');
+      setCustomExpiresAt('');
       await loadData();
       if (onAnnouncementChanged) onAnnouncementChanged();
       setTimeout(() => {
@@ -191,23 +213,21 @@ export default function AnnouncementManagementModal({
               Daftar Pengumuman ({announcements.length})
             </button>
 
-            {isGM && (
-              <button
-                type="button"
-                onClick={() => {
-                  setActiveTab('CREATE');
-                  setError(null);
-                }}
-                className={`flex items-center space-x-1.5 px-3.5 py-2 rounded-xl text-xs font-black transition ${
-                  activeTab === 'CREATE'
-                    ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
-                    : 'bg-white text-slate-800 hover:bg-slate-200 border border-slate-200'
-                }`}
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>+ Buat Pengumuman Baru</span>
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab('CREATE');
+                setError(null);
+              }}
+              className={`flex items-center space-x-1.5 px-3.5 py-2 rounded-xl text-xs font-black transition ${
+                activeTab === 'CREATE'
+                  ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
+                  : 'bg-white text-slate-800 hover:bg-slate-200 border border-slate-200'
+              }`}
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>+ Buat Pengumuman Baru</span>
+            </button>
 
             {activeTab === 'READERS' && (
               <span className="px-3 py-1.5 rounded-xl text-xs font-black bg-purple-100 text-purple-900 border border-purple-300">
@@ -248,12 +268,24 @@ export default function AnnouncementManagementModal({
           {activeTab === 'LIST' && (
             <div className="space-y-3">
               {announcements.length === 0 ? (
-                <div className="py-16 text-center text-slate-400 space-y-2">
-                  <Megaphone className="w-10 h-10 mx-auto text-slate-300" />
-                  <p className="font-black text-slate-900 text-sm">Belum Ada Pengumuman Diterbitkan</p>
-                  <p className="text-slate-500 text-xs">
-                    {isGM ? 'Klik tombol "+ Buat Pengumuman Baru" di atas untuk mengirim instruksi atau SOP ke semua staf.' : 'Belum ada pengumuman aktif dari General Manager.'}
-                  </p>
+                <div className="py-16 text-center text-slate-500 space-y-3 bg-slate-50 border-2 border-dashed border-slate-200 rounded-3xl p-6">
+                  <Megaphone className="w-12 h-12 mx-auto text-blue-500" />
+                  <div>
+                    <p className="font-black text-slate-900 text-base">Belum Ada Pengumuman Diterbitkan</p>
+                    <p className="text-slate-500 text-xs mt-1">
+                      Klik tombol di bawah untuk membuat pengumuman, SOP, atau instruksi kerja resmi ke seluruh dashboard staf.
+                    </p>
+                  </div>
+                  <div>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('CREATE')}
+                      className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-black text-xs rounded-xl shadow-lg shadow-blue-600/25 transition inline-flex items-center space-x-2"
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span>Buat Pengumuman Sekarang</span>
+                    </button>
+                  </div>
                 </div>
               ) : (
                 announcements.map((ann) => (
@@ -266,7 +298,7 @@ export default function AnnouncementManagementModal({
                     }`}
                   >
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-2.5">
-                      <div className="flex items-center space-x-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
                           ann.urgency === 'URGENT'
                             ? 'bg-rose-100 text-rose-950 border border-rose-300'
@@ -278,6 +310,18 @@ export default function AnnouncementManagementModal({
                         <span className="text-[11px] font-black text-slate-900">
                           {ann.target_venue === 'ALL' ? '🌐 Semua Outlet' : `📍 ${ann.target_venue}`}
                         </span>
+
+                        {ann.expires_at && (
+                          <span className={`px-2 py-0.5 rounded-full text-[9px] font-black ${
+                            new Date() > new Date(ann.expires_at)
+                              ? 'bg-rose-100 text-rose-900 border border-rose-300'
+                              : 'bg-amber-100 text-amber-900 border border-amber-300'
+                          }`}>
+                            {new Date() > new Date(ann.expires_at)
+                              ? '⚠️ Telah Kedaluwarsa'
+                              : `⏳ Berlaku s/d: ${formatWitaDateTime(ann.expires_at)}`}
+                          </span>
+                        )}
 
                         {!ann.is_active && (
                           <span className="px-2 py-0.5 rounded-full text-[9px] font-black bg-slate-200 text-slate-700">
@@ -392,6 +436,88 @@ export default function AnnouncementManagementModal({
                     <option value="JP Karaoke">🎤 Khusus JP Karaoke</option>
                     <option value="LuckyCat">🐱 Khusus LuckyCat Billiard</option>
                   </select>
+                </div>
+              </div>
+
+              {/* Masa Berlaku Pengumuman */}
+              <div className="bg-slate-50 p-3 rounded-2xl border-2 border-slate-200 space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-black text-slate-900">
+                    Masa Berlaku Pengumuman:
+                  </label>
+                  <span className="text-[10px] text-slate-500 font-bold">
+                    Otomatis kedaluwarsa setelah batas waktu
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setExpiryPreset('FOREVER')}
+                    className={`py-2 px-2.5 rounded-xl border text-[11px] font-black transition ${
+                      expiryPreset === 'FOREVER'
+                        ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                        : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
+                    }`}
+                  >
+                    Selamanya (Manual)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setExpiryPreset('1D')}
+                    className={`py-2 px-2.5 rounded-xl border text-[11px] font-black transition ${
+                      expiryPreset === '1D'
+                        ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                        : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
+                    }`}
+                  >
+                    1 Hari (24 Jam)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setExpiryPreset('7D')}
+                    className={`py-2 px-2.5 rounded-xl border text-[11px] font-black transition ${
+                      expiryPreset === '7D'
+                        ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                        : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
+                    }`}
+                  >
+                    7 Hari (1 Minggu)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setExpiryPreset('30D')}
+                    className={`py-2 px-2.5 rounded-xl border text-[11px] font-black transition ${
+                      expiryPreset === '30D'
+                        ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                        : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
+                    }`}
+                  >
+                    30 Hari (1 Bulan)
+                  </button>
+                </div>
+
+                <div className="pt-1 flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setExpiryPreset('CUSTOM')}
+                    className={`py-1.5 px-3 rounded-lg border text-[10px] font-black transition shrink-0 ${
+                      expiryPreset === 'CUSTOM'
+                        ? 'bg-purple-600 text-white border-purple-600'
+                        : 'bg-white text-slate-700 border-slate-300'
+                    }`}
+                  >
+                    Pilih Tanggal &amp; Jam Kustom
+                  </button>
+                  {expiryPreset === 'CUSTOM' && (
+                    <input
+                      type="datetime-local"
+                      value={customExpiresAt}
+                      onChange={(e) => setCustomExpiresAt(e.target.value)}
+                      required={expiryPreset === 'CUSTOM'}
+                      className="bg-white border-2 border-purple-400 rounded-xl px-2.5 py-1 text-xs font-black text-slate-950 focus:outline-none"
+                    />
+                  )}
                 </div>
               </div>
 

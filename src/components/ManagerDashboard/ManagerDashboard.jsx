@@ -41,6 +41,7 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [wipeModalOpen, setWipeModalOpen] = useState(false);
   const [announcementsModalOpen, setAnnouncementsModalOpen] = useState(false);
+  const [announcementInitialTab, setAnnouncementInitialTab] = useState('LIST');
   const [activeAnnouncement, setActiveAnnouncement] = useState(null);
   const [announcementCompliance, setAnnouncementCompliance] = useState(null);
 
@@ -382,12 +383,29 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
 
                 <button
                   type="button"
-                  onClick={() => setAnnouncementsModalOpen(true)}
+                  onClick={() => {
+                    setAnnouncementInitialTab(activeAnnouncement ? 'LIST' : 'CREATE');
+                    setAnnouncementsModalOpen(true);
+                  }}
                   className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-black shadow-md shadow-blue-600/30 transition flex items-center space-x-1.5"
                 >
                   <Eye className="w-3.5 h-3.5" />
                   <span>{activeAnnouncement ? 'Lihat Bukti Baca & Kelola' : '+ Buat Pengumuman (GM)'}</span>
                 </button>
+
+                {activeAnnouncement && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAnnouncementInitialTab('CREATE');
+                      setAnnouncementsModalOpen(true);
+                    }}
+                    className="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black shadow-md shadow-emerald-600/30 transition flex items-center space-x-1"
+                    title="Terbitkan Pengumuman Baru"
+                  >
+                    <span>+ Buat Baru</span>
+                  </button>
+                )}
               </div>
             </div>
 
@@ -492,6 +510,7 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
             onClose={() => setAnnouncementsModalOpen(false)}
             adminAuth={adminAuth}
             isReadOnly={isReadOnly}
+            initialTab={announcementInitialTab}
             onAnnouncementChanged={() => {
               loadActiveAnnouncement();
             }}

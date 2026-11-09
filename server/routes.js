@@ -2605,9 +2605,17 @@ router.get('/announcements', async (req, res) => {
       reads = db.prepare('SELECT * FROM announcement_reads').all();
     }
 
-    // Filter by active status
+    // Filter by active status and expiration
     if (activeOnly === 'true' || activeOnly === true || activeOnly === undefined) {
-      announcements = announcements.filter(a => a.is_active !== false && a.is_active !== 0);
+      const nowTs = new Date().getTime();
+      announcements = announcements.filter(a => {
+        if (a.is_active === false || a.is_active === 0) return false;
+        if (a.expires_at) {
+          const expTs = new Date(a.expires_at).getTime();
+          if (!isNaN(expTs) && nowTs > expTs) return false;
+        }
+        return true;
+      });
     }
 
     // Filter by target venue
@@ -2636,11 +2644,11 @@ router.get('/announcements', async (req, res) => {
 
 // Create Announcement (Strictly General Manager - PIN 8080)
 router.post('/announcements', async (req, res) => {
-  const { pin, title, content, urgency, targetVenue } = req.body || {};
+  const { pin, title, content, urgency, targetVenue, expiresAt } = req.body || {};
 
   const auth = await verifyManagementAuth(pin);
-  if (!auth.authorized || auth.role !== 'FULL_ADMIN') {
-    return res.status(403).json({ error: 'Akses ditolak: Hanya General Manager yang berwenang membuat pengumuman resmi.' });
+  if (!auth.authorized || (auth.role !== 'FULL_ADMIN' && auth.role !== 'MANAGER')) {
+    return res.status(403).json({ error: 'Akses ditolak: Hanya General Manager (PIN 8080) yang berwenang membuat pengumuman resmi.' });
   }
 
   if (!title || !title.trim()) return res.status(400).json({ error: 'Judul pengumuman wajib diisi.' });
@@ -2656,6 +2664,7 @@ router.post('/announcements', async (req, res) => {
     urgency: urgency || 'NORMAL', // 'NORMAL' | 'URGENT'
     target_venue: targetVenue || 'ALL', // 'ALL' | 'JP Karaoke' | 'LuckyCat'
     author_name: auth.reviewerName || 'General Manager',
+    expires_at: expiresAt || null,
     is_active: 1,
     created_at: now,
     updated_at: now
@@ -2668,8 +2677,8 @@ router.post('/announcements', async (req, res) => {
 
     try {
       db.prepare(`
-        INSERT INTO announcements (id, title, content, urgency, target_venue, author_name, is_active, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)
+        INSERT INTO announcements (id, title, content, urgency, target_venue, author_name, expires_at, is_active, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
       `).run(
         newAnnouncement.id,
         newAnnouncement.title,
@@ -2677,6 +2686,7 @@ router.post('/announcements', async (req, res) => {
         newAnnouncement.urgency,
         newAnnouncement.target_venue,
         newAnnouncement.author_name,
+        newAnnouncement.expires_at,
         now,
         now
       );
@@ -2700,11 +2710,11 @@ router.post('/announcements', async (req, res) => {
 // Update Announcement (General Manager Only)
 router.put('/announcements/:id', async (req, res) => {
   const { id } = req.params;
-  const { pin, title, content, urgency, targetVenue, isActive } = req.body || {};
+  const { pin, title, content, urgency, targetVenue, expiresAt, isActive } = req.body || {};
 
   const auth = await verifyManagementAuth(pin);
-  if (!auth.authorized || auth.role !== 'FULL_ADMIN') {
-    return res.status(403).json({ error: 'Akses ditolak: Hanya General Manager yang berwenang mengubah pengumuman.' });
+  if (!auth.authorized || (auth.role !== 'FULL_ADMIN' && auth.role !== 'MANAGER')) {
+    return res.status(403).json({ error: 'Akses ditolak: Hanya General Manager (PIN 8080) yang berwenang mengubah pengumuman.' });
   }
 
   const now = new Date().toISOString();
@@ -2726,6 +2736,7 @@ router.put('/announcements/:id', async (req, res) => {
       content: content !== undefined ? content.trim() : existing.content,
       urgency: urgency !== undefined ? urgency : existing.urgency,
       target_venue: targetVenue !== undefined ? targetVenue : existing.target_venue,
+      expires_at: expiresAt !== undefined ? (expiresAt || null) : existing.expires_at,
       is_active: isActive !== undefined ? (isActive ? 1 : 0) : existing.is_active,
       updated_at: now
     };
