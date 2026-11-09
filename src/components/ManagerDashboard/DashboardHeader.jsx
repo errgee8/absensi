@@ -1,11 +1,12 @@
 import React from 'react';
-import { Users, Clock, AlertTriangle, MapPin, Printer, Settings, FileSpreadsheet } from 'lucide-react';
+import { Users, Clock, AlertTriangle, MapPin, Printer, Settings, FileSpreadsheet, RotateCcw } from 'lucide-react';
 
 export default function DashboardHeader({
   stats,
   onPrint,
   onExportCsv,
   onOpenSettings,
+  onOpenResetLeaderboard,
   isReadOnly = false
 }) {
   const cards = [
@@ -75,6 +76,18 @@ export default function DashboardHeader({
             <Printer className="w-3.5 h-3.5 stroke-[2.5]" />
             <span>Print / Export PDF</span>
           </button>
+
+          {/* Reset Leaderboard & Trial Data Button - Manager Only */}
+          {!isReadOnly && onOpenResetLeaderboard && (
+            <button
+              onClick={onOpenResetLeaderboard}
+              className="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-black flex items-center space-x-1.5 shadow-md shadow-slate-900/20 transition"
+              title="Reset Poin Leaderboard ke Nol atau Wipe Data Trial"
+            >
+              <RotateCcw className="w-3.5 h-3.5 text-amber-300 stroke-[2.5]" />
+              <span>Reset Leaderboard</span>
+            </button>
+          )}
 
           {/* Settings Modal Button - Only accessible for Full Manager */}
           {!isReadOnly && (

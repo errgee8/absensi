@@ -1891,9 +1891,9 @@ router.get('/leaderboard', async (req, res) => {
   }
 });
 
-// Manager-Only Leaderboard & Trial Data Wipe Endpoint
+// Manager-Only Leaderboard & Trial Data Management Endpoint
 router.post('/admin/wipe-leaderboard', async (req, res) => {
-  const { pin, scope = 'all', targetMonth = null } = req.body || {};
+  const { pin, mode = 'reset_only', scope = 'all', targetMonth = null } = req.body || {};
 
   const cleanPin = (pin || '').trim();
   const adminPin = (getSetting('admin_pin') || '8080').trim();
@@ -1902,46 +1902,106 @@ router.post('/admin/wipe-leaderboard', async (req, res) => {
   if (!cleanPin || cleanPin !== adminPin) {
     return res.status(403).json({
       success: false,
-      error: 'Akses ditolak: PIN Manager tidak valid. Hanya Full Manager yang dapat menghapus data leaderboard.'
+      error: 'Akses ditolak: PIN Manager tidak valid. Hanya Full Manager yang dapat mengelola reset/wipe leaderboard.'
     });
   }
 
   try {
-    // 1. Wipe SQLite tables if scope includes attendance
-    if (scope === 'attendance' || scope === 'all') {
-      try {
-        if (db) {
-          db.prepare('DELETE FROM shifts').run();
-          try {
-            db.prepare('DELETE FROM breaks').run();
-          } catch (e) {}
+    // Mode 1: Reset Leaderboard Saja (Tanpa menghapus data riwayat trial)
+    if (mode === 'reset_only') {
+      const resetAt = new Date().toISOString();
+      setSetting('leaderboard_reset_at', resetAt);
+      if (isSupabaseConfigured) {
+        try {
+          await supabase.from('app_settings').upsert({
+            key: 'leaderboard_reset_at',
+            value: resetAt,
+            updated_at: resetAt
+          });
+        } catch (e) {
+          console.warn('Failed to save leaderboard_reset_at to Supabase:', e.message);
         }
-      } catch (sqliteErr) {
-        console.warn('SQLite shifts wipe note:', sqliteErr.message);
       }
+
+      broadcastEvent('LEADERBOARD_UPDATE');
+
+      return res.json({
+        success: true,
+        mode: 'reset_only',
+        resetAt,
+        message: 'Leaderboard berhasil di-reset ke nol! Riwayat absensi & inspeksi trial tetap aman dan tersimpan utuh di sistem audit.'
+      });
     }
 
-    // 2. Wipe Supabase Cloud tables
-    let result = { success: true };
-    if (isSupabaseConfigured) {
-      result = await cloudDb.wipeLeaderboardData({ scope, targetMonth });
+    // Mode 2: Undo Reset Leaderboard (Kembalikan hitungan bulan penuh)
+    if (mode === 'undo_reset') {
+      setSetting('leaderboard_reset_at', null);
+      if (isSupabaseConfigured) {
+        try {
+          await supabase.from('app_settings').delete().eq('key', 'leaderboard_reset_at');
+        } catch (e) {
+          console.warn('Failed to delete leaderboard_reset_at in Supabase:', e.message);
+        }
+      }
+
+      broadcastEvent('LEADERBOARD_UPDATE');
+
+      return res.json({
+        success: true,
+        mode: 'undo_reset',
+        message: 'Reset leaderboard dibatalkan. Leaderboard kembali menghitung akumulasi dari awal bulan penuh.'
+      });
     }
 
-    // 3. Broadcast real-time update events
-    broadcastEvent('SHIFT_UPDATE');
-    broadcastEvent('LEADERBOARD_UPDATE');
+    // Mode 3: Wipe Permanen Data Trial
+    if (mode === 'wipe_records') {
+      // Clear reset timestamp since records are wiped
+      setSetting('leaderboard_reset_at', null);
+      if (isSupabaseConfigured) {
+        try {
+          await supabase.from('app_settings').delete().eq('key', 'leaderboard_reset_at');
+        } catch (e) {}
+      }
 
-    return res.json({
-      success: true,
-      message: 'Data riwayat trial berhasil di-wipe. Leaderboard telah di-reset dan dimulai bersih dari nol.',
-      scope,
-      result
-    });
+      // 1. Wipe SQLite tables if scope includes attendance
+      if (scope === 'attendance' || scope === 'all') {
+        try {
+          if (db) {
+            db.prepare('DELETE FROM shifts').run();
+            try {
+              db.prepare('DELETE FROM breaks').run();
+            } catch (e) {}
+          }
+        } catch (sqliteErr) {
+          console.warn('SQLite shifts wipe note:', sqliteErr.message);
+        }
+      }
+
+      // 2. Wipe Supabase Cloud tables
+      let result = { success: true };
+      if (isSupabaseConfigured) {
+        result = await cloudDb.wipeLeaderboardData({ scope, targetMonth });
+      }
+
+      // 3. Broadcast real-time update events
+      broadcastEvent('SHIFT_UPDATE');
+      broadcastEvent('LEADERBOARD_UPDATE');
+
+      return res.json({
+        success: true,
+        mode: 'wipe_records',
+        message: 'Data riwayat trial berhasil dihapus permanen. Leaderboard telah di-reset dan dimulai bersih dari nol.',
+        scope,
+        result
+      });
+    }
+
+    return res.status(400).json({ error: 'Mode tidak valid. Pilih reset_only, undo_reset, atau wipe_records.' });
   } catch (err) {
-    console.error('Failed to wipe leaderboard data:', err);
+    console.error('Failed to process leaderboard wipe/reset:', err);
     return res.status(500).json({
       success: false,
-      error: 'Gagal melakukan wipe data: ' + err.message
+      error: 'Gagal melakukan aksi: ' + err.message
     });
   }
 });

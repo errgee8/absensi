@@ -218,14 +218,14 @@ export async function seedDemoData(reset = false) {
   return data;
 }
 
-export async function wipeLeaderboardData({ pin, scope = 'all', targetMonth = null }) {
+export async function wipeLeaderboardData({ pin, mode = 'reset_only', scope = 'all', targetMonth = null }) {
   const res = await fetch(`${API_BASE}/admin/wipe-leaderboard`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ pin, scope, targetMonth })
+    body: JSON.stringify({ pin, mode, scope, targetMonth })
   });
   const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Gagal menghapus data trial leaderboard');
+  if (!res.ok) throw new Error(data.error || 'Gagal memproses reset/wipe leaderboard');
   return data;
 }
 

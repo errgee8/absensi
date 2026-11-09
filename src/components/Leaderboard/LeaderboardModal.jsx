@@ -19,10 +19,8 @@ import {
   Building2,
   Columns,
   Eye,
-  Coffee,
-  Trash2
+  Coffee
 } from 'lucide-react';
-import WipeLeaderboardModal from './WipeLeaderboardModal';
 
 // Reusable Elegant Framed Avatar Component with Fallback
 function StaffAvatarFrame({ photo, name, rank, size = 'md' }) {
@@ -461,7 +459,6 @@ export default function LeaderboardModal({ isOpen, onClose }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [wipeModalOpen, setWipeModalOpen] = useState(false);
 
   const fetchLeaderboard = async () => {
     try {
@@ -552,17 +549,6 @@ export default function LeaderboardModal({ isOpen, onClose }) {
               <Columns className="w-3.5 h-3.5 text-amber-400" />
               <span>Side-by-Side View</span>
             </div>
-
-            {/* Manager Wipe Data Button */}
-            <button
-              type="button"
-              onClick={() => setWipeModalOpen(true)}
-              className="px-2.5 sm:px-3 py-1.5 rounded-xl bg-rose-950/80 hover:bg-rose-900 text-rose-300 hover:text-white border border-rose-500/50 text-xs font-black flex items-center space-x-1.5 transition shadow-sm active:scale-95"
-              title="Wipe & Reset Data Trial Leaderboard (Khusus Manager)"
-            >
-              <Trash2 className="w-3.5 h-3.5 text-rose-400 stroke-[2.5]" />
-              <span className="hidden xs:inline sm:inline">Wipe Data (Manager)</span>
-            </button>
 
             <button
               onClick={fetchLeaderboard}
@@ -663,15 +649,6 @@ export default function LeaderboardModal({ isOpen, onClose }) {
         </div>
 
       </div>
-
-      {/* Confirmation & Authorization Modal for Wiping Leaderboard Data */}
-      <WipeLeaderboardModal
-        isOpen={wipeModalOpen}
-        onClose={() => setWipeModalOpen(false)}
-        onSuccess={() => {
-          fetchLeaderboard();
-        }}
-      />
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Save, MapPin, Shield, RefreshCw, Clock, ArrowRight, Trash2 } from 'lucide-react';
+import { X, Save, MapPin, Shield, RefreshCw, Clock, ArrowRight, Trash2, RotateCcw } from 'lucide-react';
 import { updateSettings } from '../../utils/api';
 import WipeLeaderboardModal from '../Leaderboard/WipeLeaderboardModal';
 
@@ -197,19 +197,19 @@ export default function VenueSettingsModal({ settings, onClose, onSaved, onGoToS
                 <div>
                   <div className="flex items-center space-x-1.5 text-rose-950 font-black text-xs">
                     <Trash2 className="w-4 h-4 text-rose-600 stroke-[2.5]" />
-                    <span>Reset Data Trial Leaderboard</span>
+                    <span>Reset Leaderboard &amp; Data Trial</span>
                   </div>
                   <p className="text-[11px] text-rose-800 font-bold mt-0.5">
-                    Kosongkan riwayat absensi atau inspeksi selama masa uji coba.
+                    Reset poin leaderboard mulai dari nol atau wipe riwayat data masa trial.
                   </p>
                 </div>
                 <button
                   type="button"
                   onClick={() => setWipeModalOpen(true)}
-                  className="px-3.5 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-black transition flex items-center justify-center space-x-1.5 shadow-md shadow-rose-600/20 shrink-0"
+                  className="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-black transition flex items-center justify-center space-x-1.5 shadow-md shadow-slate-900/20 shrink-0"
                 >
-                  <Trash2 className="w-3.5 h-3.5 stroke-[2.5]" />
-                  <span>Wipe Data Trial</span>
+                  <RotateCcw className="w-3.5 h-3.5 text-amber-300 stroke-[2.5]" />
+                  <span>Reset / Wipe Data</span>
                 </button>
               </div>
             </div>

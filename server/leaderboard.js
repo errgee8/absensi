@@ -49,6 +49,24 @@ export async function computeLeaderboard(targetMonthStr) {
 
   if (logErr) throw logErr;
 
+  // Check if a leaderboard reset cutoff timestamp is active (Reset Leaderboard Saja)
+  let leaderboardResetAt = null;
+  try {
+    const { data: resetSetting } = await supabase
+      .from('app_settings')
+      .select('value')
+      .eq('key', 'leaderboard_reset_at')
+      .maybeSingle();
+    if (resetSetting?.value) {
+      const parsedD = new Date(resetSetting.value);
+      if (!isNaN(parsedD.getTime())) {
+        leaderboardResetAt = parsedD;
+      }
+    }
+  } catch (e) {
+    console.warn('Leaderboard reset check note:', e.message);
+  }
+
   // Build photo map of latest staff check-in selfies
   const staffPhotoMap = {};
   for (const log of attendanceLogs || []) {
@@ -104,6 +122,12 @@ export async function computeLeaderboard(targetMonthStr) {
   for (const log of attendanceLogs || []) {
     const sId = log.staff_id;
     if (!staffStats[sId]) continue;
+
+    // If leaderboard was reset, only count shifts occurring after reset timestamp
+    if (leaderboardResetAt) {
+      const logTime = new Date(log.check_in_time || log.created_at || `${log.shift_date}T12:00:00Z`);
+      if (logTime < leaderboardResetAt) continue;
+    }
 
     staffStats[sId].workDays.add(log.shift_date);
 
@@ -252,6 +276,12 @@ export async function computeLeaderboard(targetMonthStr) {
     const rawName = (ins.staff_name || '').trim();
     if (!rawName || rawName.toLowerCase() === 'test staff') continue;
 
+    // If leaderboard was reset, only count inspections occurring after reset timestamp
+    if (leaderboardResetAt) {
+      const insTime = new Date(ins.created_at);
+      if (insTime < leaderboardResetAt) continue;
+    }
+
     if (!toiletStats[rawName]) {
       toiletStats[rawName] = {
         name: rawName,
@@ -354,7 +384,8 @@ export async function computeLeaderboard(targetMonthStr) {
       startDate,
       endDate,
       maxWorkDays: 26,
-      generatedAt: new Date().toISOString()
+      generatedAt: new Date().toISOString(),
+      resetAt: leaderboardResetAt ? leaderboardResetAt.toISOString() : null
     },
     attendance: attendanceRanked,
     toilet: toiletRanked,

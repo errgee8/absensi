@@ -8,6 +8,7 @@ import PrintableTimesheet from './PrintableTimesheet';
 import StaffManagementTab from './StaffManagementTab';
 import ShiftSchedulesTab from './ShiftSchedulesTab';
 import ToiletInspectionTab from './ToiletInspectionTab';
+import WipeLeaderboardModal from '../Leaderboard/WipeLeaderboardModal';
 import { exportTimesheetToExcel } from '../../utils/excelExport';
 import { getShifts, getStats, getShiftSchedules, subscribeRealtimeEvents } from '../../utils/api';
 import { getOperationalDateYMD, getOperationalYesterdayYMD, getWitaDateYMD } from '../../utils/time';
@@ -35,6 +36,7 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
   // Modals
   const [inspectData, setInspectData] = useState(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [wipeModalOpen, setWipeModalOpen] = useState(false);
 
   const departments = [
     'Server and Cashier',
@@ -274,6 +276,7 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
               onPrint={handlePrint}
               onExportCsv={handleExportCsv}
               onOpenSettings={() => setSettingsOpen(true)}
+              onOpenResetLeaderboard={() => setWipeModalOpen(true)}
               isReadOnly={isReadOnly}
             />
 
@@ -339,6 +342,17 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
             onGoToSchedules={() => {
               setSettingsOpen(false);
               setActiveTab('SCHEDULES');
+            }}
+          />
+        )}
+
+        {/* Modal: Reset Leaderboard & Trial Data (Only for Full Manager) */}
+        {!isReadOnly && wipeModalOpen && (
+          <WipeLeaderboardModal
+            isOpen={wipeModalOpen}
+            onClose={() => setWipeModalOpen(false)}
+            onSuccess={() => {
+              loadData();
             }}
           />
         )}
