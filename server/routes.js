@@ -2837,14 +2837,6 @@ router.put('/announcements/:id', async (req, res) => {
     return res.status(500).json({ error: 'Gagal memperbarui pengumuman: ' + err.message });
   }
 });
-      message: 'Pengumuman berhasil diperbarui.',
-      announcement: updated
-    });
-  } catch (err) {
-    console.error('Error updating announcement:', err);
-    return res.status(500).json({ error: 'Gagal memperbarui pengumuman: ' + err.message });
-  }
-});
 
 // Staff Acknowledge / "Saya Mengerti"
 router.post('/announcements/:id/acknowledge', async (req, res) => {
