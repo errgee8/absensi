@@ -131,16 +131,21 @@ export async function computeLeaderboard(targetMonthStr) {
 
     staffStats[sId].workDays.add(log.shift_date);
 
+    let parsedLogNotes = {};
+    try {
+      if (typeof log.notes === 'string') parsedLogNotes = JSON.parse(log.notes);
+      else if (log.notes) parsedLogNotes = log.notes;
+    } catch {}
+
+    const flagsArr = Array.isArray(log.flags)
+      ? log.flags
+      : (typeof log.flags === 'string' ? JSON.parse(log.flags || '[]') : []);
+
     if (log.check_in_time) {
       let schedStart = '13:00';
-      try {
-        if (log.notes) {
-          const parsed = typeof log.notes === 'string' ? JSON.parse(log.notes) : log.notes;
-          if (parsed?.scheduled_start) schedStart = parsed.scheduled_start;
-        }
-      } catch (e) {}
-
-      if (schedStart === '13:00' && log.staff?.shift_start) {
+      if (parsedLogNotes?.scheduled_start) {
+        schedStart = parsedLogNotes.scheduled_start;
+      } else if (log.staff?.shift_start) {
         schedStart = log.staff.shift_start;
       }
 
@@ -156,15 +161,6 @@ export async function computeLeaderboard(targetMonthStr) {
       const diffSecs = checkInSecs - schedSecs;
 
       // Check if late checkin was officially EXCUSED / WAIVED by management
-      const flagsArr = Array.isArray(log.flags)
-        ? log.flags
-        : (typeof log.flags === 'string' ? JSON.parse(log.flags || '[]') : []);
-      let parsedLogNotes = {};
-      try {
-        if (typeof log.notes === 'string') parsedLogNotes = JSON.parse(log.notes);
-        else if (log.notes) parsedLogNotes = log.notes;
-      } catch {}
-
       const isLateExcused = flagsArr.includes('FLAG_LATE_EXCUSED') || parsedLogNotes?.late_status === 'APPROVED';
 
       if (diffSecs > 0) {
@@ -182,20 +178,12 @@ export async function computeLeaderboard(targetMonthStr) {
     // Evaluate early checkout / pulang lebih awal
     if (log.check_out_time) {
       let schedEnd = '22:00';
-      try {
-        if (log.notes) {
-          const parsed = typeof log.notes === 'string' ? JSON.parse(log.notes) : log.notes;
-          if (parsed?.scheduled_end) schedEnd = parsed.scheduled_end;
-        }
-      } catch (e) {}
-
-      if (schedEnd === '22:00' && log.staff?.shift_end) {
+      if (parsedLogNotes?.scheduled_end) {
+        schedEnd = parsedLogNotes.scheduled_end;
+      } else if (log.staff?.shift_end) {
         schedEnd = log.staff.shift_end;
       }
 
-      const flagsArr = Array.isArray(log.flags)
-        ? log.flags
-        : (typeof log.flags === 'string' ? JSON.parse(log.flags || '[]') : []);
       const hasEarlyFlag = flagsArr.some(f => String(f).includes('EARLY_CHECKOUT'));
       const isEarlyCheckoutApproved = flagsArr.includes('FLAG_EARLY_CHECKOUT_APPROVED') || parsedLogNotes?.early_checkout_status === 'APPROVED';
 
