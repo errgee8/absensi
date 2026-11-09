@@ -3,7 +3,7 @@ import { Camera, X, CheckCircle2, AlertCircle, RefreshCw, Smartphone, Loader2, S
 import confetti from 'canvas-confetti';
 import { captureAndWatermark, watermarkFile } from '../../utils/watermark';
 import { checkIn, checkOut, startBreak, endBreak } from '../../utils/api';
-import { isWithinGeofence } from '../../utils/distance';
+import { isWithinGeofence, calculateDistanceMeters } from '../../utils/distance';
 import { getAppNow } from '../../utils/time';
 
 export default function KioskCameraModal({
@@ -32,6 +32,16 @@ export default function KioskCameraModal({
   const [countdown, setCountdown] = useState(3);
 
   const [userLocation, setUserLocation] = useState(null);
+  const [geoState, setGeoState] = useState({
+    status: 'acquiring', // 'acquiring' | 'locked' | 'imprecise' | 'denied' | 'unavailable'
+    lat: null,
+    lng: null,
+    accuracy: null,
+    distance: null,
+    isInside: true,
+    errorMessage: null
+  });
+  const watchIdRef = useRef(null);
 
   // Late checkin excuse states
   const [lateReason, setLateReason] = useState('');
@@ -67,21 +77,84 @@ export default function KioskCameraModal({
     }
   }, [actionType, schedStart, staff?.division]);
 
-  // Background GPS fetch
-  useEffect(() => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          setUserLocation({
-            lat: pos.coords.latitude,
-            lng: pos.coords.longitude,
-            accuracy: Math.round(pos.coords.accuracy)
-          });
-        },
-        () => {},
-        { enableHighAccuracy: true, timeout: 8000 }
-      );
+  // High-precision GPS acquisition with continuous refinement and permission check
+  const requestGpsPosition = () => {
+    if (!navigator.geolocation) {
+      setGeoState((prev) => ({
+        ...prev,
+        status: 'unavailable',
+        errorMessage: 'Browser tidak mendukung pendeteksi lokasi GPS.'
+      }));
+      return;
     }
+
+    setGeoState((prev) => ({ ...prev, status: 'acquiring', errorMessage: null }));
+
+    const venueLat = venueSettings?.venue_lat ?? -8.780981;
+    const venueLng = venueSettings?.venue_lng ?? 115.176863;
+    const geofenceRadius = venueSettings?.geofence_radius ?? 150;
+
+    const onSuccess = (pos) => {
+      const lat = pos.coords.latitude;
+      const lng = pos.coords.longitude;
+      const accuracy = Math.round(pos.coords.accuracy);
+      const distance = calculateDistanceMeters(lat, lng, venueLat, venueLng);
+      const isImprecise = accuracy > 300; // Coarse cellular location like Hendy's 2000m
+      const isInside = distance <= geofenceRadius;
+      const status = isImprecise ? 'imprecise' : 'locked';
+
+      setUserLocation({ lat, lng, accuracy });
+      setGeoState({
+        status,
+        lat,
+        lng,
+        accuracy,
+        distance,
+        isInside,
+        errorMessage: null
+      });
+    };
+
+    const onError = (err) => {
+      console.warn('Geolocation error:', err);
+      let msg = 'Gagal mendeteksi lokasi.';
+      let status = 'unavailable';
+      if (err.code === 1) { // PERMISSION_DENIED
+        status = 'denied';
+        msg = 'Izin lokasi (GPS) ditolak oleh browser HP Anda.';
+      } else if (err.code === 2) {
+        msg = 'Sinyal lokasi tidak tersedia. Pastikan GPS ponsel Anda aktif.';
+      } else if (err.code === 3) {
+        msg = 'Waktu pencarian sinyal GPS habis.';
+      }
+      setGeoState((prev) => ({ ...prev, status, errorMessage: msg }));
+    };
+
+    // 1. One-shot immediate high-accuracy request
+    navigator.geolocation.getCurrentPosition(onSuccess, onError, {
+      enableHighAccuracy: true,
+      maximumAge: 0,
+      timeout: 10000
+    });
+
+    // 2. Continuous watch to actively refine satellite GPS lock
+    if (watchIdRef.current != null) {
+      navigator.geolocation.clearWatch(watchIdRef.current);
+    }
+    watchIdRef.current = navigator.geolocation.watchPosition(onSuccess, onError, {
+      enableHighAccuracy: true,
+      maximumAge: 0,
+      timeout: 15000
+    });
+  };
+
+  useEffect(() => {
+    requestGpsPosition();
+    return () => {
+      if (watchIdRef.current != null) {
+        navigator.geolocation.clearWatch(watchIdRef.current);
+      }
+    };
   }, []);
 
   // Start camera with exact facingMode preference and robust fallback
@@ -259,6 +332,11 @@ export default function KioskCameraModal({
   const handleShutter = async () => {
     if (!videoRef.current || flashing || submitting) return;
 
+    if (geoState.status === 'denied') {
+      setSubmitError('Izin lokasi (GPS) ditolak oleh browser HP. Aktifkan izin lokasi pada browser untuk melanjutkan.');
+      return;
+    }
+
     if (isCheckinLate && !lateReason.trim()) {
       setSubmitError('Wajib mengisi alasan keterlambatan sebelum mengambil foto check-in.');
       return;
@@ -299,6 +377,11 @@ export default function KioskCameraModal({
   const handleNativeFileChange = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    if (geoState.status === 'denied') {
+      setSubmitError('Izin lokasi (GPS) ditolak oleh browser HP. Aktifkan izin lokasi pada browser untuk melanjutkan.');
+      return;
+    }
 
     if (isCheckinLate && !lateReason.trim()) {
       setSubmitError('Wajib mengisi alasan keterlambatan sebelum memilih foto check-in.');
@@ -393,6 +476,112 @@ export default function KioskCameraModal({
             </div>
           ) : (
             <div className="space-y-3">
+              {/* GPS Status Banner */}
+              <div className="animate-fade-in">
+                {geoState.status === 'acquiring' && (
+                  <div className="flex items-center justify-between p-2.5 rounded-xl bg-blue-950/60 border border-blue-800 text-[11px] text-blue-200">
+                    <div className="flex items-center space-x-2">
+                      <Loader2 className="w-3.5 h-3.5 text-blue-400 animate-spin shrink-0" />
+                      <span>Mencari titik GPS satelit akurasi tinggi...</span>
+                    </div>
+                  </div>
+                )}
+
+                {geoState.status === 'locked' && geoState.isInside && (
+                  <div className="flex items-center justify-between p-2.5 rounded-xl bg-emerald-950/60 border border-emerald-800 text-[11px] text-emerald-200">
+                    <div className="flex items-center space-x-2">
+                      <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+                      <span className="font-bold">
+                        GPS Terkunci: Di dalam venue ({geoState.distance}m • akurasi ±{geoState.accuracy}m)
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {geoState.status === 'locked' && !geoState.isInside && (
+                  <div className="p-2.5 rounded-xl bg-rose-950/70 border border-rose-800 text-[11px] text-rose-200 space-y-1">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-1.5 font-bold text-rose-300">
+                        <AlertTriangle className="w-4 h-4 shrink-0" />
+                        <span>Di Luar Geofence ({geoState.distance}m dari outlet)</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={requestGpsPosition}
+                        className="px-2 py-0.5 rounded-lg bg-rose-800 hover:bg-rose-700 text-white text-[10px] font-bold flex items-center space-x-1 transition"
+                      >
+                        <RefreshCw className="w-3 h-3" />
+                        <span>Refresh GPS</span>
+                      </button>
+                    </div>
+                    <p className="text-[10px] text-rose-300/90 leading-tight">
+                      Batas radius adalah {venueSettings?.geofence_radius || 150}m. Pastikan Anda berada di area outlet.
+                    </p>
+                  </div>
+                )}
+
+                {geoState.status === 'imprecise' && (
+                  <div className="p-2.5 rounded-xl bg-amber-950/70 border border-amber-800 text-[11px] text-amber-200 space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-1.5 font-bold text-amber-300">
+                        <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+                        <span>Akurasi GPS Rendah (±{geoState.accuracy}m — BTS)</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={requestGpsPosition}
+                        className="px-2 py-0.5 rounded-lg bg-amber-700 hover:bg-amber-600 text-white text-[10px] font-bold flex items-center space-x-1 transition"
+                      >
+                        <RefreshCw className="w-3 h-3" />
+                        <span>Kunci Ulang</span>
+                      </button>
+                    </div>
+                    <p className="text-[10px] text-amber-200/90 leading-tight">
+                      HP Anda menggunakan perkiraan sinyal BTS seluler. Mohon aktifkan izin <strong>"Lokasi Tepat (Precise Location)"</strong> di browser Chrome HP Anda agar tidak terdeteksi di luar area.
+                    </p>
+                  </div>
+                )}
+
+                {geoState.status === 'denied' && (
+                  <div className="p-2.5 rounded-xl bg-rose-950/80 border border-rose-700 text-[11px] text-rose-200 space-y-1.5">
+                    <div className="flex items-center space-x-1.5 font-bold text-rose-300">
+                      <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+                      <span>Izin Lokasi (GPS) Ditolak!</span>
+                    </div>
+                    <p className="text-[10px] text-rose-200/90 leading-tight">
+                      Klik ikon gembok 🔒 di samping link browser HP Anda, pilih <strong>Izin Situs &rarr; Lokasi &rarr; Izinkan</strong>, lalu klik tombol di bawah.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={requestGpsPosition}
+                      className="w-full py-1.5 rounded-lg bg-rose-700 hover:bg-rose-600 text-white text-[10px] font-bold flex items-center justify-center space-x-1.5 transition"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5" />
+                      <span>Coba Deteksi Ulang Lokasi</span>
+                    </button>
+                  </div>
+                )}
+
+                {geoState.status === 'unavailable' && (
+                  <div className="p-2.5 rounded-xl bg-amber-950/70 border border-amber-800 text-[11px] text-amber-200 space-y-1">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-1.5 font-bold text-amber-300">
+                        <AlertTriangle className="w-4 h-4 shrink-0" />
+                        <span>{geoState.errorMessage || 'Sinyal GPS Tidak Tersedia'}</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={requestGpsPosition}
+                        className="px-2 py-0.5 rounded-lg bg-amber-700 hover:bg-amber-600 text-white text-[10px] font-bold flex items-center space-x-1 transition"
+                      >
+                        <RefreshCw className="w-3 h-3" />
+                        <span>Coba Lagi</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {/* Camera Frame */}
               <div className="relative aspect-[4/3] w-full bg-slate-950 rounded-2xl overflow-hidden border border-slate-800 flex items-center justify-center">
                 {flashing && (

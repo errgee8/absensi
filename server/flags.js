@@ -20,12 +20,16 @@ const GRACE_PERIOD_MINUTES = 10;
 /**
  * Evaluates flags for a check-in event including 10-minute grace period
  */
-export function evaluateCheckinFlags({ clientIp, lat, lng, distance, wifiPass, geofenceRadius, scheduledStart, checkinTime, division }) {
+export function evaluateCheckinFlags({ clientIp, lat, lng, distance, accuracy, wifiPass, geofenceRadius, scheduledStart, checkinTime, division }) {
   const flags = [];
 
   // Geofence check (Wi-Fi lock has been removed)
   if (distance !== null && geofenceRadius && distance > geofenceRadius) {
-    flags.push(FLAG_TYPES.OUTSIDE_GEOFENCE);
+    if (accuracy && accuracy >= 500) {
+      flags.push('FLAG_GPS_IMPRECISE (Perkiraan BTS)');
+    } else {
+      flags.push(FLAG_TYPES.OUTSIDE_GEOFENCE);
+    }
   }
 
   // Full Flexible shifts (Management or 00:00 start): No late flag evaluated
@@ -118,6 +122,7 @@ export function evaluateCheckoutFlags({
   lat,
   lng,
   distance,
+  accuracy,
   wifiPass,
   geofenceRadius,
   existingFlags = [],
@@ -127,7 +132,11 @@ export function evaluateCheckoutFlags({
 
   // Geofence check (Wi-Fi lock removed)
   if (distance !== null && geofenceRadius && distance > geofenceRadius) {
-    flags.add(FLAG_TYPES.OUTSIDE_GEOFENCE);
+    if (accuracy && accuracy >= 500) {
+      flags.add('FLAG_GPS_IMPRECISE (Perkiraan BTS)');
+    } else {
+      flags.add(FLAG_TYPES.OUTSIDE_GEOFENCE);
+    }
   }
 
   // Early Check-Out:

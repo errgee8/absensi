@@ -79,6 +79,7 @@ export default function PhotoDetailModal({ shift, type = 'in', onClose, onShiftU
   const lng = isCheckout ? shift.checkout_lng : shift.checkin_lng;
   const dist = isCheckout ? shift.checkout_distance : shift.checkin_distance;
   const ip = isCheckout ? shift.checkout_ip : shift.checkin_ip;
+  const accuracy = isCheckout ? (shift.checkout_accuracy ?? shift.accuracy) : (shift.checkin_accuracy ?? shift.accuracy);
 
   const hasCheckin = Boolean(shift.checkin_photo);
   const hasBreak = Boolean(shift.break_end_photo || shift.break_start_photo);
@@ -231,13 +232,36 @@ export default function PhotoDetailModal({ shift, type = 'in', onClose, onShiftU
 
             <div className="bg-slate-50 p-3.5 rounded-2xl border-2 border-slate-200">
               <span className="text-[10px] text-slate-700 uppercase font-black block mb-1">
-                Jarak dari Geofence Outlet
+                Jarak & Akurasi GPS
               </span>
-              <span className={`font-black ${dist > 150 ? 'text-rose-700' : 'text-emerald-700'}`}>
-                {dist != null ? `${dist} meter dari titik outlet` : 'N/A'}
-              </span>
+              <div className="space-y-0.5">
+                <div className={`font-black ${dist > 150 ? 'text-rose-700' : 'text-emerald-700'}`}>
+                  {dist != null ? `${dist}m dari outlet` : 'N/A'}
+                </div>
+                <div className="text-[10px] text-slate-600 font-medium">
+                  Radius toleransi akurasi: <strong className={accuracy && accuracy > 300 ? 'text-amber-800' : 'text-slate-900'}>±{accuracy != null ? `${accuracy}m` : '10m'}</strong>
+                  {accuracy && accuracy > 300 && (
+                    <span className="ml-1 text-[9px] font-bold text-amber-900 bg-amber-100 px-1.5 py-0.2 rounded border border-amber-300">
+                      Perkiraan BTS
+                    </span>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
+
+          {/* Indikasi Akurasi Rendah (Cellular BTS) Warning Notice */}
+          {accuracy && accuracy >= 300 && (
+            <div className="bg-amber-50 border-2 border-amber-300 rounded-2xl p-3 text-xs text-amber-950 flex items-start space-x-2.5">
+              <AlertTriangle className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
+              <div>
+                <span className="font-black block">Indikasi Sinyal BTS Seluler (Akurasi Rendah: ±{accuracy}m)</span>
+                <span className="text-[11px] text-amber-900 leading-tight block mt-0.5">
+                  HP karyawan melaporkan ketelitian ±{accuracy}m. Koordinat ini berasal dari menara operator seluler terdekat, bukan satelit GPS langsung. Staf disarankan mengaktifkan opsi <strong>"Lokasi Tepat (Precise Location)"</strong> di izin Chrome ponselnya.
+                </span>
+              </div>
+            </div>
+          )}
 
           {/* Break Details if break was taken */}
           {shift.break_duration_minutes != null && (

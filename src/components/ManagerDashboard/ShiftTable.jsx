@@ -39,7 +39,8 @@ export default function ShiftTable({ shifts = [], schedules = [], onInspectPhoto
       FLAG_EARLY_CHECKOUT: { text: 'Early Check-Out', color: 'bg-amber-100 text-amber-950 border-amber-300' },
       FLAG_NETWORK_MISMATCH: { text: 'Network Mismatch', color: 'bg-purple-100 text-purple-950 border-purple-300' },
       FLAG_OFF_NETWORK: { text: 'Off-Network Attempt', color: 'bg-rose-100 text-rose-950 border-rose-300' },
-      FLAG_OUTSIDE_GEOFENCE: { text: 'Outside Geofence', color: 'bg-orange-100 text-orange-950 border-orange-300' }
+      FLAG_OUTSIDE_GEOFENCE: { text: 'Outside Geofence', color: 'bg-orange-100 text-orange-950 border-orange-300' },
+      'FLAG_GPS_IMPRECISE (Perkiraan BTS)': { text: 'Sinyal BTS (±Cellular)', color: 'bg-amber-100 text-amber-950 border-amber-300' }
     };
 
     return (
