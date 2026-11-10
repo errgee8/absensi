@@ -9,7 +9,7 @@ import StaffLeaveModal from './StaffLeaveModal';
 import StaffAnnouncementModal from './StaffAnnouncementModal';
 import MandatoryNotificationModal from './MandatoryNotificationModal';
 import { getNotificationPermission } from '../../utils/pushNotifications';
-import { verifyStaffPin, getAnnouncements, acknowledgeAnnouncement, getLeaveRequests, subscribeRealtimeEvents } from '../../utils/api';
+import { verifyStaffPin, getAnnouncements, acknowledgeAnnouncement, getLeaveRequests, subscribeRealtimeEvents, sendPresenceHeartbeat } from '../../utils/api';
 import { RESTROOM_LOCATIONS } from '../../utils/toiletService';
 import { CheckCircle2 } from 'lucide-react';
 
@@ -45,6 +45,23 @@ export default function StaffView({
   const [announcementInitialView, setAnnouncementInitialView] = useState('AUTO'); // 'AUTO' | 'LIST' | 'DETAIL'
   const [showNotificationPrompt, setShowNotificationPrompt] = useState(false);
   const [leaveUpdateCount, setLeaveUpdateCount] = useState(0);
+
+  // Live Presence Heartbeat for active logged-in staff
+  useEffect(() => {
+    if (!loggedInStaff) return;
+    const sendBeat = () => {
+      sendPresenceHeartbeat({
+        id: loggedInStaff.id,
+        name: loggedInStaff.name,
+        role: loggedInStaff.role,
+        venue: loggedInStaff.venue,
+        type: 'STAFF'
+      }).catch(() => {});
+    };
+    sendBeat();
+    const interval = setInterval(sendBeat, 30000);
+    return () => clearInterval(interval);
+  }, [loggedInStaff]);
 
   // Toilet QR Scanner & Checklist state
   const [toiletScannerOpen, setToiletScannerOpen] = useState(false);

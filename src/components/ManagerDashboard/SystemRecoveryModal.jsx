@@ -88,7 +88,7 @@ export default function SystemRecoveryModal({ isOpen, onClose, adminAuth, venueS
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           pin: adminAuth?.pin || '8980',
-          createdBy: adminAuth?.reviewerName || 'General Manager'
+          createdBy: adminAuth?.reviewerName || 'Operational Manager'
         })
       });
       const data = await res.json();
@@ -155,7 +155,7 @@ export default function SystemRecoveryModal({ isOpen, onClose, adminAuth, venueS
           staffId: bypassStaffId.trim(),
           actionType: bypassType,
           reason: bypassReason,
-          reviewerName: adminAuth?.reviewerName || 'General Manager'
+          reviewerName: adminAuth?.reviewerName || 'Operational Manager'
         })
       });
       const data = await res.json();

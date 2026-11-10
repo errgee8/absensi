@@ -81,7 +81,8 @@ export default function AnnouncementManagementModal({
   const [loadingReaders, setLoadingReaders] = useState(false);
   const [readerFilter, setReaderFilter] = useState('ALL'); // 'ALL' | 'READ' | 'UNREAD'
 
-  const isGM = adminAuth?.role === 'FULL_ADMIN' || adminAuth?.role === 'MANAGER' || adminAuth?.pin === '8980' || !isReadOnly;
+  // Operational Manager full privilege check
+  const isManager = adminAuth?.role === 'FULL_ADMIN' || adminAuth?.role === 'MANAGER' || adminAuth?.pin === '8980' || !isReadOnly;
 
   const loadData = async () => {
     setLoading(true);
@@ -135,7 +136,7 @@ export default function AnnouncementManagementModal({
   const handleCreateAnnouncement = async (e) => {
     e.preventDefault();
     if (!pin.trim()) {
-      setError('PIN General Manager (8980) wajib diisi untuk otorisasi penerbitan.');
+      setError('PIN Operational Manager (8980) wajib diisi untuk otorisasi penerbitan.');
       return;
     }
 
@@ -175,8 +176,8 @@ export default function AnnouncementManagementModal({
   };
 
   const handleToggleActive = async (ann) => {
-    if (!isGM) {
-      showToast('Hanya General Manager yang berwenang mengaktifkan / mengarsipkan pengumuman.', 'warning');
+    if (!isManager) {
+      showToast('Hanya Operational Manager yang berwenang mengaktifkan / mengarsipkan pengumuman.', 'warning');
       return;
     }
     const nextState = !ann.is_active;
@@ -213,7 +214,7 @@ export default function AnnouncementManagementModal({
                   Pengumuman Resmi Management
                 </h3>
                 <span className="px-2 py-0.5 rounded-full text-[10px] bg-blue-500/40 text-blue-100 font-bold">
-                  {isGM ? 'Hak Akses GM Penuh' : 'Mode Pengawas (View Report)'}
+                  {isManager ? 'Hak Akses Manager Penuh' : 'Mode Pengawas (View Report)'}
                 </span>
               </div>
               <p className="text-[11px] text-blue-100 font-bold">
@@ -419,7 +420,7 @@ export default function AnnouncementManagementModal({
                           <span>Lihat Bukti Baca</span>
                         </button>
 
-                        {isGM && (
+                        {isManager && (
                           <button
                             type="button"
                             onClick={() => handleToggleActive(ann)}
@@ -437,13 +438,13 @@ export default function AnnouncementManagementModal({
             </div>
           )}
 
-          {/* TAB 2: BUAT PENGUMUMAN BARU (GENERAL MANAGER ONLY) */}
+          {/* TAB 2: BUAT PENGUMUMAN BARU (OPERATIONAL MANAGER ONLY) */}
           {activeTab === 'CREATE' && (
             <form onSubmit={handleCreateAnnouncement} className="space-y-4">
               <div className="p-3 bg-amber-50 border-2 border-amber-300 rounded-2xl text-amber-950 text-xs font-bold space-y-1">
                 <div className="flex items-center space-x-1.5 font-black text-amber-900">
                   <ShieldCheck className="w-4 h-4 text-amber-700" />
-                  <span>Otoritas Khusus General Manager:</span>
+                  <span>Otoritas Khusus Operational Manager:</span>
                 </div>
                 <p className="text-[11px] text-amber-800 leading-relaxed">
                   Pengumuman yang Anda buat akan langsung terkirim secara realtime ke seluruh dashboard staf saat mereka login, lengkap dengan tombol <strong>"Saya Mengerti"</strong>.
@@ -653,7 +654,7 @@ export default function AnnouncementManagementModal({
 
               <div>
                 <label className="block text-xs font-black text-slate-900 mb-1">
-                  PIN Otorisasi General Manager:
+                  PIN Otorisasi Operational Manager:
                 </label>
                 <div className="relative max-w-xs">
                   <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -663,7 +664,7 @@ export default function AnnouncementManagementModal({
                     maxLength={8}
                     value={pin}
                     onChange={(e) => setPin(e.target.value)}
-                    placeholder="PIN GM (8980)"
+                    placeholder="PIN Manager (8980)"
                     required
                     className="w-full bg-slate-50 border-2 border-slate-300 rounded-xl pl-9 pr-3 py-2 text-xs font-mono font-black text-slate-950 tracking-widest focus:outline-none focus:border-blue-600 focus:bg-white"
                   />

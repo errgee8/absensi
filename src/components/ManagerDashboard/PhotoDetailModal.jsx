@@ -354,7 +354,7 @@ export default function PhotoDetailModal({ shift, type = 'in', onClose, onShiftU
                 </div>
               )}
 
-              {/* Review Form (Accessible by General Manager or Assistant Manager) */}
+              {/* Review Form (Accessible by Operational Manager or Assistant Manager) */}
               <div className="bg-white/80 p-3 rounded-xl border border-amber-300 space-y-2.5">
                 <span className="text-[11px] font-black text-slate-900 block">
                   Keputusan Review Keterlambatan:

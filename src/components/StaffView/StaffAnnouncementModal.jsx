@@ -263,7 +263,7 @@ export default function StaffAnnouncementModal({
                         </p>
 
                         <div className="text-[10px] text-slate-400 font-bold flex items-center space-x-2 pt-0.5">
-                          <span>Oleh: {ann.author_name || 'General Manager'}</span>
+                          <span>Oleh: {ann.author_name || 'Operational Manager'}</span>
                           <span>•</span>
                           <span>{formatWitaDateTime(ann.created_at)}</span>
                           <span>•</span>
@@ -315,7 +315,7 @@ export default function StaffAnnouncementModal({
                 <div className="flex items-center space-x-1.5">
                   <ShieldCheck className="w-4 h-4 text-blue-600" />
                   <span>
-                    Diterbitkan oleh: <strong className="text-slate-900">{currentAnn.author_name || 'General Manager'}</strong>
+                    Diterbitkan oleh: <strong className="text-slate-900">{currentAnn.author_name || 'Operational Manager'}</strong>
                   </span>
                 </div>
                 <div className="flex items-center space-x-1 font-mono text-[10px]">

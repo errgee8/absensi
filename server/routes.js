@@ -272,6 +272,52 @@ async function savePhoto(dataUrl, prefix = 'photo') {
   return saveBase64Photo(dataUrl, prefix);
 }
 
+// Helper: Record Admin Login Audit Trail
+async function recordAdminLogin({ role, staffName, req }) {
+  try {
+    const now = new Date().toISOString();
+    const id = `log_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    const userAgent = req?.headers ? (req.headers['user-agent'] || '') : '';
+    const ip = req?.ip || req?.socket?.remoteAddress || '';
+
+    // 1. Local SQLite
+    try {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS admin_login_logs (
+          id TEXT PRIMARY KEY,
+          role TEXT NOT NULL,
+          staff_name TEXT NOT NULL,
+          ip_address TEXT,
+          user_agent TEXT,
+          login_at TEXT DEFAULT (datetime('now'))
+        );
+      `);
+      db.prepare(`
+        INSERT INTO admin_login_logs (id, role, staff_name, ip_address, user_agent, login_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `).run(id, role, staffName, ip, userAgent, now);
+    } catch (eSql) {
+      console.warn('SQLite admin login log note:', eSql.message);
+    }
+
+    // 2. Cloud Supabase app_settings sync (keep last 100 entries)
+    if (isSupabaseConfigured) {
+      try {
+        const existingLogs = (await cloudDb.getSetting('admin_login_logs')) || [];
+        const updatedLogs = [
+          { id, role, staff_name: staffName, ip_address: ip, user_agent: userAgent, login_at: now },
+          ...existingLogs
+        ].slice(0, 100);
+        await cloudDb.saveSetting('admin_login_logs', updatedLogs, 'Log riwayat login Manager & Assistant Manager');
+      } catch (eSupa) {
+        console.warn('Supabase admin login log note:', eSupa.message);
+      }
+    }
+  } catch (err) {
+    console.warn('recordAdminLogin warning:', err.message);
+  }
+}
+
 // 1. Admin PIN Verification Endpoint (Full Manager PIN: 8980 | Assistant Manager / View Only PIN: 7070 or Management Staff PIN)
 router.post('/admin/verify', async (req, res) => {
   const { pin } = req.body;
@@ -293,17 +339,20 @@ router.post('/admin/verify', async (req, res) => {
 
   // 1. Full Manager Check (PIN 8980)
   if (cleanPin === adminPin.trim()) {
+    recordAdminLogin({ role: 'OPERATIONAL_MANAGER', staffName: 'Operational Manager', req });
     return res.json({
       success: true,
       role: 'MANAGER',
       canEdit: true,
-      message: 'Manager Full Access authenticated successfully',
+      staffName: 'Operational Manager',
+      message: 'Operational Manager Full Access authenticated successfully',
       token: 'admin-authorized-session-token'
     });
   }
 
   // 2. Supervisor View-Only PIN (PIN 7070)
   if (cleanPin === supervisorPin.trim()) {
+    recordAdminLogin({ role: 'ASSISTANT_MANAGER', staffName: 'Assistant Manager', req });
     return res.json({
       success: true,
       role: 'VIEW_ONLY',
@@ -341,6 +390,7 @@ router.post('/admin/verify', async (req, res) => {
       if (!supaErr && supaStaffList && supaStaffList.length > 0) {
         const mgmtStaff = supaStaffList.find((s) => s.is_active && isManagementStaff(s));
         if (mgmtStaff) {
+          recordAdminLogin({ role: 'ASSISTANT_MANAGER', staffName: mgmtStaff.name, req });
           return res.json({
             success: true,
             role: 'VIEW_ONLY',
@@ -364,6 +414,7 @@ router.post('/admin/verify', async (req, res) => {
 
     const localMgmt = localStaffList.find((s) => isManagementStaff(s));
     if (localMgmt) {
+      recordAdminLogin({ role: 'ASSISTANT_MANAGER', staffName: localMgmt.name, req });
       return res.json({
         success: true,
         role: 'VIEW_ONLY',
@@ -378,6 +429,188 @@ router.post('/admin/verify', async (req, res) => {
   }
 
   return res.status(401).json({ error: 'PIN Manager / Assistant Manager salah. Akses ditolak.' });
+});
+
+// ==========================================
+// AUDIT LOGS & LIVE PRESENCE
+// ==========================================
+
+// Get Manager & Assistant Manager Login Audit Logs (Strictly Operational Manager access)
+router.get('/admin/login-logs', async (req, res) => {
+  try {
+    let logs = [];
+    if (isSupabaseConfigured) {
+      try {
+        const supaLogs = await cloudDb.getSetting('admin_login_logs');
+        if (Array.isArray(supaLogs) && supaLogs.length > 0) {
+          logs = supaLogs;
+        }
+      } catch {}
+    }
+    if (logs.length === 0) {
+      try {
+        db.exec(`
+          CREATE TABLE IF NOT EXISTS admin_login_logs (
+            id TEXT PRIMARY KEY,
+            role TEXT NOT NULL,
+            staff_name TEXT NOT NULL,
+            ip_address TEXT,
+            user_agent TEXT,
+            login_at TEXT DEFAULT (datetime('now'))
+          );
+        `);
+        logs = db.prepare('SELECT * FROM admin_login_logs ORDER BY login_at DESC LIMIT 100').all();
+      } catch {}
+    }
+    return res.json({ success: true, logs });
+  } catch (err) {
+    return res.status(500).json({ error: 'Gagal memuat log login: ' + err.message });
+  }
+});
+
+// Presence In-Memory & Cloud Cache
+const presenceMap = new Map();
+
+router.post('/presence/heartbeat', async (req, res) => {
+  try {
+    const { id, name, role, venue, type } = req.body || {};
+    if (!id || !name) {
+      return res.status(400).json({ error: 'Data kehadiran tidak lengkap (id dan name wajib).' });
+    }
+
+    const now = Date.now();
+    const nowIso = new Date().toISOString();
+    const entry = {
+      id: String(id),
+      name: String(name),
+      role: role || 'Staff',
+      venue: venue || 'JP Karaoke',
+      type: type || 'STAFF', // 'STAFF' | 'ASSISTANT_MANAGER' | 'MANAGER'
+      lastSeen: now,
+      lastSeenIso: nowIso
+    };
+
+    presenceMap.set(String(id), entry);
+
+    // Also persist to SQLite
+    try {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS staff_presence (
+          id TEXT PRIMARY KEY,
+          type TEXT NOT NULL,
+          name TEXT NOT NULL,
+          role TEXT,
+          venue TEXT,
+          last_seen TEXT NOT NULL,
+          last_seen_ms INTEGER NOT NULL
+        );
+      `);
+      db.prepare(`
+        INSERT INTO staff_presence (id, type, name, role, venue, last_seen, last_seen_ms)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(id) DO UPDATE SET
+          name = excluded.name,
+          role = excluded.role,
+          venue = excluded.venue,
+          last_seen = excluded.last_seen,
+          last_seen_ms = excluded.last_seen_ms
+      `).run(entry.id, entry.type, entry.name, entry.role, entry.venue, entry.lastSeenIso, entry.lastSeen);
+    } catch {}
+
+    return res.json({ success: true, timestamp: nowIso });
+  } catch (e) {
+    return res.status(500).json({ error: e.message });
+  }
+});
+
+// Get Live Presence (All staff + Assistant Manager)
+router.get('/presence', async (req, res) => {
+  try {
+    const now = Date.now();
+    const thresholdMs = 90 * 1000; // 90 seconds = online
+
+    // Restore from SQLite if memory is empty
+    if (presenceMap.size === 0) {
+      try {
+        db.exec(`
+          CREATE TABLE IF NOT EXISTS staff_presence (
+            id TEXT PRIMARY KEY,
+            type TEXT NOT NULL,
+            name TEXT NOT NULL,
+            role TEXT,
+            venue TEXT,
+            last_seen TEXT NOT NULL,
+            last_seen_ms INTEGER NOT NULL
+          );
+        `);
+        const rows = db.prepare('SELECT * FROM staff_presence').all();
+        for (const r of rows) {
+          presenceMap.set(String(r.id), {
+            id: String(r.id),
+            name: r.name,
+            role: r.role,
+            venue: r.venue,
+            type: r.type,
+            lastSeen: r.last_seen_ms,
+            lastSeenIso: r.last_seen
+          });
+        }
+      } catch {}
+    }
+
+    // Load active staff roster to ensure everyone has a presence slot
+    let allStaff = [];
+    if (isSupabaseConfigured) {
+      try {
+        allStaff = (await cloudDb.getStaff('ALL')) || [];
+      } catch {}
+    }
+    if (allStaff.length === 0) {
+      allStaff = db.prepare('SELECT id, name, role, venue, is_active FROM staff WHERE is_active = 1').all();
+    }
+
+    const presenceList = [];
+
+    // 1. Map staff members
+    for (const st of allStaff) {
+      const p = presenceMap.get(String(st.id));
+      const isOnline = p ? (now - p.lastSeen < thresholdMs) : false;
+      presenceList.push({
+        id: String(st.id),
+        name: st.name,
+        role: st.role,
+        venue: st.venue,
+        type: 'STAFF',
+        isOnline,
+        lastSeenIso: p?.lastSeenIso || null
+      });
+    }
+
+    // 2. Map Assistant Manager & Management accounts
+    for (const [key, p] of presenceMap.entries()) {
+      if (p.type === 'ASSISTANT_MANAGER' || p.type === 'MANAGER') {
+        const isOnline = now - p.lastSeen < thresholdMs;
+        presenceList.push({
+          id: p.id,
+          name: p.name,
+          role: p.role,
+          venue: p.venue,
+          type: p.type,
+          isOnline,
+          lastSeenIso: p.lastSeenIso
+        });
+      }
+    }
+
+    return res.json({
+      success: true,
+      presence: presenceList,
+      onlineCount: presenceList.filter(p => p.isOnline).length,
+      totalCount: presenceList.length
+    });
+  } catch (err) {
+    return res.status(500).json({ error: 'Gagal memuat status presence: ' + err.message });
+  }
 });
 
 // Official Synchronized Application Time Endpoint (Prevents Phone Time Manipulation)
@@ -2165,12 +2398,23 @@ router.get('/settings', async (req, res) => {
     geofence_radius: getSetting('geofence_radius'),
     allowed_subnets: getSetting('allowed_subnets'),
     enforce_wifi: getSetting('enforce_wifi'),
-    timezone: getSetting('timezone')
+    timezone: getSetting('timezone'),
+    notify_announcements: getSetting('notify_announcements') ?? 1,
+    notify_leave_decisions: getSetting('notify_leave_decisions') ?? 1
   });
 });
 
 router.put('/settings', async (req, res) => {
-  const { venue_name, venue_lat, venue_lng, geofence_radius, allowed_subnets, enforce_wifi } = req.body;
+  const {
+    venue_name,
+    venue_lat,
+    venue_lng,
+    geofence_radius,
+    allowed_subnets,
+    enforce_wifi,
+    notify_announcements,
+    notify_leave_decisions
+  } = req.body;
 
   if (venue_name !== undefined) setSetting('venue_name', venue_name);
   if (venue_lat !== undefined) setSetting('venue_lat', parseFloat(venue_lat));
@@ -2178,6 +2422,8 @@ router.put('/settings', async (req, res) => {
   if (geofence_radius !== undefined) setSetting('geofence_radius', parseInt(geofence_radius, 10));
   if (allowed_subnets !== undefined) setSetting('allowed_subnets', allowed_subnets);
   if (enforce_wifi !== undefined) setSetting('enforce_wifi', enforce_wifi ? 1 : 0);
+  if (notify_announcements !== undefined) setSetting('notify_announcements', notify_announcements ? 1 : 0);
+  if (notify_leave_decisions !== undefined) setSetting('notify_leave_decisions', notify_leave_decisions ? 1 : 0);
 
   // Sync directly to Supabase Cloud app_settings
   if (isSupabaseConfigured) {
@@ -2189,6 +2435,8 @@ router.put('/settings', async (req, res) => {
       if (geofence_radius !== undefined) upsertItems.push({ key: 'geofence_radius', value: parseInt(geofence_radius, 10) });
       if (allowed_subnets !== undefined) upsertItems.push({ key: 'allowed_subnets', value: allowed_subnets });
       if (enforce_wifi !== undefined) upsertItems.push({ key: 'enforce_wifi', value: enforce_wifi ? 1 : 0 });
+      if (notify_announcements !== undefined) upsertItems.push({ key: 'notify_announcements', value: notify_announcements ? 1 : 0 });
+      if (notify_leave_decisions !== undefined) upsertItems.push({ key: 'notify_leave_decisions', value: notify_leave_decisions ? 1 : 0 });
 
       for (const item of upsertItems) {
         await supabase.from('app_settings').upsert({
@@ -2358,7 +2606,7 @@ const verifyManagementAuth = async (pin) => {
 
   // 1. Full Manager (PIN 8980)
   if (cleanPin === adminPin) {
-    return { authorized: true, role: 'MANAGER', reviewerName: 'General Manager' };
+    return { authorized: true, role: 'MANAGER', reviewerName: 'Operational Manager' };
   }
 
   // 2. Assistant Manager Default PIN (PIN 7070)
@@ -2904,7 +3152,8 @@ router.post('/leave-requests/:id/review', async (req, res) => {
         ? `Pengajuan ${typeLabel} Anda disesuaikan menjadi ${approvedDays} hari. Catatan: "${managerNotes || '-'}"`
         : `Pengajuan ${typeLabel} Anda belum disetujui. Catatan: "${managerNotes || '-'}"`;
 
-      if (updated?.staff_id) {
+      const notifyLeaveEnabled = getSetting('notify_leave_decisions') !== 0 && getSetting('notify_leave_decisions') !== 'false';
+      if (updated?.staff_id && notifyLeaveEnabled) {
         sendPushNotification({
           staffIds: [String(updated.staff_id)],
           title: statusTitle,
@@ -2931,7 +3180,7 @@ router.post('/leave-requests/:id/review', async (req, res) => {
 });
 
 // ==========================================
-// 6. MANAGEMENT ANNOUNCEMENTS (GM ONLY EDIT)
+// 6. MANAGEMENT ANNOUNCEMENTS (OPERATIONAL MANAGER ONLY EDIT)
 // ==========================================
 
 // Get Announcements (Staff & Manager)
@@ -3004,13 +3253,13 @@ router.get('/announcements', async (req, res) => {
   }
 });
 
-// Create Announcement (Strictly General Manager - PIN 8980)
+// Create Announcement (Strictly Operational Manager - PIN 8980)
 router.post('/announcements', async (req, res) => {
   const { pin, title, content, urgency, targetVenue, expiresAt, images } = req.body || {};
 
   const auth = await verifyManagementAuth(pin);
   if (!auth.authorized || (auth.role !== 'FULL_ADMIN' && auth.role !== 'MANAGER')) {
-    return res.status(403).json({ error: 'Akses ditolak: Hanya General Manager (PIN 8980) yang berwenang membuat pengumuman resmi.' });
+    return res.status(403).json({ error: 'Akses ditolak: Hanya Operational Manager (PIN 8980) yang berwenang membuat pengumuman resmi.' });
   }
 
   if (!title || !title.trim()) return res.status(400).json({ error: 'Judul pengumuman wajib diisi.' });
@@ -3041,7 +3290,7 @@ router.post('/announcements', async (req, res) => {
     content: content.trim(),
     urgency: urgency || 'NORMAL', // 'NORMAL' | 'URGENT'
     target_venue: targetVenue || 'ALL', // 'ALL' | 'JP Karaoke' | 'LuckyCat'
-    author_name: auth.reviewerName || 'General Manager',
+    author_name: auth.reviewerName || 'Operational Manager',
     expires_at: expiresAt || null,
     images: savedImages,
     is_active: 1,
@@ -3076,18 +3325,21 @@ router.post('/announcements', async (req, res) => {
 
     broadcastEvent('ANNOUNCEMENT_UPDATE', { action: 'CREATED', announcement: newAnnouncement });
 
-    // Send Web Push notification to all staff
-    try {
-      const urgencyTag = newAnnouncement.urgency === 'URGENT' ? '🚨 [URGENT] ' : '📢 ';
-      sendPushNotification({
-        staffIds: 'ALL',
-        title: `${urgencyTag}Pengumuman Management: ${newAnnouncement.title}`,
-        body: newAnnouncement.content.slice(0, 120) + (newAnnouncement.content.length > 120 ? '...' : ''),
-        url: '/',
-        tag: `announcement_${newAnnouncement.id}`
-      }).catch(errPush => console.warn('Push error:', errPush.message));
-    } catch (e) {
-      console.warn('Push dispatch error for announcement:', e.message);
+    // Send Web Push notification to all staff (if enabled in settings)
+    const notifyAnnouncementsEnabled = getSetting('notify_announcements') !== 0 && getSetting('notify_announcements') !== 'false';
+    if (notifyAnnouncementsEnabled) {
+      try {
+        const urgencyTag = newAnnouncement.urgency === 'URGENT' ? '🚨 [URGENT] ' : '📢 ';
+        sendPushNotification({
+          staffIds: 'ALL',
+          title: `${urgencyTag}Pengumuman Management: ${newAnnouncement.title}`,
+          body: newAnnouncement.content.slice(0, 120) + (newAnnouncement.content.length > 120 ? '...' : ''),
+          url: '/',
+          tag: `announcement_${newAnnouncement.id}`
+        }).catch(errPush => console.warn('Push error:', errPush.message));
+      } catch (e) {
+        console.warn('Push dispatch error for announcement:', e.message);
+      }
     }
 
     return res.json({
@@ -3101,14 +3353,14 @@ router.post('/announcements', async (req, res) => {
   }
 });
 
-// Update Announcement (General Manager Only)
+// Update Announcement (Operational Manager Only)
 router.put('/announcements/:id', async (req, res) => {
   const { id } = req.params;
   const { pin, title, content, urgency, targetVenue, expiresAt, isActive, images } = req.body || {};
 
   const auth = await verifyManagementAuth(pin);
   if (!auth.authorized || (auth.role !== 'FULL_ADMIN' && auth.role !== 'MANAGER')) {
-    return res.status(403).json({ error: 'Akses ditolak: Hanya General Manager (PIN 8980) yang berwenang mengubah pengumuman.' });
+    return res.status(403).json({ error: 'Akses ditolak: Hanya Operational Manager (PIN 8980) yang berwenang mengubah pengumuman.' });
   }
 
   const now = new Date().toISOString();

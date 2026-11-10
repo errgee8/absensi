@@ -799,7 +799,7 @@ export async function exportMonthlyPayrollReport({
 }) {
   const workbook = new ExcelJS.Workbook();
   workbook.creator = 'JP Karaoke & LuckyCat Management System';
-  workbook.lastModifiedBy = 'Payroll & General Manager Audit';
+  workbook.lastModifiedBy = 'Payroll & Operational Manager Audit';
   workbook.created = new Date();
   workbook.modified = new Date();
 

@@ -399,3 +399,25 @@ export function subscribeRealtimeEvents(onEvent) {
     eventSource.close();
   };
 }
+
+export async function getAdminLoginLogs() {
+  const res = await fetch(`${API_BASE}/admin/login-logs`);
+  if (!res.ok) throw new Error('Failed to load login logs');
+  return res.json();
+}
+
+export async function sendPresenceHeartbeat(data) {
+  const res = await fetch(`${API_BASE}/presence/heartbeat`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  });
+  if (!res.ok) throw new Error('Failed to send heartbeat');
+  return res.json();
+}
+
+export async function getLivePresence() {
+  const res = await fetch(`${API_BASE}/presence`);
+  if (!res.ok) throw new Error('Failed to load live presence');
+  return res.json();
+}

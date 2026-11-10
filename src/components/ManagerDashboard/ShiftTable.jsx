@@ -47,15 +47,22 @@ export default function ShiftTable({ shifts = [], schedules = [], onInspectPhoto
       <div className="flex flex-wrap gap-1">
         {/* Special Late Justification status badge - 1-Click to Review */}
         {isLateApproved && (
-          <button
-            type="button"
-            onClick={() => onReviewLate?.(shift)}
-            className="inline-flex items-center space-x-1 px-1.5 py-0.5 rounded-md text-[9px] font-black border bg-emerald-100 text-emerald-950 border-emerald-300 hover:bg-emerald-200 transition cursor-pointer shadow-2xs"
-            title={shift?.late_reviewed_by ? `Di-ACC oleh ${shift.late_reviewed_by}. Klik untuk lihat/ubah.` : 'Di-ACC. Klik untuk detail.'}
-          >
-            <CheckCircle className="w-2.5 h-2.5 stroke-[2.5]" />
-            <span>Late Di-ACC ✓</span>
-          </button>
+          <div className="flex flex-col items-start">
+            <button
+              type="button"
+              onClick={() => onReviewLate?.(shift)}
+              className="inline-flex items-center space-x-1 px-1.5 py-0.5 rounded-md text-[9px] font-black border bg-emerald-100 text-emerald-950 border-emerald-300 hover:bg-emerald-200 transition cursor-pointer shadow-2xs"
+              title={shift?.late_reviewed_by ? `Di-ACC oleh ${shift.late_reviewed_by}. Klik untuk lihat/ubah.` : 'Di-ACC. Klik untuk detail.'}
+            >
+              <CheckCircle className="w-2.5 h-2.5 stroke-[2.5]" />
+              <span>Late Di-ACC ✓</span>
+            </button>
+            {shift?.late_reviewed_by && (
+              <span className="text-[8.5px] font-bold text-slate-500 truncate max-w-[110px]" title={shift.late_reviewed_by}>
+                oleh {shift.late_reviewed_by}
+              </span>
+            )}
+          </div>
         )}
         {!isLateApproved && isLatePending && (
           <button
@@ -69,15 +76,22 @@ export default function ShiftTable({ shifts = [], schedules = [], onInspectPhoto
           </button>
         )}
         {!isLateApproved && isLateRejected && (
-          <button
-            type="button"
-            onClick={() => onReviewLate?.(shift)}
-            className="inline-flex items-center space-x-1 px-1.5 py-0.5 rounded-md text-[9px] font-black border bg-rose-100 text-rose-950 border-rose-300 hover:bg-rose-200 transition cursor-pointer shadow-2xs"
-            title={shift?.late_reviewed_by ? `Ditolak oleh ${shift.late_reviewed_by}. Klik untuk lihat/ubah.` : 'Ditolak. Klik untuk detail.'}
-          >
-            <AlertTriangle className="w-2.5 h-2.5 stroke-[2.5]" />
-            <span>Late Ditolak ✕</span>
-          </button>
+          <div className="flex flex-col items-start">
+            <button
+              type="button"
+              onClick={() => onReviewLate?.(shift)}
+              className="inline-flex items-center space-x-1 px-1.5 py-0.5 rounded-md text-[9px] font-black border bg-rose-100 text-rose-950 border-rose-300 hover:bg-rose-200 transition cursor-pointer shadow-2xs"
+              title={shift?.late_reviewed_by ? `Ditolak oleh ${shift.late_reviewed_by}. Klik untuk lihat/ubah.` : 'Ditolak. Klik untuk detail.'}
+            >
+              <AlertTriangle className="w-2.5 h-2.5 stroke-[2.5]" />
+              <span>Late Ditolak ✕</span>
+            </button>
+            {shift?.late_reviewed_by && (
+              <span className="text-[8.5px] font-bold text-slate-500 truncate max-w-[110px]" title={shift.late_reviewed_by}>
+                oleh {shift.late_reviewed_by}
+              </span>
+            )}
+          </div>
         )}
 
         {flags?.map((f, idx) => {

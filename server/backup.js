@@ -14,7 +14,7 @@ try {
  * Creates a full system snapshot across Supabase and SQLite
  * @param {string} createdBy - Name of the manager or 'SYSTEM_CRON'
  */
-export async function createSystemSnapshot(createdBy = 'General Manager') {
+export async function createSystemSnapshot(createdBy = 'Operational Manager') {
   const timestamp = new Date().toISOString();
   const backupId = `backup_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
 

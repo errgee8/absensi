@@ -63,20 +63,12 @@ export default function MandatoryNotificationModal({
           </span>
           <ul className="space-y-1.5 text-slate-800 font-bold">
             <li className="flex items-center space-x-2">
-              <span className="w-1.5 h-1.5 rounded-full bg-blue-600 shrink-0" />
-              <span>Pengingat jam masuk shift (agar tidak terlambat)</span>
-            </li>
-            <li className="flex items-center space-x-2">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 shrink-0" />
-              <span>Pengingat check-out pulang saat shift berakhir</span>
+              <span>Pemberitahuan persetujuan status izin, sakit, atau cuti</span>
             </li>
             <li className="flex items-center space-x-2">
-              <span className="w-1.5 h-1.5 rounded-full bg-amber-600 shrink-0" />
-              <span>Pemberitahuan persetujuan izin, sakit, atau cuti</span>
-            </li>
-            <li className="flex items-center space-x-2">
-              <span className="w-1.5 h-1.5 rounded-full bg-rose-600 shrink-0" />
-              <span>Pengumuman penting dan promo resmi dari Manajemen</span>
+              <span className="w-1.5 h-1.5 rounded-full bg-blue-600 shrink-0" />
+              <span>Pengumuman penting dan arahan resmi dari Manajemen</span>
             </li>
           </ul>
         </div>

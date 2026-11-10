@@ -101,7 +101,7 @@ export default function PrintableTimesheet({ shifts = [], venueName = 'JP Karaok
           <span style={{ fontSize: '8.5pt', color: '#475569' }}>Audited</span>
         </div>
         <div style={{ width: '220px', borderTop: '1px solid #000', paddingTop: '6px', textAlign: 'center' }}>
-          <strong>General Manager</strong><br />
+          <strong>Operational Manager</strong><br />
           <span style={{ fontSize: '8.5pt', color: '#475569' }}>Approved</span>
         </div>
       </div>

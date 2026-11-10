@@ -105,7 +105,7 @@ db.exec(`
     content TEXT NOT NULL,
     urgency TEXT DEFAULT 'NORMAL',
     target_venue TEXT DEFAULT 'ALL',
-    author_name TEXT DEFAULT 'General Manager',
+    author_name TEXT DEFAULT 'Operational Manager',
     is_active INTEGER DEFAULT 1,
     created_at TEXT DEFAULT (datetime('now')),
     updated_at TEXT DEFAULT (datetime('now'))
@@ -156,7 +156,7 @@ db.exec(`
     content TEXT NOT NULL,
     urgency TEXT DEFAULT 'NORMAL',
     target_venue TEXT DEFAULT 'ALL',
-    author_name TEXT DEFAULT 'General Manager',
+    author_name TEXT DEFAULT 'Operational Manager',
     is_active INTEGER DEFAULT 1,
     created_at TEXT DEFAULT (datetime('now')),
     updated_at TEXT DEFAULT (datetime('now'))
