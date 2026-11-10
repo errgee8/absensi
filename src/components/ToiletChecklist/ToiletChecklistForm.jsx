@@ -122,16 +122,16 @@ export default function ToiletChecklistForm({ location, staff, onClose, onSucces
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-fade-in">
-      <div className="bg-white border-2 border-slate-300 rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
-        {/* Header - Vivid Royal Blue */}
-        <div className="p-4 sm:p-5 bg-blue-600 text-white flex items-center justify-between">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in text-slate-200">
+      <div className="bg-[#161b24] border border-slate-800 rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+        {/* Header */}
+        <div className="p-4 sm:p-5 bg-gradient-to-r from-blue-950 via-indigo-950 to-[#12161f] border-b border-slate-800 text-white flex items-center justify-between">
           <div>
-            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-white/20 text-white">
+            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-white/10 text-white">
               Checklist Kebersihan Toilet
             </span>
             <h3 className="text-xl font-black text-white mt-1">{location.name}</h3>
-            <p className="text-xs text-blue-100 flex items-center space-x-1.5 mt-0.5 font-bold">
+            <p className="text-xs text-slate-300 flex items-center space-x-1.5 mt-0.5 font-bold">
               <Building2 className="w-4 h-4 stroke-[2.5]" />
               <span>{location.building} • {location.floor}</span>
             </p>
@@ -142,19 +142,19 @@ export default function ToiletChecklistForm({ location, staff, onClose, onSucces
               stopCamera();
               onClose();
             }}
-            className="p-2 rounded-xl bg-white/20 hover:bg-white/30 text-white transition"
+            className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition cursor-pointer"
           >
             <X className="w-5 h-5 stroke-[2.5]" />
           </button>
         </div>
 
-        {/* Staff Identity Bar - High Contrast */}
-        <div className="p-3 bg-blue-50 border-b-2 border-blue-200 flex items-center justify-between text-xs px-5">
-          <div className="flex items-center space-x-2 text-slate-800 font-extrabold">
-            <User className="w-4 h-4 text-blue-700 stroke-[2.5]" />
-            <span>Petugas Inspeksi: <strong className="text-blue-900 font-black">{staff.name}</strong></span>
+        {/* Staff Identity Bar */}
+        <div className="p-3 bg-[#12161f] border-b border-slate-800 flex items-center justify-between text-xs px-5">
+          <div className="flex items-center space-x-2 text-slate-300 font-extrabold">
+            <User className="w-4 h-4 text-blue-400 stroke-[2.5]" />
+            <span>Petugas Inspeksi: <strong className="text-white font-black">{staff.name}</strong></span>
           </div>
-          <span className="text-xs font-mono text-blue-950 font-black bg-white px-2.5 py-1 rounded-lg border-2 border-blue-300">
+          <span className="text-xs font-mono text-blue-300 font-black bg-[#1c2230] px-2.5 py-1 rounded-lg border border-slate-700">
             {location.qr_token}
           </span>
         </div>

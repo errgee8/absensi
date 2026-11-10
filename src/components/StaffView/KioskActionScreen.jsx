@@ -75,7 +75,7 @@ export default function KioskActionScreen({
         {onBackToPortal ? (
           <button
             onClick={onBackToPortal}
-            className="flex items-center space-x-1.5 px-3.5 py-2 rounded-xl bg-white border-2 border-slate-300 text-xs font-black text-slate-900 hover:text-blue-700 hover:border-blue-500 shadow-sm transition"
+            className="flex items-center space-x-1.5 px-3.5 py-2 rounded-xl bg-[#161b24] border border-slate-800 text-xs font-black text-slate-200 hover:text-white hover:border-slate-700 shadow-sm transition cursor-pointer"
           >
             <ArrowLeft className="w-3.5 h-3.5 stroke-[2.5]" />
             <span>Kembali ke Menu Utama</span>
@@ -83,45 +83,45 @@ export default function KioskActionScreen({
         ) : (
           <button
             onClick={onLogout}
-            className="flex items-center space-x-1.5 px-3.5 py-2 rounded-xl bg-white border-2 border-slate-300 text-xs font-black text-slate-900 hover:text-slate-950 shadow-sm transition"
+            className="flex items-center space-x-1.5 px-3.5 py-2 rounded-xl bg-[#161b24] border border-slate-800 text-xs font-black text-slate-200 hover:text-white hover:border-slate-700 shadow-sm transition cursor-pointer"
           >
             <ArrowLeft className="w-3.5 h-3.5 stroke-[2.5]" />
             <span>Batal / Keluar</span>
           </button>
         )}
 
-        <span className="text-xs font-black text-slate-800 bg-slate-200 border border-slate-300 px-3 py-1 rounded-xl">
+        <span className="text-xs font-black text-slate-300 bg-[#161b24] border border-slate-800 px-3 py-1 rounded-xl">
           {staff.venue} • {staff.division}
         </span>
       </div>
 
-      {/* Main Crisp White Action Card - High Contrast */}
-      <div className="bg-white border-2 border-slate-300 rounded-3xl p-6 sm:p-7 shadow-xl shadow-slate-300/40 relative overflow-hidden">
+      {/* Main Crisp Action Card */}
+      <div className="bg-[#161b24] border border-slate-800 rounded-3xl p-6 sm:p-7 shadow-2xl relative overflow-hidden text-slate-200">
         {/* Header: Halo, [Nama]! Status */}
         <div className="mb-5">
           <div className="flex flex-wrap items-center gap-2 mb-2">
             <span
-              className={`px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider border-2 ${
+              className={`px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider border ${
                 isOnBreak
-                  ? 'bg-sky-100 text-sky-950 border-sky-400 animate-pulse'
+                  ? 'bg-sky-500/15 text-sky-300 border-sky-500/30 animate-pulse'
                   : isCheckedIn
-                  ? 'bg-emerald-100 text-emerald-950 border-emerald-400'
-                  : 'bg-amber-100 text-amber-950 border-amber-400'
+                  ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                  : 'bg-amber-500/15 text-amber-300 border-amber-500/30'
               }`}
             >
               Status: {isOnBreak ? 'Sedang Istirahat' : isCheckedIn ? 'Sudah Masuk' : 'Belum Masuk'}
             </span>
-            <span className="text-xs text-slate-800 font-extrabold">
+            <span className="text-xs text-slate-400 font-extrabold">
               {staff.role}
             </span>
           </div>
 
-          <h2 className="text-2xl sm:text-3xl font-black text-slate-950 tracking-tight">
+          <h2 className="text-2xl sm:text-3xl font-black text-slate-100 tracking-tight">
             Halo, {staff.name}!
           </h2>
           <div className="flex flex-wrap items-center gap-2 mt-2">
-            <span className="text-xs text-blue-950 font-black bg-blue-100 border-2 border-blue-300 px-3 py-1 rounded-xl flex items-center space-x-1.5 shadow-sm">
-              <span className="w-2.5 h-2.5 rounded-full bg-blue-600 animate-pulse"></span>
+            <span className="text-xs text-blue-300 font-black bg-blue-500/15 border border-blue-500/30 px-3 py-1 rounded-xl flex items-center space-x-1.5 shadow-sm">
+              <span className="w-2.5 h-2.5 rounded-full bg-blue-400 animate-pulse"></span>
               <span>{isManagement ? 'Shift Fleksibel (Management)' : `${currentShiftName} (${shiftStart} - ${shiftEnd} WITA)`}</span>
             </span>
           </div>
@@ -129,37 +129,37 @@ export default function KioskActionScreen({
 
         {/* Break in Progress Box */}
         {isOnBreak && (
-          <div className="bg-sky-50 border-2 border-sky-300 rounded-2xl p-4 mb-5 text-center">
-            <span className="text-xs text-sky-950 uppercase font-black tracking-wider block mb-1">
+          <div className="bg-[#1a202d] border border-sky-500/30 rounded-2xl p-4 mb-5 text-center">
+            <span className="text-xs text-sky-300 uppercase font-black tracking-wider block mb-1">
               Waktu Istirahat Berjalan (Maksimal 1 Jam)
             </span>
-            <div className="text-4xl font-black font-mono text-sky-700 my-1">
+            <div className="text-4xl font-black font-mono text-sky-400 my-1">
               {formatTimerSeconds(breakSeconds)}
             </div>
-            <p className="text-xs text-sky-950 font-bold mt-1">
-              Batas istirahat harus selesai sebelum: <strong>{breakCutoffTime} WITA</strong> (2 jam sebelum shift usai)
+            <p className="text-xs text-slate-300 font-bold mt-1">
+              Batas istirahat harus selesai sebelum: <strong className="text-sky-300">{breakCutoffTime} WITA</strong> (2 jam sebelum shift usai)
             </p>
           </div>
         )}
 
         {/* Active Shift Details Box if already checked in and not on break */}
         {isCheckedIn && !isOnBreak && (
-          <div className="bg-slate-50 border-2 border-slate-200 rounded-2xl p-4 mb-5">
-            <div className="flex items-center justify-between text-xs text-slate-900 mb-2 font-black">
+          <div className="bg-[#1c2230] border border-slate-800 rounded-2xl p-4 mb-5">
+            <div className="flex items-center justify-between text-xs text-slate-300 mb-2 font-black">
               <span className="flex items-center space-x-1.5">
-                <Clock className="w-4 h-4 text-slate-700 stroke-[2.2]" />
+                <Clock className="w-4 h-4 text-slate-400 stroke-[2.2]" />
                 <span>Masuk Pukul:</span>
               </span>
-              <span className="font-mono font-black text-slate-950 text-sm">
+              <span className="font-mono font-black text-slate-100 text-sm">
                 {formatWitaTimeOnly(activeShift.checkin_time)}
               </span>
             </div>
 
-            <div className="text-center py-2.5 bg-white rounded-xl border border-slate-300 shadow-sm">
-              <span className="text-[11px] text-slate-900 uppercase font-black tracking-wider block mb-0.5">
+            <div className="text-center py-2.5 bg-[#12161f] rounded-xl border border-slate-700/80 shadow-inner">
+              <span className="text-[11px] text-slate-400 uppercase font-black tracking-wider block mb-0.5">
                 Durasi Bertugas
               </span>
-              <span className="text-3xl font-black font-mono text-blue-700">
+              <span className="text-3xl font-black font-mono text-blue-400">
                 {formatTimerSeconds(elapsedSeconds)}
               </span>
             </div>
@@ -175,12 +175,12 @@ export default function KioskActionScreen({
             <div className="space-y-2">
               <button
                 onClick={() => onTriggerCamera('break_end')}
-                className="w-full py-4 px-6 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-base rounded-2xl shadow-lg shadow-emerald-600/30 active:scale-[0.98] transition flex items-center justify-center space-x-2.5"
+                className="w-full py-4 px-6 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-base rounded-2xl shadow-lg shadow-emerald-600/30 active:scale-[0.98] transition flex items-center justify-center space-x-2.5 cursor-pointer"
               >
                 <Coffee className="w-5 h-5 stroke-[2.5]" />
                 <span>AMBIL FOTO & SELESAI ISTIRAHAT</span>
               </button>
-              <p className="text-xs text-slate-700 text-center font-bold">
+              <p className="text-xs text-slate-400 text-center font-bold">
                 Wajib foto selfie untuk verifikasi selesai istirahat dan kembali bertugas.
               </p>
             </div>
@@ -193,7 +193,7 @@ export default function KioskActionScreen({
                   {/* Button 1: Take Break */}
                   <button
                     onClick={() => onTriggerCamera('break_start')}
-                    className="w-full py-4 px-6 bg-blue-600 hover:bg-blue-700 text-white font-black text-base rounded-2xl shadow-lg shadow-blue-600/30 active:scale-[0.98] transition flex items-center justify-center space-x-2.5"
+                    className="w-full py-4 px-6 bg-blue-600 hover:bg-blue-500 text-white font-black text-base rounded-2xl shadow-lg shadow-blue-600/30 active:scale-[0.98] transition flex items-center justify-center space-x-2.5 cursor-pointer"
                   >
                     <Coffee className="w-5 h-5 stroke-[2.5]" />
                     <span>AMBIL FOTO & MULAI ISTIRAHAT</span>
@@ -202,13 +202,13 @@ export default function KioskActionScreen({
                   {/* Button 2: Check Out */}
                   <button
                     onClick={() => onTriggerCamera('checkout')}
-                    className="w-full py-4 px-6 bg-rose-600 hover:bg-rose-700 text-white font-black text-base rounded-2xl shadow-lg shadow-rose-600/30 active:scale-[0.98] transition flex items-center justify-center space-x-2.5"
+                    className="w-full py-4 px-6 bg-rose-600 hover:bg-rose-500 text-white font-black text-base rounded-2xl shadow-lg shadow-rose-600/30 active:scale-[0.98] transition flex items-center justify-center space-x-2.5 cursor-pointer"
                   >
                     <Camera className="w-5 h-5 stroke-[2.5]" />
                     <span>AMBIL FOTO & CHECK-OUT</span>
                   </button>
 
-                  <p className="text-xs text-slate-950 text-center font-black">
+                  <p className="text-xs text-slate-400 text-center font-medium">
                     Istirahat hanya diperbolehkan 1x per shift selama maksimal 1 jam (60 menit).
                   </p>
                 </div>
@@ -217,28 +217,28 @@ export default function KioskActionScreen({
                 <div className="space-y-3">
                   <button
                     onClick={() => onTriggerCamera('checkout')}
-                    className="w-full py-5 px-6 bg-rose-600 hover:bg-rose-700 text-white font-black text-lg rounded-2xl shadow-xl shadow-rose-600/35 active:scale-[0.98] transition flex items-center justify-center space-x-3"
+                    className="w-full py-5 px-6 bg-rose-600 hover:bg-rose-500 text-white font-black text-lg rounded-2xl shadow-xl shadow-rose-600/35 active:scale-[0.98] transition flex items-center justify-center space-x-3 cursor-pointer"
                   >
                     <Camera className="w-6 h-6 stroke-[2.5]" />
                     <span className="tracking-wide">AMBIL FOTO & CHECK-OUT</span>
                   </button>
 
                   {hasTakenBreak ? (
-                    <div className="p-3 bg-emerald-50 border-2 border-emerald-300 rounded-xl text-xs text-emerald-950 font-black flex items-center justify-center space-x-2">
-                      <CheckCircle className="w-4 h-4 text-emerald-700 shrink-0 stroke-[2.5]" />
+                    <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-xs text-emerald-300 font-bold flex items-center justify-center space-x-2">
+                      <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0 stroke-[2.5]" />
                       <span>Istirahat 1x (maksimal 1 jam) sudah selesai diambil untuk shift ini.</span>
                     </div>
                   ) : !shiftAllowsBreak ? (
-                    <div className="p-3 bg-slate-100 border-2 border-slate-300 rounded-xl text-xs text-slate-900 font-black flex items-center justify-center space-x-2">
-                      <Coffee className="w-4 h-4 text-slate-700 shrink-0 stroke-[2.5]" />
+                    <div className="p-3 bg-slate-800/80 border border-slate-700 rounded-xl text-xs text-slate-300 font-bold flex items-center justify-center space-x-2">
+                      <Coffee className="w-4 h-4 text-slate-400 shrink-0 stroke-[2.5]" />
                       <span>Shift ini diatur tanpa waktu istirahat (No Break Allowed).</span>
                     </div>
                   ) : null}
 
-                  <div className="p-3 bg-amber-50 border-2 border-amber-300 rounded-xl text-xs text-amber-950 font-bold flex items-start space-x-2.5">
-                    <Shirt className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+                  <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl text-xs text-amber-200 font-medium flex items-start space-x-2.5">
+                    <Shirt className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
                     <span>
-                      <strong>Pengingat Selesai Kerja:</strong> Pastikan seragam sudah dilepas dan operan shift selesai.
+                      <strong className="text-amber-300 font-black">Pengingat Selesai Kerja:</strong> Pastikan seragam sudah dilepas dan operan shift selesai.
                     </span>
                   </div>
                 </div>
@@ -246,11 +246,11 @@ export default function KioskActionScreen({
 
               {/* Shortcut: Request Early Departure (Sakit Mendadak / Urusan Darurat On Duty) */}
               {onOpenEarlyDeparture && (
-                <div className="pt-2 border-t border-slate-200">
+                <div className="pt-2 border-t border-slate-800">
                   <button
                     type="button"
                     onClick={onOpenEarlyDeparture}
-                    className="w-full py-3 px-4 bg-purple-50 hover:bg-purple-100 border-2 border-purple-300 rounded-2xl text-xs font-black text-purple-950 flex items-center justify-center space-x-2 transition shadow-sm active:scale-[0.99]"
+                    className="w-full py-3 px-4 bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30 rounded-2xl text-xs font-black text-purple-300 flex items-center justify-center space-x-2 transition shadow-sm active:scale-[0.99] cursor-pointer"
                   >
                     <span className="text-base">🏃</span>
                     <span>Izin Pulang Lebih Awal (Sakit Mendadak / On Duty)</span>
@@ -272,16 +272,16 @@ export default function KioskActionScreen({
                     setConfirmModalOpen(true);
                   }
                 }}
-                className="w-full py-5 px-6 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-lg rounded-2xl shadow-xl shadow-emerald-600/35 active:scale-[0.98] transition flex items-center justify-center space-x-3"
+                className="w-full py-5 px-6 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-lg rounded-2xl shadow-xl shadow-emerald-600/35 active:scale-[0.98] transition flex items-center justify-center space-x-3 cursor-pointer"
               >
                 <Camera className="w-6 h-6 stroke-[2.5]" />
                 <span className="tracking-wide">AMBIL FOTO & CHECK-IN</span>
               </button>
 
-              <div className="p-3.5 bg-emerald-50 border-2 border-emerald-300 rounded-xl text-xs text-emerald-950 font-bold flex items-start space-x-2.5">
-                <Shirt className="w-4 h-4 text-emerald-700 shrink-0 mt-0.5" />
+              <div className="p-3.5 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-xs text-emerald-200 font-medium flex items-start space-x-2.5">
+                <Shirt className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
                 <span>
-                  <strong>Standar Grooming:</strong> Pastikan sudah rapi / grooming lengkap sebelum mengambil foto check-in.
+                  <strong className="text-emerald-300 font-black">Standar Grooming:</strong> Pastikan sudah rapi / grooming lengkap sebelum mengambil foto check-in.
                 </span>
               </div>
             </div>
@@ -289,12 +289,12 @@ export default function KioskActionScreen({
         </div>
 
         {/* Shift details footer */}
-        <div className="mt-6 pt-4 border-t-2 border-slate-200 text-xs text-slate-900 flex flex-col sm:flex-row sm:items-center justify-between gap-1 font-black">
+        <div className="mt-6 pt-4 border-t border-slate-800 text-xs text-slate-300 flex flex-col sm:flex-row sm:items-center justify-between gap-1 font-bold">
           <span className="flex items-center space-x-1.5">
-            <span className="inline-block w-2.5 h-2.5 rounded-full bg-blue-600"></span>
-            <span>Jadwal: <strong className="text-slate-950 font-black">{isManagement ? 'Fleksibel Penuh (Management)' : `${currentShiftName} (${shiftStart} - ${shiftEnd})`}</strong></span>
+            <span className="inline-block w-2.5 h-2.5 rounded-full bg-blue-500"></span>
+            <span>Jadwal: <strong className="text-slate-100 font-black">{isManagement ? 'Fleksibel Penuh (Management)' : `${currentShiftName} (${shiftStart} - ${shiftEnd})`}</strong></span>
           </span>
-          <span className={isManagement ? "text-blue-700 font-black" : "text-emerald-700 font-black"}>
+          <span className={isManagement ? "text-blue-400 font-black" : "text-emerald-400 font-black"}>
             {isManagement ? "Jam Kerja Fleksibel" : "Toleransi Grace Period: 10 Menit"}
           </span>
         </div>
@@ -304,33 +304,33 @@ export default function KioskActionScreen({
           CONFIRMATION MODAL: "Apakah anda masuk di jam sekian?"
          ========================================================================= */}
       {confirmModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white border-2 border-slate-300 rounded-3xl max-w-sm w-full p-6 shadow-2xl relative text-center">
-            <div className="w-14 h-14 rounded-2xl bg-blue-100 text-blue-700 mx-auto flex items-center justify-center border-2 border-blue-300 mb-3">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
+          <div className="bg-[#161b24] border border-slate-800 rounded-3xl max-w-sm w-full p-6 shadow-2xl relative text-center text-slate-200">
+            <div className="w-14 h-14 rounded-2xl bg-blue-500/15 text-blue-400 mx-auto flex items-center justify-center border border-blue-500/30 mb-3 shadow-lg">
               <Clock className="w-7 h-7 stroke-[2.5]" />
             </div>
 
-            <h3 className="text-xl font-black text-slate-950">Konfirmasi Jadwal Shift</h3>
+            <h3 className="text-xl font-black text-slate-100">Konfirmasi Jadwal Shift</h3>
 
-            <p className="text-xs sm:text-sm text-slate-800 mt-1 font-bold">
+            <p className="text-xs sm:text-sm text-slate-400 mt-1 font-bold">
               Apakah Anda masuk di jam:
             </p>
 
             {/* Selected Shift Highlight Box */}
-            <div className="my-3.5 p-4 bg-blue-50/60 rounded-2xl border-2 border-blue-400 text-center">
-              <span className="text-xs uppercase font-black text-blue-700 tracking-wider block">
+            <div className="my-3.5 p-4 bg-[#12161f] rounded-2xl border border-blue-500/40 text-center">
+              <span className="text-xs uppercase font-black text-blue-400 tracking-wider block">
                 {selectedShift?.name || 'Shift Standar'}
               </span>
-              <span className="text-2xl font-black text-slate-950 font-mono block mt-1">
+              <span className="text-2xl font-black text-slate-100 font-mono block mt-1">
                 {selectedShift?.start_time || '13:00'} - {selectedShift?.end_time || '22:00'} WITA
               </span>
 
               {selectedShift?.autoDetected ? (
-                <span className="inline-block mt-2 text-[11px] font-black text-emerald-950 bg-emerald-100 px-3 py-1 rounded-full border border-emerald-300">
+                <span className="inline-block mt-2 text-[11px] font-black text-emerald-300 bg-emerald-500/15 px-3 py-1 rounded-full border border-emerald-500/30">
                   ✓ Otomatis Terdeteksi (±30 Menit dari Jam Shift)
                 </span>
               ) : (
-                <span className="inline-block mt-2 text-[11px] font-black text-amber-950 bg-amber-100 px-3 py-1 rounded-full border border-amber-300">
+                <span className="inline-block mt-2 text-[11px] font-black text-amber-300 bg-amber-500/15 px-3 py-1 rounded-full border border-amber-500/30">
                   ⚠️ Di Luar Toleransi 30 Menit (Pastikan Shift Sesuai)
                 </span>
               )}
@@ -339,7 +339,7 @@ export default function KioskActionScreen({
             {/* Selector if multiple shifts exist in division */}
             {availableSchedules.length > 1 && (
               <div className="mb-4 text-left">
-                <label className="text-xs text-slate-900 block mb-1.5 font-black">
+                <label className="text-xs text-slate-300 block mb-1.5 font-black">
                   Bukan shift ini? Pilih shift Anda:
                 </label>
                 <div className="grid grid-cols-2 gap-2">
@@ -350,10 +350,10 @@ export default function KioskActionScreen({
                         key={idx}
                         type="button"
                         onClick={() => setSelectedShift(s)}
-                        className={`p-2.5 rounded-xl text-xs font-black border-2 transition text-center ${
+                        className={`p-2.5 rounded-xl text-xs font-black border transition text-center cursor-pointer ${
                           isSelected
-                            ? 'bg-blue-600 border-blue-700 text-white shadow-sm'
-                            : 'bg-white border-slate-300 text-slate-800 hover:bg-slate-100'
+                            ? 'bg-blue-600 border-blue-500 text-white shadow-lg'
+                            : 'bg-[#1c2230] border-slate-700 text-slate-300 hover:bg-[#252d3d]'
                         }`}
                       >
                         <span className="block text-[11px] opacity-90">{s.name}</span>
@@ -373,7 +373,7 @@ export default function KioskActionScreen({
                   setConfirmModalOpen(false);
                   onTriggerCamera('checkin', selectedShift);
                 }}
-                className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-sm uppercase tracking-wider rounded-xl transition shadow-lg shadow-emerald-600/30 active:scale-95 flex items-center justify-center space-x-2"
+                className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-sm uppercase tracking-wider rounded-xl transition shadow-lg shadow-emerald-600/30 active:scale-95 flex items-center justify-center space-x-2 cursor-pointer"
               >
                 <Check className="w-4 h-4 stroke-[3]" />
                 <span>Ya, Benar (Lanjut Selfie)</span>
@@ -382,7 +382,7 @@ export default function KioskActionScreen({
               <button
                 type="button"
                 onClick={() => setConfirmModalOpen(false)}
-                className="w-full py-2.5 text-xs text-slate-700 hover:text-slate-950 transition font-black"
+                className="w-full py-2.5 text-xs text-slate-400 hover:text-white transition font-black cursor-pointer"
               >
                 Batal
               </button>

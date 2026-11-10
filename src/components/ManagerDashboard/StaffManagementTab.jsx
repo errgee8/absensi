@@ -273,26 +273,26 @@ export default function StaffManagementTab({ onStaffUpdated }) {
   });
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      {/* Top Banner Card - White & Blue */}
-      <div className="bg-white rounded-3xl p-5 border-2 border-slate-200 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="space-y-6 animate-fade-in text-slate-200">
+      {/* Top Banner Card */}
+      <div className="bg-[#161b24] rounded-3xl p-5 border border-slate-800 shadow-md flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center space-x-2">
-            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-blue-100 text-blue-900 border border-blue-300">
+            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-blue-500/15 text-blue-300 border border-blue-500/30">
               Staff &amp; PIN Management
             </span>
           </div>
-          <h3 className="text-xl font-black text-slate-950 mt-1">
+          <h3 className="text-xl font-black text-slate-100 mt-1">
             Pengaturan Karyawan &amp; Hak Akses PIN
           </h3>
-          <p className="text-xs text-slate-700 mt-0.5 font-bold">
+          <p className="text-xs text-slate-400 mt-0.5 font-bold">
             Manajemen staf terpusat JP Karaoke &amp; LuckyCat Billiard. Data tersimpan permanen di cloud.
           </p>
         </div>
 
         <button
           onClick={handleOpenAddModal}
-          className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-xl text-xs flex items-center justify-center space-x-1.5 shadow-md shadow-blue-600/30 transition shrink-0"
+          className="px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-black rounded-xl text-xs flex items-center justify-center space-x-1.5 shadow-lg shadow-blue-600/30 transition shrink-0 cursor-pointer"
         >
           <UserPlus className="w-4 h-4 stroke-[2.5]" />
           <span>+ Tambah Karyawan Baru</span>
@@ -303,20 +303,20 @@ export default function StaffManagementTab({ onStaffUpdated }) {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex flex-1 items-center space-x-2 max-w-md">
           <div className="relative flex-1">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Cari nama, role, atau ID staff..."
-              className="w-full bg-white border-2 border-slate-300 rounded-xl pl-9 pr-3 py-2 text-xs text-slate-950 font-bold placeholder-slate-400 focus:outline-none focus:border-blue-600"
+              className="w-full bg-[#12161f] border border-slate-700 rounded-xl pl-9 pr-3 py-2 text-xs text-slate-100 font-bold placeholder-slate-500 focus:outline-none focus:border-blue-500"
             />
           </div>
 
           <select
             value={venueFilter}
             onChange={(e) => setVenueFilter(e.target.value)}
-            className="bg-white border-2 border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-950 font-black focus:outline-none focus:border-blue-600 cursor-pointer"
+            className="bg-[#12161f] border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-100 font-black focus:outline-none focus:border-blue-500 cursor-pointer"
           >
             <option value="ALL">Semua Outlet</option>
             <option value="JP Karaoke">JP Karaoke</option>
@@ -324,16 +324,16 @@ export default function StaffManagementTab({ onStaffUpdated }) {
           </select>
         </div>
 
-        <div className="text-xs text-slate-700 font-bold flex items-center space-x-2">
-          <span>Total: <strong className="text-slate-950 font-black">{filteredStaff.length}</strong> staff</span>
+        <div className="text-xs text-slate-400 font-bold flex items-center space-x-2">
+          <span>Total: <strong className="text-slate-100 font-black">{filteredStaff.length}</strong> staff</span>
           <span>•</span>
-          <span className="text-emerald-700 font-black">
+          <span className="text-emerald-400 font-black">
             {filteredStaff.filter((s) => s.is_active === 1).length} aktif
           </span>
           <button
             onClick={loadRoster}
             disabled={loading}
-            className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 transition ml-2"
+            className="p-1.5 rounded-lg bg-[#1c2230] hover:bg-[#252d3d] text-slate-300 border border-slate-700 transition ml-2 cursor-pointer"
             title="Refresh Data"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
@@ -341,11 +341,11 @@ export default function StaffManagementTab({ onStaffUpdated }) {
         </div>
       </div>
 
-      {/* Roster Table - High Contrast */}
-      <div className="bg-white border-2 border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+      {/* Roster Table */}
+      <div className="bg-[#161b24] border border-slate-800 rounded-2xl overflow-hidden shadow-md">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs text-slate-700">
-            <thead className="bg-slate-100 text-slate-950 uppercase text-[10px] tracking-wider font-black border-b-2 border-slate-200">
+          <table className="w-full text-left text-xs text-slate-300">
+            <thead className="bg-[#12161f] text-slate-300 uppercase text-[10px] tracking-wider font-black border-b border-slate-800">
               <tr>
                 <th className="py-3.5 px-3">Staff ID</th>
                 <th className="py-3.5 px-3">Outlet &amp; Divisi</th>
@@ -357,7 +357,7 @@ export default function StaffManagementTab({ onStaffUpdated }) {
                 <th className="py-3.5 px-3 text-right">Aksi</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 font-medium">
+            <tbody className="divide-y divide-slate-800 font-medium">
               {filteredStaff.map((staff) => {
                 const isActive = staff.is_active === 1;
                 const pinRevealed = showPins[staff.id];
@@ -365,29 +365,29 @@ export default function StaffManagementTab({ onStaffUpdated }) {
                 return (
                   <tr
                     key={staff.id}
-                    className={`hover:bg-blue-50/40 transition-colors ${
-                      !isActive ? 'bg-rose-50/40 opacity-75' : ''
+                    className={`hover:bg-slate-800/40 transition-colors ${
+                      !isActive ? 'bg-rose-500/5 opacity-75' : ''
                     }`}
                   >
-                    <td className="py-3 px-3 font-mono font-bold text-slate-500">{staff.id}</td>
+                    <td className="py-3 px-3 font-mono font-bold text-slate-400">{staff.id}</td>
 
                     <td className="py-3 px-3">
-                      <span className="font-black text-slate-950 block">
+                      <span className="font-black text-slate-100 block">
                         {staff.venue === 'JP Karaoke' ? '🎤 JP Karaoke' : '🐱 LuckyCat'}
                       </span>
-                      <div className="text-[11px] text-blue-700 font-bold">
+                      <div className="text-[11px] text-blue-400 font-bold">
                         {staff.division}
                       </div>
                     </td>
 
-                    <td className="py-3 px-3 font-black text-slate-950 text-sm">{staff.name}</td>
-                    <td className="py-3 px-3 text-slate-800 font-bold">{staff.role}</td>
+                    <td className="py-3 px-3 font-black text-slate-100 text-sm">{staff.name}</td>
+                    <td className="py-3 px-3 text-slate-300 font-bold">{staff.role}</td>
 
                     {/* Assigned PIN */}
                     <td className="py-3 px-3">
-                      <div className="inline-flex items-center space-x-1.5 bg-slate-50 px-2.5 py-1 rounded-xl border-2 border-slate-200 font-mono">
-                        <Key className="w-3.5 h-3.5 text-blue-600 stroke-[2.5]" />
-                        <span className="font-black text-slate-950 tracking-wider">
+                      <div className="inline-flex items-center space-x-1.5 bg-[#12161f] px-2.5 py-1 rounded-xl border border-slate-700 font-mono">
+                        <Key className="w-3.5 h-3.5 text-blue-400 stroke-[2.5]" />
+                        <span className="font-black text-slate-100 tracking-wider">
                           {pinRevealed ? staff.pin : '••••'}
                         </span>
                         <button
@@ -475,20 +475,20 @@ export default function StaffManagementTab({ onStaffUpdated }) {
 
       {/* Modal: Add New Staff (Simplified Template-based) */}
       {modalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white border-2 border-slate-300 rounded-3xl max-w-md w-full overflow-hidden shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in text-slate-200">
+          <div className="bg-[#161b24] border border-slate-800 rounded-3xl max-w-md w-full overflow-hidden shadow-2xl">
             <form onSubmit={handleCreateStaff}>
-              <div className="p-4 sm:p-5 border-b-2 border-slate-200 bg-slate-50 flex items-center justify-between">
+              <div className="p-4 sm:p-5 border-b border-slate-800 bg-[#12161f] flex items-center justify-between">
                 <div className="flex items-center space-x-2">
-                  <div className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center">
+                  <div className="w-8 h-8 rounded-xl bg-blue-500/15 border border-blue-500/30 text-blue-400 flex items-center justify-center">
                     <UserPlus className="w-4 h-4 stroke-[2.5]" />
                   </div>
-                  <h3 className="text-base font-black text-slate-950">Tambah Karyawan Baru</h3>
+                  <h3 className="text-base font-black text-slate-100">Tambah Karyawan Baru</h3>
                 </div>
                 <button
                   type="button"
                   onClick={() => setModalOpen(false)}
-                  className="p-1.5 text-slate-500 hover:text-slate-950 rounded-lg hover:bg-slate-200 transition"
+                  className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition cursor-pointer"
                 >
                   ✕
                 </button>
@@ -497,11 +497,11 @@ export default function StaffManagementTab({ onStaffUpdated }) {
               <div className="p-5 space-y-4 text-xs">
                 {/* Outlet Venue Selection */}
                 <div>
-                  <label className="text-slate-950 font-black block mb-1">Outlet / Lokasi</label>
+                  <label className="text-slate-300 font-black block mb-1">Outlet / Lokasi</label>
                   <select
                     value={newVenue}
                     onChange={(e) => handleVenueChange(e.target.value)}
-                    className="w-full bg-slate-50 border-2 border-slate-300 rounded-xl px-3 py-2 text-slate-950 font-bold focus:outline-none focus:border-blue-600"
+                    className="w-full bg-[#12161f] border border-slate-700 rounded-xl px-3 py-2 text-slate-100 font-bold focus:outline-none focus:border-blue-500 cursor-pointer"
                   >
                     <option value="LuckyCat">LuckyCat (LC)</option>
                     <option value="JP Karaoke">JP Karaoke</option>
@@ -510,11 +510,11 @@ export default function StaffManagementTab({ onStaffUpdated }) {
 
                 {/* Division & Role Selection */}
                 <div>
-                  <label className="text-slate-950 font-black block mb-1">Divisi &amp; Posisi Kerja</label>
+                  <label className="text-slate-300 font-black block mb-1">Divisi &amp; Posisi Kerja</label>
                   <select
                     value={selectedRoleOption}
                     onChange={(e) => setSelectedRoleOption(e.target.value)}
-                    className="w-full bg-slate-50 border-2 border-slate-300 rounded-xl px-3 py-2 text-slate-950 font-bold focus:outline-none focus:border-blue-600"
+                    className="w-full bg-[#12161f] border border-slate-700 rounded-xl px-3 py-2 text-slate-100 font-bold focus:outline-none focus:border-blue-500 cursor-pointer"
                   >
                     {currentTemplateOptions.map((opt) => (
                       <option key={opt.role} value={opt.role}>
@@ -526,28 +526,28 @@ export default function StaffManagementTab({ onStaffUpdated }) {
 
                 {/* Name */}
                 <div>
-                  <label className="text-slate-950 font-black block mb-1">Nama Karyawan</label>
+                  <label className="text-slate-300 font-black block mb-1">Nama Karyawan</label>
                   <input
                     type="text"
                     required
                     value={newName}
                     onChange={(e) => setNewName(e.target.value)}
                     placeholder="Contoh: Iwan"
-                    className="w-full bg-slate-50 border-2 border-slate-300 rounded-xl px-3 py-2.5 text-slate-950 text-sm font-black focus:outline-none focus:border-blue-600"
+                    className="w-full bg-[#12161f] border border-slate-700 rounded-xl px-3 py-2.5 text-slate-100 placeholder:text-slate-500 text-sm font-black focus:outline-none focus:border-blue-500"
                   />
                 </div>
 
                 {/* Template Shift Info Card (Auto Inherited) */}
                 {currentTemplate && (
-                  <div className="p-3.5 bg-blue-50 border-2 border-blue-200 rounded-2xl space-y-1.5">
-                    <div className="flex items-center space-x-1.5 text-blue-900 font-black text-xs">
-                      <Sparkles className="w-3.5 h-3.5 text-blue-600 stroke-[2.5]" />
+                  <div className="p-3.5 bg-[#1c2230] border border-blue-500/30 rounded-2xl space-y-1.5">
+                    <div className="flex items-center space-x-1.5 text-blue-300 font-black text-xs">
+                      <Sparkles className="w-3.5 h-3.5 text-blue-400 stroke-[2.5]" />
                       <span>Template Jam Kerja Terikat:</span>
                     </div>
-                    <div className="text-xs font-mono text-blue-950 font-black">
+                    <div className="text-xs font-mono text-slate-200 font-black">
                       {currentTemplate.description}
                     </div>
-                    <div className="text-[11px] text-slate-700 font-bold">
+                    <div className="text-[11px] text-slate-400 font-bold">
                       ✓ Jam shift terikat otomatis sesuai template divisi. Anda tidak perlu memasukkan jam manual.
                     </div>
                   </div>
@@ -556,11 +556,11 @@ export default function StaffManagementTab({ onStaffUpdated }) {
                 {/* PIN */}
                 <div>
                   <div className="flex justify-between items-center mb-1">
-                    <label className="text-slate-950 font-black">PIN Karyawan (4-Digit)</label>
+                    <label className="text-slate-300 font-black">PIN Karyawan (4-Digit)</label>
                     <button
                       type="button"
                       onClick={handleGeneratePin}
-                      className="text-xs text-blue-700 hover:underline flex items-center space-x-1 font-bold"
+                      className="text-xs text-blue-400 hover:text-blue-300 flex items-center space-x-1 font-bold cursor-pointer"
                     >
                       <Sparkles className="w-3 h-3" />
                       <span>Acak Ulang PIN</span>
@@ -573,15 +573,15 @@ export default function StaffManagementTab({ onStaffUpdated }) {
                     value={newPin}
                     onChange={(e) => setNewPin(e.target.value)}
                     placeholder="Contoh: 4829"
-                    className="w-full bg-slate-50 border-2 border-slate-300 rounded-xl px-3 py-2 text-blue-700 font-mono text-lg font-black tracking-widest focus:outline-none focus:border-blue-600 text-center"
+                    className="w-full bg-[#12161f] border border-slate-700 rounded-xl px-3 py-2 text-blue-400 font-mono text-lg font-black tracking-widest focus:outline-none focus:border-blue-500 text-center"
                   />
                 </div>
 
                 {/* Initial Status */}
-                <div className="p-3 bg-slate-50 rounded-xl border-2 border-slate-200 flex items-center justify-between">
+                <div className="p-3 bg-[#1c2230] rounded-xl border border-slate-800 flex items-center justify-between">
                   <div>
-                    <span className="font-black text-slate-950 block">Status Karyawan</span>
-                    <span className="text-[11px] text-slate-600 font-bold">
+                    <span className="font-black text-slate-100 block">Status Karyawan</span>
+                    <span className="text-[11px] text-slate-400 font-bold">
                       {newStatus ? 'Aktif (Karyawan langsung bisa login via PIN)' : 'Nonaktif / Suspended'}
                     </span>
                   </div>
@@ -594,18 +594,18 @@ export default function StaffManagementTab({ onStaffUpdated }) {
                 </div>
               </div>
 
-              <div className="p-4 border-t-2 border-slate-200 bg-slate-50 flex justify-end space-x-2">
+              <div className="p-4 border-t border-slate-800 bg-[#12161f] flex justify-end space-x-2">
                 <button
                   type="button"
                   onClick={() => setModalOpen(false)}
-                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-black transition"
+                  className="px-4 py-2 bg-[#1c2230] hover:bg-[#252d3d] text-slate-300 rounded-xl text-xs font-black transition cursor-pointer"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-xl text-xs shadow-md shadow-blue-600/30 transition"
+                  className="px-5 py-2 bg-blue-600 hover:bg-blue-500 text-white font-black rounded-xl text-xs shadow-lg shadow-blue-600/30 transition cursor-pointer"
                 >
                   {submitting ? 'Menyimpan...' : 'Simpan & Daftarkan Staff'}
                 </button>
@@ -617,28 +617,28 @@ export default function StaffManagementTab({ onStaffUpdated }) {
 
       {/* Modal: Reset Staff PIN */}
       {pinModalStaff && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white border-2 border-slate-300 rounded-3xl max-w-sm w-full overflow-hidden shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in text-slate-200">
+          <div className="bg-[#161b24] border border-slate-800 rounded-3xl max-w-sm w-full overflow-hidden shadow-2xl">
             <form onSubmit={handleSaveResetPin}>
-              <div className="p-4 border-b-2 border-slate-200 bg-slate-50 flex items-center justify-between">
+              <div className="p-4 border-b border-slate-800 bg-[#12161f] flex items-center justify-between">
                 <div className="flex items-center space-x-2">
-                  <div className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center">
+                  <div className="w-8 h-8 rounded-xl bg-blue-500/15 border border-blue-500/30 text-blue-400 flex items-center justify-center">
                     <Key className="w-4 h-4 stroke-[2.5]" />
                   </div>
-                  <h3 className="text-sm font-black text-slate-950">Reset PIN Staff</h3>
+                  <h3 className="text-sm font-black text-slate-100">Reset PIN Staff</h3>
                 </div>
                 <button
                   type="button"
                   onClick={() => setPinModalStaff(null)}
-                  className="p-1.5 text-slate-500 hover:text-slate-950 rounded-lg hover:bg-slate-200 transition"
+                  className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition cursor-pointer"
                 >
                   ✕
                 </button>
               </div>
 
               <div className="p-5 space-y-3 text-xs">
-                <p className="text-slate-800 font-bold">
-                  Masukkan 4 digit PIN baru untuk <strong className="text-slate-950">{pinModalStaff.name}</strong> ({pinModalStaff.id}):
+                <p className="text-slate-300 font-bold">
+                  Masukkan 4 digit PIN baru untuk <strong className="text-white">{pinModalStaff.name}</strong> ({pinModalStaff.id}):
                 </p>
 
                 <div>
@@ -649,24 +649,24 @@ export default function StaffManagementTab({ onStaffUpdated }) {
                     value={resetPinValue}
                     onChange={(e) => setResetPinValue(e.target.value)}
                     placeholder="••••"
-                    className="w-full bg-slate-50 border-2 border-slate-300 rounded-xl px-3 py-2 text-slate-950 font-mono text-xl font-black text-center tracking-widest focus:outline-none focus:border-blue-600"
+                    className="w-full bg-[#12161f] border border-slate-700 rounded-xl px-3 py-2 text-slate-100 font-mono text-xl font-black text-center tracking-widest focus:outline-none focus:border-blue-500"
                     autoFocus
                   />
                 </div>
               </div>
 
-              <div className="p-4 border-t-2 border-slate-200 bg-slate-50 flex justify-end space-x-2">
+              <div className="p-4 border-t border-slate-800 bg-[#12161f] flex justify-end space-x-2">
                 <button
                   type="button"
                   onClick={() => setPinModalStaff(null)}
-                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-black transition"
+                  className="px-4 py-2 bg-[#1c2230] hover:bg-[#252d3d] text-slate-300 rounded-xl text-xs font-black transition cursor-pointer"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
                   disabled={pinSubmitting || resetPinValue.length < 4}
-                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-black shadow-md shadow-blue-600/30 transition disabled:opacity-50"
+                  className="px-5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-black shadow-lg shadow-blue-600/30 transition disabled:opacity-50 cursor-pointer"
                 >
                   {pinSubmitting ? 'Menyimpan...' : 'Perbarui PIN'}
                 </button>

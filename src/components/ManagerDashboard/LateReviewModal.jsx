@@ -93,26 +93,26 @@ export default function LateReviewModal({ shift, schedules = [], adminAuth, onCl
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/75 backdrop-blur-sm animate-fade-in">
-      <div className="bg-white border-2 border-slate-300 rounded-3xl max-w-xl w-full overflow-hidden shadow-2xl flex flex-col max-h-[92vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
+      <div className="bg-[#161b24] border border-slate-800 rounded-3xl max-w-xl w-full overflow-hidden shadow-2xl flex flex-col max-h-[92vh] text-slate-200">
         {/* Modal Header */}
-        <div className="p-4 sm:p-5 border-b-2 border-slate-200 bg-slate-50 flex items-center justify-between">
+        <div className="p-4 sm:p-5 border-b border-slate-800 bg-[#12161f] flex items-center justify-between">
           <div className="flex items-center space-x-2.5">
-            <div className="w-10 h-10 rounded-2xl bg-amber-100 border-2 border-amber-300 flex items-center justify-center text-amber-700 shadow-xs">
+            <div className="w-10 h-10 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 shadow-xs">
               <Clock className="w-5 h-5 stroke-[2.5]" />
             </div>
             <div>
-              <h3 className="text-base font-black text-slate-950 leading-tight">
+              <h3 className="text-base font-black text-slate-100 leading-tight">
                 Review Keterlambatan Check-In
               </h3>
-              <p className="text-xs text-slate-700 font-bold">
+              <p className="text-xs text-slate-400 font-bold">
                 Verifikasi waktu seharusnya vs aktual &amp; tentukan ACC / Tolak
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-950 transition border border-slate-300"
+            className="p-2 rounded-xl bg-[#1c2230] hover:bg-[#252d3d] text-slate-300 hover:text-white transition border border-slate-700 cursor-pointer"
             title="Tutup"
           >
             <X className="w-5 h-5 stroke-[2.5]" />
@@ -122,56 +122,56 @@ export default function LateReviewModal({ shift, schedules = [], adminAuth, onCl
         {/* Modal Content */}
         <div className="p-4 sm:p-5 overflow-y-auto space-y-4 text-xs">
           {/* Status Review Badge Banner */}
-          <div className="flex items-center justify-between p-3 rounded-2xl border-2 bg-slate-50">
+          <div className="flex items-center justify-between p-3 rounded-2xl border border-slate-800 bg-[#1a202d]">
             <div className="flex items-center space-x-2">
-              <User className="w-4 h-4 text-slate-500" />
+              <User className="w-4 h-4 text-slate-400" />
               <div>
-                <span className="font-black text-slate-950 text-sm">{shift.staff_name}</span>
-                <span className="text-slate-700 text-xs font-bold ml-1.5 font-mono">[{shift.staff_id}]</span>
+                <span className="font-black text-slate-100 text-sm">{shift.staff_name}</span>
+                <span className="text-slate-400 text-xs font-bold ml-1.5 font-mono">[{shift.staff_id}]</span>
               </div>
             </div>
             <div className="flex items-center space-x-1.5">
-              <span className="px-2 py-0.5 rounded-lg text-[10px] font-black bg-blue-100 text-blue-900 border border-blue-200">
+              <span className="px-2 py-0.5 rounded-lg text-[10px] font-black bg-blue-500/15 text-blue-300 border border-blue-500/30">
                 {shift.staff_venue === 'JP Karaoke' ? '🎤 JP Karaoke' : '🐱 LuckyCat'}
               </span>
-              <span className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-slate-100 text-slate-800 border border-slate-300">
+              <span className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-slate-800 text-slate-300 border border-slate-700">
                 {shift.staff_division || shift.staff_role}
               </span>
             </div>
           </div>
 
           {/* Time Comparison Card: Scheduled vs Actual vs Late */}
-          <div className="bg-gradient-to-br from-amber-50 to-orange-50 border-2 border-amber-300 rounded-2xl p-4 space-y-3">
-            <span className="text-[10px] uppercase tracking-wider font-black text-amber-900 block">
+          <div className="bg-[#1c2230] border border-amber-500/30 rounded-2xl p-4 space-y-3">
+            <span className="text-[10px] uppercase tracking-wider font-black text-amber-300 block">
               Perbandingan Waktu Masuk Kerja
             </span>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
               {/* Box 1: Scheduled Time (Waktu Seharusnya) */}
-              <div className="bg-white p-3 rounded-xl border border-amber-200 shadow-xs">
-                <span className="text-[10px] font-black text-slate-500 uppercase block mb-1">
+              <div className="bg-[#12161f] p-3 rounded-xl border border-slate-700/80 shadow-xs">
+                <span className="text-[10px] font-black text-slate-400 uppercase block mb-1">
                   1. Waktu Seharusnya
                 </span>
-                <div className="font-mono text-base font-black text-blue-900">
-                  {scheduledStart} <span className="text-xs font-bold text-slate-600">WITA</span>
+                <div className="font-mono text-base font-black text-blue-400">
+                  {scheduledStart} <span className="text-xs font-bold text-slate-400">WITA</span>
                 </div>
-                <div className="text-[10px] text-slate-600 font-bold mt-0.5">
+                <div className="text-[10px] text-slate-400 font-bold mt-0.5">
                   Jadwal: {shiftInfo.shiftName}
                 </div>
-                <div className="text-[10px] text-emerald-700 font-black mt-1 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 inline-block">
+                <div className="text-[10px] text-emerald-300 font-black mt-1 bg-emerald-500/15 px-1.5 py-0.5 rounded border border-emerald-500/30 inline-block">
                   Batas Toleransi: {graceTimeStr} WITA
                 </div>
               </div>
 
               {/* Box 2: Actual Check-In Time */}
-              <div className="bg-white p-3 rounded-xl border border-amber-200 shadow-xs">
-                <span className="text-[10px] font-black text-slate-500 uppercase block mb-1">
+              <div className="bg-[#12161f] p-3 rounded-xl border border-slate-700/80 shadow-xs">
+                <span className="text-[10px] font-black text-slate-400 uppercase block mb-1">
                   2. Waktu Masuk Aktual
                 </span>
-                <div className="font-mono text-base font-black text-rose-700">
-                  {shift.checkin_time ? formatWitaTimeOnly(shift.checkin_time) : '-'} <span className="text-xs font-bold text-slate-600">WITA</span>
+                <div className="font-mono text-base font-black text-rose-400">
+                  {shift.checkin_time ? formatWitaTimeOnly(shift.checkin_time) : '-'} <span className="text-xs font-bold text-slate-400">WITA</span>
                 </div>
-                <div className="text-[10px] text-slate-600 font-bold mt-0.5">
+                <div className="text-[10px] text-slate-400 font-bold mt-0.5">
                   {shift.checkin_time ? formatWitaDateOnly(shift.checkin_time) : shift.date}
                 </div>
                 <div className="text-[10px] text-slate-500 font-medium mt-1">
@@ -180,14 +180,14 @@ export default function LateReviewModal({ shift, schedules = [], adminAuth, onCl
               </div>
 
               {/* Box 3: Late Duration */}
-              <div className="bg-white p-3 rounded-xl border border-amber-200 shadow-xs">
-                <span className="text-[10px] font-black text-slate-500 uppercase block mb-1">
+              <div className="bg-[#12161f] p-3 rounded-xl border border-slate-700/80 shadow-xs">
+                <span className="text-[10px] font-black text-slate-400 uppercase block mb-1">
                   3. Total Keterlambatan
                 </span>
-                <div className="font-mono text-base font-black text-amber-950">
+                <div className="font-mono text-base font-black text-amber-300">
                   {diffMinutes > 0 ? `${diffMinutes} Menit` : 'Terlambat'}
                 </div>
-                <div className="text-[10px] text-rose-700 font-black mt-0.5">
+                <div className="text-[10px] text-rose-400 font-black mt-0.5">
                   +{excessMinutes} menit di luar toleransi
                 </div>
                 <div className="text-[10px] text-slate-500 font-medium mt-1">
@@ -198,16 +198,16 @@ export default function LateReviewModal({ shift, schedules = [], adminAuth, onCl
           </div>
 
           {/* Staff Reason & Evidence Photo */}
-          <div className="bg-slate-50 border-2 border-slate-200 rounded-2xl p-4 space-y-3">
-            <span className="text-[10px] uppercase tracking-wider font-black text-slate-700 block">
+          <div className="bg-[#1a202d] border border-slate-800 rounded-2xl p-4 space-y-3">
+            <span className="text-[10px] uppercase tracking-wider font-black text-slate-300 block">
               Klarifikasi &amp; Alasan Karyawan
             </span>
 
-            <div className="bg-white p-3 rounded-xl border border-slate-200">
-              <span className="text-[10px] font-black text-slate-500 uppercase block mb-1">
+            <div className="bg-[#12161f] p-3 rounded-xl border border-slate-800">
+              <span className="text-[10px] font-black text-slate-400 uppercase block mb-1">
                 Alasan Ditulis Karyawan:
               </span>
-              <p className="text-xs font-bold text-slate-900 italic">
+              <p className="text-xs font-bold text-slate-200 italic">
                 "{shift.late_reason || 'Karyawan tidak menuliskan alasan keterlambatan.'}"
               </p>
             </div>
@@ -215,54 +215,54 @@ export default function LateReviewModal({ shift, schedules = [], adminAuth, onCl
             {/* Photos: Proof and Checkin Selfie */}
             <div className="grid grid-cols-2 gap-3 pt-1">
               <div>
-                <span className="text-[10px] font-black text-slate-600 uppercase block mb-1">
+                <span className="text-[10px] font-black text-slate-400 uppercase block mb-1">
                   Foto Bukti Keterlambatan:
                 </span>
                 {shift.late_photo_url ? (
                   <button
                     type="button"
                     onClick={() => setZoomPhoto(shift.late_photo_url)}
-                    className="relative group rounded-xl overflow-hidden border-2 border-blue-300 hover:border-blue-600 transition block w-full aspect-video bg-slate-900 shadow-xs"
+                    className="relative group rounded-xl overflow-hidden border border-blue-500/40 hover:border-blue-500 transition block w-full aspect-video bg-slate-900 shadow-xs cursor-pointer"
                   >
                     <img
                       src={shift.late_photo_url}
                       alt="Foto Bukti"
                       className="w-full h-full object-cover group-hover:scale-105 transition duration-200"
                     />
-                    <div className="absolute inset-0 bg-blue-950/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition text-white font-black text-[10px] space-x-1">
+                    <div className="absolute inset-0 bg-blue-950/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition text-white font-black text-[10px] space-x-1">
                       <Eye className="w-3.5 h-3.5" />
                       <span>Perbesar Bukti</span>
                     </div>
                   </button>
                 ) : (
-                  <div className="h-16 rounded-xl border border-dashed border-slate-300 bg-slate-100 flex items-center justify-center text-slate-400 font-bold text-[10px] text-center px-2">
+                  <div className="h-16 rounded-xl border border-dashed border-slate-700 bg-[#12161f] flex items-center justify-center text-slate-500 font-bold text-[10px] text-center px-2">
                     Tidak ada lampiran foto bukti
                   </div>
                 )}
               </div>
 
               <div>
-                <span className="text-[10px] font-black text-slate-600 uppercase block mb-1">
+                <span className="text-[10px] font-black text-slate-400 uppercase block mb-1">
                   Foto Selfie Masuk:
                 </span>
                 {shift.checkin_photo ? (
                   <button
                     type="button"
                     onClick={() => setZoomPhoto(shift.checkin_photo)}
-                    className="relative group rounded-xl overflow-hidden border-2 border-slate-300 hover:border-blue-600 transition block w-full aspect-video bg-slate-900 shadow-xs"
+                    className="relative group rounded-xl overflow-hidden border border-slate-700 hover:border-blue-500 transition block w-full aspect-video bg-slate-900 shadow-xs cursor-pointer"
                   >
                     <img
                       src={shift.checkin_photo}
                       alt="Selfie Check-In"
                       className="w-full h-full object-cover group-hover:scale-105 transition duration-200"
                     />
-                    <div className="absolute inset-0 bg-blue-950/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition text-white font-black text-[10px] space-x-1">
+                    <div className="absolute inset-0 bg-blue-950/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition text-white font-black text-[10px] space-x-1">
                       <Eye className="w-3.5 h-3.5" />
                       <span>Perbesar Selfie</span>
                     </div>
                   </button>
                 ) : (
-                  <div className="h-16 rounded-xl border border-dashed border-slate-300 bg-slate-100 flex items-center justify-center text-slate-400 font-bold text-[10px] text-center px-2">
+                  <div className="h-16 rounded-xl border border-dashed border-slate-700 bg-[#12161f] flex items-center justify-center text-slate-500 font-bold text-[10px] text-center px-2">
                     Foto selfie tidak tersedia
                   </div>
                 )}
@@ -272,67 +272,67 @@ export default function LateReviewModal({ shift, schedules = [], adminAuth, onCl
 
           {/* Previous Review Log (If Already Reviewed) */}
           {(shift.late_reviewed_by || isApproved || isRejected) && (
-            <div className={`p-3.5 rounded-2xl border-2 text-xs space-y-1 ${
+            <div className={`p-3.5 rounded-2xl border text-xs space-y-1 ${
               isApproved
-                ? 'bg-emerald-50 border-emerald-300 text-emerald-950'
-                : 'bg-rose-50 border-rose-300 text-rose-950'
+                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-200'
+                : 'bg-rose-500/10 border-rose-500/30 text-rose-200'
             }`}>
               <div className="flex items-center space-x-1.5 font-black">
                 {isApproved ? (
                   <>
-                    <CheckCircle className="w-4 h-4 text-emerald-700 stroke-[2.5]" />
+                    <CheckCircle className="w-4 h-4 text-emerald-400 stroke-[2.5]" />
                     <span>STATUS: SUDAH DI-ACC (DIMAAFKAN / BEBAS PENALTI)</span>
                   </>
                 ) : (
                   <>
-                    <AlertTriangle className="w-4 h-4 text-rose-700 stroke-[2.5]" />
+                    <AlertTriangle className="w-4 h-4 text-rose-400 stroke-[2.5]" />
                     <span>STATUS: DITOLAK (TETAP KENA PENALTI)</span>
                   </>
                 )}
               </div>
               {shift.late_reviewed_by && (
                 <div className="text-[11px] font-bold">
-                  Direview oleh: <strong className="text-slate-950">{shift.late_reviewed_by}</strong>
+                  Direview oleh: <strong className="text-white">{shift.late_reviewed_by}</strong>
                   {shift.late_reviewed_at && ` pada ${formatWitaDateTime(shift.late_reviewed_at)}`}
                 </div>
               )}
               {shift.late_manager_note && (
-                <div className="text-[11px] font-bold text-slate-800">
+                <div className="text-[11px] font-bold text-slate-300">
                   Catatan Management: <span className="italic">"{shift.late_manager_note}"</span>
                 </div>
               )}
-              <div className="text-[10px] text-slate-600 font-medium pt-1">
+              <div className="text-[10px] text-slate-400 font-medium pt-1">
                 Anda dapat mengubah keputusan sewaktu-waktu di form bawah ini.
               </div>
             </div>
           )}
 
           {/* Review Decision Form (1-Click ACC / Tolak) */}
-          <div className="bg-white border-2 border-slate-300 rounded-2xl p-4 space-y-3 shadow-sm">
+          <div className="bg-[#1a202d] border border-slate-800 rounded-2xl p-4 space-y-3 shadow-sm">
             <div className="flex items-center space-x-2">
-              <ShieldCheck className="w-4 h-4 text-blue-700 stroke-[2.5]" />
-              <span className="font-black text-slate-950 text-xs">
+              <ShieldCheck className="w-4 h-4 text-blue-400 stroke-[2.5]" />
+              <span className="font-black text-slate-100 text-xs">
                 Keputusan Management (1 Tombol ACC / Tolak)
               </span>
             </div>
 
             {error && (
-              <div className="p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold flex items-center space-x-2">
+              <div className="p-2.5 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs font-bold flex items-center space-x-2">
                 <AlertTriangle className="w-4 h-4 shrink-0" />
                 <span>{error}</span>
               </div>
             )}
 
             {success && (
-              <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-black flex items-center space-x-2">
-                <CheckCircle className="w-4 h-4 shrink-0 text-emerald-600" />
+              <div className="p-2.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs font-black flex items-center space-x-2">
+                <CheckCircle className="w-4 h-4 shrink-0 text-emerald-400" />
                 <span>{success}</span>
               </div>
             )}
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
               <div>
-                <label className="text-[10px] font-black text-slate-600 uppercase block mb-1">
+                <label className="text-[10px] font-black text-slate-400 uppercase block mb-1">
                   Catatan Keputusan (Opsional):
                 </label>
                 <input
@@ -340,12 +340,12 @@ export default function LateReviewModal({ shift, schedules = [], adminAuth, onCl
                   placeholder="Contoh: Ban bocor terverifikasi valid"
                   value={managerNotes}
                   onChange={(e) => setManagerNotes(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-bold focus:border-blue-500 focus:outline-none"
+                  className="w-full px-3 py-2 rounded-xl border border-slate-700 bg-[#12161f] text-slate-100 placeholder:text-slate-500 text-xs font-bold focus:border-blue-500 focus:outline-none"
                 />
               </div>
 
               <div>
-                <label className="text-[10px] font-black text-slate-600 uppercase block mb-1">
+                <label className="text-[10px] font-black text-slate-400 uppercase block mb-1">
                   PIN Otorisasi Manager:
                 </label>
                 <input
@@ -353,7 +353,7 @@ export default function LateReviewModal({ shift, schedules = [], adminAuth, onCl
                   placeholder="PIN Manager"
                   value={pin}
                   onChange={(e) => setPin(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-mono font-bold focus:border-blue-500 focus:outline-none"
+                  className="w-full px-3 py-2 rounded-xl border border-slate-700 bg-[#12161f] text-slate-100 placeholder:text-slate-500 text-xs font-mono font-bold focus:border-blue-500 focus:outline-none"
                 />
               </div>
             </div>
@@ -364,7 +364,7 @@ export default function LateReviewModal({ shift, schedules = [], adminAuth, onCl
                 type="button"
                 disabled={submitting}
                 onClick={() => handleDecision('APPROVE')}
-                className="flex-1 py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-black text-xs transition shadow-md shadow-emerald-600/30 flex items-center justify-center space-x-1.5 cursor-pointer"
+                className="flex-1 py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-black text-xs transition shadow-lg shadow-emerald-600/30 flex items-center justify-center space-x-1.5 cursor-pointer"
               >
                 <Check className="w-4 h-4 stroke-[3]" />
                 <span>ACC Telat (Hapus Penalti)</span>
@@ -374,7 +374,7 @@ export default function LateReviewModal({ shift, schedules = [], adminAuth, onCl
                 type="button"
                 disabled={submitting}
                 onClick={() => handleDecision('REJECT')}
-                className="flex-1 py-3 px-4 rounded-xl bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white font-black text-xs transition shadow-md shadow-rose-600/30 flex items-center justify-center space-x-1.5 cursor-pointer"
+                className="flex-1 py-3 px-4 rounded-xl bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white font-black text-xs transition shadow-lg shadow-rose-600/30 flex items-center justify-center space-x-1.5 cursor-pointer"
               >
                 <X className="w-4 h-4 stroke-[3]" />
                 <span>Tolak (Tetap Kena Penalti)</span>
@@ -384,13 +384,13 @@ export default function LateReviewModal({ shift, schedules = [], adminAuth, onCl
         </div>
 
         {/* Modal Footer */}
-        <div className="p-4 border-t-2 border-slate-200 bg-slate-50 flex items-center justify-between">
-          <span className="text-[10px] text-slate-500 font-bold">
+        <div className="p-4 border-t border-slate-800 bg-[#12161f] flex items-center justify-between">
+          <span className="text-[10px] text-slate-400 font-bold">
             Keputusan review langsung memperbarui peringkat Leaderboard &amp; laporan bulanan.
           </span>
           <button
             onClick={onClose}
-            className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-xl text-xs font-black transition"
+            className="px-4 py-2 bg-[#1c2230] hover:bg-[#252d3d] border border-slate-700 text-slate-200 rounded-xl text-xs font-black transition cursor-pointer"
           >
             Tutup
           </button>

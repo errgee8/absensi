@@ -278,70 +278,70 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
       <div className="no-print space-y-6">
         {/* View Only Mode Notification Banner */}
         {isReadOnly && (
-          <div className="bg-blue-50 border-2 border-blue-300 text-blue-950 p-4 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm animate-fade-in">
+          <div className="bg-[#141d2e] border border-blue-500/40 text-blue-200 p-4 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-md animate-fade-in">
             <div className="flex items-center space-x-3">
               <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-md shadow-blue-600/20">
-                <Eye className="w-5 h-5 stroke-[2.5]" />
+                <Eye className="w-5 h-5 stroke-[2.2]" />
               </div>
               <div>
                 <div className="flex items-center space-x-2">
-                  <span className="text-sm font-black text-slate-950">
+                  <span className="text-sm font-bold text-white">
                     Mode Pengawas (View Only)
                   </span>
-                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-blue-200 text-blue-900 border border-blue-400">
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase bg-blue-950 text-blue-300 border border-blue-500/40">
                     Read Only
                   </span>
                 </div>
-                <p className="text-xs text-slate-700 font-bold mt-0.5">
-                  Login: <span className="font-black text-blue-950">{adminAuth?.staffName || 'Assistant Manager'}</span> • Khusus monitoring laporan absensi &amp; kebersihan toilet. Akses pendaftaran dan perubahan data dinonaktifkan.
+                <p className="text-xs text-slate-300 font-medium mt-0.5">
+                  Login: <span className="font-bold text-blue-300">{adminAuth?.staffName || 'Assistant Manager'}</span> • Khusus monitoring laporan absensi &amp; kebersihan toilet. Akses pendaftaran dan perubahan data dinonaktifkan.
                 </p>
               </div>
             </div>
-            <div className="text-[11px] font-black text-blue-900 bg-white/80 px-3 py-1.5 rounded-xl border border-blue-200 self-start sm:self-auto">
+            <div className="text-[11px] font-bold text-blue-300 bg-blue-950/80 px-3 py-1.5 rounded-xl border border-blue-500/30 self-start sm:self-auto">
               👁️ Akses Terbatas (Laporan Saja)
             </div>
           </div>
         )}
 
-        {/* Navigation Tabs Bar - Clean White & Blue Theme */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-4">
-          <div className="flex flex-wrap bg-white p-1.5 rounded-2xl border-2 border-slate-200 shadow-sm gap-1.5">
+        {/* Navigation Tabs Bar - Refined Dark Theme */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-4">
+          <div className="flex flex-wrap bg-[#161b24] p-1.5 rounded-2xl border border-slate-800 shadow-md gap-1.5">
             <button
               onClick={() => setActiveTab('AUDIT')}
-              className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-black transition ${
+              className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-bold transition ${
                 activeTab === 'AUDIT'
                   ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
-                  : 'text-slate-800 hover:text-blue-700 hover:bg-slate-100'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/80'
               }`}
             >
-              <LayoutDashboard className="w-4 h-4 stroke-[2.5]" />
+              <LayoutDashboard className="w-4 h-4 stroke-[2.2]" />
               <span>Riwayat &amp; Audit Shift</span>
             </button>
 
             <button
               onClick={() => setActiveTab('TOILET')}
-              className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-black transition ${
+              className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-bold transition ${
                 activeTab === 'TOILET'
                   ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
-                  : 'text-slate-800 hover:text-blue-700 hover:bg-slate-100'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/80'
               }`}
             >
-              <Sparkles className="w-4 h-4 stroke-[2.5]" />
+              <Sparkles className="w-4 h-4 stroke-[2.2]" />
               <span>Kebersihan Toilet (QR Live)</span>
             </button>
 
             <button
               onClick={() => setActiveTab('LEAVE')}
-              className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-black transition relative ${
+              className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-bold transition relative ${
                 activeTab === 'LEAVE'
                   ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
-                  : 'text-slate-800 hover:text-blue-700 hover:bg-slate-100'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/80'
               }`}
             >
-              <FileText className="w-4 h-4 stroke-[2.5]" />
+              <FileText className="w-4 h-4 stroke-[2.2]" />
               <span>Perizinan &amp; Cuti</span>
               {pendingLeaveCount > 0 && (
-                <span className="ml-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-rose-600 text-white animate-pulse">
+                <span className="ml-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-600 text-white animate-pulse">
                   {pendingLeaveCount}
                 </span>
               )}
@@ -351,10 +351,10 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
               <button
                 type="button"
                 onClick={onOpenLeaderboard}
-                className="flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-black bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-500 hover:from-amber-300 hover:to-yellow-400 text-slate-950 shadow-md shadow-amber-500/20 transition active:scale-95"
+                className="flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-bold bg-gradient-to-r from-amber-500/20 via-yellow-500/15 to-amber-500/20 hover:from-amber-500/30 hover:to-yellow-500/25 text-amber-200 border border-amber-400/30 transition active:scale-95 shadow-xs"
                 title="Buka Peringkat Kinerja Staf Terajin & Bonus Bulanan"
               >
-                <Trophy className="w-4 h-4 text-slate-950 stroke-[2.5]" />
+                <Trophy className="w-4 h-4 text-amber-300 stroke-[2.2]" />
                 <span>🏆 Leaderboard Bonus</span>
               </button>
             )}
@@ -363,37 +363,37 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
               <>
                 <button
                   onClick={() => setActiveTab('SCHEDULES')}
-                  className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-black transition ${
+                  className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-bold transition ${
                     activeTab === 'SCHEDULES'
                       ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
-                      : 'text-slate-800 hover:text-blue-700 hover:bg-slate-100'
+                      : 'text-slate-400 hover:text-white hover:bg-slate-800/80'
                   }`}
                 >
-                  <Clock className="w-4 h-4 stroke-[2.5]" />
+                  <Clock className="w-4 h-4 stroke-[2.2]" />
                   <span>Pengaturan Divisi &amp; Jam Kerja</span>
                 </button>
 
                 <button
                   onClick={() => setActiveTab('STAFF')}
-                  className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-black transition ${
+                  className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-bold transition ${
                     activeTab === 'STAFF'
                       ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
-                      : 'text-slate-800 hover:text-blue-700 hover:bg-slate-100'
+                      : 'text-slate-400 hover:text-white hover:bg-slate-800/80'
                   }`}
                 >
-                  <Users className="w-4 h-4 stroke-[2.5]" />
+                  <Users className="w-4 h-4 stroke-[2.2]" />
                   <span>Pengaturan Staff &amp; PIN</span>
                 </button>
 
                 <button
                   onClick={() => setActiveTab('MONITORING')}
-                  className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-black transition ${
+                  className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-bold transition ${
                     activeTab === 'MONITORING'
                       ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
-                      : 'text-slate-800 hover:text-blue-700 hover:bg-slate-100'
+                      : 'text-slate-400 hover:text-white hover:bg-slate-800/80'
                   }`}
                 >
-                  <Activity className="w-4 h-4 stroke-[2.5]" />
+                  <Activity className="w-4 h-4 stroke-[2.2]" />
                   <span>Monitoring &amp; Log Akses</span>
                 </button>
               </>
@@ -401,9 +401,9 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
           </div>
 
           {/* SSE Realtime Indicator */}
-          <div className="flex items-center space-x-2 px-3.5 py-2 rounded-xl bg-white border-2 border-slate-200 shadow-sm text-xs font-mono font-black text-emerald-800">
-            <span className="flex h-2.5 w-2.5 rounded-full bg-emerald-600 animate-ping" />
-            <Radio className="w-4 h-4 text-emerald-700 stroke-[2.5]" />
+          <div className="flex items-center space-x-2 px-3.5 py-2 rounded-xl bg-[#161b24] border border-slate-800 shadow-sm text-xs font-mono font-bold text-emerald-400">
+            <span className="flex h-2.5 w-2.5 rounded-full bg-emerald-500 animate-ping" />
+            <Radio className="w-4 h-4 text-emerald-400 stroke-[2.2]" />
             <span>Realtime Live Sync Active</span>
           </div>
         </div>
@@ -487,23 +487,23 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
             </div>
 
             {/* Live On-Duty Floor Intelligence Banner */}
-            <div className="bg-white border-2 border-slate-200 rounded-3xl p-4 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-3 animate-fade-in">
+            <div className="bg-[#161b24] border border-slate-800 rounded-3xl p-4 shadow-md flex flex-col md:flex-row md:items-center justify-between gap-3 animate-fade-in">
               <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 rounded-2xl bg-emerald-50 border-2 border-emerald-300 flex items-center justify-center text-emerald-600 shadow-xs relative shrink-0">
+                <div className="w-10 h-10 rounded-2xl bg-emerald-950/80 border border-emerald-500/40 flex items-center justify-center text-emerald-400 shadow-xs relative shrink-0">
                   <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 absolute -top-1 -right-1 animate-ping" />
-                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-600 absolute -top-1 -right-1" />
-                  <Users className="w-5 h-5 stroke-[2.5]" />
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 absolute -top-1 -right-1" />
+                  <Users className="w-5 h-5 stroke-[2.2]" />
                 </div>
                 <div>
                   <div className="flex items-center space-x-2">
-                    <span className="text-xs font-black text-slate-950 uppercase tracking-wide">
+                    <span className="text-xs font-bold text-white uppercase tracking-wide">
                       Sedang Bertugas di Lantai (Live On Duty)
                     </span>
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-950 border border-emerald-300">
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-950 text-emerald-300 border border-emerald-500/40">
                       {onDutyShifts.length} Staf Aktif
                     </span>
                   </div>
-                  <p className="text-[11px] text-slate-600 font-bold mt-0.5">
+                  <p className="text-[11px] text-slate-400 font-medium mt-0.5">
                     Monitoring staf yang saat ini aktif bertugas di masing-masing outlet
                   </p>
                 </div>
@@ -511,22 +511,22 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
 
               {/* Outlet Breakdown Badges */}
               <div className="flex flex-wrap items-center gap-2">
-                <div className="px-3 py-1.5 rounded-xl bg-blue-50 border border-blue-200 flex items-center space-x-2">
+                <div className="px-3 py-1.5 rounded-xl bg-[#131b2c] border border-blue-500/30 flex items-center space-x-2">
                   <span className="text-xs">🎤</span>
-                  <span className="text-xs font-black text-blue-950">JP Karaoke:</span>
-                  <span className="font-mono text-xs font-black text-blue-700 bg-white px-1.5 py-0.5 rounded border border-blue-200">
+                  <span className="text-xs font-bold text-blue-200">JP Karaoke:</span>
+                  <span className="font-mono text-xs font-bold text-blue-300 bg-[#0f1422] px-1.5 py-0.5 rounded border border-blue-500/30">
                     {jpOnDuty.length} Orang
                   </span>
                 </div>
 
-                <div className="px-3 py-1.5 rounded-xl bg-amber-50 border border-amber-200 flex items-center space-x-2">
+                <div className="px-3 py-1.5 rounded-xl bg-[#241c12] border border-amber-500/30 flex items-center space-x-2">
                   <span className="text-xs">🐱</span>
-                  <span className="text-xs font-black text-amber-950">LuckyCat:</span>
-                  <span className="font-mono text-xs font-black text-amber-700 bg-white px-1.5 py-0.5 rounded border border-amber-200">
+                  <span className="text-xs font-bold text-amber-200">LuckyCat:</span>
+                  <span className="font-mono text-xs font-bold text-amber-300 bg-[#1a140d] px-1.5 py-0.5 rounded border border-amber-500/30">
                     {lcOnDuty.length} Orang
                   </span>
                   {lcOnDuty.some((s) => s.break_status === 'ON_BREAK') && (
-                    <span className="text-[10px] font-bold text-sky-800 bg-sky-100 px-1.5 py-0.2 rounded border border-sky-300">
+                    <span className="text-[10px] font-bold text-sky-300 bg-sky-950/80 px-1.5 py-0.2 rounded border border-sky-500/40">
                       ({lcOnDuty.filter((s) => s.break_status === 'ON_BREAK').length} istirahat)
                     </span>
                   )}

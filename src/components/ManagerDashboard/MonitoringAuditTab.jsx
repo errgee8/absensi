@@ -125,23 +125,23 @@ export default function MonitoringAuditTab({ adminAuth }) {
   });
 
   return (
-    <div className="space-y-6 animate-fade-in text-slate-900">
+    <div className="space-y-6 animate-fade-in text-slate-200">
       {/* Header Bar */}
-      <div className="bg-white border-2 border-slate-200 rounded-3xl p-5 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="bg-[#161b24] border border-slate-800 rounded-3xl p-5 shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center space-x-3.5">
-          <div className="w-12 h-12 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shadow-md shadow-indigo-600/30 shrink-0">
+          <div className="w-12 h-12 rounded-2xl bg-indigo-600/20 border border-indigo-500/30 text-indigo-400 flex items-center justify-center shadow-lg shrink-0">
             <Activity className="w-6 h-6 stroke-[2.5]" />
           </div>
           <div>
             <div className="flex items-center space-x-2">
-              <h2 className="text-lg sm:text-xl font-black text-slate-950 tracking-tight">
+              <h2 className="text-lg sm:text-xl font-black text-slate-100 tracking-tight">
                 Monitoring &amp; Audit Akses
               </h2>
-              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-indigo-100 text-indigo-900 border border-indigo-300">
+              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-indigo-500/15 text-indigo-300 border border-indigo-500/30">
                 Khusus Operational Manager
               </span>
             </div>
-            <p className="text-xs text-slate-600 font-bold mt-0.5">
+            <p className="text-xs text-slate-400 font-bold mt-0.5">
               Pantau keaktifan Assistant Manager, status Live Presence staf, dan kontrol aturan notifikasi
             </p>
           </div>
@@ -151,25 +151,25 @@ export default function MonitoringAuditTab({ adminAuth }) {
           type="button"
           onClick={() => loadData(false)}
           disabled={refreshing}
-          className="px-4 py-2.5 rounded-2xl bg-slate-100 hover:bg-slate-200 border-2 border-slate-300 text-slate-800 text-xs font-black transition flex items-center space-x-2 shadow-xs shrink-0 self-start sm:self-auto"
+          className="px-4 py-2.5 rounded-2xl bg-[#1c2230] hover:bg-[#252d3d] border border-slate-700 text-slate-200 text-xs font-black transition flex items-center space-x-2 shadow-xs shrink-0 self-start sm:self-auto cursor-pointer"
         >
-          <RefreshCw className={`w-4 h-4 stroke-[2.5] ${refreshing ? 'animate-spin text-blue-600' : ''}`} />
+          <RefreshCw className={`w-4 h-4 stroke-[2.5] ${refreshing ? 'animate-spin text-blue-400' : ''}`} />
           <span>{refreshing ? 'Memperbarui...' : 'Segarkan Data'}</span>
         </button>
       </div>
 
       {/* SECTION 1: PEMANTAUAN LOG LOGIN MANAGER & ASSISTANT MANAGER */}
-      <div className="bg-white border-2 border-slate-200 rounded-3xl p-5 shadow-sm space-y-4">
-        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+      <div className="bg-[#161b24] border border-slate-800 rounded-3xl p-5 shadow-xl space-y-4">
+        <div className="flex items-center justify-between border-b border-slate-800 pb-3">
           <div className="flex items-center space-x-2.5">
-            <div className="w-8 h-8 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-xl bg-blue-500/15 border border-blue-500/30 text-blue-400 flex items-center justify-center">
               <ShieldCheck className="w-5 h-5 stroke-[2.5]" />
             </div>
             <div>
-              <h3 className="text-sm font-black text-slate-950">
+              <h3 className="text-sm font-black text-slate-100">
                 Log Keaktifan Manager &amp; Assistant Manager
               </h3>
-              <p className="text-[11px] text-slate-500 font-bold">
+              <p className="text-[11px] text-slate-400 font-bold">
                 Memantau kedisiplinan dan frekuensi pemeriksaan dashboard oleh pengawas
               </p>
             </div>
@@ -179,24 +179,24 @@ export default function MonitoringAuditTab({ adminAuth }) {
         {/* 2-Card Summary: Operational Manager vs Assistant Manager */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Card Assistant Manager */}
-          <div className="p-4 rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-50/60 border-2 border-blue-200 space-y-2">
+          <div className="p-4 rounded-2xl bg-[#1c2230] border border-blue-500/30 space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-black text-blue-950 uppercase tracking-wide flex items-center space-x-1.5">
-                <span className="w-2.5 h-2.5 rounded-full bg-blue-600" />
+              <span className="text-xs font-black text-blue-300 uppercase tracking-wide flex items-center space-x-1.5">
+                <span className="w-2.5 h-2.5 rounded-full bg-blue-500" />
                 <span>Assistant Manager (Sherly)</span>
               </span>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-blue-600 text-white shadow-xs">
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-blue-600/30 text-blue-300 border border-blue-500/40">
                 {asstMgrLoginsToday}x Login Hari Ini
               </span>
             </div>
 
             <div className="pt-1">
-              <div className="text-[11px] text-slate-600 font-bold">Terakhir Membuka Aplikasi:</div>
-              <div className="font-mono text-sm font-black text-slate-950 mt-0.5">
+              <div className="text-[11px] text-slate-400 font-bold">Terakhir Membuka Aplikasi:</div>
+              <div className="font-mono text-sm font-black text-slate-100 mt-0.5">
                 {latestAsstMgrLog ? formatWitaDateTime(latestAsstMgrLog.login_at) : 'Belum tercatat riwayat login'}
               </div>
               {latestAsstMgrLog && (
-                <div className="text-[10px] text-slate-500 font-bold mt-1 truncate">
+                <div className="text-[10px] text-slate-400 font-bold mt-1 truncate">
                   Akun: {latestAsstMgrLog.staff_name || 'Assistant Manager'} • IP: {latestAsstMgrLog.ip_address || 'Lokal/Jaringan'}
                 </div>
               )}
@@ -204,23 +204,23 @@ export default function MonitoringAuditTab({ adminAuth }) {
           </div>
 
           {/* Card Operational Manager */}
-          <div className="p-4 rounded-2xl bg-gradient-to-br from-slate-50 to-emerald-50/50 border-2 border-slate-200 space-y-2">
+          <div className="p-4 rounded-2xl bg-[#1c2230] border border-emerald-500/30 space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-black text-slate-950 uppercase tracking-wide flex items-center space-x-1.5">
-                <span className="w-2.5 h-2.5 rounded-full bg-emerald-600" />
+              <span className="text-xs font-black text-emerald-300 uppercase tracking-wide flex items-center space-x-1.5">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
                 <span>Operational Manager (Anda)</span>
               </span>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-900 border border-emerald-300">
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
                 Full Authorization
               </span>
             </div>
 
             <div className="pt-1">
-              <div className="text-[11px] text-slate-600 font-bold">Terakhir Login / Aktif:</div>
-              <div className="font-mono text-sm font-black text-slate-950 mt-0.5">
+              <div className="text-[11px] text-slate-400 font-bold">Terakhir Login / Aktif:</div>
+              <div className="font-mono text-sm font-black text-slate-100 mt-0.5">
                 {latestOpMgrLog ? formatWitaDateTime(latestOpMgrLog.login_at) : 'Sesi aktif saat ini'}
               </div>
-              <div className="text-[10px] text-slate-500 font-bold mt-1">
+              <div className="text-[10px] text-slate-400 font-bold mt-1">
                 PIN 8980 • Otoritas Penuh Seluruh Outlet &amp; Sistem
               </div>
             </div>
@@ -229,13 +229,13 @@ export default function MonitoringAuditTab({ adminAuth }) {
 
         {/* Tabel Riwayat Sesi Login Terakhir */}
         <div className="pt-2">
-          <span className="text-xs font-black text-slate-800 uppercase tracking-wide block mb-2">
+          <span className="text-xs font-black text-slate-300 uppercase tracking-wide block mb-2">
             Riwayat 10 Sesi Login Terakhir:
           </span>
-          <div className="border border-slate-200 rounded-2xl overflow-hidden shadow-2xs">
+          <div className="border border-slate-800 rounded-2xl overflow-hidden shadow-md">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
-                <thead className="bg-slate-100 border-b border-slate-200 text-slate-700 font-black">
+                <thead className="bg-[#12161f] border-b border-slate-800 text-slate-300 font-black">
                   <tr>
                     <th className="py-2.5 px-3.5">Waktu Login (WITA)</th>
                     <th className="py-2.5 px-3.5">Akun / Pengawas</th>
@@ -243,10 +243,10 @@ export default function MonitoringAuditTab({ adminAuth }) {
                     <th className="py-2.5 px-3.5">Alamat IP / Jaringan</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100 font-bold text-slate-800">
+                <tbody className="divide-y divide-slate-800 font-bold text-slate-300">
                   {logs.length === 0 ? (
                     <tr>
-                      <td colSpan={4} className="py-4 text-center text-slate-400">
+                      <td colSpan={4} className="py-4 text-center text-slate-500">
                         Belum ada rekaman sesi login.
                       </td>
                     </tr>
@@ -254,18 +254,18 @@ export default function MonitoringAuditTab({ adminAuth }) {
                     logs.slice(0, 10).map((log, idx) => {
                       const isAsst = log.role === 'ASSISTANT_MANAGER' || (log.staff_name && log.staff_name.toLowerCase().includes('assistant'));
                       return (
-                        <tr key={log.id || idx} className="hover:bg-slate-50 transition">
-                          <td className="py-2.5 px-3.5 font-mono text-[11px] text-slate-900">
+                        <tr key={log.id || idx} className="hover:bg-slate-800/40 transition">
+                          <td className="py-2.5 px-3.5 font-mono text-[11px] text-slate-200">
                             {formatWitaDateTime(log.login_at)}
                           </td>
-                          <td className="py-2.5 px-3.5 font-black text-slate-950">
+                          <td className="py-2.5 px-3.5 font-black text-slate-100">
                             {log.staff_name}
                           </td>
                           <td className="py-2.5 px-3.5">
                             <span className={`px-2 py-0.5 rounded-md text-[10px] font-black ${
                               isAsst
-                                ? 'bg-blue-100 text-blue-900 border border-blue-300'
-                                : 'bg-emerald-100 text-emerald-900 border border-emerald-300'
+                                ? 'bg-blue-500/15 text-blue-300 border border-blue-500/30'
+                                : 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
                             }`}>
                               {isAsst ? 'Assistant Manager' : 'Operational Manager'}
                             </span>
@@ -285,23 +285,23 @@ export default function MonitoringAuditTab({ adminAuth }) {
       </div>
 
       {/* SECTION 2: STATUS LIVE PRESENCE (ONLINE / OFFLINE) */}
-      <div className="bg-white border-2 border-slate-200 rounded-3xl p-5 shadow-sm space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+      <div className="bg-[#161b24] border border-slate-800 rounded-3xl p-5 shadow-xl space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-3">
           <div className="flex items-center space-x-2.5">
-            <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 flex items-center justify-center">
               <Radio className="w-5 h-5 stroke-[2.5]" />
             </div>
             <div>
               <div className="flex items-center space-x-2">
-                <h3 className="text-sm font-black text-slate-950">
+                <h3 className="text-sm font-black text-slate-100">
                   Status Live Presence (Online / Offline)
                 </h3>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-900 border border-emerald-300 flex items-center space-x-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" />
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 flex items-center space-x-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
                   <span>{onlineCount} Online Sekarang</span>
                 </span>
               </div>
-              <p className="text-[11px] text-slate-500 font-bold">
+              <p className="text-[11px] text-slate-400 font-bold">
                 Memantau staf &amp; Assistant Manager yang sedang membuka aplikasi saat ini (Hanya terlihat di akun Anda)
               </p>
             </div>
@@ -310,20 +310,20 @@ export default function MonitoringAuditTab({ adminAuth }) {
           {/* Search & Filter Controls */}
           <div className="flex items-center space-x-2">
             <div className="relative">
-              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+              <Search className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
                 value={presenceSearch}
                 onChange={(e) => setPresenceSearch(e.target.value)}
                 placeholder="Cari nama / peran..."
-                className="pl-8 pr-3 py-1.5 text-xs font-bold rounded-xl border border-slate-300 bg-slate-50 focus:bg-white focus:outline-none focus:border-blue-600 w-36 sm:w-44"
+                className="pl-8 pr-3 py-1.5 text-xs font-bold rounded-xl border border-slate-700 bg-[#12161f] text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-blue-500 w-36 sm:w-44"
               />
             </div>
 
             <select
               value={presenceVenueFilter}
               onChange={(e) => setPresenceVenueFilter(e.target.value)}
-              className="py-1.5 px-2.5 text-xs font-bold rounded-xl border border-slate-300 bg-slate-50 focus:bg-white focus:outline-none focus:border-blue-600"
+              className="py-1.5 px-2.5 text-xs font-bold rounded-xl border border-slate-700 bg-[#12161f] text-slate-100 focus:outline-none focus:border-blue-500"
             >
               <option value="ALL">Semua ({presenceList.length})</option>
               <option value="ONLINE">Hanya Online ({onlineCount})</option>
@@ -336,7 +336,7 @@ export default function MonitoringAuditTab({ adminAuth }) {
         {/* Presence Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
           {filteredPresence.length === 0 ? (
-            <div className="col-span-full py-8 text-center text-slate-400 text-xs font-bold">
+            <div className="col-span-full py-8 text-center text-slate-500 text-xs font-bold">
               Tidak ada staf atau pengawas yang cocok dengan filter.
             </div>
           ) : (
@@ -345,10 +345,10 @@ export default function MonitoringAuditTab({ adminAuth }) {
               return (
                 <div
                   key={`${person.type}_${person.id}`}
-                  className={`p-3.5 rounded-2xl border-2 transition shadow-2xs flex items-center justify-between ${
+                  className={`p-3.5 rounded-2xl border transition shadow-xs flex items-center justify-between ${
                     person.isOnline
-                      ? 'bg-emerald-50/50 border-emerald-300'
-                      : 'bg-slate-50 border-slate-200'
+                      ? 'bg-emerald-500/10 border-emerald-500/30'
+                      : 'bg-[#1c2230] border-slate-800'
                   }`}
                 >
                   <div className="flex items-center space-x-3 min-w-0 pr-2">
@@ -358,14 +358,14 @@ export default function MonitoringAuditTab({ adminAuth }) {
                       }`}>
                         {person.name.charAt(0).toUpperCase()}
                       </div>
-                      <span className={`w-3 h-3 rounded-full absolute -top-1 -right-1 border-2 border-white ${
-                        person.isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'
+                      <span className={`w-3 h-3 rounded-full absolute -top-1 -right-1 border-2 border-[#161b24] ${
+                        person.isOnline ? 'bg-emerald-400 animate-pulse' : 'bg-slate-600'
                       }`} />
                     </div>
 
                     <div className="min-w-0">
-                      <h4 className="text-xs font-black text-slate-950 truncate">{person.name}</h4>
-                      <p className="text-[10px] text-slate-600 font-bold truncate">
+                      <h4 className="text-xs font-black text-slate-100 truncate">{person.name}</h4>
+                      <p className="text-[10px] text-slate-400 font-bold truncate">
                         {person.role} • {person.venue || 'Outlet'}
                       </p>
                     </div>
@@ -373,11 +373,11 @@ export default function MonitoringAuditTab({ adminAuth }) {
 
                   <div className="shrink-0 text-right">
                     {person.isOnline ? (
-                      <span className="px-2 py-0.5 rounded-md text-[10px] font-black bg-emerald-200 text-emerald-950 border border-emerald-400">
+                      <span className="px-2 py-0.5 rounded-md text-[10px] font-black bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
                         Online
                       </span>
                     ) : (
-                      <span className="text-[10px] text-slate-400 font-bold block">
+                      <span className="text-[10px] text-slate-500 font-bold block">
                         Offline
                       </span>
                     )}
@@ -390,16 +390,16 @@ export default function MonitoringAuditTab({ adminAuth }) {
       </div>
 
       {/* SECTION 3: PENGATURAN NOTIFIKASI SISTEM */}
-      <div className="bg-white border-2 border-slate-200 rounded-3xl p-5 shadow-sm space-y-4">
-        <div className="flex items-center space-x-2.5 border-b border-slate-100 pb-3">
-          <div className="w-8 h-8 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center">
+      <div className="bg-[#161b24] border border-slate-800 rounded-3xl p-5 shadow-xl space-y-4">
+        <div className="flex items-center space-x-2.5 border-b border-slate-800 pb-3">
+          <div className="w-8 h-8 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-400 flex items-center justify-center">
             <Bell className="w-5 h-5 stroke-[2.5]" />
           </div>
           <div>
-            <h3 className="text-sm font-black text-slate-950">
+            <h3 className="text-sm font-black text-slate-100">
               Pengaturan Aturan Notifikasi (Push Notifications)
             </h3>
-            <p className="text-[11px] text-slate-500 font-bold">
+            <p className="text-[11px] text-slate-400 font-bold">
               Tentukan jenis notifikasi push apa saja yang berhak dikirimkan ke HP seluruh staf
             </p>
           </div>
@@ -407,20 +407,20 @@ export default function MonitoringAuditTab({ adminAuth }) {
 
         <div className="space-y-3 pt-1">
           {/* Toggle 1: Notifikasi Pengumuman */}
-          <div className="p-4 rounded-2xl bg-slate-50 border-2 border-slate-200 flex items-center justify-between gap-4">
+          <div className="p-4 rounded-2xl bg-[#1c2230] border border-slate-800 flex items-center justify-between gap-4">
             <div className="space-y-0.5">
-              <span className="text-xs font-black text-slate-950 block">
+              <span className="text-xs font-black text-slate-100 block">
                 Notifikasi Pengumuman Resmi &amp; Urgent
               </span>
-              <p className="text-[11px] text-slate-600 font-bold">
+              <p className="text-[11px] text-slate-400 font-bold">
                 Kirim push notification instan ke HP seluruh staf saat Operational Manager menerbitkan pengumuman baru.
               </p>
             </div>
             <button
               type="button"
               onClick={() => setNotifyAnnouncements((prev) => !prev)}
-              className={`w-12 h-6 rounded-full transition-colors relative shrink-0 p-0.5 ${
-                notifyAnnouncements ? 'bg-blue-600' : 'bg-slate-300'
+              className={`w-12 h-6 rounded-full transition-colors relative shrink-0 p-0.5 cursor-pointer ${
+                notifyAnnouncements ? 'bg-blue-600' : 'bg-slate-700'
               }`}
             >
               <div
@@ -432,20 +432,20 @@ export default function MonitoringAuditTab({ adminAuth }) {
           </div>
 
           {/* Toggle 2: Notifikasi Keputusan Izin/Cuti */}
-          <div className="p-4 rounded-2xl bg-slate-50 border-2 border-slate-200 flex items-center justify-between gap-4">
+          <div className="p-4 rounded-2xl bg-[#1c2230] border border-slate-800 flex items-center justify-between gap-4">
             <div className="space-y-0.5">
-              <span className="text-xs font-black text-slate-950 block">
+              <span className="text-xs font-black text-slate-100 block">
                 Notifikasi Persetujuan Izin, Sakit, &amp; Cuti
               </span>
-              <p className="text-[11px] text-slate-600 font-bold">
+              <p className="text-[11px] text-slate-400 font-bold">
                 Kirim pemberitahuan instan ke HP staf saat pengajuan izin mereka telah disetujui (ACC) atau ditolak.
               </p>
             </div>
             <button
               type="button"
               onClick={() => setNotifyLeaveDecisions((prev) => !prev)}
-              className={`w-12 h-6 rounded-full transition-colors relative shrink-0 p-0.5 ${
-                notifyLeaveDecisions ? 'bg-blue-600' : 'bg-slate-300'
+              className={`w-12 h-6 rounded-full transition-colors relative shrink-0 p-0.5 cursor-pointer ${
+                notifyLeaveDecisions ? 'bg-blue-600' : 'bg-slate-700'
               }`}
             >
               <div
@@ -462,7 +462,7 @@ export default function MonitoringAuditTab({ adminAuth }) {
               type="button"
               disabled={savingSettings}
               onClick={handleSaveNotificationSettings}
-              className="px-5 py-2.5 rounded-2xl bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-black text-xs shadow-md shadow-blue-600/30 transition flex items-center space-x-2"
+              className="px-5 py-2.5 rounded-2xl bg-blue-600 hover:bg-blue-500 active:scale-95 text-white font-black text-xs shadow-lg shadow-blue-600/30 transition flex items-center space-x-2 cursor-pointer"
             >
               {savingSettings ? (
                 <>

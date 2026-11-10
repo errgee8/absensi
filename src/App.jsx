@@ -102,17 +102,17 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-100 text-slate-900 flex flex-col font-sans">
-      {/* PWA Home Screen Banner - High Contrast Royal Blue */}
+    <div className="min-h-screen bg-[#0f131a] text-slate-100 flex flex-col font-sans selection:bg-blue-600 selection:text-white">
+      {/* PWA Home Screen Banner - Sleek Dark Indigo Accent */}
       {!isInstalled && (
-        <div className="no-print bg-blue-600 text-white px-4 py-2.5 flex items-center justify-between text-xs font-black shadow-md">
+        <div className="no-print bg-[#131b2e] border-b border-blue-500/30 text-slate-200 px-4 py-2.5 flex items-center justify-between text-xs font-semibold shadow-md">
           <div className="flex items-center space-x-2">
-            <Smartphone className="w-4 h-4 shrink-0" />
+            <Smartphone className="w-4 h-4 text-blue-400 shrink-0" />
             <span>Pasang Staff Portal PWA di HP staf untuk akses cepat 1-klik</span>
           </div>
           <button
             onClick={handleInstallPwa}
-            className="px-3.5 py-1 bg-white text-blue-900 rounded-xl text-xs font-black hover:bg-blue-50 active:scale-95 transition flex items-center space-x-1.5 shadow-sm shrink-0 ml-2"
+            className="px-3.5 py-1 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold active:scale-95 transition flex items-center space-x-1.5 shadow-sm shadow-blue-600/30 shrink-0 ml-2"
           >
             <Download className="w-3.5 h-3.5 stroke-[2.5]" />
             <span>Download PWA</span>

@@ -124,54 +124,54 @@ export default function LeaveManagementTab({ adminAuth, onRefreshData }) {
   const izinPendingCount = requests.filter((r) => r.type === 'IZIN' && r.status === 'PENDING').length;
 
   return (
-    <div className="space-y-5 animate-fade-in text-slate-900">
+    <div className="space-y-5 animate-fade-in text-slate-200">
       
       {/* Top Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <div className="p-4 bg-white border-2 border-slate-200 rounded-2xl shadow-sm flex items-center justify-between">
+        <div className="p-4 bg-[#161b24] border border-slate-800 rounded-2xl shadow-md flex items-center justify-between">
           <div>
-            <span className="text-[11px] font-black uppercase text-slate-500">Total Menunggu Review</span>
-            <div className="text-2xl font-black text-amber-600 mt-0.5">{pendingCount} Pengajuan</div>
+            <span className="text-[11px] font-black uppercase text-slate-400">Total Menunggu Review</span>
+            <div className="text-2xl font-black text-amber-400 mt-0.5">{pendingCount} Pengajuan</div>
           </div>
-          <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center font-black">
+          <div className="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-400 flex items-center justify-center font-black">
             ⏳
           </div>
         </div>
 
-        <div className="p-4 bg-white border-2 border-slate-200 rounded-2xl shadow-sm flex items-center justify-between">
+        <div className="p-4 bg-[#161b24] border border-slate-800 rounded-2xl shadow-md flex items-center justify-between">
           <div>
-            <span className="text-[11px] font-black uppercase text-slate-500">Cuti Tahunan Pending</span>
-            <div className="text-2xl font-black text-blue-700 mt-0.5">{cutiPendingCount} Staf</div>
+            <span className="text-[11px] font-black uppercase text-slate-400">Cuti Tahunan Pending</span>
+            <div className="text-2xl font-black text-blue-400 mt-0.5">{cutiPendingCount} Staf</div>
           </div>
-          <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center font-black">
+          <div className="w-10 h-10 rounded-xl bg-blue-500/15 border border-blue-500/30 text-blue-400 flex items-center justify-center font-black">
             🌴
           </div>
         </div>
 
-        <div className="p-4 bg-white border-2 border-slate-200 rounded-2xl shadow-sm flex items-center justify-between">
+        <div className="p-4 bg-[#161b24] border border-slate-800 rounded-2xl shadow-md flex items-center justify-between">
           <div>
-            <span className="text-[11px] font-black uppercase text-slate-500">Izin Sakit Pending</span>
-            <div className="text-2xl font-black text-purple-700 mt-0.5">{izinPendingCount} Surat</div>
+            <span className="text-[11px] font-black uppercase text-slate-400">Izin Sakit Pending</span>
+            <div className="text-2xl font-black text-purple-400 mt-0.5">{izinPendingCount} Surat</div>
           </div>
-          <div className="w-10 h-10 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center font-black">
+          <div className="w-10 h-10 rounded-xl bg-purple-500/15 border border-purple-500/30 text-purple-400 flex items-center justify-center font-black">
             🏥
           </div>
         </div>
       </div>
 
       {/* Filter and Search Bar */}
-      <div className="bg-white border-2 border-slate-200 rounded-3xl p-4 shadow-sm space-y-3">
+      <div className="bg-[#161b24] border border-slate-800 rounded-3xl p-4 shadow-md space-y-3">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           
           {/* Search */}
           <div className="relative flex-1 max-w-sm">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Cari nama staf, divisi, alasan..."
-              className="w-full bg-slate-50 border-2 border-slate-300 rounded-xl pl-9 pr-3 py-2 text-xs font-black text-slate-950 focus:outline-none focus:border-blue-600 focus:bg-white transition"
+              className="w-full bg-[#12161f] border border-slate-700 rounded-xl pl-9 pr-3 py-2 text-xs font-black text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-blue-500 transition"
             />
           </div>
 
@@ -182,7 +182,7 @@ export default function LeaveManagementTab({ adminAuth, onRefreshData }) {
             <select
               value={filterType}
               onChange={(e) => setFilterType(e.target.value)}
-              className="bg-slate-50 border-2 border-slate-300 rounded-xl px-3 py-2 text-xs font-black text-slate-950 focus:outline-none focus:border-blue-600 transition"
+              className="bg-[#12161f] border border-slate-700 rounded-xl px-3 py-2 text-xs font-black text-slate-100 focus:outline-none focus:border-blue-500 transition"
             >
               <option value="ALL">Semua Jenis (Cuti &amp; Izin)</option>
               <option value="CUTI">🌴 Cuti Tahunan Saja</option>
@@ -193,7 +193,7 @@ export default function LeaveManagementTab({ adminAuth, onRefreshData }) {
             <select
               value={filterStatus}
               onChange={(e) => setFilterStatus(e.target.value)}
-              className="bg-slate-50 border-2 border-slate-300 rounded-xl px-3 py-2 text-xs font-black text-slate-950 focus:outline-none focus:border-blue-600 transition"
+              className="bg-[#12161f] border border-slate-700 rounded-xl px-3 py-2 text-xs font-black text-slate-100 focus:outline-none focus:border-blue-500 transition"
             >
               <option value="PENDING">⏳ Menunggu Review Saja</option>
               <option value="APPROVED">✅ Disetujui Penuh</option>
@@ -206,7 +206,7 @@ export default function LeaveManagementTab({ adminAuth, onRefreshData }) {
               type="button"
               onClick={loadRequests}
               disabled={loading}
-              className="p-2 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded-xl text-slate-700 transition"
+              className="p-2 bg-[#1c2230] hover:bg-[#252d3d] border border-slate-700 rounded-xl text-slate-300 transition cursor-pointer"
               title="Perbarui Data"
             >
               <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
@@ -218,13 +218,13 @@ export default function LeaveManagementTab({ adminAuth, onRefreshData }) {
       {/* Requests Card Grid */}
       {loading && requests.length === 0 ? (
         <div className="py-20 text-center text-slate-500 font-bold space-y-2">
-          <RefreshCw className="w-8 h-8 animate-spin mx-auto text-blue-600" />
+          <RefreshCw className="w-8 h-8 animate-spin mx-auto text-blue-500" />
           <p>Memuat daftar permohonan cuti dan izin...</p>
         </div>
       ) : filteredRequests.length === 0 ? (
-        <div className="p-12 text-center bg-white border-2 border-dashed border-slate-200 rounded-3xl text-slate-500 space-y-1">
-          <CheckCircle className="w-8 h-8 mx-auto text-emerald-500 mb-2" />
-          <p className="font-black text-slate-800 text-sm">Tidak ada pengajuan yang cocok dengan filter.</p>
+        <div className="p-12 text-center bg-[#161b24] border border-dashed border-slate-800 rounded-3xl text-slate-400 space-y-1">
+          <CheckCircle className="w-8 h-8 mx-auto text-emerald-400 mb-2" />
+          <p className="font-black text-slate-100 text-sm">Tidak ada pengajuan yang cocok dengan filter.</p>
           <p className="text-xs">Semua permohonan staf sudah di-review atau belum ada pengajuan baru.</p>
         </div>
       ) : (
@@ -239,14 +239,14 @@ export default function LeaveManagementTab({ adminAuth, onRefreshData }) {
             return (
               <div
                 key={req.id}
-                className={`bg-white border-2 rounded-3xl p-5 shadow-sm transition-all flex flex-col justify-between ${
+                className={`bg-[#161b24] border rounded-3xl p-5 shadow-md transition-all flex flex-col justify-between ${
                   isPending
-                    ? 'border-amber-300 ring-2 ring-amber-400/20'
+                    ? 'border-amber-500/50 ring-1 ring-amber-500/30'
                     : isApproved
-                    ? 'border-emerald-300'
+                    ? 'border-emerald-500/40'
                     : isAdjusted
-                    ? 'border-blue-300'
-                    : 'border-slate-200 opacity-90'
+                    ? 'border-blue-500/40'
+                    : 'border-slate-800 opacity-90'
                 }`}
               >
                 <div>

@@ -343,23 +343,23 @@ export default function StaffLeaveModal({ isOpen, onClose, staff, onRefreshShift
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/85 backdrop-blur-md animate-fade-in text-slate-900">
-      <div className="bg-white border-2 border-slate-300 rounded-3xl max-w-2xl w-full overflow-hidden shadow-2xl animate-scale-up flex flex-col max-h-[92vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-md animate-fade-in text-slate-200">
+      <div className="bg-[#161b24] border border-slate-800 rounded-3xl max-w-2xl w-full overflow-hidden shadow-2xl animate-scale-up flex flex-col max-h-[92vh]">
         
-        {/* Header - Staff Specific & High Contrast */}
-        <div className="p-4 sm:p-5 bg-gradient-to-r from-blue-700 via-indigo-800 to-slate-900 text-white flex items-center justify-between shrink-0">
+        {/* Header - Staff Specific */}
+        <div className="p-4 sm:p-5 bg-gradient-to-r from-blue-900/80 via-indigo-900/80 to-[#12161f] border-b border-slate-800 text-white flex items-center justify-between shrink-0">
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 rounded-2xl bg-white/20 flex items-center justify-center text-white font-black text-lg shadow-inner">
-              <Palmtree className="w-5 h-5 text-amber-300 stroke-[2.5]" />
+            <div className="w-10 h-10 rounded-2xl bg-white/10 flex items-center justify-center text-white font-black text-lg shadow-inner">
+              <Palmtree className="w-5 h-5 text-amber-400 stroke-[2.5]" />
             </div>
             <div>
               <div className="flex items-center space-x-2">
                 <h3 className="text-base sm:text-lg font-black tracking-tight">Izin &amp; Cuti Saya</h3>
-                <span className="px-2 py-0.5 rounded-full text-[10px] bg-blue-500/40 border border-blue-300/40 text-blue-100 font-black">
+                <span className="px-2 py-0.5 rounded-full text-[10px] bg-blue-500/30 border border-blue-400/30 text-blue-200 font-black">
                   {staff.name}
                 </span>
               </div>
-              <p className="text-[11px] text-blue-100 font-bold">
+              <p className="text-[11px] text-slate-300 font-bold">
                 {staff.venue} • {staff.division} • Kuota Cuti Tahunan: <strong className="text-amber-300">{balance.remainingDays} dari {balance.maxQuota} Hari</strong>
               </p>
             </div>
@@ -367,21 +367,21 @@ export default function StaffLeaveModal({ isOpen, onClose, staff, onRefreshShift
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white transition"
+            className="p-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white transition cursor-pointer"
           >
             <X className="w-5 h-5 stroke-[2.5]" />
           </button>
         </div>
 
         {/* Tab Navigation */}
-        <div className="flex border-b-2 border-slate-200 bg-slate-50 p-2 gap-2 text-xs font-black shrink-0">
+        <div className="flex border-b border-slate-800 bg-[#12161f] p-2 gap-2 text-xs font-black shrink-0">
           <button
             type="button"
             onClick={() => { setActiveTab('HISTORY'); stopCamera(); }}
-            className={`flex-1 py-2.5 rounded-xl transition flex items-center justify-center space-x-1.5 ${
+            className={`flex-1 py-2.5 rounded-xl transition flex items-center justify-center space-x-1.5 cursor-pointer ${
               activeTab === 'HISTORY'
                 ? 'bg-blue-600 text-white shadow-sm'
-                : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100'
+                : 'bg-[#1c2230] text-slate-300 border border-slate-700 hover:bg-[#252d3d]'
             }`}
           >
             <CalendarCheck2 className="w-4 h-4" />
@@ -391,32 +391,32 @@ export default function StaffLeaveModal({ isOpen, onClose, staff, onRefreshShift
           <button
             type="button"
             onClick={() => { setActiveTab('CUTI'); stopCamera(); }}
-            className={`flex-1 py-2.5 rounded-xl transition flex items-center justify-center space-x-1.5 ${
+            className={`flex-1 py-2.5 rounded-xl transition flex items-center justify-center space-x-1.5 cursor-pointer ${
               activeTab === 'CUTI'
                 ? 'bg-blue-600 text-white shadow-sm'
-                : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100'
+                : 'bg-[#1c2230] text-slate-300 border border-slate-700 hover:bg-[#252d3d]'
             }`}
           >
-            <Palmtree className="w-4 h-4 text-amber-500" />
+            <Palmtree className="w-4 h-4 text-amber-400" />
             <span>Ajukan Cuti (H-14)</span>
           </button>
 
           <button
             type="button"
             onClick={() => { setActiveTab('IZIN'); stopCamera(); }}
-            className={`flex-1 py-2.5 rounded-xl transition flex items-center justify-center space-x-1.5 ${
+            className={`flex-1 py-2.5 rounded-xl transition flex items-center justify-center space-x-1.5 cursor-pointer ${
               activeTab === 'IZIN'
                 ? 'bg-blue-600 text-white shadow-sm'
-                : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100'
+                : 'bg-[#1c2230] text-slate-300 border border-slate-700 hover:bg-[#252d3d]'
             }`}
           >
-            <FileText className="w-4 h-4 text-purple-600" />
+            <FileText className="w-4 h-4 text-purple-400" />
             <span>Ajukan Izin (Biasa / Sakit)</span>
           </button>
         </div>
 
         {/* Scrollable Content */}
-        <div className="p-4 sm:p-5 overflow-y-auto space-y-4 text-xs font-bold custom-scrollbar">
+        <div className="p-4 sm:p-5 overflow-y-auto space-y-4 text-xs font-bold custom-scrollbar text-slate-200">
 
           {/* Alert / Feedback Banners */}
           {error && (

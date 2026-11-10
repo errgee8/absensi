@@ -86,50 +86,50 @@ export default function PhotoDetailModal({ shift, type = 'in', onClose, onShiftU
   const hasCheckout = Boolean(shift.checkout_photo);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/75 backdrop-blur-sm animate-fade-in">
-      <div className="bg-white border-2 border-slate-300 rounded-3xl max-w-2xl w-full overflow-hidden shadow-2xl flex flex-col max-h-[92vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm animate-fade-in text-slate-200">
+      <div className="bg-[#161b24] border border-slate-800 rounded-3xl max-w-2xl w-full overflow-hidden shadow-2xl flex flex-col max-h-[92vh]">
         {/* Modal Header */}
-        <div className="p-4 sm:p-5 border-b-2 border-slate-200 bg-slate-50 flex items-center justify-between">
+        <div className="p-4 sm:p-5 border-b border-slate-800 bg-[#12161f] flex items-center justify-between">
           <div>
             <div className="flex items-center space-x-2">
               <span
                 className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border ${
                   isBreak
-                    ? 'bg-sky-100 text-sky-950 border-sky-300'
+                    ? 'bg-sky-500/15 text-sky-300 border-sky-500/30'
                     : isCheckin
-                    ? 'bg-emerald-100 text-emerald-950 border-emerald-300'
-                    : 'bg-indigo-100 text-indigo-950 border-indigo-300'
+                    ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                    : 'bg-indigo-500/15 text-indigo-300 border-indigo-500/30'
                 }`}
               >
                 {statusBadge}
               </span>
-              <span className="text-xs text-slate-700 font-mono font-bold">Shift #{shift.id}</span>
-              <span className="text-xs text-blue-900 font-black">
+              <span className="text-xs text-slate-400 font-mono font-bold">Shift #{shift.id}</span>
+              <span className="text-xs text-blue-400 font-black">
                 {shift.staff_venue === 'JP Karaoke' ? '🎤 JP Karaoke' : '🐱 LuckyCat'}
               </span>
             </div>
-            <h3 className="text-lg font-black text-slate-950 mt-1">
-              {shift.staff_name} • <span className="text-slate-700 font-bold">{shift.staff_division || shift.staff_role}</span>
+            <h3 className="text-lg font-black text-slate-100 mt-1">
+              {shift.staff_name} • <span className="text-slate-400 font-bold">{shift.staff_division || shift.staff_role}</span>
             </h3>
           </div>
 
           <button
             onClick={onClose}
-            className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-950 transition border border-slate-300"
+            className="p-2 rounded-xl bg-[#1c2230] hover:bg-[#252d3d] text-slate-400 hover:text-white transition border border-slate-700 cursor-pointer"
           >
             <X className="w-5 h-5 stroke-[2.5]" />
           </button>
         </div>
 
         {/* Tab Switcher: Foto Masuk vs Foto Istirahat vs Foto Pulang */}
-        <div className="p-2.5 bg-slate-100/80 border-b border-slate-200 flex items-center gap-2 overflow-x-auto">
+        <div className="p-2.5 bg-[#12161f] border-b border-slate-800 flex items-center gap-2 overflow-x-auto">
           <button
             type="button"
             onClick={() => setActiveTab('in')}
-            className={`flex items-center space-x-2 px-3.5 py-2 rounded-xl text-xs font-black transition ${
+            className={`flex items-center space-x-2 px-3.5 py-2 rounded-xl text-xs font-black transition cursor-pointer ${
               activeTab === 'in'
-                ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/30'
-                : 'bg-white text-slate-800 hover:bg-slate-200 border border-slate-200'
+                ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/30'
+                : 'bg-[#1c2230] text-slate-300 hover:bg-[#252d3d] border border-slate-700'
             }`}
           >
             <LogIn className="w-3.5 h-3.5" />
@@ -140,10 +140,10 @@ export default function PhotoDetailModal({ shift, type = 'in', onClose, onShiftU
             <button
               type="button"
               onClick={() => setActiveTab('break')}
-              className={`flex items-center space-x-2 px-3.5 py-2 rounded-xl text-xs font-black transition ${
+              className={`flex items-center space-x-2 px-3.5 py-2 rounded-xl text-xs font-black transition cursor-pointer ${
                 activeTab === 'break'
-                  ? 'bg-sky-600 text-white shadow-md shadow-sky-600/30'
-                  : 'bg-white text-slate-800 hover:bg-slate-200 border border-slate-200'
+                  ? 'bg-sky-600 text-white shadow-lg shadow-sky-600/30'
+                  : 'bg-[#1c2230] text-slate-300 hover:bg-[#252d3d] border border-slate-700'
               }`}
             >
               <Coffee className="w-3.5 h-3.5" />
@@ -154,10 +154,10 @@ export default function PhotoDetailModal({ shift, type = 'in', onClose, onShiftU
           <button
             type="button"
             onClick={() => setActiveTab('out')}
-            className={`flex items-center space-x-2 px-3.5 py-2 rounded-xl text-xs font-black transition ${
+            className={`flex items-center space-x-2 px-3.5 py-2 rounded-xl text-xs font-black transition cursor-pointer ${
               activeTab === 'out'
-                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
-                : 'bg-white text-slate-800 hover:bg-slate-200 border border-slate-200'
+                ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30'
+                : 'bg-[#1c2230] text-slate-300 hover:bg-[#252d3d] border border-slate-700'
             }`}
           >
             <LogOut className="w-3.5 h-3.5" />

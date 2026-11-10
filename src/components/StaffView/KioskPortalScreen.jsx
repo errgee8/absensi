@@ -61,21 +61,21 @@ export default function KioskPortalScreen({
 
   return (
     <div className="max-w-xl mx-auto space-y-5 animate-fade-in py-2">
-      {/* Staff Identity Header Card - High Contrast */}
-      <div className="bg-white rounded-3xl p-5 border-2 border-slate-200 shadow-md flex items-center justify-between">
+      {/* Staff Identity Header Card - Dark Theme */}
+      <div className="bg-[#161b24] rounded-3xl p-5 border border-slate-800 shadow-xl flex items-center justify-between">
         <div className="flex items-center space-x-3.5">
-          <div className="w-12 h-12 rounded-2xl bg-blue-600 text-white flex items-center justify-center font-black text-xl shadow-md shadow-blue-600/30">
+          <div className="w-12 h-12 rounded-2xl bg-blue-600 text-white flex items-center justify-center font-bold text-xl shadow-md shadow-blue-600/30">
             {staff.name.charAt(0).toUpperCase()}
           </div>
           <div>
             <div className="flex items-center space-x-2">
-              <h2 className="text-xl font-black text-slate-950 tracking-tight">{staff.name}</h2>
-              <span className="px-2.5 py-0.5 rounded-full text-[11px] font-black uppercase bg-blue-100 text-blue-900 border border-blue-300">
+              <h2 className="text-xl font-bold text-white tracking-tight">{staff.name}</h2>
+              <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase bg-blue-950/80 text-blue-300 border border-blue-500/30">
                 {staff.role}
               </span>
             </div>
-            <p className="text-xs text-slate-700 font-bold flex items-center space-x-1.5 mt-0.5">
-              <Building2 className="w-4 h-4 text-blue-600 shrink-0" />
+            <p className="text-xs text-slate-400 font-medium flex items-center space-x-1.5 mt-0.5">
+              <Building2 className="w-4 h-4 text-blue-400 shrink-0" />
               <span>{staff.venue} • {staff.division}</span>
             </p>
           </div>
@@ -83,7 +83,7 @@ export default function KioskPortalScreen({
 
         <div className="flex items-center space-x-2">
           {/* Live WITA Clock Pill */}
-          <div className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-slate-950 text-emerald-400 font-mono text-xs font-black shadow-inner border border-slate-800">
+          <div className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-[#0f131a] text-emerald-400 font-mono text-xs font-bold shadow-inner border border-slate-800">
             <Clock className="w-3.5 h-3.5 text-emerald-400 animate-pulse shrink-0" />
             <span>{timeStr} <span className="text-[10px] text-slate-400">WITA</span></span>
           </div>
@@ -91,36 +91,36 @@ export default function KioskPortalScreen({
           <button
             type="button"
             onClick={onLogout}
-            className="px-3 py-2 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 transition flex items-center space-x-1.5 shadow-sm"
+            className="px-3 py-2 rounded-2xl bg-[#1c2230] hover:bg-[#252d3f] text-slate-300 hover:text-white border border-slate-700/80 transition flex items-center space-x-1.5 shadow-xs active:scale-95"
             title="Keluar / Ganti Akun"
           >
-            <LogOut className="w-4 h-4 stroke-[2.2]" />
-            <span className="text-xs font-black hidden sm:inline">Keluar</span>
+            <LogOut className="w-4 h-4 stroke-[2]" />
+            <span className="text-xs font-bold hidden sm:inline">Keluar</span>
           </button>
         </div>
       </div>
 
-      {/* Attendance Status Banner - High Contrast Background & Borders */}
-      <div className={`p-4 rounded-2xl border-2 flex items-center justify-between shadow-sm ${
+      {/* Attendance Status Banner - Elegant Dark Tint */}
+      <div className={`p-4 rounded-2xl border flex items-center justify-between shadow-md ${
         isOnBreak
-          ? 'bg-sky-50 border-sky-300 text-sky-950'
+          ? 'bg-sky-950/50 border-sky-500/40 text-sky-200'
           : isCheckedIn
-          ? 'bg-emerald-50 border-emerald-300 text-emerald-950'
-          : 'bg-amber-50 border-amber-300 text-amber-950'
+          ? 'bg-emerald-950/50 border-emerald-500/40 text-emerald-200'
+          : 'bg-amber-950/40 border-amber-500/40 text-amber-200'
       }`}>
         <div className="flex items-center space-x-3">
           {isOnBreak ? (
-            <Coffee className="w-6 h-6 text-sky-700 animate-pulse shrink-0" />
+            <Coffee className="w-6 h-6 text-sky-400 animate-pulse shrink-0" />
           ) : isCheckedIn ? (
-            <CheckCircle className="w-6 h-6 text-emerald-700 shrink-0" />
+            <CheckCircle className="w-6 h-6 text-emerald-400 shrink-0" />
           ) : (
-            <Clock className="w-6 h-6 text-amber-700 shrink-0" />
+            <Clock className="w-6 h-6 text-amber-400 shrink-0" />
           )}
           <div>
-            <span className="text-[11px] font-black uppercase tracking-wider block text-slate-950">
+            <span className="text-[11px] font-bold uppercase tracking-wider block text-slate-400">
               Status Kehadiran Hari Ini:
             </span>
-            <span className="text-sm sm:text-base font-black">
+            <span className="text-sm sm:text-base font-bold text-white">
               {isOnBreak
                 ? 'Sedang Waktu Istirahat'
                 : isCheckedIn
@@ -130,11 +130,11 @@ export default function KioskPortalScreen({
           </div>
         </div>
 
-        <span className={`px-3 py-1 rounded-xl text-xs font-black uppercase shadow-sm ${
+        <span className={`px-3 py-1 rounded-xl text-xs font-bold uppercase shadow-xs ${
           isOnBreak
-            ? 'bg-sky-700 text-white'
+            ? 'bg-sky-600 text-white'
             : isCheckedIn
-            ? 'bg-emerald-700 text-white'
+            ? 'bg-emerald-600 text-white'
             : 'bg-amber-600 text-white'
         }`}>
           {isOnBreak ? 'Istirahat' : isCheckedIn ? 'On Duty' : 'Off Duty'}
@@ -145,10 +145,10 @@ export default function KioskPortalScreen({
       {announcements && announcements.length > 0 && (
         <div
           onClick={onOpenAnnouncements}
-          className={`p-4 rounded-3xl border-2 transition-all cursor-pointer shadow-sm hover:shadow-md flex items-center justify-between gap-3 ${
+          className={`p-4 rounded-3xl border transition-all cursor-pointer shadow-md hover:shadow-lg flex items-center justify-between gap-3 ${
             unreadAnnouncementsCount > 0
-              ? 'bg-gradient-to-r from-amber-500/15 via-rose-500/10 to-amber-500/20 border-amber-400 ring-2 ring-amber-400/30'
-              : 'bg-white border-slate-200'
+              ? 'bg-gradient-to-r from-amber-500/15 via-rose-500/10 to-amber-500/20 border-amber-500/40 ring-1 ring-amber-500/30'
+              : 'bg-[#161b24] border-slate-800'
           }`}
         >
           <div className="flex items-center space-x-3 min-w-0">
@@ -263,25 +263,25 @@ export default function KioskPortalScreen({
 
       {/* BREAK ELIGIBILITY CARD: Prominent 1-Click Take Break Action */}
       {canTakeBreak && (
-        <div className="bg-gradient-to-r from-amber-50 via-orange-50 to-amber-50 rounded-3xl p-5 sm:p-6 border-3 border-amber-400 shadow-xl shadow-amber-500/15 relative overflow-hidden animate-fade-in">
+        <div className="bg-[#1a202d] rounded-3xl p-5 sm:p-6 border border-amber-500/40 shadow-xl shadow-black/25 relative overflow-hidden animate-fade-in text-white">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="flex items-start space-x-3.5">
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-amber-500 to-orange-600 text-white flex items-center justify-center shrink-0 shadow-lg shadow-amber-500/30">
-                <Coffee className="w-7 h-7 stroke-[2.5]" />
+              <div className="w-14 h-14 rounded-2xl bg-amber-600 text-white flex items-center justify-center shrink-0 shadow-lg shadow-amber-600/30">
+                <Coffee className="w-7 h-7 stroke-[2.2]" />
               </div>
               <div>
                 <div className="flex items-center space-x-2">
-                  <h3 className="text-lg sm:text-xl font-black text-slate-950">
+                  <h3 className="text-lg sm:text-xl font-bold text-white">
                     Tombol Istirahat Kerja
                   </h3>
-                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-amber-200 text-amber-950 border border-amber-300">
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase bg-amber-950/80 text-amber-300 border border-amber-500/30">
                     Tersedia (1 Jam)
                   </span>
                 </div>
-                <p className="text-xs sm:text-sm text-slate-800 font-bold mt-1">
+                <p className="text-xs sm:text-sm text-slate-300 font-medium mt-1">
                   Istirahat hanya diperbolehkan <strong>1x per shift</strong> selama maksimal <strong>1 jam (60 menit)</strong>.
                 </p>
-                <p className="text-[11px] text-slate-600 font-semibold mt-0.5">
+                <p className="text-[11px] text-slate-400 font-normal mt-0.5">
                   Wajib ambil foto selfie saat mulai istirahat &amp; saat selesai istirahat.
                 </p>
               </div>
@@ -290,9 +290,9 @@ export default function KioskPortalScreen({
             <button
               type="button"
               onClick={() => onTriggerCamera && onTriggerCamera('break_start')}
-              className="w-full sm:w-auto px-5 py-4 bg-amber-600 hover:bg-amber-700 text-white font-black text-sm rounded-2xl shadow-lg shadow-amber-600/35 active:scale-95 transition flex items-center justify-center space-x-2.5 shrink-0"
+              className="w-full sm:w-auto px-5 py-4 bg-amber-600 hover:bg-amber-500 text-white font-bold text-sm rounded-2xl shadow-lg shadow-amber-600/30 active:scale-95 transition flex items-center justify-center space-x-2.5 shrink-0"
             >
-              <Coffee className="w-5 h-5 stroke-[2.5]" />
+              <Coffee className="w-5 h-5 stroke-[2.2]" />
               <span>AMBIL FOTO &amp; MULAI ISTIRAHAT</span>
             </button>
           </div>
@@ -301,14 +301,14 @@ export default function KioskPortalScreen({
 
       {/* Break Completed Info Pill */}
       {hasTakenBreak && isCheckedIn && !isOnBreak && (
-        <div className="bg-emerald-50 border-2 border-emerald-300 rounded-2xl px-4 py-3 flex items-center justify-between shadow-sm">
+        <div className="bg-[#14201c] border border-emerald-500/40 rounded-2xl px-4 py-3 flex items-center justify-between shadow-xs">
           <div className="flex items-center space-x-2.5">
-            <CheckCircle className="w-5 h-5 text-emerald-700 shrink-0" />
-            <span className="text-xs sm:text-sm text-emerald-950 font-black">
+            <CheckCircle className="w-5 h-5 text-emerald-400 shrink-0" />
+            <span className="text-xs sm:text-sm text-emerald-200 font-bold">
               Istirahat 1x (maksimal 1 jam) sudah selesai digunakan pada shift ini.
             </span>
           </div>
-          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-emerald-200 text-emerald-900 border border-emerald-300">
+          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase bg-emerald-950 text-emerald-300 border border-emerald-500/30">
             Selesai ✓
           </span>
         </div>
@@ -316,11 +316,11 @@ export default function KioskPortalScreen({
 
       {/* Action Options Prompt */}
       <div className="flex items-center justify-between px-1">
-        <span className="text-xs font-black uppercase tracking-wider text-slate-900">
+        <span className="text-xs font-bold uppercase tracking-wider text-slate-300">
           Pilih Aktivitas Anda:
         </span>
-        <span className="text-[11px] font-black text-blue-800 bg-blue-100 px-3 py-1 rounded-full border border-blue-300 flex items-center space-x-1">
-          <Star className="w-3 h-3 text-amber-500 fill-amber-500" />
+        <span className="text-[11px] font-bold text-blue-300 bg-blue-950/70 px-3 py-1 rounded-full border border-blue-500/30 flex items-center space-x-1">
+          <Star className="w-3 h-3 text-amber-400 fill-amber-400" />
           <span>Absensi adalah Menu Utama</span>
         </span>
       </div>
@@ -331,38 +331,38 @@ export default function KioskPortalScreen({
         <button
           type="button"
           onClick={onSelectAttendance}
-          className="w-full relative bg-white rounded-3xl p-6 sm:p-7 border-3 border-blue-600 shadow-xl shadow-blue-600/15 ring-4 ring-blue-500/10 hover:ring-blue-500/25 transition-all text-left flex flex-col justify-between group touch-press overflow-hidden"
+          className="w-full relative bg-[#161b24] hover:bg-[#1a202c] rounded-3xl p-6 sm:p-7 border-2 border-blue-500/70 shadow-xl shadow-black/30 hover:border-blue-400 transition-all text-left flex flex-col justify-between group touch-press overflow-hidden"
         >
           {/* Top colored accent bar */}
-          <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-emerald-500" />
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 via-indigo-500 to-emerald-400" />
 
           <div>
             {/* High Priority Badge */}
             <div className="flex flex-wrap items-center justify-between gap-2 mb-3.5">
-              <span className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-blue-600 text-white shadow-md shadow-blue-600/30">
+              <span className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-blue-600 text-white shadow-md shadow-blue-600/30">
                 <Sparkles className="w-3.5 h-3.5" />
                 <span>1. UTAMA: WAJIB DI AWAL &amp; AKHIR SHIFT</span>
               </span>
-              <span className="text-xs font-black text-blue-700 animate-pulse hidden sm:inline">
+              <span className="text-xs font-bold text-blue-400 animate-pulse hidden sm:inline">
                 Pencet Di Sini Untuk Absen →
               </span>
             </div>
 
             <div className="flex items-start space-x-4">
-              <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-700 text-white flex items-center justify-center shrink-0 shadow-lg shadow-blue-600/35 group-hover:scale-105 transition">
-                <Camera className="w-7 h-7 sm:w-8 sm:h-8 stroke-[2.5]" />
+              <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center shrink-0 shadow-lg shadow-blue-600/35 group-hover:scale-105 transition">
+                <Camera className="w-7 h-7 sm:w-8 sm:h-8 stroke-[2.2]" />
               </div>
               <div className="flex-1">
                 <div className="flex flex-wrap items-center gap-2">
-                  <h3 className="text-xl sm:text-2xl font-black text-slate-950 group-hover:text-blue-700 transition tracking-tight">
+                  <h3 className="text-xl sm:text-2xl font-bold text-white group-hover:text-blue-300 transition tracking-tight">
                     Absensi Kerja
                   </h3>
-                  <span className="px-2.5 py-0.5 rounded-lg text-[10px] font-black uppercase bg-emerald-100 text-emerald-950 border border-emerald-300">
+                  <span className="px-2.5 py-0.5 rounded-lg text-[10px] font-bold uppercase bg-emerald-950/80 text-emerald-300 border border-emerald-500/30">
                     {isOnBreak ? 'Selesai Istirahat' : isCheckedIn ? 'Pulang / Istirahat' : 'Check-In Masuk'}
                   </span>
                 </div>
 
-                <p className="text-xs sm:text-sm text-slate-700 font-bold mt-1.5 leading-relaxed">
+                <p className="text-xs sm:text-sm text-slate-300 font-medium mt-1.5 leading-relaxed">
                   {isOnBreak
                     ? 'Tekan tombol ini untuk foto selfie selesai istirahat dan kembali dinas.'
                     : isCheckedIn
@@ -374,8 +374,8 @@ export default function KioskPortalScreen({
           </div>
 
           {/* Prominent Large Solid CTA Button */}
-          <div className="mt-5 w-full py-4 px-6 rounded-2xl bg-blue-600 group-hover:bg-blue-700 text-white font-black text-sm sm:text-base flex items-center justify-center space-x-2.5 shadow-lg shadow-blue-600/30 transition">
-            <Camera className="w-5 h-5 stroke-[2.5]" />
+          <div className="mt-5 w-full py-4 px-6 rounded-2xl bg-blue-600 group-hover:bg-blue-500 text-white font-bold text-sm sm:text-base flex items-center justify-center space-x-2.5 shadow-lg shadow-blue-600/30 transition">
+            <Camera className="w-5 h-5 stroke-[2.2]" />
             <span>
               {isOnBreak
                 ? 'BUKA MENU SELESAI ISTIRAHAT'
@@ -383,7 +383,7 @@ export default function KioskPortalScreen({
                 ? 'BUKA MENU PULANG / ISTIRAHAT'
                 : 'BUKA MENU CHECK-IN MASUK'}
             </span>
-            <ArrowRight className="w-5 h-5 group-hover:translate-x-1.5 transition stroke-[2.5]" />
+            <ArrowRight className="w-5 h-5 group-hover:translate-x-1.5 transition stroke-[2.2]" />
           </div>
         </button>
 
@@ -391,33 +391,33 @@ export default function KioskPortalScreen({
         <button
           type="button"
           onClick={onSelectToilet}
-          className="w-full bg-slate-50 hover:bg-white rounded-3xl p-5 border-2 border-slate-300 hover:border-slate-400 shadow-sm hover:shadow-md transition-all text-left flex flex-col justify-between group touch-press"
+          className="w-full bg-[#161b24] hover:bg-[#1a202c] rounded-3xl p-5 border border-slate-800 hover:border-slate-700 shadow-md transition-all text-left flex flex-col justify-between group touch-press"
         >
           <div>
             <div className="flex items-center justify-between mb-2">
-              <span className="inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-slate-200 text-slate-700 border border-slate-300">
+              <span className="inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-slate-800 text-slate-300 border border-slate-700">
                 <span>2. Opsi Tambahan (Bila Sedang Bertugas)</span>
               </span>
             </div>
 
             <div className="flex items-start space-x-3.5">
-              <div className="w-11 h-11 rounded-2xl bg-slate-200 text-slate-700 group-hover:bg-indigo-600 group-hover:text-white flex items-center justify-center shrink-0 transition">
-                <QrCode className="w-5 h-5 stroke-[2.5]" />
+              <div className="w-11 h-11 rounded-2xl bg-slate-800 text-slate-300 group-hover:bg-indigo-600 group-hover:text-white flex items-center justify-center shrink-0 transition">
+                <QrCode className="w-5 h-5 stroke-[2.2]" />
               </div>
               <div className="flex-1">
-                <h3 className="text-base font-black text-slate-800 group-hover:text-slate-950 transition">
+                <h3 className="text-base font-bold text-white group-hover:text-blue-300 transition">
                   Scan QR Checklist Toilet
                 </h3>
-                <p className="text-xs text-slate-600 font-semibold mt-0.5 leading-relaxed">
+                <p className="text-xs text-slate-400 font-normal mt-0.5 leading-relaxed">
                   Khusus saat membersihkan toilet JP &amp; LC. Arahkan kamera HP ke stiker QR di toilet untuk mengisi form kebersihan berkala.
                 </p>
               </div>
             </div>
           </div>
 
-          <div className="pt-3 mt-3 border-t border-slate-200 flex items-center justify-between text-xs font-black text-slate-700 group-hover:text-indigo-700">
+          <div className="pt-3 mt-3 border-t border-slate-800/80 flex items-center justify-between text-xs font-bold text-slate-400 group-hover:text-blue-400">
             <span>Scan Stiker Toilet</span>
-            <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition stroke-[2.5]" />
+            <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition stroke-[2]" />
           </div>
         </button>
 
@@ -426,44 +426,44 @@ export default function KioskPortalScreen({
           <button
             type="button"
             onClick={onOpenStaffLeaveModal}
-            className="w-full bg-gradient-to-r from-emerald-50 via-teal-50 to-cyan-50 hover:from-emerald-100 hover:to-teal-100 rounded-3xl p-5 border-2 border-emerald-400 hover:border-emerald-500 shadow-sm hover:shadow-md transition-all text-left flex flex-col justify-between group touch-press"
+            className="w-full bg-[#161b24] hover:bg-[#1a202c] rounded-3xl p-5 border border-slate-800 hover:border-emerald-500/40 shadow-md transition-all text-left flex flex-col justify-between group touch-press"
           >
             <div>
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center space-x-2">
-                  <span className="inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-600 text-white shadow-sm">
-                    <Palmtree className="w-3 h-3 text-amber-300" />
+                  <span className="inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-950 text-emerald-300 border border-emerald-500/30 shadow-xs">
+                    <Palmtree className="w-3 h-3 text-emerald-400" />
                     <span>3. Pengajuan Izin &amp; Cuti</span>
                   </span>
                   {leaveUpdateCount > 0 && (
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-rose-600 text-white animate-pulse shadow-sm">
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-600 text-white animate-pulse shadow-xs">
                       {leaveUpdateCount} Update Baru!
                     </span>
                   )}
                 </div>
-                <span className="text-[11px] font-black text-emerald-800 group-hover:text-emerald-950">
+                <span className="text-[11px] font-bold text-emerald-400 group-hover:text-emerald-300">
                   Kelola Cuti &amp; Izin Saya →
                 </span>
               </div>
 
               <div className="flex items-start space-x-3.5 mt-1">
                 <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-600 to-teal-700 text-white flex items-center justify-center shrink-0 shadow-md shadow-emerald-600/30 group-hover:scale-105 transition">
-                  <Palmtree className="w-6 h-6 stroke-[2.5]" />
+                  <Palmtree className="w-6 h-6 stroke-[2.2]" />
                 </div>
                 <div className="flex-1">
-                  <h3 className="text-base sm:text-lg font-black text-slate-950 group-hover:text-emerald-950 transition">
+                  <h3 className="text-base sm:text-lg font-bold text-white group-hover:text-emerald-300 transition">
                     Pengajuan Cuti &amp; Izin ({staff.name})
                   </h3>
-                  <p className="text-xs text-slate-700 font-bold mt-1 leading-relaxed">
-                    Ajukan cuti tahunan (H-14), izin, atau izin sakit/darurat, serta pantau status persetujuan dari management.
+                  <p className="text-xs text-slate-400 font-normal mt-1 leading-relaxed">
+                    Ajukan cuti tahunan (H-14), izin biasa, atau izin sakit/darurat, serta pantau status persetujuan dari management.
                   </p>
                 </div>
               </div>
             </div>
 
-            <div className="pt-3 mt-3 border-t border-emerald-200 flex items-center justify-between text-xs font-black text-emerald-900 group-hover:text-black">
+            <div className="pt-3 mt-3 border-t border-slate-800/80 flex items-center justify-between text-xs font-bold text-emerald-400 group-hover:text-emerald-300">
               <span>Buka Riwayat &amp; Formulir Pengajuan</span>
-              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition stroke-[2.5]" />
+              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition stroke-[2]" />
             </div>
           </button>
         )}
@@ -473,37 +473,37 @@ export default function KioskPortalScreen({
           <button
             type="button"
             onClick={onOpenLeaderboard}
-            className="w-full bg-gradient-to-r from-amber-50 via-yellow-50 to-amber-100/80 hover:from-amber-100 hover:to-yellow-100 rounded-3xl p-5 border-2 border-amber-400 hover:border-amber-500 shadow-md transition-all text-left flex flex-col justify-between group touch-press"
+            className="w-full bg-[#161b24] hover:bg-[#1a202c] rounded-3xl p-5 border border-slate-800 hover:border-amber-500/40 shadow-md transition-all text-left flex flex-col justify-between group touch-press"
           >
             <div>
               <div className="flex items-center justify-between mb-2">
-                <span className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-gradient-to-r from-amber-500 to-yellow-500 text-slate-950 shadow-sm">
+                <span className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-amber-950/80 text-amber-300 border border-amber-500/30 shadow-xs">
                   <Trophy className="w-3.5 h-3.5" />
                   <span>4. Prestasi &amp; Bonus Bulanan</span>
                 </span>
-                <span className="text-[11px] font-black text-amber-900 animate-pulse">
+                <span className="text-[11px] font-bold text-amber-400 animate-pulse">
                   Lihat Peringkat Staf →
                 </span>
               </div>
 
               <div className="flex items-start space-x-3.5 mt-2">
-                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-400 to-yellow-500 text-slate-950 flex items-center justify-center shrink-0 shadow-md shadow-amber-500/30 group-hover:scale-105 transition">
-                  <Trophy className="w-6 h-6 stroke-[2.5]" />
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-500 to-yellow-600 text-slate-950 flex items-center justify-center shrink-0 shadow-md shadow-amber-500/30 group-hover:scale-105 transition">
+                  <Trophy className="w-6 h-6 stroke-[2.2]" />
                 </div>
                 <div className="flex-1">
-                  <h3 className="text-base sm:text-lg font-black text-slate-950 group-hover:text-amber-950 transition">
+                  <h3 className="text-base sm:text-lg font-bold text-white group-hover:text-amber-300 transition">
                     Leaderboard Staf Terajin (Top 5)
                   </h3>
-                  <p className="text-xs text-slate-700 font-bold mt-1 leading-relaxed">
+                  <p className="text-xs text-slate-400 font-normal mt-1 leading-relaxed">
                     Pantau posisi peringkat kehadiran absensi tepat waktu dan checklist toilet harian untuk penentuan bonus bulanan.
                   </p>
                 </div>
               </div>
             </div>
 
-            <div className="pt-3 mt-3 border-t border-amber-300/80 flex items-center justify-between text-xs font-black text-amber-950 group-hover:text-black">
+            <div className="pt-3 mt-3 border-t border-slate-800/80 flex items-center justify-between text-xs font-bold text-amber-400 group-hover:text-amber-300">
               <span>Buka Leaderboard Real-Time</span>
-              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition stroke-[2.5]" />
+              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition stroke-[2]" />
             </div>
           </button>
         )}
@@ -513,45 +513,45 @@ export default function KioskPortalScreen({
           <button
             type="button"
             onClick={onOpenMonitoring}
-            className="w-full bg-gradient-to-r from-blue-50 to-indigo-50 hover:from-blue-100 hover:to-indigo-100 rounded-3xl p-5 border-2 border-blue-400 hover:border-blue-600 shadow-md transition-all text-left flex flex-col justify-between group touch-press"
+            className="w-full bg-[#161b24] hover:bg-[#1a202c] rounded-3xl p-5 border border-slate-800 hover:border-indigo-500/40 shadow-md transition-all text-left flex flex-col justify-between group touch-press"
           >
             <div>
               <div className="flex items-center justify-between mb-2">
-                <span className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full text-[11px] font-black uppercase tracking-wider bg-blue-600 text-white shadow-sm">
+                <span className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider bg-indigo-950 text-indigo-300 border border-indigo-500/30 shadow-xs">
                   <Eye className="w-3.5 h-3.5" />
                   <span>3. Akses Khusus: {staff.name} ({staff.role})</span>
                 </span>
-                <span className="text-[11px] font-black text-blue-700">
+                <span className="text-[11px] font-bold text-indigo-400">
                   Buka Monitoring →
                 </span>
               </div>
 
               <div className="flex items-start space-x-3.5 mt-2">
-                <div className="w-12 h-12 rounded-2xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-md shadow-blue-600/30 group-hover:scale-105 transition">
-                  <Eye className="w-6 h-6 stroke-[2.5]" />
+                <div className="w-12 h-12 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-md shadow-indigo-600/30 group-hover:scale-105 transition">
+                  <Eye className="w-6 h-6 stroke-[2.2]" />
                 </div>
                 <div className="flex-1">
-                  <h3 className="text-base sm:text-lg font-black text-blue-950 group-hover:text-blue-900 transition">
+                  <h3 className="text-base sm:text-lg font-bold text-white group-hover:text-indigo-300 transition">
                     Buka Dashboard View Only (Laporan Absensi &amp; Toilet)
                   </h3>
-                  <p className="text-xs text-blue-900/80 font-bold mt-1 leading-relaxed">
+                  <p className="text-xs text-slate-400 font-normal mt-1 leading-relaxed">
                     Masuk langsung ke laporan riwayat absen anak-anak, foto selfie kehadiran, dan checklist kebersihan toilet tanpa perlu memasukkan PIN lagi.
                   </p>
                 </div>
               </div>
             </div>
 
-            <div className="pt-3 mt-3 border-t border-blue-200/80 flex items-center justify-between text-xs font-black text-blue-800 group-hover:text-blue-950">
+            <div className="pt-3 mt-3 border-t border-slate-800/80 flex items-center justify-between text-xs font-bold text-indigo-400 group-hover:text-indigo-300">
               <span>Buka Laporan Monitoring Sekarang</span>
-              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition stroke-[2.5]" />
+              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition stroke-[2]" />
             </div>
           </button>
         )}
       </div>
 
       <div className="text-center pt-2">
-        <p className="text-xs text-slate-950 font-black">
-          Staff Portal • Lucky Cat &amp; JPE Karaoke by Ryan Gerrit
+        <p className="text-xs text-slate-500 font-medium">
+          Staff Portal • Lucky Cat &amp; JPE Karaoke
         </p>
       </div>
     </div>

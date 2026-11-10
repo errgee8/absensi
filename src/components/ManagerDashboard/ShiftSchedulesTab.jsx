@@ -176,27 +176,27 @@ export default function ShiftSchedulesTab() {
   const jpKaraokeSchedules = schedules.filter((s) => s.venue === 'JP Karaoke');
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-6 animate-fade-in text-slate-200">
       {/* Header Bar */}
-      <div className="bg-white p-5 rounded-3xl border-2 border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm">
+      <div className="bg-[#161b24] p-5 rounded-3xl border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-md">
         <div>
           <div className="flex items-center space-x-2">
-            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-blue-100 text-blue-900 border border-blue-300">
+            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-blue-500/15 text-blue-300 border border-blue-500/30">
               Shift &amp; Break Rules
             </span>
           </div>
-          <h3 className="text-xl font-black text-slate-950 mt-1 flex items-center space-x-2">
-            <Clock className="w-5 h-5 text-blue-600 stroke-[2.5]" />
+          <h3 className="text-xl font-black text-slate-100 mt-1 flex items-center space-x-2">
+            <Clock className="w-5 h-5 text-blue-400 stroke-[2.5]" />
             <span>Pengaturan Divisi &amp; Jam Kerja Shift</span>
           </h3>
-          <p className="text-xs text-slate-700 font-bold mt-0.5">
+          <p className="text-xs text-slate-400 font-bold mt-0.5">
             Atur jam kerja shift, checkout fleksibel, dan jendela waktu istirahat (kapan tombol istirahat diizinkan muncul).
           </p>
         </div>
 
         <button
           onClick={() => handleOpenAddModal('LuckyCat')}
-          className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-xl text-xs flex items-center justify-center space-x-1.5 shadow-md shadow-blue-600/30 transition shrink-0"
+          className="px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-black rounded-xl text-xs flex items-center justify-center space-x-1.5 shadow-lg shadow-blue-600/30 transition shrink-0 cursor-pointer"
         >
           <Plus className="w-4 h-4 stroke-[2.5]" />
           <span>+ Tambah Shift Baru</span>
@@ -204,29 +204,29 @@ export default function ShiftSchedulesTab() {
       </div>
 
       {notification && (
-        <div className="p-3.5 bg-emerald-100 border-2 border-emerald-300 rounded-2xl text-xs text-emerald-950 font-black flex items-center space-x-2 shadow-sm animate-fade-in">
-          <CheckCircle2 className="w-4 h-4 text-emerald-700 shrink-0 stroke-[2.5]" />
+        <div className="p-3.5 bg-emerald-500/15 border border-emerald-500/30 rounded-2xl text-xs text-emerald-300 font-black flex items-center space-x-2 shadow-sm animate-fade-in">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 stroke-[2.5]" />
           <span>{notification.msg}</span>
         </div>
       )}
 
       {/* 1. LuckyCat Section */}
-      <div className="bg-white border-2 border-slate-200 rounded-3xl p-5 shadow-sm">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 border-b-2 border-slate-100 pb-3 gap-2">
+      <div className="bg-[#161b24] border border-slate-800 rounded-3xl p-5 shadow-md">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 border-b border-slate-800 pb-3 gap-2">
           <div className="flex items-center space-x-2.5">
-            <span className="w-3.5 h-3.5 rounded-full bg-amber-500 shadow-sm" />
+            <span className="w-3.5 h-3.5 rounded-full bg-amber-400 shadow-sm" />
             <div>
-              <h4 className="text-base font-black text-slate-950 uppercase tracking-tight">
+              <h4 className="text-base font-black text-slate-100 uppercase tracking-tight">
                 LuckyCat (LC) Shifts
               </h4>
-              <span className="text-xs text-slate-700 font-bold">
+              <span className="text-xs text-slate-400 font-bold">
                 Server, Cashier, Bar &amp; Kitchen Shifts
               </span>
             </div>
           </div>
           <button
             onClick={() => handleOpenAddModal('LuckyCat')}
-            className="text-xs font-black text-blue-900 hover:text-blue-950 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-xl border border-blue-300 transition flex items-center space-x-1.5 self-start sm:self-auto shadow-sm"
+            className="text-xs font-black text-blue-300 hover:text-white bg-blue-500/10 hover:bg-blue-500/20 px-3 py-1.5 rounded-xl border border-blue-500/30 transition flex items-center space-x-1.5 self-start sm:self-auto shadow-xs cursor-pointer"
           >
             <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
             <span>Tambah Shift LC</span>
@@ -234,13 +234,13 @@ export default function ShiftSchedulesTab() {
         </div>
 
         {luckyCatSchedules.length === 0 ? (
-          <div className="p-8 text-center text-slate-700 text-xs bg-slate-50 rounded-2xl border-2 border-slate-200 font-bold">
+          <div className="p-8 text-center text-slate-400 text-xs bg-[#1c2230] rounded-2xl border border-slate-800 font-bold">
             Belum ada jadwal shift untuk LuckyCat. Klik tombol <strong>+ Tambah Shift LC</strong> untuk menambahkan.
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs text-slate-900 border-collapse">
-              <thead className="bg-slate-100 text-slate-950 text-[10px] uppercase font-black tracking-wider border-b-2 border-slate-200">
+            <table className="w-full text-left text-xs text-slate-200 border-collapse">
+              <thead className="bg-[#12161f] text-slate-300 text-[10px] uppercase font-black tracking-wider border-b border-slate-800">
                 <tr>
                   <th className="py-3 px-3">Divisi</th>
                   <th className="py-3 px-3">Nama Shift</th>
@@ -251,12 +251,12 @@ export default function ShiftSchedulesTab() {
                   <th className="py-3 px-3 text-right">Aksi</th>
                 </tr>
               </thead>
-              <tbody className="divide-y-2 divide-slate-100 font-bold">
+              <tbody className="divide-y divide-slate-800 font-bold">
                 {luckyCatSchedules.map((sched) => {
                   const isEditing = editingId === sched.id;
                   return (
-                    <tr key={sched.id} className="hover:bg-blue-50/40 transition">
-                      <td className="py-3 px-3 font-black text-slate-950 text-sm">{sched.division}</td>
+                    <tr key={sched.id} className="hover:bg-slate-800/40 transition">
+                      <td className="py-3 px-3 font-black text-slate-100 text-sm">{sched.division}</td>
                       <td className="py-3 px-3">
                         {isEditing ? (
                           <input
@@ -419,22 +419,22 @@ export default function ShiftSchedulesTab() {
       </div>
 
       {/* 2. JP Karaoke Section */}
-      <div className="bg-white border-2 border-slate-200 rounded-3xl p-5 shadow-sm">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 border-b-2 border-slate-100 pb-3 gap-2">
+      <div className="bg-[#161b24] border border-slate-800 rounded-3xl p-5 shadow-md">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 border-b border-slate-800 pb-3 gap-2">
           <div className="flex items-center space-x-2.5">
-            <span className="w-3.5 h-3.5 rounded-full bg-blue-600 shadow-sm" />
+            <span className="w-3.5 h-3.5 rounded-full bg-blue-500 shadow-sm" />
             <div>
-              <h4 className="text-base font-black text-slate-950 uppercase tracking-tight">
+              <h4 className="text-base font-black text-slate-100 uppercase tracking-tight">
                 JP Karaoke Shifts
               </h4>
-              <span className="text-xs text-slate-700 font-bold">
+              <span className="text-xs text-slate-400 font-bold">
                 Server &amp; Cashier, Cleaning Service, Storage Staff
               </span>
             </div>
           </div>
           <button
             onClick={() => handleOpenAddModal('JP Karaoke')}
-            className="text-xs font-black text-blue-900 hover:text-blue-950 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-xl border border-blue-300 transition flex items-center space-x-1.5 self-start sm:self-auto shadow-sm"
+            className="text-xs font-black text-blue-300 hover:text-white bg-blue-500/10 hover:bg-blue-500/20 px-3 py-1.5 rounded-xl border border-blue-500/30 transition flex items-center space-x-1.5 self-start sm:self-auto shadow-xs cursor-pointer"
           >
             <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
             <span>Tambah Shift JP</span>
@@ -442,8 +442,8 @@ export default function ShiftSchedulesTab() {
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs text-slate-900 border-collapse">
-            <thead className="bg-slate-100 text-slate-950 text-[10px] uppercase font-black tracking-wider border-b-2 border-slate-200">
+          <table className="w-full text-left text-xs text-slate-200 border-collapse">
+            <thead className="bg-[#12161f] text-slate-300 text-[10px] uppercase font-black tracking-wider border-b border-slate-800">
               <tr>
                 <th className="py-3 px-3">Divisi</th>
                 <th className="py-3 px-3">Nama Shift</th>
@@ -454,7 +454,7 @@ export default function ShiftSchedulesTab() {
                 <th className="py-3 px-3 text-right">Aksi</th>
               </tr>
             </thead>
-            <tbody className="divide-y-2 divide-slate-100 font-bold">
+            <tbody className="divide-y divide-slate-800 font-bold">
               {jpKaraokeSchedules.map((sched) => {
                 const isEditing = editingId === sched.id;
                 return (
@@ -622,23 +622,23 @@ export default function ShiftSchedulesTab() {
 
       {/* Modal: Add New Shift Schedule */}
       {addModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white border-2 border-slate-300 rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in text-slate-200">
+          <div className="bg-[#161b24] border border-slate-800 rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl">
             <form onSubmit={handleCreateSchedule}>
-              <div className="p-4 sm:p-5 border-b-2 border-slate-200 bg-slate-50 flex items-center justify-between">
+              <div className="p-4 sm:p-5 border-b border-slate-800 bg-[#12161f] flex items-center justify-between">
                 <div className="flex items-center space-x-2">
-                  <div className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-sm">
+                  <div className="w-8 h-8 rounded-xl bg-blue-500/15 border border-blue-500/30 text-blue-400 flex items-center justify-center shadow-sm">
                     <Clock className="w-4 h-4 stroke-[2.5]" />
                   </div>
                   <div>
-                    <h3 className="text-base font-black text-slate-950">Tambah Jadwal Shift Baru</h3>
-                    <p className="text-xs text-slate-700 font-bold mt-0.5">Tentukan jam masuk, jam pulang, dan batas jendela istirahat</p>
+                    <h3 className="text-base font-black text-slate-100">Tambah Jadwal Shift Baru</h3>
+                    <p className="text-xs text-slate-400 font-bold mt-0.5">Tentukan jam masuk, jam pulang, dan batas jendela istirahat</p>
                   </div>
                 </div>
                 <button
                   type="button"
                   onClick={() => setAddModalOpen(false)}
-                  className="p-1.5 text-slate-700 hover:text-slate-950 hover:bg-slate-200 rounded-xl border border-slate-300 transition"
+                  className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition cursor-pointer"
                 >
                   <X className="w-4 h-4 stroke-[2.5]" />
                 </button>
@@ -648,7 +648,7 @@ export default function ShiftSchedulesTab() {
                 {/* Outlet Selection */}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="text-slate-950 font-black block mb-1">Outlet / Venue</label>
+                    <label className="text-slate-300 font-black block mb-1">Outlet / Venue</label>
                     <select
                       value={newVenue}
                       onChange={(e) => {
@@ -657,7 +657,7 @@ export default function ShiftSchedulesTab() {
                         const divs = divisionPresets[v] || [];
                         setNewDivision(divs[0] || '');
                       }}
-                      className="w-full bg-slate-50 border-2 border-slate-300 rounded-xl px-3 py-2 text-slate-950 font-black focus:outline-none focus:border-blue-600 focus:bg-white cursor-pointer"
+                      className="w-full bg-[#12161f] border border-slate-700 rounded-xl px-3 py-2 text-slate-100 font-black focus:outline-none focus:border-blue-500 cursor-pointer"
                     >
                       <option value="LuckyCat">LuckyCat (LC)</option>
                       <option value="JP Karaoke">JP Karaoke</option>
@@ -665,11 +665,11 @@ export default function ShiftSchedulesTab() {
                   </div>
 
                   <div>
-                    <label className="text-slate-950 font-black block mb-1">Divisi Kerja</label>
+                    <label className="text-slate-300 font-black block mb-1">Divisi Kerja</label>
                     <select
                       value={newDivision}
                       onChange={(e) => setNewDivision(e.target.value)}
-                      className="w-full bg-slate-50 border-2 border-slate-300 rounded-xl px-3 py-2 text-slate-950 font-black focus:outline-none focus:border-blue-600 focus:bg-white cursor-pointer"
+                      className="w-full bg-[#12161f] border border-slate-700 rounded-xl px-3 py-2 text-slate-100 font-black focus:outline-none focus:border-blue-500 cursor-pointer"
                     >
                       {(divisionPresets[newVenue] || []).map((d) => (
                         <option key={d} value={d}>{d}</option>
@@ -680,14 +680,14 @@ export default function ShiftSchedulesTab() {
 
                 {newDivision === 'Lainnya (Ketik Manual)' && (
                   <div>
-                    <label className="text-slate-950 font-black block mb-1">Nama Divisi Baru</label>
+                    <label className="text-slate-300 font-black block mb-1">Nama Divisi Baru</label>
                     <input
                       type="text"
                       required
                       value={customDivision}
                       onChange={(e) => setCustomDivision(e.target.value)}
                       placeholder="Contoh: Security / Teknisi"
-                      className="w-full bg-slate-50 border-2 border-slate-300 rounded-xl px-3 py-2 text-slate-950 font-black focus:outline-none focus:border-blue-600 focus:bg-white"
+                      className="w-full bg-[#12161f] border border-slate-700 rounded-xl px-3 py-2 text-slate-100 placeholder:text-slate-500 font-black focus:outline-none focus:border-blue-500"
                     />
                   </div>
                 )}
@@ -695,26 +695,26 @@ export default function ShiftSchedulesTab() {
                 {/* Shift Name & Shift Number */}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="text-slate-950 font-black block mb-1">Nama Shift</label>
+                    <label className="text-slate-300 font-black block mb-1">Nama Shift</label>
                     <input
                       type="text"
                       required
                       value={newShiftName}
                       onChange={(e) => setNewShiftName(e.target.value)}
                       placeholder="Contoh: Shift 1, Middle 1, Shift Malam"
-                      className="w-full bg-slate-50 border-2 border-slate-300 rounded-xl px-3 py-2 text-slate-950 font-black focus:outline-none focus:border-blue-600 focus:bg-white"
+                      className="w-full bg-[#12161f] border border-slate-700 rounded-xl px-3 py-2 text-slate-100 placeholder:text-slate-500 font-black focus:outline-none focus:border-blue-500"
                     />
                   </div>
 
                   <div>
-                    <label className="text-slate-950 font-black block mb-1">Urutan Shift</label>
+                    <label className="text-slate-300 font-black block mb-1">Urutan Shift</label>
                     <input
                       type="number"
                       min="1"
                       max="10"
                       value={newShiftNumber}
                       onChange={(e) => setNewShiftNumber(e.target.value)}
-                      className="w-full bg-slate-50 border-2 border-slate-300 rounded-xl px-3 py-2 text-slate-950 font-mono font-black focus:outline-none focus:border-blue-600 focus:bg-white"
+                      className="w-full bg-[#12161f] border border-slate-700 rounded-xl px-3 py-2 text-slate-100 font-mono font-black focus:outline-none focus:border-blue-500"
                     />
                   </div>
                 </div>
@@ -722,34 +722,34 @@ export default function ShiftSchedulesTab() {
                 {/* Start Time & End Time */}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="text-slate-950 font-black block mb-1">Jam Mulai (Masuk)</label>
+                    <label className="text-slate-300 font-black block mb-1">Jam Mulai (Masuk)</label>
                     <input
                       type="time"
                       required
                       value={newStartTime}
                       onChange={(e) => setNewStartTime(e.target.value)}
-                      className="w-full bg-slate-50 border-2 border-slate-300 rounded-xl px-3 py-2 text-slate-950 font-mono font-black focus:outline-none focus:border-blue-600 focus:bg-white"
+                      className="w-full bg-[#12161f] border border-slate-700 rounded-xl px-3 py-2 text-slate-100 font-mono font-black focus:outline-none focus:border-blue-500"
                     />
                   </div>
 
                   <div>
-                    <label className="text-slate-950 font-black block mb-1">Jam Selesai (Pulang)</label>
+                    <label className="text-slate-300 font-black block mb-1">Jam Selesai (Pulang)</label>
                     <input
                       type="text"
                       required
                       value={newEndTime}
                       onChange={(e) => setNewEndTime(e.target.value)}
                       placeholder="Contoh: 19:00 atau 03:30"
-                      className="w-full bg-slate-50 border-2 border-slate-300 rounded-xl px-3 py-2 text-slate-950 font-mono font-black focus:outline-none focus:border-blue-600 focus:bg-white"
+                      className="w-full bg-[#12161f] border border-slate-700 rounded-xl px-3 py-2 text-slate-100 font-mono font-black focus:outline-none focus:border-blue-500"
                     />
                   </div>
                 </div>
 
                 {/* Checkout Mode */}
-                <div className="p-3.5 bg-slate-50 rounded-2xl border-2 border-slate-200 flex items-center justify-between">
+                <div className="p-3.5 bg-[#1c2230] rounded-2xl border border-slate-800 flex items-center justify-between">
                   <div>
-                    <span className="font-black text-slate-950 block">Flexible Checkout</span>
-                    <span className="text-[11px] text-slate-700 block mt-0.5 font-bold">
+                    <span className="font-black text-slate-100 block">Flexible Checkout</span>
+                    <span className="text-[11px] text-slate-400 block mt-0.5 font-bold">
                       Aktifkan untuk shift malam/dini hari yang boleh check-out fleksibel saat operasional tutup.
                     </span>
                   </div>
@@ -762,11 +762,11 @@ export default function ShiftSchedulesTab() {
                 </div>
 
                 {/* Break Policy & Window Rules */}
-                <div className="p-4 bg-slate-50 rounded-2xl border-2 border-slate-200 space-y-3">
+                <div className="p-4 bg-[#1c2230] rounded-2xl border border-slate-800 space-y-3">
                   <div className="flex items-center justify-between">
                     <div>
-                      <span className="font-black text-slate-950 block">Bolehkan Istirahat (Break Allowed)</span>
-                      <span className="text-[11px] text-slate-700 block mt-0.5 font-bold">
+                      <span className="font-black text-slate-100 block">Bolehkan Istirahat (Break Allowed)</span>
+                      <span className="text-[11px] text-slate-400 block mt-0.5 font-bold">
                         Apakah karyawan pada shift ini berhak mendapatkan waktu istirahat?
                       </span>
                     </div>
@@ -779,14 +779,14 @@ export default function ShiftSchedulesTab() {
                   </div>
 
                   {newAllowsBreak && (
-                    <div className="pt-2 border-t-2 border-slate-200 space-y-2.5">
-                      <div className="text-xs font-black text-amber-900 flex items-center space-x-1.5">
+                    <div className="pt-2 border-t border-slate-800 space-y-2.5">
+                      <div className="text-xs font-black text-amber-300 flex items-center space-x-1.5">
                         <Coffee className="w-3.5 h-3.5 stroke-[2.5]" />
                         <span>Aturan Jendela Waktu Istirahat (Break Time Window):</span>
                       </div>
                       <div className="grid grid-cols-2 gap-3">
                         <div>
-                          <label className="text-xs text-slate-950 font-black block mb-1">
+                          <label className="text-xs text-slate-400 font-black block mb-1">
                             Tombol Istirahat Muncul Dari Jam:
                           </label>
                           <input
@@ -794,12 +794,12 @@ export default function ShiftSchedulesTab() {
                             value={newBreakStartTime}
                             onChange={(e) => setNewBreakStartTime(e.target.value)}
                             placeholder="Contoh: 14:00"
-                            className="w-full bg-white border-2 border-slate-300 rounded-xl px-3 py-1.5 text-slate-950 font-mono font-black text-xs focus:outline-none focus:border-blue-600"
+                            className="w-full bg-[#12161f] border border-slate-700 rounded-xl px-3 py-1.5 text-slate-100 font-mono font-black text-xs focus:outline-none focus:border-blue-500"
                           />
                         </div>
 
                         <div>
-                          <label className="text-xs text-slate-950 font-black block mb-1">
+                          <label className="text-xs text-slate-400 font-black block mb-1">
                             Batas Akhir Selesai Istirahat:
                           </label>
                           <input
@@ -807,11 +807,11 @@ export default function ShiftSchedulesTab() {
                             value={newMaxBreakEnd}
                             onChange={(e) => setNewMaxBreakEnd(e.target.value)}
                             placeholder="Contoh: 17:00"
-                            className="w-full bg-white border-2 border-slate-300 rounded-xl px-3 py-1.5 text-slate-950 font-mono font-black text-xs focus:outline-none focus:border-blue-600"
+                            className="w-full bg-[#12161f] border border-slate-700 rounded-xl px-3 py-1.5 text-slate-100 font-mono font-black text-xs focus:outline-none focus:border-blue-500"
                           />
                         </div>
                       </div>
-                      <p className="text-[11px] text-slate-700 font-bold">
+                      <p className="text-[11px] text-slate-400 font-bold">
                         * Tombol istirahat hanya akan muncul dan bisa ditekan oleh staf antara jam di atas (dan maksimal 2 jam sebelum shift selesai).
                       </p>
                     </div>
@@ -819,18 +819,18 @@ export default function ShiftSchedulesTab() {
                 </div>
               </div>
 
-              <div className="p-4 border-t-2 border-slate-200 bg-slate-50 flex justify-end space-x-2">
+              <div className="p-4 border-t border-slate-800 bg-[#12161f] flex justify-end space-x-2">
                 <button
                   type="button"
                   onClick={() => setAddModalOpen(false)}
-                  className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-black border border-slate-300 transition"
+                  className="px-4 py-2.5 bg-[#1c2230] hover:bg-[#252d3d] text-slate-300 rounded-xl text-xs font-black border border-slate-700 transition cursor-pointer"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
                   disabled={adding}
-                  className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-xl text-xs shadow-md shadow-blue-600/30 transition"
+                  className="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-black rounded-xl text-xs shadow-lg shadow-blue-600/30 transition cursor-pointer"
                 >
                   {adding ? 'Menyimpan...' : 'Simpan Shift Baru'}
                 </button>

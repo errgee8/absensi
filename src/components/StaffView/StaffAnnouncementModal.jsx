@@ -106,23 +106,23 @@ export default function StaffAnnouncementModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-md animate-fade-in text-slate-900">
-      <div className="bg-white border-2 border-slate-300 rounded-3xl max-w-2xl w-full overflow-hidden shadow-2xl animate-scale-up flex flex-col max-h-[92vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-md animate-fade-in text-slate-200">
+      <div className="bg-[#161b24] border border-slate-800 rounded-3xl max-w-2xl w-full overflow-hidden shadow-2xl animate-scale-up flex flex-col max-h-[92vh]">
         {/* Header */}
         <div
-          className={`p-4 sm:p-5 flex items-center justify-between text-white ${
+          className={`p-4 sm:p-5 flex items-center justify-between text-white border-b border-slate-800 ${
             viewMode === 'DETAIL' && isUrgent
-              ? 'bg-gradient-to-r from-rose-700 via-red-800 to-slate-900'
-              : 'bg-gradient-to-r from-blue-700 via-indigo-800 to-slate-900'
+              ? 'bg-gradient-to-r from-rose-950 via-red-900 to-[#12161f]'
+              : 'bg-gradient-to-r from-blue-950 via-indigo-950 to-[#12161f]'
           }`}
         >
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 rounded-2xl bg-white/20 flex items-center justify-center text-white shadow-inner">
-              <Megaphone className="w-5 h-5 text-amber-300 stroke-[2.5]" />
+            <div className="w-10 h-10 rounded-2xl bg-white/10 flex items-center justify-center text-white shadow-inner">
+              <Megaphone className="w-5 h-5 text-amber-400 stroke-[2.5]" />
             </div>
             <div>
               <div className="flex items-center space-x-2">
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-white/20 text-white">
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-white/10 text-white">
                   📢 Pengumuman Resmi Manajemen
                 </span>
                 {totalUnread > 0 ? (
@@ -146,7 +146,7 @@ export default function StaffAnnouncementModal({
               <button
                 type="button"
                 onClick={() => setViewMode('LIST')}
-                className="px-2.5 py-1 rounded-xl bg-white/15 hover:bg-white/25 text-white text-[11px] font-black flex items-center space-x-1 transition"
+                className="px-2.5 py-1 rounded-xl bg-white/15 hover:bg-white/25 text-white text-[11px] font-black flex items-center space-x-1 transition cursor-pointer"
                 title="Lihat Daftar"
               >
                 <Layers className="w-3.5 h-3.5" />
@@ -156,7 +156,7 @@ export default function StaffAnnouncementModal({
             <button
               type="button"
               onClick={onClose}
-              className="p-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white transition"
+              className="p-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white transition cursor-pointer"
               title="Tutup"
             >
               <X className="w-4 h-4 stroke-[2.5]" />
@@ -165,15 +165,15 @@ export default function StaffAnnouncementModal({
         </div>
 
         {/* View Switcher Bar */}
-        <div className="bg-slate-100 border-b border-slate-200 px-4 py-2 flex items-center justify-between text-xs font-bold text-slate-600">
+        <div className="bg-[#12161f] border-b border-slate-800 px-4 py-2 flex items-center justify-between text-xs font-bold text-slate-400">
           <div className="flex items-center space-x-2">
             <button
               type="button"
               onClick={() => setViewMode('LIST')}
-              className={`px-3 py-1.5 rounded-xl transition flex items-center space-x-1.5 font-black ${
+              className={`px-3 py-1.5 rounded-xl transition flex items-center space-x-1.5 font-black cursor-pointer ${
                 viewMode === 'LIST'
                   ? 'bg-blue-600 text-white shadow-sm'
-                  : 'bg-white hover:bg-slate-200 text-slate-700 border border-slate-200'
+                  : 'bg-[#1c2230] hover:bg-[#252d3d] text-slate-300 border border-slate-700'
               }`}
             >
               <Layers className="w-3.5 h-3.5" />
@@ -183,10 +183,10 @@ export default function StaffAnnouncementModal({
               <button
                 type="button"
                 onClick={() => setViewMode('DETAIL')}
-                className={`px-3 py-1.5 rounded-xl transition flex items-center space-x-1.5 font-black ${
+                className={`px-3 py-1.5 rounded-xl transition flex items-center space-x-1.5 font-black cursor-pointer ${
                   viewMode === 'DETAIL'
                     ? 'bg-blue-600 text-white shadow-sm'
-                    : 'bg-white hover:bg-slate-200 text-slate-700 border border-slate-200'
+                    : 'bg-[#1c2230] hover:bg-[#252d3d] text-slate-300 border border-slate-700'
                 }`}
               >
                 <FileText className="w-3.5 h-3.5" />
@@ -194,13 +194,13 @@ export default function StaffAnnouncementModal({
               </button>
             )}
           </div>
-          <span className="text-[11px] text-slate-500 hidden sm:inline">
+          <span className="text-[11px] text-slate-400 hidden sm:inline">
             {totalUnread > 0 ? `Wajib disetujui 1 per 1` : 'Semua telah disetujui'}
           </span>
         </div>
 
         {/* Modal Body */}
-        <div className="p-4 sm:p-5 overflow-y-auto space-y-4 text-xs font-bold text-slate-800 flex-1">
+        <div className="p-4 sm:p-5 overflow-y-auto space-y-4 text-xs font-bold text-slate-200 flex-1">
           {viewMode === 'LIST' ? (
             /* ================================================= */
             /* 1. LIST VIEW: SHOW ALL ANNOUNCEMENTS TOGETHER     */
