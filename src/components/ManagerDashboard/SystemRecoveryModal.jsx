@@ -87,7 +87,7 @@ export default function SystemRecoveryModal({ isOpen, onClose, adminAuth, venueS
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          pin: adminAuth?.pin || '8080',
+          pin: adminAuth?.pin || '8980',
           createdBy: adminAuth?.reviewerName || 'General Manager'
         })
       });
@@ -119,7 +119,7 @@ export default function SystemRecoveryModal({ isOpen, onClose, adminAuth, venueS
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           backupId: id,
-          pin: adminAuth?.pin || '8080'
+          pin: adminAuth?.pin || '8980'
         })
       });
       const data = await res.json();
@@ -151,7 +151,7 @@ export default function SystemRecoveryModal({ isOpen, onClose, adminAuth, venueS
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          pin: adminAuth?.pin || '8080',
+          pin: adminAuth?.pin || '8980',
           staffId: bypassStaffId.trim(),
           actionType: bypassType,
           reason: bypassReason,

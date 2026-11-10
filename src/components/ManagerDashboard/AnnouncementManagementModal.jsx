@@ -45,7 +45,7 @@ export default function AnnouncementManagementModal({
   const [targetVenue, setTargetVenue] = useState('ALL');
   const [expiryPreset, setExpiryPreset] = useState('FOREVER'); // 'FOREVER' | '1D' | '3D' | '7D' | '14D' | '30D' | 'CUSTOM'
   const [customExpiresAt, setCustomExpiresAt] = useState('');
-  const [pin, setPin] = useState(adminAuth?.pin || (adminAuth?.role === 'MANAGER' ? '8080' : ''));
+  const [pin, setPin] = useState(adminAuth?.pin || (adminAuth?.role === 'MANAGER' ? '8980' : ''));
   const [submitting, setSubmitting] = useState(false);
   const [formSuccess, setFormSuccess] = useState(null);
 
@@ -80,7 +80,7 @@ export default function AnnouncementManagementModal({
   const [loadingReaders, setLoadingReaders] = useState(false);
   const [readerFilter, setReaderFilter] = useState('ALL'); // 'ALL' | 'READ' | 'UNREAD'
 
-  const isGM = adminAuth?.role === 'FULL_ADMIN' || adminAuth?.role === 'MANAGER' || adminAuth?.pin === '8080' || !isReadOnly;
+  const isGM = adminAuth?.role === 'FULL_ADMIN' || adminAuth?.role === 'MANAGER' || adminAuth?.pin === '8980' || !isReadOnly;
 
   const loadData = async () => {
     setLoading(true);
@@ -134,7 +134,7 @@ export default function AnnouncementManagementModal({
   const handleCreateAnnouncement = async (e) => {
     e.preventDefault();
     if (!pin.trim()) {
-      setError('PIN General Manager (8080) wajib diisi untuk otorisasi penerbitan.');
+      setError('PIN General Manager (8980) wajib diisi untuk otorisasi penerbitan.');
       return;
     }
 
@@ -185,7 +185,7 @@ export default function AnnouncementManagementModal({
 
     try {
       await updateAnnouncement(ann.id, {
-        pin: adminAuth?.pin || '8080',
+        pin: adminAuth?.pin || '8980',
         isActive: nextState
       });
       await loadData();
@@ -661,7 +661,7 @@ export default function AnnouncementManagementModal({
                     maxLength={8}
                     value={pin}
                     onChange={(e) => setPin(e.target.value)}
-                    placeholder="PIN GM (8080)"
+                    placeholder="PIN GM (8980)"
                     required
                     className="w-full bg-slate-50 border-2 border-slate-300 rounded-xl pl-9 pr-3 py-2 text-xs font-mono font-black text-slate-950 tracking-widest focus:outline-none focus:border-blue-600 focus:bg-white"
                   />

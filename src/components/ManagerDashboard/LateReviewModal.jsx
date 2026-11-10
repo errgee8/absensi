@@ -7,7 +7,7 @@ import { reviewLateCheckin } from '../../utils/api';
 export default function LateReviewModal({ shift, schedules = [], adminAuth, onClose, onShiftUpdated }) {
   if (!shift) return null;
 
-  const [pin, setPin] = useState(adminAuth?.pin || (adminAuth?.role === 'MANAGER' ? '8080' : ''));
+  const [pin, setPin] = useState(adminAuth?.pin || (adminAuth?.role === 'MANAGER' ? '8980' : ''));
   const [managerNotes, setManagerNotes] = useState(shift.late_manager_note || '');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
@@ -57,7 +57,7 @@ export default function LateReviewModal({ shift, schedules = [], adminAuth, onCl
   const isPending = !isApproved && !isRejected;
 
   const handleDecision = async (action) => {
-    const activePin = pin.trim() || adminAuth?.pin || '8080';
+    const activePin = pin.trim() || adminAuth?.pin || '8980';
     if (!activePin) {
       setError('Masukkan PIN Manager / Assistant Manager untuk otorisasi review.');
       return;

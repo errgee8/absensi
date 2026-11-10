@@ -32,7 +32,7 @@ npx vercel alias set <DEPLOYMENT_URL_SEBELUMNYA> absensi-jplc.vercel.app
 Sistem telah dilengkapi dengan mesin pencadangan otomatis dengan retensi 30 hari.
 
 ### Cara 1: Menggunakan Tombol "Recover" di Dashboard Manager
-1. Masuk ke Dashboard Manager menggunakan PIN Admin (`8080`).
+1. Masuk ke Dashboard Manager menggunakan PIN Admin (`8980`).
 2. Klik tombol **`🛡️ Recovery & Fault Switch`** di header dashboard.
 3. Di tab **"Recover Button & Backup"**, akan tampil daftar seluruh snapshot harian yang pernah dibuat.
 4. Pilih snapshot tanggal/jam sebelum insiden terjadi, lalu klik tombol hijau **`Pulihkan (Recover)`**.

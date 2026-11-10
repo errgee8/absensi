@@ -13,4 +13,4 @@ services:
       - key: SUPABASE_KEY
         value: sb_publishable_BUF7h-NV1YNYauHAZSquJw_9vjaVr4e
       - key: ADMIN_PIN
-        value: 8080
+        value: 8980

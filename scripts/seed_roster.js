@@ -58,8 +58,8 @@ const lcStaff = [
   { name: 'Harun', venue: 'LuckyCat', division: 'Kitchen', role: 'Kitchen Staff', department: 'Kitchen', shift_start: '18:00', shift_end: '03:00', standard_hours: 9.0 }
 ];
 
-// Generate unique, clean 4-digit PINs (excluding admin pin 8080)
-const usedPins = new Set(['8080', '0000', '1111', '2222', '3333', '4444', '5555', '6666', '7777', '8888', '9999']);
+// Generate unique, clean 4-digit PINs (excluding admin pins 8980, 8080)
+const usedPins = new Set(['8980', '8080', '7988', '7070', '0000', '1111', '2222', '3333', '4444', '5555', '6666', '7777', '8888', '9999']);
 function getUniquePin() {
   while (true) {
     const pin = Math.floor(1000 + Math.random() * 9000).toString();

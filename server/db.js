@@ -215,7 +215,7 @@ export const setSetting = (key, value) => {
 const initSettings = () => {
   const defaults = {
     venue_name: 'JP Karaoke & LuckyCat Outlets',
-    admin_pin: '8080',
+    admin_pin: '8980',
     venue_lat: -8.780981,
     venue_lng: 115.176863,
     geofence_radius: 150,

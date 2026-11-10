@@ -272,7 +272,7 @@ async function savePhoto(dataUrl, prefix = 'photo') {
   return saveBase64Photo(dataUrl, prefix);
 }
 
-// 1. Admin PIN Verification Endpoint (Full Manager PIN: 8080 | Assistant Manager / View Only PIN: 7070 or Management Staff PIN)
+// 1. Admin PIN Verification Endpoint (Full Manager PIN: 8980 | Assistant Manager / View Only PIN: 7070 or Management Staff PIN)
 router.post('/admin/verify', async (req, res) => {
   const { pin } = req.body;
   if (!pin || !pin.trim()) {
@@ -280,10 +280,18 @@ router.post('/admin/verify', async (req, res) => {
   }
 
   const cleanPin = pin.trim();
-  const adminPin = getSetting('admin_pin') || '8080';
+  let adminPin = process.env.ADMIN_PIN || getSetting('admin_pin') || '8980';
+  if (isSupabaseConfigured) {
+    try {
+      const { data: supaPin } = await supabase.from('app_settings').select('value').eq('key', 'admin_pin').maybeSingle();
+      if (supaPin?.value) {
+        adminPin = typeof supaPin.value === 'string' ? supaPin.value.replace(/"/g, '') : String(supaPin.value);
+      }
+    } catch {}
+  }
   const supervisorPin = getSetting('supervisor_pin') || '7070';
 
-  // 1. Full Manager Check (PIN 8080)
+  // 1. Full Manager Check (PIN 8980)
   if (cleanPin === adminPin.trim()) {
     return res.json({
       success: true,
@@ -2215,9 +2223,17 @@ router.post('/admin/wipe-leaderboard', async (req, res) => {
   const { pin, mode = 'reset_only', scope = 'all', targetMonth = null } = req.body || {};
 
   const cleanPin = (pin || '').trim();
-  const adminPin = (getSetting('admin_pin') || '8080').trim();
+  let adminPin = (process.env.ADMIN_PIN || getSetting('admin_pin') || '8980').trim();
+  if (isSupabaseConfigured) {
+    try {
+      const { data: supaPin } = await supabase.from('app_settings').select('value').eq('key', 'admin_pin').maybeSingle();
+      if (supaPin?.value) {
+        adminPin = typeof supaPin.value === 'string' ? supaPin.value.replace(/"/g, '') : String(supaPin.value);
+      }
+    } catch {}
+  }
 
-  // Strictly check Manager PIN (8080)
+  // Strictly check Manager PIN (8980)
   if (!cleanPin || cleanPin !== adminPin) {
     return res.status(403).json({
       success: false,
@@ -2329,10 +2345,18 @@ router.post('/admin/wipe-leaderboard', async (req, res) => {
 const verifyManagementAuth = async (pin) => {
   if (!pin) return { authorized: false };
   const cleanPin = pin.trim();
-  const adminPin = (getSetting('admin_pin') || '8080').trim();
+  let adminPin = (process.env.ADMIN_PIN || getSetting('admin_pin') || '8980').trim();
+  if (isSupabaseConfigured) {
+    try {
+      const { data: supaPin } = await supabase.from('app_settings').select('value').eq('key', 'admin_pin').maybeSingle();
+      if (supaPin?.value) {
+        adminPin = typeof supaPin.value === 'string' ? supaPin.value.replace(/"/g, '') : String(supaPin.value);
+      }
+    } catch {}
+  }
   const supervisorPin = (getSetting('supervisor_pin') || '7070').trim();
 
-  // 1. Full Manager (PIN 8080)
+  // 1. Full Manager (PIN 8980)
   if (cleanPin === adminPin) {
     return { authorized: true, role: 'MANAGER', reviewerName: 'General Manager' };
   }
@@ -2980,13 +3004,13 @@ router.get('/announcements', async (req, res) => {
   }
 });
 
-// Create Announcement (Strictly General Manager - PIN 8080)
+// Create Announcement (Strictly General Manager - PIN 8980)
 router.post('/announcements', async (req, res) => {
   const { pin, title, content, urgency, targetVenue, expiresAt, images } = req.body || {};
 
   const auth = await verifyManagementAuth(pin);
   if (!auth.authorized || (auth.role !== 'FULL_ADMIN' && auth.role !== 'MANAGER')) {
-    return res.status(403).json({ error: 'Akses ditolak: Hanya General Manager (PIN 8080) yang berwenang membuat pengumuman resmi.' });
+    return res.status(403).json({ error: 'Akses ditolak: Hanya General Manager (PIN 8980) yang berwenang membuat pengumuman resmi.' });
   }
 
   if (!title || !title.trim()) return res.status(400).json({ error: 'Judul pengumuman wajib diisi.' });
@@ -3084,7 +3108,7 @@ router.put('/announcements/:id', async (req, res) => {
 
   const auth = await verifyManagementAuth(pin);
   if (!auth.authorized || (auth.role !== 'FULL_ADMIN' && auth.role !== 'MANAGER')) {
-    return res.status(403).json({ error: 'Akses ditolak: Hanya General Manager (PIN 8080) yang berwenang mengubah pengumuman.' });
+    return res.status(403).json({ error: 'Akses ditolak: Hanya General Manager (PIN 8980) yang berwenang mengubah pengumuman.' });
   }
 
   const now = new Date().toISOString();

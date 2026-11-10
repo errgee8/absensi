@@ -15,7 +15,7 @@ export default function WipeLeaderboardModal({ isOpen, onClose, onSuccess, curre
   const handleSubmit = async (e, customMode) => {
     if (e && e.preventDefault) e.preventDefault();
     if (!pin.trim()) {
-      setError('Silakan masukkan PIN Manager (8080) untuk konfirmasi otorisasi.');
+      setError('Silakan masukkan PIN Manager (8980) untuk konfirmasi otorisasi.');
       return;
     }
 
@@ -231,7 +231,7 @@ export default function WipeLeaderboardModal({ isOpen, onClose, onSuccess, curre
                 maxLength={8}
                 value={pin}
                 onChange={(e) => setPin(e.target.value)}
-                placeholder="PIN Manager (8080)..."
+                placeholder="PIN Manager (8980)..."
                 className="w-full bg-slate-50 border-2 border-slate-300 rounded-xl pl-9 pr-3 py-2 text-xs font-black text-slate-950 focus:outline-none focus:border-blue-600 focus:bg-white transition tracking-widest"
                 autoFocus
                 disabled={loading}
