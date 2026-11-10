@@ -1,5 +1,5 @@
 import React from 'react';
-import { Users, Clock, AlertTriangle, MapPin, Printer, Settings, FileSpreadsheet, RotateCcw, Shield } from 'lucide-react';
+import { Users, Clock, AlertTriangle, MapPin, Printer, Settings, FileSpreadsheet, RotateCcw, Shield, RefreshCw } from 'lucide-react';
 
 export default function DashboardHeader({
   stats,
@@ -9,7 +9,9 @@ export default function DashboardHeader({
   onOpenSettings,
   onOpenResetLeaderboard,
   onOpenRecovery,
-  isReadOnly = false
+  isReadOnly = false,
+  onRefresh,
+  loading = false
 }) {
   const cards = [
     {
@@ -60,6 +62,21 @@ export default function DashboardHeader({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          {/* Quick Refresh Button */}
+          {onRefresh && (
+            <button
+              onClick={onRefresh}
+              disabled={loading}
+              className={`px-3.5 py-2 bg-white hover:bg-slate-100 text-slate-800 rounded-xl border-2 border-slate-300 text-xs font-black flex items-center space-x-1.5 transition shadow-sm active:scale-95 cursor-pointer ${
+                loading ? 'opacity-80 cursor-wait' : ''
+              }`}
+              title="Segarkan data riwayat dan statistik dashboard"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 stroke-[2.5] ${loading ? 'animate-spin text-blue-600' : 'text-slate-700'}`} />
+              <span className="hidden sm:inline">{loading ? 'Menyegarkan...' : 'Refresh'}</span>
+            </button>
+          )}
+
           {/* Export Excel (.xlsx) */}
           <button
             onClick={onExportCsv}

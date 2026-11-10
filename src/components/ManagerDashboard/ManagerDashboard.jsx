@@ -377,6 +377,8 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
               onOpenResetLeaderboard={() => setWipeModalOpen(true)}
               onOpenRecovery={() => setRecoveryModalOpen(true)}
               isReadOnly={isReadOnly}
+              onRefresh={loadData}
+              loading={loading}
             />
 
             {/* Official Management Announcement Compliance Bar */}
@@ -458,6 +460,7 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
               search={search}
               setSearch={setSearch}
               departments={departments}
+              loading={loading}
               onRefresh={loadData}
               totalResults={displayedShifts.length}
             />

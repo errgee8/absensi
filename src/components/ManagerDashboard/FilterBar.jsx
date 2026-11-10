@@ -1,5 +1,5 @@
-import React from 'react';
-import { Search, Calendar, RefreshCw, AlertTriangle, Clock, X, CalendarCheck2 } from 'lucide-react';
+import React, { useState } from 'react';
+import { Search, Calendar, RefreshCw, AlertTriangle, Clock, X, CalendarCheck2, Check } from 'lucide-react';
 import { formatWitaDateFull } from '../../utils/time';
 
 export default function FilterBar({
@@ -18,9 +18,38 @@ export default function FilterBar({
   search,
   setSearch,
   departments = [],
+  loading = false,
   onRefresh,
   totalResults = 0
 }) {
+  const [isSpinning, setIsSpinning] = useState(false);
+  const [justRefreshed, setJustRefreshed] = useState(false);
+
+  const isActuallyRefreshing = loading || isSpinning;
+
+  const handleRefreshClick = async () => {
+    if (!onRefresh || isActuallyRefreshing) return;
+    setIsSpinning(true);
+    setJustRefreshed(false);
+
+    const minSpinPromise = new Promise((resolve) => setTimeout(resolve, 800));
+    try {
+      if (typeof onRefresh === 'function') {
+        await Promise.all([Promise.resolve(onRefresh()), minSpinPromise]);
+      } else {
+        await minSpinPromise;
+      }
+      setJustRefreshed(true);
+      setTimeout(() => {
+        setJustRefreshed(false);
+      }, 2000);
+    } catch (err) {
+      console.error('Refresh failed:', err);
+    } finally {
+      setIsSpinning(false);
+    }
+  };
+
   const isCustomDate = dateRange === 'CUSTOM' && specificDate;
 
   const handlePickDate = (e) => {
@@ -247,11 +276,34 @@ export default function FilterBar({
           {onRefresh && (
             <button
               type="button"
-              onClick={onRefresh}
-              className="text-blue-700 hover:text-blue-900 font-black flex items-center space-x-1.5 text-xs transition"
+              onClick={handleRefreshClick}
+              disabled={isActuallyRefreshing}
+              className={`px-3 py-1.5 rounded-xl border-2 font-black flex items-center space-x-1.5 text-xs transition-all shadow-xs cursor-pointer ${
+                isActuallyRefreshing
+                  ? 'bg-blue-50 border-blue-300 text-blue-700 opacity-90 cursor-wait'
+                  : justRefreshed
+                  ? 'bg-emerald-50 border-emerald-300 text-emerald-800'
+                  : 'bg-white hover:bg-blue-50 text-blue-700 hover:text-blue-900 border-slate-200 hover:border-blue-300 active:scale-95'
+              }`}
+              title="Perbarui riwayat absensi dan data kehadiran realtime"
             >
-              <RefreshCw className="w-3.5 h-3.5 stroke-[2.5]" />
-              <span>Refresh</span>
+              {justRefreshed ? (
+                <>
+                  <Check className="w-3.5 h-3.5 stroke-[3] text-emerald-600 animate-in fade-in" />
+                  <span className="text-emerald-700 font-black">Data Terkini ✓</span>
+                </>
+              ) : (
+                <>
+                  <RefreshCw
+                    className={`w-3.5 h-3.5 stroke-[2.5] ${
+                      isActuallyRefreshing
+                        ? 'animate-spin text-blue-600'
+                        : 'text-blue-700'
+                    }`}
+                  />
+                  <span>{isActuallyRefreshing ? 'Menyegarkan...' : 'Refresh'}</span>
+                </>
+              )}
             </button>
           )}
         </div>
