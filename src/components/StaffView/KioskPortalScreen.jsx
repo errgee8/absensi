@@ -26,6 +26,20 @@ export default function KioskPortalScreen({
   const canTakeBreak = isCheckedIn && !isOnBreak && !hasTakenBreak && shiftAllowsBreak;
 
   const [breakSeconds, setBreakSeconds] = useState(0);
+  const [liveTime, setLiveTime] = useState(() => new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => setLiveTime(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const timeStr = new Intl.DateTimeFormat('id-ID', {
+    timeZone: 'Asia/Makassar',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false
+  }).format(liveTime);
 
   useEffect(() => {
     if (!isOnBreak || !activeShift?.break_start_time) return;
@@ -67,15 +81,23 @@ export default function KioskPortalScreen({
           </div>
         </div>
 
-        <button
-          type="button"
-          onClick={onLogout}
-          className="px-3 py-2 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 transition flex items-center space-x-1.5 shadow-sm"
-          title="Keluar / Ganti Akun"
-        >
-          <LogOut className="w-4 h-4 stroke-[2.2]" />
-          <span className="text-xs font-black hidden sm:inline">Keluar</span>
-        </button>
+        <div className="flex items-center space-x-2">
+          {/* Live WITA Clock Pill */}
+          <div className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-slate-950 text-emerald-400 font-mono text-xs font-black shadow-inner border border-slate-800">
+            <Clock className="w-3.5 h-3.5 text-emerald-400 animate-pulse shrink-0" />
+            <span>{timeStr} <span className="text-[10px] text-slate-400">WITA</span></span>
+          </div>
+
+          <button
+            type="button"
+            onClick={onLogout}
+            className="px-3 py-2 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 transition flex items-center space-x-1.5 shadow-sm"
+            title="Keluar / Ganti Akun"
+          >
+            <LogOut className="w-4 h-4 stroke-[2.2]" />
+            <span className="text-xs font-black hidden sm:inline">Keluar</span>
+          </button>
+        </div>
       </div>
 
       {/* Attendance Status Banner - High Contrast Background & Borders */}

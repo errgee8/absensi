@@ -1,6 +1,7 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { Camera, RefreshCw, Check, AlertCircle, Sparkles, ShieldAlert } from 'lucide-react';
 import { captureAndWatermark } from '../../utils/watermark';
+import { showToast } from '../Common/Toast';
 
 export default function SelfieCamera({
   staffName,
@@ -87,7 +88,7 @@ export default function SelfieCamera({
       stopCamera();
     } catch (err) {
       console.error('Watermarking failed:', err);
-      alert('Failed to process photo: ' + err.message);
+      showToast('Gagal memproses foto: ' + err.message, 'error');
     } finally {
       setProcessing(false);
     }

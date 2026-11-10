@@ -3,6 +3,7 @@ import { X, CheckCircle, AlertTriangle, Camera, RefreshCw, Send, Loader2, Sparkl
 import confetti from 'canvas-confetti';
 import { ROUTINE_TASKS, submitRestroomInspection } from '../../utils/toiletService';
 import { stampPhotoWithAppTime } from '../../utils/watermark';
+import { showToast } from '../Common/Toast';
 
 export default function ToiletChecklistForm({ location, staff, onClose, onSuccess }) {
   const applicableTasks = ROUTINE_TASKS.filter(
@@ -47,7 +48,7 @@ export default function ToiletChecklistForm({ location, staff, onClose, onSucces
       }
     } catch (err) {
       console.warn('Camera error:', err);
-      alert('Tidak dapat mengakses kamera: ' + err.message);
+      showToast('Tidak dapat mengakses kamera: ' + err.message, 'error');
       setCameraActive(false);
     }
   };

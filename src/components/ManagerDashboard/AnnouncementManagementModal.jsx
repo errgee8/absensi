@@ -22,6 +22,7 @@ import {
 import { getAnnouncements, createAnnouncement, updateAnnouncement, getAnnouncementReaders } from '../../utils/api';
 import { formatWitaDateTime } from '../../utils/time';
 import ZoomableImage from '../Common/ZoomableImage';
+import { showToast } from '../Common/Toast';
 
 export default function AnnouncementManagementModal({
   isOpen,
@@ -125,7 +126,7 @@ export default function AnnouncementManagementModal({
       const report = await getAnnouncementReaders(ann.id);
       setReadersReport(report);
     } catch (e) {
-      alert('Gagal memuat laporan pembaca: ' + e.message);
+      showToast('Gagal memuat laporan pembaca: ' + e.message, 'error');
     } finally {
       setLoadingReaders(false);
     }
@@ -175,7 +176,7 @@ export default function AnnouncementManagementModal({
 
   const handleToggleActive = async (ann) => {
     if (!isGM) {
-      alert('Hanya General Manager yang berwenang mengaktifkan / mengarsipkan pengumuman.');
+      showToast('Hanya General Manager yang berwenang mengaktifkan / mengarsipkan pengumuman.', 'warning');
       return;
     }
     const nextState = !ann.is_active;
@@ -190,8 +191,9 @@ export default function AnnouncementManagementModal({
       });
       await loadData();
       if (onAnnouncementChanged) onAnnouncementChanged();
+      showToast(`Pengumuman berhasil ${nextState ? 'diaktifkan kembali' : 'diarsipkan'}.`, 'success');
     } catch (e) {
-      alert('Gagal mengubah status pengumuman: ' + e.message);
+      showToast('Gagal mengubah status pengumuman: ' + e.message, 'error');
     }
   };
 

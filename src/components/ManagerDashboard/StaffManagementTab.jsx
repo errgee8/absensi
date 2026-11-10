@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { UserPlus, Key, ShieldAlert, CheckCircle2, XCircle, Search, Eye, EyeOff, RefreshCw, Sparkles, UserCheck, Building2, Trash2 } from 'lucide-react';
 import { getAdminStaffList, createStaff, resetStaffPin, toggleStaffStatus, deleteStaff } from '../../utils/api';
+import { showToast } from '../Common/Toast';
 
 export default function StaffManagementTab({ onStaffUpdated }) {
   const [staffRoster, setStaffRoster] = useState([]);
@@ -207,8 +208,9 @@ export default function StaffManagementTab({ onStaffUpdated }) {
       setNewPin('');
       await loadRoster();
       if (onStaffUpdated) onStaffUpdated();
+      showToast('Karyawan baru berhasil ditambahkan.', 'success');
     } catch (err) {
-      alert('Error creating staff: ' + err.message);
+      showToast('Error creating staff: ' + err.message, 'error');
     } finally {
       setSubmitting(false);
     }
@@ -220,8 +222,9 @@ export default function StaffManagementTab({ onStaffUpdated }) {
       await toggleStaffStatus(staff.id, nextStatus);
       await loadRoster();
       if (onStaffUpdated) onStaffUpdated();
+      showToast(`Status staf ${staff.name} berhasil diubah.`, 'success');
     } catch (err) {
-      alert('Error toggling status: ' + err.message);
+      showToast('Error toggling status: ' + err.message, 'error');
     }
   };
 
@@ -233,8 +236,9 @@ export default function StaffManagementTab({ onStaffUpdated }) {
       await deleteStaff(staff.id);
       await loadRoster();
       if (onStaffUpdated) onStaffUpdated();
+      showToast('Staff berhasil dihapus.', 'success');
     } catch (err) {
-      alert('Gagal menghapus staff: ' + err.message);
+      showToast('Gagal menghapus staff: ' + err.message, 'error');
     }
   };
 
@@ -249,8 +253,9 @@ export default function StaffManagementTab({ onStaffUpdated }) {
       setResetPinValue('');
       await loadRoster();
       if (onStaffUpdated) onStaffUpdated();
+      showToast('PIN berhasil diperbarui.', 'success');
     } catch (err) {
-      alert('Error resetting PIN: ' + err.message);
+      showToast('Error resetting PIN: ' + err.message, 'error');
     } finally {
       setPinSubmitting(false);
     }

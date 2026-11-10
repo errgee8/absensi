@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Save, MapPin, Shield, RefreshCw, Clock, ArrowRight, Trash2, RotateCcw } from 'lucide-react';
 import { updateSettings } from '../../utils/api';
+import { showToast } from '../Common/Toast';
 import WipeLeaderboardModal from '../Leaderboard/WipeLeaderboardModal';
 
 export default function VenueSettingsModal({ settings, onClose, onSaved, onGoToSchedules }) {
@@ -28,13 +29,14 @@ export default function VenueSettingsModal({ settings, onClose, onSaved, onGoToS
 
   // Helper to grab browser GPS as venue pin
   const handleUseCurrentGps = () => {
-    if (!navigator.geolocation) return alert('Geolocation tidak didukung browser ini.');
+    if (!navigator.geolocation) return showToast('Geolocation tidak didukung browser ini.', 'warning');
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         setLat(Number(pos.coords.latitude.toFixed(6)));
         setLng(Number(pos.coords.longitude.toFixed(6)));
+        showToast('Koordinat GPS berhasil disematkan.', 'success');
       },
-      (err) => alert('Gagal membaca GPS: ' + err.message),
+      (err) => showToast('Gagal membaca GPS: ' + err.message, 'error'),
       { enableHighAccuracy: true }
     );
   };
@@ -57,10 +59,11 @@ export default function VenueSettingsModal({ settings, onClose, onSaved, onGoToS
         enforce_wifi: 0
       });
 
+      showToast('Pengaturan outlet berhasil disimpan.', 'success');
       onSaved();
       onClose();
     } catch (err) {
-      alert('Error updating settings: ' + err.message);
+      showToast('Error updating settings: ' + err.message, 'error');
     } finally {
       setSaving(false);
     }

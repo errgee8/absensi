@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Clock, Edit2, Save, X, Coffee, Plus, Trash2, CheckCircle2, ShieldAlert, Sparkles, Building2 } from 'lucide-react';
 import { getShiftSchedules, updateShiftSchedule, createShiftSchedule, deleteShiftSchedule } from '../../utils/api';
+import { showToast } from '../Common/Toast';
 
 export default function ShiftSchedulesTab() {
   const [schedules, setSchedules] = useState([]);
@@ -98,8 +99,9 @@ export default function ShiftSchedulesTab() {
       setEditingId(null);
       await loadSchedules();
       showNotification('Jadwal shift berhasil diperbarui.');
+      showToast('Jadwal shift berhasil diperbarui.', 'success');
     } catch (err) {
-      alert('Gagal menyimpan jadwal: ' + err.message);
+      showToast('Gagal menyimpan jadwal: ' + err.message, 'error');
     } finally {
       setSaving(false);
     }
@@ -113,8 +115,9 @@ export default function ShiftSchedulesTab() {
       await deleteShiftSchedule(sched.id);
       await loadSchedules();
       showNotification('Jadwal shift berhasil dihapus.');
+      showToast('Jadwal shift berhasil dihapus.', 'success');
     } catch (err) {
-      alert('Gagal menghapus shift: ' + err.message);
+      showToast('Gagal menghapus shift: ' + err.message, 'error');
     }
   };
 
@@ -140,7 +143,7 @@ export default function ShiftSchedulesTab() {
     try {
       const targetDivision = newDivision === 'Lainnya (Ketik Manual)' ? customDivision.trim() : newDivision;
       if (!targetDivision) {
-        alert('Harap masukkan nama divisi kerja.');
+        showToast('Harap masukkan nama divisi kerja.', 'warning');
         setAdding(false);
         return;
       }
@@ -161,8 +164,9 @@ export default function ShiftSchedulesTab() {
       setAddModalOpen(false);
       await loadSchedules();
       showNotification(`Shift baru "${newShiftName}" untuk ${targetDivision} berhasil ditambahkan!`);
+      showToast(`Shift baru "${newShiftName}" berhasil ditambahkan!`, 'success');
     } catch (err) {
-      alert('Gagal membuat shift baru: ' + err.message);
+      showToast('Gagal membuat shift baru: ' + err.message, 'error');
     } finally {
       setAdding(false);
     }

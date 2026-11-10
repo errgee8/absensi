@@ -17,6 +17,7 @@ import { exportMonthlyPayrollReport, exportTimesheetToExcel } from '../../utils/
 import { getShifts, getStats, getShiftSchedules, getStaffList, getLeaveRequests, getAnnouncements, getAnnouncementReaders, subscribeRealtimeEvents } from '../../utils/api';
 import { getOperationalDateYMD, getOperationalYesterdayYMD, getWitaDateYMD, getAppNow, formatWitaDateTime } from '../../utils/time';
 import { resolveShift } from '../../utils/shiftResolver';
+import { showToast } from '../Common/Toast';
 import { LayoutDashboard, Users, Clock, Radio, Building2, Sparkles, Eye, ShieldAlert, Trophy, FileText, Megaphone } from 'lucide-react';
 
 export default function ManagerDashboard({ venueSettings, refreshSettings, adminAuth, isReadOnly = false, onOpenLeaderboard }) {
@@ -193,6 +194,16 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
     });
   }, [shifts, shiftFilter, schedules]);
 
+  // Live Floor Staff (Sedang Bertugas Detik Ini)
+  const onDutyShifts = React.useMemo(() => {
+    return shifts.filter(
+      (s) => !s.checkout_time || s.status === 'IN_PROGRESS' || s.status === 'ON_DUTY' || s.status === 'ON_BREAK'
+    );
+  }, [shifts]);
+
+  const jpOnDuty = React.useMemo(() => onDutyShifts.filter((s) => s.staff_venue === 'JP Karaoke'), [onDutyShifts]);
+  const lcOnDuty = React.useMemo(() => onDutyShifts.filter((s) => s.staff_venue !== 'JP Karaoke'), [onDutyShifts]);
+
   const handleExportCsv = async () => {
     setIsExporting(true);
     try {
@@ -226,7 +237,7 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
       });
     } catch (err) {
       console.error('Failed to export Excel payroll recap:', err);
-      alert('Gagal mengekspor Rekap Gaji Excel: ' + (err.message || 'Terjadi kesalahan sistem'));
+      showToast('Gagal mengekspor Rekap Gaji Excel: ' + (err.message || 'Terjadi kesalahan sistem'), 'error');
     } finally {
       setIsExporting(false);
     }
@@ -441,6 +452,54 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
                     <span>+ Buat Baru</span>
                   </button>
                 )}
+              </div>
+            </div>
+
+            {/* Live On-Duty Floor Intelligence Banner */}
+            <div className="bg-white border-2 border-slate-200 rounded-3xl p-4 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-3 animate-fade-in">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 rounded-2xl bg-emerald-50 border-2 border-emerald-300 flex items-center justify-center text-emerald-600 shadow-xs relative shrink-0">
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 absolute -top-1 -right-1 animate-ping" />
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-600 absolute -top-1 -right-1" />
+                  <Users className="w-5 h-5 stroke-[2.5]" />
+                </div>
+                <div>
+                  <div className="flex items-center space-x-2">
+                    <span className="text-xs font-black text-slate-950 uppercase tracking-wide">
+                      Sedang Bertugas di Lantai (Live On Duty)
+                    </span>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-950 border border-emerald-300">
+                      {onDutyShifts.length} Staf Aktif
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-600 font-bold mt-0.5">
+                    Monitoring staf yang saat ini aktif bertugas di masing-masing outlet
+                  </p>
+                </div>
+              </div>
+
+              {/* Outlet Breakdown Badges */}
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="px-3 py-1.5 rounded-xl bg-blue-50 border border-blue-200 flex items-center space-x-2">
+                  <span className="text-xs">🎤</span>
+                  <span className="text-xs font-black text-blue-950">JP Karaoke:</span>
+                  <span className="font-mono text-xs font-black text-blue-700 bg-white px-1.5 py-0.5 rounded border border-blue-200">
+                    {jpOnDuty.length} Orang
+                  </span>
+                </div>
+
+                <div className="px-3 py-1.5 rounded-xl bg-amber-50 border border-amber-200 flex items-center space-x-2">
+                  <span className="text-xs">🐱</span>
+                  <span className="text-xs font-black text-amber-950">LuckyCat:</span>
+                  <span className="font-mono text-xs font-black text-amber-700 bg-white px-1.5 py-0.5 rounded border border-amber-200">
+                    {lcOnDuty.length} Orang
+                  </span>
+                  {lcOnDuty.some((s) => s.break_status === 'ON_BREAK') && (
+                    <span className="text-[10px] font-bold text-sky-800 bg-sky-100 px-1.5 py-0.2 rounded border border-sky-300">
+                      ({lcOnDuty.filter((s) => s.break_status === 'ON_BREAK').length} istirahat)
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
 

@@ -1,5 +1,5 @@
-import React from 'react';
-import { Lock, Delete, AlertCircle, Loader2, Trophy } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Lock, Delete, AlertCircle, Loader2, Trophy, Clock } from 'lucide-react';
 
 export default function KioskLoginScreen({
   pin,
@@ -10,13 +10,62 @@ export default function KioskLoginScreen({
   loading,
   error
 }) {
+  const [liveTime, setLiveTime] = useState(() => new Date());
+
+  // Real-time live WITA clock ticking every second
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setLiveTime(new Date());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const timeStr = new Intl.DateTimeFormat('id-ID', {
+    timeZone: 'Asia/Makassar',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false
+  }).format(liveTime);
+
+  const dateStr = new Intl.DateTimeFormat('id-ID', {
+    timeZone: 'Asia/Makassar',
+    weekday: 'long',
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric'
+  }).format(liveTime);
+
+  // Keyboard navigation for physical numpad / keyboard typing
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (loading) return;
+      if (e.key >= '0' && e.key <= '9') {
+        if (pin.length < 4) {
+          const nextPin = pin + e.key;
+          setPin(nextPin);
+          if (nextPin.length === 4) {
+            onLogin(nextPin);
+          }
+        }
+      } else if (e.key === 'Backspace') {
+        setPin((prev) => prev.slice(0, -1));
+      } else if (e.key === 'Escape') {
+        setPin('');
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [pin, loading, onLogin, setPin]);
+
   // Numpad click
   const handleNumClick = (val) => {
     if (loading) return;
-    if (pin.length < 6) {
+    if (pin.length < 4) {
       const nextPin = pin + val;
       setPin(nextPin);
-      // Auto submit if 4 digits
+      // Auto submit immediately on 4 digits
       if (nextPin.length === 4) {
         onLogin(nextPin);
       }
@@ -25,7 +74,7 @@ export default function KioskLoginScreen({
 
   const handleBackspace = () => {
     if (loading) return;
-    setPin(pin.slice(0, -1));
+    setPin((prev) => prev.slice(0, -1));
   };
 
   const handleClear = () => {
@@ -49,6 +98,19 @@ export default function KioskLoginScreen({
         <p className="text-xs text-slate-900 font-extrabold mt-1">
           One Gate System: Absensi Kerja &amp; Checklist QR Toilet
         </p>
+      </div>
+
+      {/* Live WITA Digital Clock Banner */}
+      <div className="mb-4 flex items-center justify-center">
+        <div className="inline-flex items-center space-x-2.5 px-4 py-2.5 rounded-2xl bg-slate-950 text-white shadow-lg border-2 border-slate-800">
+          <Clock className="w-4 h-4 text-emerald-400 animate-pulse" />
+          <span className="font-mono text-base sm:text-lg font-black tracking-widest text-emerald-400">
+            {timeStr} <span className="text-xs font-bold text-slate-300">WITA</span>
+          </span>
+          <span className="text-[11px] font-bold text-slate-400 border-l border-slate-700 pl-2.5 hidden sm:inline">
+            {dateStr}
+          </span>
+        </div>
       </div>
 
       {/* Luxurious Real-time Leaderboard Teaser Banner */}
@@ -162,26 +224,13 @@ export default function KioskLoginScreen({
           </button>
         </div>
 
-        {/* Action Button - Royal Blue */}
-        <button
-          type="button"
-          disabled={loading || pin.length < 4}
-          onClick={() => onLogin(pin)}
-          className={`w-full py-4 rounded-2xl font-black text-sm uppercase tracking-wider flex items-center justify-center space-x-2 transition shadow-lg ${
-            pin.length >= 4 && !loading
-              ? 'bg-blue-600 text-white shadow-blue-600/30 hover:bg-blue-700 active:scale-[0.98]'
-              : 'bg-slate-200 text-slate-500 border border-slate-300 cursor-not-allowed'
-          }`}
-        >
-          {loading ? (
-            <>
-              <Loader2 className="w-5 h-5 animate-spin text-white" />
-              <span>Memeriksa PIN Staf...</span>
-            </>
-          ) : (
-            <span>MASUK KE STAFF PORTAL</span>
-          )}
-        </button>
+        {/* Auto-verifying Loading Indicator */}
+        {loading && (
+          <div className="py-3.5 px-4 rounded-2xl bg-blue-600 text-white font-black text-xs flex items-center justify-center space-x-2 animate-pulse shadow-md shadow-blue-600/30">
+            <Loader2 className="w-4 h-4 animate-spin text-white" />
+            <span>Memverifikasi PIN Staf...</span>
+          </div>
+        )}
       </div>
     </div>
   );

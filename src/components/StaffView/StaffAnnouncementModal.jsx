@@ -19,6 +19,7 @@ import {
 import confetti from 'canvas-confetti';
 import { formatWitaDateTime } from '../../utils/time';
 import ZoomableImage from '../Common/ZoomableImage';
+import { showToast } from '../Common/Toast';
 
 export default function StaffAnnouncementModal({
   isOpen,
@@ -98,7 +99,7 @@ export default function StaffAnnouncementModal({
         }
       }, 1200);
     } catch (e) {
-      alert('Gagal mencatat konfirmasi: ' + (e.message || 'Error'));
+      showToast('Gagal mencatat konfirmasi: ' + (e.message || 'Error'), 'error');
     } finally {
       setSubmitting(false);
     }

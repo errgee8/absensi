@@ -4,6 +4,7 @@ import StaffView from './components/StaffView/StaffView';
 import ManagerDashboard from './components/ManagerDashboard/ManagerDashboard';
 import AdminPinModal from './components/ManagerDashboard/AdminPinModal';
 import LeaderboardModal from './components/Leaderboard/LeaderboardModal';
+import ToastContainer, { showToast } from './components/Common/Toast';
 import { getNetworkStatus, getStaffList, getSettings, getServerTime } from './utils/api';
 import { Smartphone, Download } from 'lucide-react';
 
@@ -66,7 +67,7 @@ export default function App() {
 
   const handleInstallPwa = async () => {
     if (!installPrompt) {
-      alert('Untuk pengguna iPhone/Safari: Tekan tombol Bagikan (Share) di browser bawah lalu pilih "Tambahkan ke Layar Utama" (Add to Home Screen).\n\nUntuk Chrome di Android: Tekan titik tiga di pojok kanan atas lalu pilih "Install Aplikasi" / "Tambahkan ke Layar Utama".');
+      showToast('iPhone/Safari: Tekan Bagikan (Share) lalu pilih "Add to Home Screen".\nAndroid: Tekan titik tiga di kanan atas lalu pilih "Install Aplikasi".', 'info', 6000);
       return;
     }
     installPrompt.prompt();
@@ -174,6 +175,9 @@ export default function App() {
         isOpen={leaderboardOpen}
         onClose={() => setLeaderboardOpen(false)}
       />
+
+      {/* Global Toast Notification System */}
+      <ToastContainer />
     </div>
   );
 }
