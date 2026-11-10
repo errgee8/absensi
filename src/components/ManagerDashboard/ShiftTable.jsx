@@ -3,7 +3,7 @@ import { Eye, AlertTriangle, CheckCircle, Clock, Coffee, MapPin } from 'lucide-r
 import { formatWitaTimeOnly, formatWitaDateOnly, formatDuration } from '../../utils/time';
 import { resolveShift } from '../../utils/shiftResolver';
 
-export default function ShiftTable({ shifts = [], schedules = [], onInspectPhoto, readersSet, hasActiveAnnouncement }) {
+export default function ShiftTable({ shifts = [], schedules = [], onInspectPhoto, onReviewLate, readersSet, hasActiveAnnouncement }) {
   if (shifts.length === 0) {
     return (
       <div className="bg-white border-2 border-slate-200 rounded-3xl p-12 text-center shadow-sm">
@@ -35,7 +35,7 @@ export default function ShiftTable({ shifts = [], schedules = [], onInspectPhoto
       FLAG_UNVERIFIED_NETWORK: { text: 'Unverified Network', color: 'bg-rose-100 text-rose-950 border-rose-300' },
       'FLAG: Break Exceeded 1 Hour': { text: 'Break > 1 Hr', color: 'bg-amber-100 text-amber-950 border-amber-300' },
       'FLAG: Break Past Allowed Window': { text: 'Late Break Window', color: 'bg-amber-100 text-amber-950 border-amber-300' },
-      FLAG_MISSING_CHECKOUT: { text: 'Missing Out (>12h)', color: 'bg-rose-100 text-rose-950 border-rose-300' },
+      FLAG_MISSING_CHECKOUT: { text: 'Lupa Check-Out (Auto Cut-Off)', color: 'bg-rose-100 text-rose-950 border-rose-300' },
       FLAG_EARLY_CHECKOUT: { text: 'Early Check-Out', color: 'bg-amber-100 text-amber-950 border-amber-300' },
       FLAG_NETWORK_MISMATCH: { text: 'Network Mismatch', color: 'bg-purple-100 text-purple-950 border-purple-300' },
       FLAG_OFF_NETWORK: { text: 'Off-Network Attempt', color: 'bg-rose-100 text-rose-950 border-rose-300' },
@@ -45,33 +45,39 @@ export default function ShiftTable({ shifts = [], schedules = [], onInspectPhoto
 
     return (
       <div className="flex flex-wrap gap-1">
-        {/* Special Late Justification status badge */}
+        {/* Special Late Justification status badge - 1-Click to Review */}
         {isLateApproved && (
-          <span
-            className="inline-flex items-center space-x-1 px-1.5 py-0.5 rounded-md text-[9px] font-black border bg-emerald-100 text-emerald-950 border-emerald-300"
-            title={shift?.late_reviewed_by ? `Di-ACC oleh ${shift.late_reviewed_by}` : 'Di-ACC'}
+          <button
+            type="button"
+            onClick={() => onReviewLate?.(shift)}
+            className="inline-flex items-center space-x-1 px-1.5 py-0.5 rounded-md text-[9px] font-black border bg-emerald-100 text-emerald-950 border-emerald-300 hover:bg-emerald-200 transition cursor-pointer shadow-2xs"
+            title={shift?.late_reviewed_by ? `Di-ACC oleh ${shift.late_reviewed_by}. Klik untuk lihat/ubah.` : 'Di-ACC. Klik untuk detail.'}
           >
             <CheckCircle className="w-2.5 h-2.5 stroke-[2.5]" />
             <span>Late Di-ACC ✓</span>
-          </span>
+          </button>
         )}
         {!isLateApproved && isLatePending && (
-          <span
-            className="inline-flex items-center space-x-1 px-1.5 py-0.5 rounded-md text-[9px] font-black border bg-amber-100 text-amber-950 border-amber-400 animate-pulse"
-            title="Keterlambatan belum direview management"
+          <button
+            type="button"
+            onClick={() => onReviewLate?.(shift)}
+            className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-md text-[9px] font-black border bg-amber-500 hover:bg-amber-600 text-white border-amber-600 transition cursor-pointer shadow-sm animate-pulse"
+            title="Klik 1-tombol untuk melihat detail keterlambatan & ACC / Tolak"
           >
             <Clock className="w-2.5 h-2.5 stroke-[2.5]" />
-            <span>Late: Perlu Review ⏳</span>
-          </span>
+            <span>Review Late ⏳</span>
+          </button>
         )}
         {!isLateApproved && isLateRejected && (
-          <span
-            className="inline-flex items-center space-x-1 px-1.5 py-0.5 rounded-md text-[9px] font-black border bg-rose-100 text-rose-950 border-rose-300"
-            title={shift?.late_reviewed_by ? `Ditolak oleh ${shift.late_reviewed_by}` : 'Ditolak'}
+          <button
+            type="button"
+            onClick={() => onReviewLate?.(shift)}
+            className="inline-flex items-center space-x-1 px-1.5 py-0.5 rounded-md text-[9px] font-black border bg-rose-100 text-rose-950 border-rose-300 hover:bg-rose-200 transition cursor-pointer shadow-2xs"
+            title={shift?.late_reviewed_by ? `Ditolak oleh ${shift.late_reviewed_by}. Klik untuk lihat/ubah.` : 'Ditolak. Klik untuk detail.'}
           >
             <AlertTriangle className="w-2.5 h-2.5 stroke-[2.5]" />
             <span>Late Ditolak ✕</span>
-          </span>
+          </button>
         )}
 
         {flags?.map((f, idx) => {
@@ -306,15 +312,41 @@ export default function ShiftTable({ shifts = [], schedules = [], onInspectPhoto
                   {/* Flags */}
                   <td className="py-3 px-3 max-w-xs">{renderFlagBadges(shift.flags, shift)}</td>
 
-                  {/* Inspect Button */}
-                  <td className="py-3 px-2 text-right">
-                    <button
-                      onClick={() => onInspectPhoto(shift, shift.checkout_photo ? 'out' : 'in')}
-                      className="p-2 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 transition shadow-sm"
-                      title="Lihat detail audit shift"
-                    >
-                      <Eye className="w-4 h-4 stroke-[2.5]" />
-                    </button>
+                  {/* Inspect Button & 1-Click Late Review */}
+                  <td className="py-3 px-2 text-right whitespace-nowrap">
+                    <div className="flex items-center justify-end space-x-1.5">
+                      {(shift.flags?.some(f => String(f).includes('Late')) || shift.late_status || shift.late_reason) && (
+                        <button
+                          type="button"
+                          onClick={() => onReviewLate?.(shift)}
+                          className={`px-2 py-1.5 rounded-xl border text-[10px] font-black transition flex items-center space-x-1 shadow-2xs cursor-pointer ${
+                            shift.late_status === 'APPROVED' || shift.flags?.includes('FLAG_LATE_EXCUSED')
+                              ? 'bg-emerald-100 hover:bg-emerald-200 text-emerald-950 border-emerald-300'
+                              : shift.late_status === 'REJECTED'
+                              ? 'bg-rose-100 hover:bg-rose-200 text-rose-950 border-rose-300'
+                              : 'bg-amber-500 hover:bg-amber-600 text-white border-amber-600 animate-pulse'
+                          }`}
+                          title="1-Klik Review Keterlambatan (Waktu seharusnya vs aktual & ACC/Tolak)"
+                        >
+                          <Clock className="w-3.5 h-3.5 stroke-[2.5]" />
+                          <span className="hidden sm:inline">
+                            {shift.late_status === 'APPROVED' || shift.flags?.includes('FLAG_LATE_EXCUSED')
+                              ? 'Late Di-ACC'
+                              : shift.late_status === 'REJECTED'
+                              ? 'Late Ditolak'
+                              : 'Review Late'}
+                          </span>
+                        </button>
+                      )}
+
+                      <button
+                        onClick={() => onInspectPhoto(shift, shift.checkout_photo ? 'out' : 'in')}
+                        className="p-2 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 transition shadow-sm"
+                        title="Lihat detail audit shift"
+                      >
+                        <Eye className="w-4 h-4 stroke-[2.5]" />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               );

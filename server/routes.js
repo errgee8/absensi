@@ -842,6 +842,21 @@ router.post('/staff/verify-pin', async (req, res) => {
     return res.status(401).json({ error: 'PIN salah. Silakan coba lagi.' });
   }
 
+  // Auto-close any forgotten previous-day shifts that passed 07:00 WITA cutoff
+  if (isSupabaseConfigured) {
+    try {
+      await cloudDb.autoCloseCutoffShifts(staff.uuid || staff.id);
+    } catch {}
+  }
+  try {
+    const curOpDate = getOperationalDateYMD(new Date());
+    db.prepare(`
+      UPDATE shifts 
+      SET status = 'COMPLETED', updated_at = datetime('now')
+      WHERE staff_id = ? AND status != 'COMPLETED' AND date < ?
+    `).run(staff.id, curOpDate);
+  } catch {}
+
   // Get active shift
   let activeShift = db.prepare(`
     SELECT s.*, st.name as staff_name, st.venue, st.division, st.role, st.department, st.standard_hours
@@ -1184,6 +1199,21 @@ router.post('/checkin', async (req, res) => {
   if (!staff) return res.status(404).json({ error: 'Karyawan tidak ditemukan.' });
   if (!staff.is_active) return res.status(403).json({ error: 'Akun dinonaktifkan. Hubungi Manajer / HR.' });
   if (pin && staff.pin && staff.pin !== pin.trim()) return res.status(401).json({ error: 'PIN Rahasia salah.' });
+
+  // Auto-close any forgotten previous-day shifts that passed 07:00 WITA cutoff
+  if (isSupabaseConfigured) {
+    try {
+      await cloudDb.autoCloseCutoffShifts(staff.uuid || staff.id);
+    } catch {}
+  }
+  try {
+    const curOpDate = getOperationalDateYMD(new Date());
+    db.prepare(`
+      UPDATE shifts 
+      SET status = 'COMPLETED', updated_at = datetime('now')
+      WHERE staff_id = ? AND status != 'COMPLETED' AND date < ?
+    `).run(staff.id, curOpDate);
+  } catch {}
 
   const existingActive = db.prepare("SELECT id FROM shifts WHERE staff_id = ? AND status != 'COMPLETED'").get(staff.id);
   if (existingActive) {
@@ -1977,7 +2007,7 @@ router.post('/checkout', async (req, res) => {
 
 // 14. Manager Shifts List with Advanced Filters
 router.get('/shifts', async (req, res) => {
-  auditOpenShifts();
+  await auditOpenShifts();
 
   // Primary: Supabase Cloud (authoritative & persistent across serverless containers)
   if (isSupabaseConfigured) {
@@ -2049,7 +2079,7 @@ router.get('/shifts', async (req, res) => {
 
 // 15. Manager KPI Stats
 router.get('/stats', async (req, res) => {
-  auditOpenShifts();
+  await auditOpenShifts();
 
   // Primary: Supabase Cloud (authoritative & persistent across serverless containers)
   if (isSupabaseConfigured) {

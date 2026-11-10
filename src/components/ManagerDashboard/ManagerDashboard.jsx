@@ -3,6 +3,7 @@ import DashboardHeader from './DashboardHeader';
 import FilterBar from './FilterBar';
 import ShiftTable from './ShiftTable';
 import PhotoDetailModal from './PhotoDetailModal';
+import LateReviewModal from './LateReviewModal';
 import VenueSettingsModal from './VenueSettingsModal';
 import PrintableTimesheet from './PrintableTimesheet';
 import StaffManagementTab from './StaffManagementTab';
@@ -47,6 +48,7 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
   const [activeAnnouncement, setActiveAnnouncement] = useState(null);
   const [announcementCompliance, setAnnouncementCompliance] = useState(null);
   const [recoveryModalOpen, setRecoveryModalOpen] = useState(false);
+  const [lateReviewShift, setLateReviewShift] = useState(null);
 
   const departments = [
     'Server and Cashier',
@@ -466,6 +468,7 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
               readersSet={announcementCompliance?.readersSet}
               hasActiveAnnouncement={Boolean(activeAnnouncement)}
               onInspectPhoto={(shift, type) => setInspectData({ shift, type })}
+              onReviewLate={(shift) => setLateReviewShift(shift)}
             />
           </>
         )}
@@ -504,6 +507,20 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
               loadPendingLeaveCount();
             }}
             onClose={() => setInspectData(null)}
+          />
+        )}
+
+        {/* Modal: 1-Click Late Check-In Review */}
+        {lateReviewShift && (
+          <LateReviewModal
+            shift={lateReviewShift}
+            schedules={schedules}
+            adminAuth={adminAuth}
+            onClose={() => setLateReviewShift(null)}
+            onShiftUpdated={() => {
+              loadData();
+              loadPendingLeaveCount();
+            }}
           />
         )}
 

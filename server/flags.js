@@ -1,6 +1,8 @@
 import { isWithinGeofence } from './geofence.js';
 import { validateClientNetwork } from './network.js';
 import { getSetting, db } from './db.js';
+import { getOperationalDateYMD } from './shifts.js';
+import { isSupabaseConfigured, cloudDb } from './supabase.js';
 
 export const FLAG_TYPES = {
   MISSING_CHECKOUT: 'FLAG_MISSING_CHECKOUT',
@@ -209,32 +211,60 @@ export function evaluateCheckoutFlags({
 }
 
 /**
- * Routine audit to detect open shifts exceeding 12 hours without checkout
+ * Routine audit to detect open shifts exceeding cutoff (07:00 WITA) or >12 hours without checkout.
+ * Auto-terminates forgotten sessions so staff can check in cleanly the next day without button conflict.
  */
-export function auditOpenShifts() {
+export async function auditOpenShifts() {
   const now = new Date();
-  const openShifts = db.prepare(`SELECT * FROM shifts WHERE status != 'COMPLETED'`).all();
+  const currentOpDate = getOperationalDateYMD(now);
+  const nowIso = now.toISOString();
 
-  const updateStmt = db.prepare(`
-    UPDATE shifts 
-    SET flags = ?, updated_at = datetime('now')
-    WHERE id = ?
-  `);
-
-  for (const shift of openShifts) {
-    const checkinDate = new Date(shift.checkin_time);
-    const elapsedHours = (now.getTime() - checkinDate.getTime()) / (1000 * 60 * 60);
-
-    let flags = [];
+  // 1. Supabase Cloud audit and auto-close
+  if (isSupabaseConfigured) {
     try {
-      flags = JSON.parse(shift.flags || '[]');
-    } catch {
-      flags = [];
+      await cloudDb.autoCloseCutoffShifts();
+    } catch (e) {
+      console.warn('Supabase autoCloseCutoffShifts error:', e.message);
     }
+  }
 
-    if (elapsedHours > 12 && !flags.includes(FLAG_TYPES.MISSING_CHECKOUT)) {
-      flags.push(FLAG_TYPES.MISSING_CHECKOUT);
-      updateStmt.run(JSON.stringify(flags), shift.id);
+  // 2. SQLite local audit and auto-close
+  try {
+    const openShifts = db.prepare(`SELECT * FROM shifts WHERE status != 'COMPLETED'`).all();
+
+    for (const shift of openShifts) {
+      const checkinDate = new Date(shift.checkin_time || shift.created_at);
+      const elapsedHours = (now.getTime() - checkinDate.getTime()) / (1000 * 60 * 60);
+      const isPastCutoff = (shift.date && shift.date < currentOpDate && elapsedHours >= 8) || (elapsedHours >= 14);
+
+      let flags = [];
+      try {
+        flags = JSON.parse(shift.flags || '[]');
+      } catch {
+        flags = [];
+      }
+
+      if (isPastCutoff) {
+        if (!flags.includes(FLAG_TYPES.MISSING_CHECKOUT)) {
+          flags.push(FLAG_TYPES.MISSING_CHECKOUT);
+        }
+        let parsedNotes = {};
+        try { parsedNotes = JSON.parse(shift.notes || '{}'); } catch {}
+        parsedNotes.auto_closed_reason = 'CUTOFF_07_MISSED_CHECKOUT';
+        parsedNotes.auto_closed_note = 'Lupa Check-Out Pulang (Sesi otomatis diakhiri pada cut off 07:00 WITA)';
+        parsedNotes.auto_closed_at = nowIso;
+
+        db.prepare(`
+          UPDATE shifts 
+          SET status = 'COMPLETED', flags = ?, notes = ?, updated_at = datetime('now')
+          WHERE id = ?
+        `).run(JSON.stringify(flags), JSON.stringify(parsedNotes), shift.id);
+      } else if (elapsedHours > 12 && !flags.includes(FLAG_TYPES.MISSING_CHECKOUT)) {
+        flags.push(FLAG_TYPES.MISSING_CHECKOUT);
+        db.prepare(`UPDATE shifts SET flags = ?, updated_at = datetime('now') WHERE id = ?`).run(JSON.stringify(flags), shift.id);
+      }
     }
+  } catch (err) {
+    console.warn('SQLite auditOpenShifts error:', err.message);
   }
 }

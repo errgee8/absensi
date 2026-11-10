@@ -466,6 +466,96 @@ export const cloudDb = {
     return data;
   },
 
+  // 6b. Auto-close shifts that missed checkout past 07:00 WITA cutoff
+  async autoCloseCutoffShifts(staffUuid = null) {
+    if (!supabase) return [];
+    try {
+      const now = new Date();
+      const currentOpDate = getOperationalDateYMD(now);
+      const nowIso = now.toISOString();
+
+      let query = supabase
+        .from('attendance_logs')
+        .select('id, staff_id, shift_date, check_in_time, status, flags, notes')
+        .neq('status', 'COMPLETED');
+
+      if (staffUuid) {
+        query = query.eq('staff_id', staffUuid);
+      }
+
+      const { data: openLogs, error } = await query;
+      if (error) throw error;
+      if (!openLogs || openLogs.length === 0) return [];
+
+      const closedIds = [];
+      for (const log of openLogs) {
+        const checkinTime = log.check_in_time ? new Date(log.check_in_time) : new Date(log.created_at);
+        const elapsedHours = (now.getTime() - checkinTime.getTime()) / (1000 * 3600);
+
+        // Condition: Past cutoff if shift_date < currentOpDate AND elapsed >= 8 hours, OR elapsed >= 14 hours
+        const isPastCutoff = (log.shift_date && log.shift_date < currentOpDate && elapsedHours >= 8) || (elapsedHours >= 14);
+
+        if (isPastCutoff) {
+          let flags = Array.isArray(log.flags)
+            ? [...log.flags]
+            : (typeof log.flags === 'string' ? JSON.parse(log.flags || '[]') : []);
+
+          if (!flags.includes('FLAG_MISSING_CHECKOUT')) {
+            flags.push('FLAG_MISSING_CHECKOUT');
+          }
+
+          let parsedNotes = {};
+          try {
+            if (typeof log.notes === 'string' && log.notes.startsWith('{')) {
+              parsedNotes = JSON.parse(log.notes);
+            } else if (log.notes) {
+              parsedNotes = { legacy_note: log.notes };
+            }
+          } catch {}
+          parsedNotes.auto_closed_reason = 'CUTOFF_07_MISSED_CHECKOUT';
+          parsedNotes.auto_closed_note = 'Lupa Check-Out Pulang (Sesi otomatis diakhiri pada cut off 07:00 WITA)';
+          parsedNotes.auto_closed_at = nowIso;
+
+          // Default duration to standard shift length (e.g. 8 hours)
+          const duration = Math.min(Math.round(elapsedHours * 60), 8 * 60);
+
+          await supabase
+            .from('attendance_logs')
+            .update({
+              status: 'COMPLETED',
+              duration_minutes: duration,
+              flags,
+              notes: JSON.stringify(parsedNotes),
+              updated_at: nowIso
+            })
+            .eq('id', log.id);
+
+          // Close any open break_logs associated with this shift
+          try {
+            await supabase
+              .from('break_logs')
+              .update({
+                status: 'COMPLETED',
+                break_end: new Date(checkinTime.getTime() + 60 * 60 * 1000).toISOString()
+              })
+              .eq('attendance_id', log.id)
+              .eq('status', 'ON_BREAK');
+          } catch {}
+
+          closedIds.push(log.id);
+        }
+      }
+
+      if (closedIds.length > 0) {
+        console.log(`[AutoCutoff] Closed ${closedIds.length} open shift(s) past 07:00 WITA cutoff:`, closedIds);
+      }
+      return closedIds;
+    } catch (e) {
+      console.warn('Error in cloudDb.autoCloseCutoffShifts:', e.message);
+      return [];
+    }
+  },
+
   // 7. Get Shifts from Cloud with complete filter support
   async getShifts({ startDate, endDate, venue, department, flagFilter, search } = {}) {
     if (!supabase) return null;
