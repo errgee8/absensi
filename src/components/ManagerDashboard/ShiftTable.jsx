@@ -312,41 +312,15 @@ export default function ShiftTable({ shifts = [], schedules = [], onInspectPhoto
                   {/* Flags */}
                   <td className="py-3 px-3 max-w-xs">{renderFlagBadges(shift.flags, shift)}</td>
 
-                  {/* Inspect Button & 1-Click Late Review */}
-                  <td className="py-3 px-2 text-right whitespace-nowrap">
-                    <div className="flex items-center justify-end space-x-1.5">
-                      {(shift.flags?.some(f => String(f).includes('Late')) || shift.late_status || shift.late_reason) && (
-                        <button
-                          type="button"
-                          onClick={() => onReviewLate?.(shift)}
-                          className={`px-2 py-1.5 rounded-xl border text-[10px] font-black transition flex items-center space-x-1 shadow-2xs cursor-pointer ${
-                            shift.late_status === 'APPROVED' || shift.flags?.includes('FLAG_LATE_EXCUSED')
-                              ? 'bg-emerald-100 hover:bg-emerald-200 text-emerald-950 border-emerald-300'
-                              : shift.late_status === 'REJECTED'
-                              ? 'bg-rose-100 hover:bg-rose-200 text-rose-950 border-rose-300'
-                              : 'bg-amber-500 hover:bg-amber-600 text-white border-amber-600 animate-pulse'
-                          }`}
-                          title="1-Klik Review Keterlambatan (Waktu seharusnya vs aktual & ACC/Tolak)"
-                        >
-                          <Clock className="w-3.5 h-3.5 stroke-[2.5]" />
-                          <span className="hidden sm:inline">
-                            {shift.late_status === 'APPROVED' || shift.flags?.includes('FLAG_LATE_EXCUSED')
-                              ? 'Late Di-ACC'
-                              : shift.late_status === 'REJECTED'
-                              ? 'Late Ditolak'
-                              : 'Review Late'}
-                          </span>
-                        </button>
-                      )}
-
-                      <button
-                        onClick={() => onInspectPhoto(shift, shift.checkout_photo ? 'out' : 'in')}
-                        className="p-2 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 transition shadow-sm"
-                        title="Lihat detail audit shift"
-                      >
-                        <Eye className="w-4 h-4 stroke-[2.5]" />
-                      </button>
-                    </div>
+                  {/* Inspect Button */}
+                  <td className="py-3 px-2 text-right">
+                    <button
+                      onClick={() => onInspectPhoto(shift, shift.checkout_photo ? 'out' : 'in')}
+                      className="p-2 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 transition shadow-sm"
+                      title="Lihat detail audit shift"
+                    >
+                      <Eye className="w-4 h-4 stroke-[2.5]" />
+                    </button>
                   </td>
                 </tr>
               );
