@@ -699,7 +699,7 @@ export const cloudDb = {
   // 8. Get KPI Stats from Cloud
   async getStats() {
     if (!supabase) return null;
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = getOperationalDateYMD(new Date());
 
     const { data: todayLogs, error } = await supabase
       .from('attendance_logs')
