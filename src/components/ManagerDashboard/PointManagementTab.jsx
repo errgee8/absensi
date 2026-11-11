@@ -1,0 +1,960 @@
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import ExcelJS from 'exceljs';
+import {
+  AlertTriangle,
+  Award,
+  CheckCircle2,
+  Clock,
+  Download,
+  FileSpreadsheet,
+  History,
+  Lock,
+  Plus,
+  RefreshCw,
+  Search,
+  Send,
+  ShieldCheck,
+  Trash2,
+  UserCheck,
+  Users,
+  X
+} from 'lucide-react';
+import { getPoints, getStaffList, createStaffPoint, deleteStaffPoint, subscribeRealtimeEvents } from '../../utils/api';
+import { formatWitaDateTime, getPointCycleInfo } from '../../utils/time';
+import { showToast } from '../Common/Toast';
+
+export default function PointManagementTab({ adminAuth, isReadOnly = false, onPointsUpdated }) {
+  const [staffList, setStaffList] = useState([]);
+  const [pointsData, setPointsData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  // Sub-tab: 'RECAP' | 'LOG'
+  const [subTab, setSubTab] = useState('RECAP');
+
+  // Shared Filters
+  const [selectedCycleKey, setSelectedCycleKey] = useState('CURRENT');
+  const [venueFilter, setVenueFilter] = useState('ALL');
+  const [search, setSearch] = useState('');
+  const [onlyWithPoints, setOnlyWithPoints] = useState(false);
+  const [statusFilter, setStatusFilter] = useState('ALL'); // 'ALL' | 'PENDING' | 'ACKNOWLEDGED'
+
+  // Give Point Form State
+  const [staffSearchQuery, setStaffSearchQuery] = useState('');
+  const [formVenueFilter, setFormVenueFilter] = useState('ALL');
+  const [selectedStaffId, setSelectedStaffId] = useState('');
+  const [pointAmount, setPointAmount] = useState('');
+  const [reason, setReason] = useState('');
+  const [pinInput, setPinInput] = useState(adminAuth?.pin || '');
+  const [submitting, setSubmitting] = useState(false);
+
+  // Delete confirmation modal (strictly Operational Manager)
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deletePin, setDeletePin] = useState(adminAuth?.pin || '');
+  const [deleting, setDeleting] = useState(false);
+
+  const [exporting, setExporting] = useState(false);
+
+  useEffect(() => {
+    if (adminAuth?.pin && !pinInput) {
+      setPinInput(adminAuth.pin);
+    }
+    if (adminAuth?.pin && !deletePin) {
+      setDeletePin(adminAuth.pin);
+    }
+  }, [adminAuth?.pin]);
+
+  const loadData = useCallback(async (isSilent = false) => {
+    if (!isSilent) setRefreshing(true);
+    try {
+      const [ptsRes, staffRes] = await Promise.all([
+        getPoints({ cycleKey: selectedCycleKey, status: 'ALL' }),
+        getStaffList('ALL')
+      ]);
+      setPointsData(ptsRes);
+      setStaffList(Array.isArray(staffRes) ? staffRes : []);
+    } catch (err) {
+      console.error('Failed to load point management data:', err);
+      if (!isSilent) showToast('Gagal memuat data poin: ' + (err.message || 'Error'), 'error');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [selectedCycleKey]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  useEffect(() => {
+    const unsubscribe = subscribeRealtimeEvents((eventType) => {
+      if (eventType === 'POINT_UPDATE') {
+        loadData(true);
+        if (onPointsUpdated) onPointsUpdated();
+      }
+    });
+    return () => unsubscribe();
+  }, [loadData, onPointsUpdated]);
+
+  const currentCycle = pointsData?.currentCycle || getPointCycleInfo();
+  const activeCycleInfo = pointsData?.selectedCycle || currentCycle;
+  const availableCycles = pointsData?.availableCycles || [currentCycle];
+  const allPoints = pointsData?.points || [];
+  const staffTotals = pointsData?.staffTotals || [];
+
+  // Selectable staff in the form (exclude Management if desired? Keep non-management first or all active staff cleanly searchable)
+  const selectableStaff = useMemo(() => {
+    const q = staffSearchQuery.trim().toLowerCase();
+    return staffList
+      .filter((s) => {
+        if (formVenueFilter !== 'ALL' && s.venue !== formVenueFilter) return false;
+        if (!q) return true;
+        return (
+          (s.name && s.name.toLowerCase().includes(q)) ||
+          (s.division && s.division.toLowerCase().includes(q)) ||
+          (s.role && s.role.toLowerCase().includes(q)) ||
+          (s.venue && s.venue.toLowerCase().includes(q))
+        );
+      })
+      .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  }, [staffList, staffSearchQuery, formVenueFilter]);
+
+  const selectedStaffObj = useMemo(
+    () => staffList.find((s) => String(s.id) === String(selectedStaffId) || String(s.uuid) === String(selectedStaffId)),
+    [staffList, selectedStaffId]
+  );
+
+  // KPI metrics for selected period
+  const stats = useMemo(() => {
+    const totalPoints = allPoints.reduce((sum, p) => sum + Number(p.points || 0), 0);
+    const totalEntries = allPoints.length;
+    const acknowledged = allPoints.filter((p) => p.status === 'ACKNOWLEDGED').length;
+    const pending = totalEntries - acknowledged;
+    return {
+      totalPoints: Math.round(totalPoints * 100) / 100,
+      totalEntries,
+      acknowledged,
+      pending
+    };
+  }, [allPoints]);
+
+  // Filtered staff recap table
+  const filteredRecap = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return staffTotals.filter((row) => {
+      if (venueFilter !== 'ALL' && row.staff_venue !== venueFilter) return false;
+      if (onlyWithPoints && Number(row.total_points || 0) === 0 && Number(row.violation_count || 0) === 0) return false;
+      if (q) {
+        return (
+          (row.staff_name && row.staff_name.toLowerCase().includes(q)) ||
+          (row.staff_division && row.staff_division.toLowerCase().includes(q)) ||
+          (row.staff_role && row.staff_role.toLowerCase().includes(q)) ||
+          (row.staff_venue && row.staff_venue.toLowerCase().includes(q))
+        );
+      }
+      return true;
+    });
+  }, [staffTotals, venueFilter, onlyWithPoints, search]);
+
+  // Filtered violation log table
+  const filteredLogs = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return allPoints.filter((p) => {
+      if (venueFilter !== 'ALL' && p.staff_venue !== venueFilter) return false;
+      if (statusFilter !== 'ALL' && p.status !== statusFilter) return false;
+      if (q) {
+        return (
+          (p.staff_name && p.staff_name.toLowerCase().includes(q)) ||
+          (p.reason && p.reason.toLowerCase().includes(q)) ||
+          (p.given_by && p.given_by.toLowerCase().includes(q)) ||
+          (p.staff_division && p.staff_division.toLowerCase().includes(q))
+        );
+      }
+      return true;
+    });
+  }, [allPoints, venueFilter, statusFilter, search]);
+
+  const handleSubmitPoint = async (e) => {
+    e.preventDefault();
+    if (submitting) return;
+
+    const effectivePin = (adminAuth?.pin || pinInput || '').trim();
+    if (!effectivePin) {
+      showToast('Masukkan PIN otorisasi Operational Manager / Assistant Manager terlebih dahulu.', 'error');
+      return;
+    }
+    if (!selectedStaffId) {
+      showToast('Pilih nama staff yang akan diberikan poin.', 'error');
+      return;
+    }
+    const numPts = Number(pointAmount);
+    if (!Number.isFinite(numPts) || numPts === 0) {
+      showToast('Masukkan jumlah poin berupa angka yang valid (tidak boleh 0).', 'error');
+      return;
+    }
+    if (!reason.trim()) {
+      showToast('Alasan pemberian poin wajib diisi.', 'error');
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const res = await createStaffPoint({
+        pin: effectivePin,
+        staffId: selectedStaffId,
+        points: numPts,
+        reason: reason.trim()
+      });
+      showToast(res.message || 'Poin pelanggaran berhasil diberikan & notifikasi dikirim.', 'success');
+      setSelectedStaffId('');
+      setStaffSearchQuery('');
+      setPointAmount('');
+      setReason('');
+      await loadData(true);
+      if (onPointsUpdated) onPointsUpdated();
+    } catch (err) {
+      showToast(err.message || 'Gagal memberikan poin.', 'error');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleConfirmDelete = async (e) => {
+    e.preventDefault();
+    if (!deleteTarget || deleting) return;
+    const effectivePin = (adminAuth?.pin || deletePin || '').trim();
+    if (!effectivePin) {
+      showToast('PIN Operational Manager wajib diisi untuk menghapus catatan poin.', 'error');
+      return;
+    }
+
+    setDeleting(true);
+    try {
+      await deleteStaffPoint(deleteTarget.id, effectivePin);
+      showToast('Catatan poin berhasil dihapus.', 'success');
+      setDeleteTarget(null);
+      await loadData(true);
+      if (onPointsUpdated) onPointsUpdated();
+    } catch (err) {
+      showToast(err.message || 'Gagal menghapus catatan poin.', 'error');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const handleExportExcel = async () => {
+    setExporting(true);
+    try {
+      const workbook = new ExcelJS.Workbook();
+      workbook.creator = 'JP & LuckyCat Attendance System';
+
+      // Sheet 1: Rekap Cut-Off Per Staff
+      const wsRecap = workbook.addWorksheet('Rekap Poin Cut-Off');
+      wsRecap.addRow([
+        `REKAP AKUMULASI POIN PELANGGARAN STAFF — PERIODE: ${selectedCycleKey === 'ALL' ? 'SEMUA PERIODE' : activeCycleInfo.label}`
+      ]);
+      wsRecap.addRow([`Dicetak oleh: ${adminAuth?.staffName || 'Management'} • ${formatWitaDateTime(new Date().toISOString())}`]);
+      wsRecap.addRow([]);
+      wsRecap.addRow([
+        'No',
+        'Nama Staff',
+        'Outlet',
+        'Divisi / Role',
+        'Jumlah Pelanggaran',
+        'Total Poin Akumulasi',
+        'Sudah Disetujui Staff',
+        'Belum Disetujui Staff'
+      ]);
+
+      const headerRow = wsRecap.getRow(4);
+      headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+      headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E293B' } };
+
+      filteredRecap.forEach((row, idx) => {
+        wsRecap.addRow([
+          idx + 1,
+          row.staff_name,
+          row.staff_venue,
+          row.staff_division || row.staff_role,
+          row.violation_count,
+          row.total_points,
+          row.acknowledged_count,
+          row.pending_count
+        ]);
+      });
+
+      wsRecap.columns.forEach((col, idx) => {
+        col.width = idx === 1 ? 26 : idx === 3 ? 24 : 18;
+      });
+
+      // Sheet 2: Log Riwayat Detail
+      const wsLog = workbook.addWorksheet('Log Riwayat Poin');
+      wsLog.addRow([
+        'No',
+        'Tanggal & Waktu (WITA)',
+        'Periode Cut-Off',
+        'Nama Staff',
+        'Outlet',
+        'Divisi',
+        'Jumlah Poin',
+        'Alasan Pelanggaran',
+        'Diberikan Oleh',
+        'Status Konfirmasi Staff',
+        'Waktu Disetujui Staff (WITA)'
+      ]);
+      const logHeader = wsLog.getRow(1);
+      logHeader.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+      logHeader.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E293B' } };
+
+      filteredLogs.forEach((pt, idx) => {
+        wsLog.addRow([
+          idx + 1,
+          formatWitaDateTime(pt.created_at),
+          pt.cycle_label,
+          pt.staff_name,
+          pt.staff_venue,
+          pt.staff_division,
+          pt.points,
+          pt.reason,
+          pt.given_by,
+          pt.status === 'ACKNOWLEDGED' ? 'Sudah Disetujui Staff' : 'Menunggu Persetujuan',
+          pt.acknowledged_at ? formatWitaDateTime(pt.acknowledged_at) : '-'
+        ]);
+      });
+
+      wsLog.columns.forEach((col, idx) => {
+        col.width = idx === 7 ? 38 : idx === 1 || idx === 10 ? 24 : 18;
+      });
+
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const fileSlug = selectedCycleKey === 'ALL' ? 'Semua_Periode' : activeCycleInfo.cycleKey;
+      a.download = `Rekap_Poin_Staff_${fileSlug}.xlsx`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+      showToast('File Excel Rekap Poin berhasil diunduh.', 'success');
+    } catch (err) {
+      showToast('Gagal mengekspor Excel: ' + err.message, 'error');
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const quickSelectStaff = (staffId) => {
+    setSelectedStaffId(staffId);
+    const target = staffList.find((s) => String(s.id) === String(staffId));
+    if (target) {
+      setStaffSearchQuery(target.name);
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const issuerLabel = adminAuth?.role === 'MANAGER'
+    ? 'Operational Manager'
+    : `Assistant Manager${adminAuth?.staffName && adminAuth.staffName !== 'Assistant Manager' ? ` (${adminAuth.staffName})` : ''}`;
+
+  return (
+    <div className="space-y-6 animate-fade-in text-slate-200">
+      {/* Header Banner + Cutoff Period KPI */}
+      <div className="bg-[#161b24] border border-slate-800 rounded-3xl p-5 shadow-xl space-y-4">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+          <div className="flex items-center space-x-3">
+            <div className="w-11 h-11 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-rose-400 flex items-center justify-center shrink-0">
+              <Award className="w-6 h-6 stroke-[2.2]" />
+            </div>
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="text-lg font-bold text-white tracking-tight">
+                  Sistem Poin Pelanggaran Staff
+                </h2>
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase bg-blue-950 text-blue-300 border border-blue-500/30">
+                  Akses: {issuerLabel}
+                </span>
+              </div>
+              <p className="text-xs text-slate-400 font-medium mt-0.5">
+                Siklus Reset Bulanan: <strong className="text-slate-200">Tanggal 17 s/d Tanggal 13 bulan berikutnya</strong> • Periode aktif: <strong className="text-amber-300">{currentCycle.label}</strong>
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => loadData(false)}
+              disabled={refreshing}
+              className="px-3.5 py-2 rounded-xl bg-[#1c2230] hover:bg-[#252d3f] border border-slate-700 text-xs font-bold text-slate-200 flex items-center space-x-1.5 transition cursor-pointer"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin text-blue-400' : ''}`} />
+              <span>Refresh</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleExportExcel}
+              disabled={exporting}
+              className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center space-x-1.5 shadow-md shadow-emerald-600/20 transition cursor-pointer"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5" />
+              <span>{exporting ? 'Menyiapkan...' : 'Export Excel Cut-Off'}</span>
+            </button>
+          </div>
+        </div>
+
+        {/* 4 KPI Cards */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 pt-1">
+          <div className="p-3.5 rounded-2xl bg-[#12161f] border border-slate-800">
+            <span className="text-[10px] font-bold uppercase text-slate-400 block">
+              Total Poin Periode Terpilih
+            </span>
+            <div className="text-2xl font-mono font-bold text-rose-400 mt-1">
+              {stats.totalPoints} <span className="text-xs text-slate-400 font-sans">Poin</span>
+            </div>
+          </div>
+
+          <div className="p-3.5 rounded-2xl bg-[#12161f] border border-slate-800">
+            <span className="text-[10px] font-bold uppercase text-slate-400 block">
+              Total Catatan Pelanggaran
+            </span>
+            <div className="text-2xl font-mono font-bold text-white mt-1">
+              {stats.totalEntries} <span className="text-xs text-slate-400 font-sans">Catatan</span>
+            </div>
+          </div>
+
+          <div className="p-3.5 rounded-2xl bg-[#12161f] border border-emerald-500/25">
+            <span className="text-[10px] font-bold uppercase text-emerald-400 block">
+              Sudah Disetujui Staff ✓
+            </span>
+            <div className="text-2xl font-mono font-bold text-emerald-300 mt-1">
+              {stats.acknowledged}
+            </div>
+          </div>
+
+          <div className="p-3.5 rounded-2xl bg-[#12161f] border border-amber-500/25">
+            <span className="text-[10px] font-bold uppercase text-amber-400 block">
+              Menunggu "Saya Mengerti"
+            </span>
+            <div className="text-2xl font-mono font-bold text-amber-300 mt-1">
+              {stats.pending}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* SECTION 1: Give Point Form (OM & AM) */}
+      <form
+        onSubmit={handleSubmitPoint}
+        className="bg-[#161b24] border border-slate-800 rounded-3xl p-5 shadow-xl space-y-4"
+      >
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-800">
+          <div className="flex items-center space-x-2.5">
+            <div className="w-8 h-8 rounded-xl bg-blue-600/20 border border-blue-500/30 text-blue-400 flex items-center justify-center">
+              <Plus className="w-4 h-4 stroke-[2.5]" />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-white">Berikan Poin Pelanggaran Staff</h3>
+              <p className="text-[11px] text-slate-400">
+                Notifikasi langsung terkirim ke staff &amp; wajib disetujui dengan janji perbaikan saat login.
+              </p>
+            </div>
+          </div>
+
+          <span className="text-[11px] font-semibold text-emerald-300 bg-emerald-950/60 border border-emerald-500/30 px-3 py-1 rounded-xl self-start sm:self-auto">
+            Dicatat sebagai: {issuerLabel}
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+          {/* Staff Search & Selection (5 cols) */}
+          <div className="lg:col-span-5 space-y-2.5">
+            <label className="text-xs font-bold text-slate-200 block">
+              1. Cari &amp; Pilih Nama Staff
+            </label>
+
+            <div className="flex items-center gap-2">
+              <div className="relative flex-1">
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={staffSearchQuery}
+                  onChange={(e) => setStaffSearchQuery(e.target.value)}
+                  placeholder="Ketik nama staff..."
+                  className="w-full bg-[#12161f] border border-slate-700 rounded-xl pl-8 pr-3 py-2 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-blue-500"
+                />
+              </div>
+              <select
+                value={formVenueFilter}
+                onChange={(e) => setFormVenueFilter(e.target.value)}
+                className="bg-[#12161f] border border-slate-700 rounded-xl px-2.5 py-2 text-xs font-bold text-slate-200 focus:outline-none focus:border-blue-500"
+              >
+                <option value="ALL">Semua Outlet</option>
+                <option value="JP Karaoke">JP Karaoke</option>
+                <option value="LuckyCat">LuckyCat</option>
+              </select>
+            </div>
+
+            {/* Staff List Box */}
+            <div className="bg-[#12161f] border border-slate-800 rounded-2xl max-h-48 overflow-y-auto divide-y divide-slate-800/70">
+              {selectableStaff.length === 0 ? (
+                <div className="p-4 text-center text-xs text-slate-500">
+                  Tidak ada staff cocok dengan pencarian.
+                </div>
+              ) : (
+                selectableStaff.map((s) => {
+                  const isSelected = String(selectedStaffId) === String(s.id);
+                  return (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => setSelectedStaffId(s.id)}
+                      className={`w-full px-3 py-2.5 text-left flex items-center justify-between transition cursor-pointer ${
+                        isSelected
+                          ? 'bg-blue-600/20 text-white border-l-4 border-l-blue-500'
+                          : 'hover:bg-slate-800/60 text-slate-300'
+                      }`}
+                    >
+                      <div className="min-w-0">
+                        <div className="text-xs font-bold truncate">{s.name}</div>
+                        <div className="text-[10px] text-slate-400 truncate">
+                          {s.venue} • {s.division || s.role}
+                        </div>
+                      </div>
+                      {isSelected && (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-600 text-white shrink-0 ml-2">
+                          Dipilih ✓
+                        </span>
+                      )}
+                    </button>
+                  );
+                })
+              )}
+            </div>
+
+            {selectedStaffObj && (
+              <div className="px-3 py-2 rounded-xl bg-blue-950/40 border border-blue-500/30 text-xs text-blue-200 flex items-center justify-between">
+                <span>
+                  Target: <strong>{selectedStaffObj.name}</strong> ({selectedStaffObj.venue})
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setSelectedStaffId('')}
+                  className="text-slate-400 hover:text-white cursor-pointer"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Points & Reason (7 cols) */}
+          <div className="lg:col-span-7 space-y-3">
+            <div>
+              <label className="text-xs font-bold text-slate-200 block mb-1.5">
+                2. Masukkan Jumlah Poin (Bebas Angka Berapapun)
+              </label>
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                <input
+                  type="number"
+                  step="any"
+                  value={pointAmount}
+                  onChange={(e) => setPointAmount(e.target.value)}
+                  placeholder="Contoh: 10 atau 25 atau 100"
+                  className="flex-1 bg-[#12161f] border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm font-mono font-bold text-white placeholder:text-slate-500 focus:outline-none focus:border-blue-500"
+                  required
+                />
+                <div className="flex flex-wrap gap-1.5">
+                  {[5, 10, 15, 25, 50, 100].map((preset) => (
+                    <button
+                      key={preset}
+                      type="button"
+                      onClick={() => setPointAmount(String(preset))}
+                      className={`px-2.5 py-1.5 rounded-xl text-xs font-mono font-bold border transition cursor-pointer ${
+                        String(pointAmount) === String(preset)
+                          ? 'bg-rose-600 text-white border-rose-500'
+                          : 'bg-[#12161f] hover:bg-slate-800 text-slate-300 border-slate-700'
+                      }`}
+                    >
+                      {preset}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {Number(pointAmount) < 0 && (
+                <p className="text-[11px] text-amber-300 mt-1">
+                  Catatan: Angka negatif akan mengurangi akumulasi poin staff (koreksi/pengurangan poin).
+                </p>
+              )}
+            </div>
+
+            <div>
+              <label className="text-xs font-bold text-slate-200 block mb-1.5">
+                3. Alasan Pemberian Poin / Kesalahan
+              </label>
+              <textarea
+                rows={3}
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                placeholder="Contoh: Tidak memakai seragam lengkap / Terlambat tanpa konfirmasi / Kesalahan SOP kasir..."
+                className="w-full bg-[#12161f] border border-slate-700 rounded-xl p-3 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-blue-500"
+                required
+              />
+            </div>
+
+            {/* PIN Input only if not already cached in session */}
+            {!adminAuth?.pin && (
+              <div>
+                <label className="text-xs font-bold text-slate-200 flex items-center space-x-1.5 mb-1">
+                  <Lock className="w-3.5 h-3.5 text-amber-400" />
+                  <span>PIN Otorisasi OM / AM</span>
+                </label>
+                <input
+                  type="password"
+                  inputMode="numeric"
+                  value={pinInput}
+                  onChange={(e) => setPinInput(e.target.value)}
+                  placeholder="Masukkan PIN Operational Manager atau Assistant Manager"
+                  className="w-full bg-[#12161f] border border-slate-700 rounded-xl px-3.5 py-2 text-xs font-mono text-white focus:outline-none focus:border-blue-500"
+                  required
+                />
+              </div>
+            )}
+
+            <div className="pt-1 flex justify-end">
+              <button
+                type="submit"
+                disabled={submitting || !selectedStaffId || !pointAmount || !reason.trim()}
+                className="w-full sm:w-auto px-5 py-3 rounded-2xl bg-rose-600 hover:bg-rose-500 disabled:bg-slate-800 disabled:text-slate-500 text-white text-xs font-bold shadow-lg shadow-rose-600/25 transition flex items-center justify-center space-x-2 cursor-pointer"
+              >
+                <Send className="w-4 h-4" />
+                <span>{submitting ? 'Menyimpan & Mengirim...' : 'Berikan Poin & Kirim Notifikasi'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </form>
+
+      {/* SECTION 2: Sub-tabs + Filters + Data Tables */}
+      <div className="bg-[#161b24] border border-slate-800 rounded-3xl p-5 shadow-xl space-y-4">
+        {/* Sub-tab switcher & Period/Filter Controls */}
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pb-4 border-b border-slate-800">
+          <div className="flex bg-[#12161f] p-1 rounded-2xl border border-slate-800 gap-1 self-start">
+            <button
+              type="button"
+              onClick={() => setSubTab('RECAP')}
+              className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center space-x-2 transition cursor-pointer ${
+                subTab === 'RECAP'
+                  ? 'bg-blue-600 text-white shadow-md shadow-blue-600/25'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <Users className="w-4 h-4" />
+              <span>Rekap Poin Per Staff ({filteredRecap.length})</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setSubTab('LOG')}
+              className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center space-x-2 transition cursor-pointer ${
+                subTab === 'LOG'
+                  ? 'bg-blue-600 text-white shadow-md shadow-blue-600/25'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <History className="w-4 h-4" />
+              <span>Log Riwayat &amp; Persetujuan ({filteredLogs.length})</span>
+            </button>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Period Selector */}
+            <select
+              value={selectedCycleKey}
+              onChange={(e) => setSelectedCycleKey(e.target.value)}
+              className="bg-[#12161f] border border-slate-700 rounded-xl px-3 py-2 text-xs font-bold text-slate-200 focus:outline-none focus:border-blue-500"
+            >
+              {availableCycles.map((c) => (
+                <option key={c.cycleKey} value={c.cycleKey === currentCycle.cycleKey ? 'CURRENT' : c.cycleKey}>
+                  {c.label}{c.cycleKey === currentCycle.cycleKey ? ' (Periode Aktif)' : ''}
+                </option>
+              ))}
+              <option value="ALL">Semua Periode</option>
+            </select>
+
+            {/* Outlet Filter */}
+            <select
+              value={venueFilter}
+              onChange={(e) => setVenueFilter(e.target.value)}
+              className="bg-[#12161f] border border-slate-700 rounded-xl px-3 py-2 text-xs font-bold text-slate-200 focus:outline-none focus:border-blue-500"
+            >
+              <option value="ALL">Semua Outlet</option>
+              <option value="JP Karaoke">JP Karaoke</option>
+              <option value="LuckyCat">LuckyCat</option>
+            </select>
+
+            {/* Search */}
+            <div className="relative">
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Cari nama / alasan..."
+                className="bg-[#12161f] border border-slate-700 rounded-xl pl-8 pr-3 py-2 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-blue-500 w-44 sm:w-52"
+              />
+            </div>
+
+            {subTab === 'RECAP' ? (
+              <label className="flex items-center space-x-2 px-3 py-2 rounded-xl bg-[#12161f] border border-slate-700 text-xs font-semibold text-slate-300 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={onlyWithPoints}
+                  onChange={(e) => setOnlyWithPoints(e.target.checked)}
+                  className="accent-blue-500 rounded cursor-pointer"
+                />
+                <span>Hanya yang punya poin</span>
+              </label>
+            ) : (
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="bg-[#12161f] border border-slate-700 rounded-xl px-3 py-2 text-xs font-bold text-slate-200 focus:outline-none focus:border-blue-500"
+              >
+                <option value="ALL">Semua Status Persetujuan</option>
+                <option value="PENDING">Menunggu Konfirmasi Staff</option>
+                <option value="ACKNOWLEDGED">Sudah Disetujui Staff</option>
+              </select>
+            )}
+          </div>
+        </div>
+
+        {/* Table Content */}
+        {loading ? (
+          <div className="py-12 text-center text-xs text-slate-400">Memuat data poin...</div>
+        ) : subTab === 'RECAP' ? (
+          <div className="overflow-x-auto rounded-2xl border border-slate-800">
+            <table className="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr className="bg-[#12161f] text-slate-400 uppercase text-[10px] font-bold tracking-wider border-b border-slate-800">
+                  <th className="py-3 px-4">No</th>
+                  <th className="py-3 px-4">Nama Staff</th>
+                  <th className="py-3 px-3">Outlet &amp; Divisi</th>
+                  <th className="py-3 px-3 text-center">Pelanggaran</th>
+                  <th className="py-3 px-3 text-center">Total Poin Cut-Off</th>
+                  <th className="py-3 px-3">Status Persetujuan</th>
+                  <th className="py-3 px-4 text-right">Aksi Cepat</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800/80">
+                {filteredRecap.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="py-10 text-center text-slate-500">
+                      Tidak ada data staff sesuai filter.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredRecap.map((row, idx) => (
+                    <tr key={`${row.staff_id}-${idx}`} className="hover:bg-slate-800/30 transition">
+                      <td className="py-3 px-4 font-mono text-slate-500">{idx + 1}</td>
+                      <td className="py-3 px-4 font-bold text-white">{row.staff_name}</td>
+                      <td className="py-3 px-3 text-slate-400">
+                        <span className="text-slate-200 font-semibold">{row.staff_venue}</span>
+                        <span className="block text-[10px] text-slate-500">{row.staff_division}</span>
+                      </td>
+                      <td className="py-3 px-3 text-center font-mono font-bold text-slate-300">
+                        {row.violation_count}x
+                      </td>
+                      <td className="py-3 px-3 text-center">
+                        <span className={`inline-block px-3 py-1 rounded-xl font-mono font-bold text-xs ${
+                          row.total_points > 0
+                            ? 'bg-rose-500/20 text-rose-300 border border-rose-500/35'
+                            : row.total_points < 0
+                            ? 'bg-sky-500/20 text-sky-300 border border-sky-500/35'
+                            : 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
+                        }`}>
+                          {row.total_points} Poin
+                        </span>
+                      </td>
+                      <td className="py-3 px-3">
+                        {row.violation_count === 0 ? (
+                          <span className="text-[11px] text-slate-500">-</span>
+                        ) : row.pending_count === 0 ? (
+                          <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-950 text-emerald-300 border border-emerald-500/30">
+                            <CheckCircle2 className="w-3 h-3" />
+                            <span>Semua Disetujui ({row.acknowledged_count})</span>
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-950 text-amber-300 border border-amber-500/30">
+                            <Clock className="w-3 h-3" />
+                            <span>{row.pending_count} Belum Disetujui</span>
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-3 px-4 text-right">
+                        <button
+                          type="button"
+                          onClick={() => quickSelectStaff(row.staff_id)}
+                          className="px-2.5 py-1.5 rounded-xl bg-blue-600/20 hover:bg-blue-600 text-blue-300 hover:text-white border border-blue-500/30 text-[11px] font-bold transition cursor-pointer"
+                        >
+                          + Beri Poin
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="overflow-x-auto rounded-2xl border border-slate-800">
+            <table className="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr className="bg-[#12161f] text-slate-400 uppercase text-[10px] font-bold tracking-wider border-b border-slate-800">
+                  <th className="py-3 px-4">Waktu (WITA)</th>
+                  <th className="py-3 px-3">Staff</th>
+                  <th className="py-3 px-3 text-center">Poin</th>
+                  <th className="py-3 px-3">Alasan Pelanggaran</th>
+                  <th className="py-3 px-3">Pemberi Poin</th>
+                  <th className="py-3 px-3">Konfirmasi Staff</th>
+                  {!isReadOnly && <th className="py-3 px-4 text-right">Hapus</th>}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800/80">
+                {filteredLogs.length === 0 ? (
+                  <tr>
+                    <td colSpan={isReadOnly ? 6 : 7} className="py-10 text-center text-slate-500">
+                      Belum ada riwayat pemberian poin pada periode ini.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredLogs.map((pt) => {
+                    const isAck = pt.status === 'ACKNOWLEDGED';
+                    return (
+                      <tr key={pt.id} className="hover:bg-slate-800/30 transition align-top">
+                        <td className="py-3 px-4 whitespace-nowrap">
+                          <div className="font-mono text-[11px] text-slate-200 font-bold">
+                            {formatWitaDateTime(pt.created_at)}
+                          </div>
+                          <div className="text-[10px] text-slate-500 mt-0.5">{pt.cycle_label}</div>
+                        </td>
+                        <td className="py-3 px-3">
+                          <div className="font-bold text-white">{pt.staff_name}</div>
+                          <div className="text-[10px] text-slate-400">
+                            {pt.staff_venue} • {pt.staff_division}
+                          </div>
+                        </td>
+                        <td className="py-3 px-3 text-center whitespace-nowrap">
+                          <span className="px-2.5 py-1 rounded-xl font-mono font-bold text-xs bg-rose-500/20 text-rose-300 border border-rose-500/35">
+                            {pt.points > 0 ? `+${pt.points}` : pt.points} Poin
+                          </span>
+                        </td>
+                        <td className="py-3 px-3 max-w-xs">
+                          <p className="text-slate-200 font-medium leading-relaxed whitespace-pre-wrap">
+                            {pt.reason}
+                          </p>
+                        </td>
+                        <td className="py-3 px-3 whitespace-nowrap">
+                          <span className="text-slate-200 font-semibold">{pt.given_by}</span>
+                        </td>
+                        <td className="py-3 px-3">
+                          {isAck ? (
+                            <div className="space-y-1">
+                              <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-950 text-emerald-300 border border-emerald-500/35">
+                                <CheckCircle2 className="w-3 h-3" />
+                                <span>Sudah Disetujui Staff</span>
+                              </span>
+                              <div className="text-[10px] font-mono text-slate-400">
+                                {formatWitaDateTime(pt.acknowledged_at)}
+                              </div>
+                              <div className="text-[10px] text-emerald-400/80 italic">
+                                Menyetujui janji perbaikan ✓
+                              </div>
+                            </div>
+                          ) : (
+                            <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-950 text-amber-300 border border-amber-500/35 animate-pulse">
+                              <Clock className="w-3 h-3" />
+                              <span>Menunggu "Saya Mengerti"</span>
+                            </span>
+                          )}
+                        </td>
+                        {!isReadOnly && (
+                          <td className="py-3 px-4 text-right">
+                            <button
+                              type="button"
+                              onClick={() => setDeleteTarget(pt)}
+                              className="p-2 rounded-xl bg-rose-950/50 hover:bg-rose-600 text-rose-400 hover:text-white border border-rose-500/30 transition cursor-pointer"
+                              title="Hapus Catatan Poin"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </td>
+                        )}
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Delete Confirmation Modal (Operational Manager Only) */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
+          <div className="bg-[#161b24] border border-slate-800 rounded-3xl max-w-md w-full p-5 space-y-4 shadow-2xl text-slate-200">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <h4 className="text-sm font-bold text-white flex items-center space-x-2">
+                <AlertTriangle className="w-4 h-4 text-rose-400" />
+                <span>Hapus Catatan Poin Pelanggaran?</span>
+              </h4>
+              <button
+                type="button"
+                onClick={() => setDeleteTarget(null)}
+                className="p-1 text-slate-400 hover:text-white cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="p-3 rounded-2xl bg-[#12161f] border border-slate-800 text-xs space-y-1">
+              <div>Staff: <strong className="text-white">{deleteTarget.staff_name}</strong></div>
+              <div>Poin: <strong className="text-rose-300">{deleteTarget.points} Poin</strong></div>
+              <div>Alasan: <span className="text-slate-300">{deleteTarget.reason}</span></div>
+            </div>
+            <form onSubmit={handleConfirmDelete} className="space-y-3">
+              {!adminAuth?.pin && (
+                <input
+                  type="password"
+                  inputMode="numeric"
+                  value={deletePin}
+                  onChange={(e) => setDeletePin(e.target.value)}
+                  placeholder="Masukkan PIN Operational Manager"
+                  className="w-full bg-[#12161f] border border-slate-700 rounded-xl px-3 py-2 text-xs font-mono text-white"
+                  required
+                />
+              )}
+              <div className="flex space-x-2">
+                <button
+                  type="button"
+                  onClick={() => setDeleteTarget(null)}
+                  className="flex-1 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-300 cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={deleting}
+                  className="flex-1 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-xs font-bold text-white cursor-pointer"
+                >
+                  {deleting ? 'Menghapus...' : 'Ya, Hapus'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

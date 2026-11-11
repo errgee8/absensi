@@ -175,3 +175,49 @@ export function formatTimerSeconds(totalSeconds) {
   const s = totalSeconds % 60;
   return [h, m, s].map((v) => String(v).padStart(2, '0')).join(':');
 }
+
+const MONTH_SHORT_ID = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+
+export function buildPointCycle(startYear, startMonth) {
+  let endYear = startYear;
+  let endMonth = startMonth + 1;
+  if (endMonth > 12) {
+    endMonth = 1;
+    endYear += 1;
+  }
+  const startDate = `${startYear}-${String(startMonth).padStart(2, '0')}-17`;
+  const cutoffDate = `${endYear}-${String(endMonth).padStart(2, '0')}-13`;
+  const label = `17 ${MONTH_SHORT_ID[startMonth - 1]} ${startYear} – 13 ${MONTH_SHORT_ID[endMonth - 1]} ${endYear}`;
+  return {
+    cycleKey: startDate,
+    startDate,
+    cutoffDate,
+    label
+  };
+}
+
+export function getPointCycleInfo(date = getAppNow()) {
+  const d = typeof date === 'string' ? new Date(date) : (date || getAppNow());
+  const validDate = isNaN(d.getTime()) ? new Date() : d;
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Makassar',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).formatToParts(validDate);
+
+  const day = parseInt(parts.find((p) => p.type === 'day')?.value || '1', 10);
+  const month = parseInt(parts.find((p) => p.type === 'month')?.value || '1', 10);
+  const year = parseInt(parts.find((p) => p.type === 'year')?.value || '2026', 10);
+
+  let startYear = year;
+  let startMonth = month;
+  if (day < 17) {
+    startMonth -= 1;
+    if (startMonth < 1) {
+      startMonth = 12;
+      startYear -= 1;
+    }
+  }
+  return buildPointCycle(startYear, startMonth);
+}

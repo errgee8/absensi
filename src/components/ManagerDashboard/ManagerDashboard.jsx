@@ -14,12 +14,13 @@ import AnnouncementManagementModal from './AnnouncementManagementModal';
 import WipeLeaderboardModal from '../Leaderboard/WipeLeaderboardModal';
 import SystemRecoveryModal from './SystemRecoveryModal';
 import MonitoringAuditTab from './MonitoringAuditTab';
+import PointManagementTab from './PointManagementTab';
 import { exportMonthlyPayrollReport, exportTimesheetToExcel } from '../../utils/excelExport';
-import { getShifts, getStats, getShiftSchedules, getStaffList, getLeaveRequests, getAnnouncements, getAnnouncementReaders, subscribeRealtimeEvents, sendPresenceHeartbeat } from '../../utils/api';
+import { getShifts, getStats, getShiftSchedules, getStaffList, getLeaveRequests, getAnnouncements, getAnnouncementReaders, getPoints, subscribeRealtimeEvents, sendPresenceHeartbeat } from '../../utils/api';
 import { getOperationalDateYMD, getOperationalYesterdayYMD, getWitaDateYMD, getAppNow, formatWitaDateTime } from '../../utils/time';
 import { resolveShift } from '../../utils/shiftResolver';
 import { showToast } from '../Common/Toast';
-import { LayoutDashboard, Users, Clock, Radio, Building2, Sparkles, Eye, ShieldAlert, Trophy, FileText, Megaphone, Activity } from 'lucide-react';
+import { LayoutDashboard, Users, Clock, Radio, Building2, Sparkles, Eye, ShieldAlert, Trophy, FileText, Megaphone, Activity, Award } from 'lucide-react';
 
 export default function ManagerDashboard({ venueSettings, refreshSettings, adminAuth, isReadOnly = false, onOpenLeaderboard }) {
   // Tabs: 'AUDIT' | 'SCHEDULES' | 'STAFF' | 'TOILET'
@@ -31,6 +32,7 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
   const [loading, setLoading] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
   const [pendingLeaveCount, setPendingLeaveCount] = useState(0);
+  const [pendingPointsCount, setPendingPointsCount] = useState(0);
 
   // Filters - Default to TODAY's operational shift cycle (07:00 AM cutoff)
   const [dateRange, setDateRange] = useState('TODAY');
@@ -96,6 +98,17 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
     }
   };
 
+  const loadPendingPointsCount = async () => {
+    try {
+      const data = await getPoints({ cycleKey: 'CURRENT', status: 'PENDING' });
+      if (Array.isArray(data?.points)) {
+        setPendingPointsCount(data.points.length);
+      }
+    } catch (e) {
+      console.warn('Failed to load pending points count:', e);
+    }
+  };
+
   const loadSchedules = async () => {
     try {
       const data = await getShiftSchedules();
@@ -108,6 +121,7 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
   useEffect(() => {
     loadSchedules();
     loadPendingLeaveCount();
+    loadPendingPointsCount();
     loadActiveAnnouncement();
   }, []);
 
@@ -176,6 +190,8 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
         loadPendingLeaveCount();
       } else if (eventType === 'ANNOUNCEMENT_UPDATE' || eventType === 'ANNOUNCEMENT_READ') {
         loadActiveAnnouncement();
+      } else if (eventType === 'POINT_UPDATE') {
+        loadPendingPointsCount();
       }
     });
 
@@ -343,6 +359,23 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
               {pendingLeaveCount > 0 && (
                 <span className="ml-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-600 text-white animate-pulse">
                   {pendingLeaveCount}
+                </span>
+              )}
+            </button>
+
+            <button
+              onClick={() => setActiveTab('POINT')}
+              className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-bold transition relative cursor-pointer ${
+                activeTab === 'POINT'
+                  ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/80'
+              }`}
+            >
+              <Award className="w-4 h-4 stroke-[2.2]" />
+              <span>Point</span>
+              {pendingPointsCount > 0 && (
+                <span className="ml-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500 text-slate-950">
+                  {pendingPointsCount}
                 </span>
               )}
             </button>
@@ -575,6 +608,14 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
               loadData();
               loadPendingLeaveCount();
             }}
+          />
+        )}
+
+        {activeTab === 'POINT' && (
+          <PointManagementTab
+            adminAuth={adminAuth}
+            isReadOnly={isReadOnly}
+            onPointsUpdated={loadPendingPointsCount}
           />
         )}
 

@@ -36,6 +36,7 @@ export default function MonitoringAuditTab({ adminAuth }) {
   // Notification Settings State
   const [notifyAnnouncements, setNotifyAnnouncements] = useState(true);
   const [notifyLeaveDecisions, setNotifyLeaveDecisions] = useState(true);
+  const [notifyPoints, setNotifyPoints] = useState(true);
   const [savingSettings, setSavingSettings] = useState(false);
 
   const loadData = useCallback(async (isSilent = false) => {
@@ -54,6 +55,7 @@ export default function MonitoringAuditTab({ adminAuth }) {
       if (settingsRes) {
         setNotifyAnnouncements(settingsRes.notify_announcements !== 0 && settingsRes.notify_announcements !== 'false');
         setNotifyLeaveDecisions(settingsRes.notify_leave_decisions !== 0 && settingsRes.notify_leave_decisions !== 'false');
+        setNotifyPoints(settingsRes.notify_points !== 0 && settingsRes.notify_points !== 'false');
       }
     } catch (err) {
       console.warn('Monitoring tab data load note:', err);
@@ -77,7 +79,8 @@ export default function MonitoringAuditTab({ adminAuth }) {
     try {
       await updateSettings({
         notify_announcements: notifyAnnouncements ? 1 : 0,
-        notify_leave_decisions: notifyLeaveDecisions ? 1 : 0
+        notify_leave_decisions: notifyLeaveDecisions ? 1 : 0,
+        notify_points: notifyPoints ? 1 : 0
       });
       showToast('Pengaturan notifikasi berhasil disimpan.', 'success');
     } catch (err) {
@@ -451,6 +454,31 @@ export default function MonitoringAuditTab({ adminAuth }) {
               <div
                 className={`w-5 h-5 rounded-full bg-white shadow-md transform transition-transform ${
                   notifyLeaveDecisions ? 'translate-x-6' : 'translate-x-0'
+                }`}
+              />
+            </button>
+          </div>
+
+          {/* Toggle 3: Notifikasi Poin Pelanggaran */}
+          <div className="p-4 rounded-2xl bg-[#1c2230] border border-slate-800 flex items-center justify-between gap-4">
+            <div className="space-y-0.5">
+              <span className="text-xs font-black text-slate-100 block">
+                Notifikasi Pemberian Poin Pelanggaran
+              </span>
+              <p className="text-[11px] text-slate-400 font-bold">
+                Kirim push notification langsung ke HP staf terkait saat Operational Manager / Assistant Manager memberikan poin.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setNotifyPoints((prev) => !prev)}
+              className={`w-12 h-6 rounded-full transition-colors relative shrink-0 p-0.5 cursor-pointer ${
+                notifyPoints ? 'bg-blue-600' : 'bg-slate-700'
+              }`}
+            >
+              <div
+                className={`w-5 h-5 rounded-full bg-white shadow-md transform transition-transform ${
+                  notifyPoints ? 'translate-x-6' : 'translate-x-0'
                 }`}
               />
             </button>

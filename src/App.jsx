@@ -95,7 +95,8 @@ export default function App() {
     setAdminAuth({
       role: 'VIEW_ONLY',
       canEdit: false,
-      staffName: staff?.name || 'Assistant Manager'
+      staffName: staff?.name || 'Assistant Manager',
+      pin: staff?.pin || ''
     });
     setIsAdminAuthenticated(true);
     setView('manager');

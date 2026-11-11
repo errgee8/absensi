@@ -6,7 +6,7 @@ import { calculateDistanceMeters, isWithinGeofence } from './geofence.js';
 import { getClientIp, validateClientNetwork } from './network.js';
 import { evaluateCheckinFlags, evaluateCheckoutFlags, evaluateBreakFlags, auditOpenShifts, FLAG_TYPES } from './flags.js';
 import { isSupabaseConfigured, uploadPhotoToSupabase, resolveAttendancePhotoUrls, cloudDb, supabase, findStaffInSupabase } from './supabase.js';
-import { detectShiftSchedule, getBreakCutoff, isBreakAllowedNow, getWitaTimeString, getWitaDateYMD, getOperationalDateYMD, getOperationalYesterdayYMD } from './shifts.js';
+import { detectShiftSchedule, getBreakCutoff, isBreakAllowedNow, getWitaTimeString, getWitaDateYMD, getOperationalDateYMD, getOperationalYesterdayYMD, getPointCycleInfo, getPointCycleFromKey, getRecentPointCycles } from './shifts.js';
 import { computeLeaderboard } from './leaderboard.js';
 import { getVapidPublicKey, savePushSubscription, sendPushNotification } from './push.js';
 import { createSystemSnapshot, listSystemBackups, restoreSystemSnapshot } from './backup.js';
@@ -2413,7 +2413,8 @@ router.get('/settings', async (req, res) => {
     enforce_wifi: getSetting('enforce_wifi'),
     timezone: getSetting('timezone'),
     notify_announcements: getSetting('notify_announcements') ?? 1,
-    notify_leave_decisions: getSetting('notify_leave_decisions') ?? 1
+    notify_leave_decisions: getSetting('notify_leave_decisions') ?? 1,
+    notify_points: getSetting('notify_points') ?? 1
   });
 });
 
@@ -2426,7 +2427,8 @@ router.put('/settings', async (req, res) => {
     allowed_subnets,
     enforce_wifi,
     notify_announcements,
-    notify_leave_decisions
+    notify_leave_decisions,
+    notify_points
   } = req.body;
 
   if (venue_name !== undefined) setSetting('venue_name', venue_name);
@@ -2437,6 +2439,7 @@ router.put('/settings', async (req, res) => {
   if (enforce_wifi !== undefined) setSetting('enforce_wifi', enforce_wifi ? 1 : 0);
   if (notify_announcements !== undefined) setSetting('notify_announcements', notify_announcements ? 1 : 0);
   if (notify_leave_decisions !== undefined) setSetting('notify_leave_decisions', notify_leave_decisions ? 1 : 0);
+  if (notify_points !== undefined) setSetting('notify_points', notify_points ? 1 : 0);
 
   // Sync directly to Supabase Cloud app_settings
   if (isSupabaseConfigured) {
@@ -2450,6 +2453,7 @@ router.put('/settings', async (req, res) => {
       if (enforce_wifi !== undefined) upsertItems.push({ key: 'enforce_wifi', value: enforce_wifi ? 1 : 0 });
       if (notify_announcements !== undefined) upsertItems.push({ key: 'notify_announcements', value: notify_announcements ? 1 : 0 });
       if (notify_leave_decisions !== undefined) upsertItems.push({ key: 'notify_leave_decisions', value: notify_leave_decisions ? 1 : 0 });
+      if (notify_points !== undefined) upsertItems.push({ key: 'notify_points', value: notify_points ? 1 : 0 });
 
       for (const item of upsertItems) {
         await supabase.from('app_settings').upsert({
@@ -3564,6 +3568,388 @@ router.get('/announcements/:id/readers', async (req, res) => {
   } catch (err) {
     console.error('Error fetching announcement readers:', err);
     return res.status(500).json({ error: 'Gagal memuat laporan pembaca: ' + err.message });
+  }
+});
+
+// ==========================================
+// STAFF VIOLATION POINTS SYSTEM (OM & AM)
+// Monthly cutoff cycle: 17th -> 13th next month
+// ==========================================
+
+const POINT_PLEDGE_TEXT = 'Dengan menyetujui ini saya berjanji akan memperbaiki kesalahan saya dan tidak mengulangi lagi';
+
+function doesPointMatchStaff(point, staffId, staffUuid) {
+  const targets = new Set([staffId, staffUuid].filter(Boolean).map(String));
+  if (targets.size === 0) return false;
+  return (
+    (point.staff_id && targets.has(String(point.staff_id))) ||
+    (point.staff_uuid && targets.has(String(point.staff_uuid)))
+  );
+}
+
+router.get('/points', async (req, res) => {
+  try {
+    const { staffId, staffUuid, cycleKey = 'CURRENT', status = 'ALL' } = req.query;
+    const currentCycle = getPointCycleInfo(new Date());
+    const targetCycleKey = !cycleKey || cycleKey === 'CURRENT' ? currentCycle.cycleKey : cycleKey;
+
+    let allPoints = [];
+    let staffList = [];
+
+    if (isSupabaseConfigured) {
+      [allPoints, staffList] = await Promise.all([
+        cloudDb.getStaffPoints(),
+        cloudDb.getStaff('ALL').catch(() => [])
+      ]);
+    } else {
+      allPoints = db.prepare('SELECT * FROM staff_points ORDER BY created_at DESC').all();
+      staffList = db.prepare('SELECT * FROM staff WHERE is_active = 1').all();
+    }
+
+    const normalized = (allPoints || []).map((p) => {
+      const cInfo = p.cycle_key ? getPointCycleFromKey(p.cycle_key) : getPointCycleInfo(p.created_at);
+      return {
+        ...p,
+        points: Number(p.points || 0),
+        cycle_key: cInfo.cycleKey,
+        cycle_label: p.cycle_label || cInfo.label,
+        status: p.acknowledged_at || p.status === 'ACKNOWLEDGED' ? 'ACKNOWLEDGED' : 'PENDING'
+      };
+    });
+
+    // Build available cycles dropdown list
+    const recentCycles = getRecentPointCycles(6, new Date());
+    const cycleMap = new Map(recentCycles.map((c) => [c.cycleKey, c]));
+    for (const p of normalized) {
+      if (p.cycle_key && !cycleMap.has(p.cycle_key)) {
+        cycleMap.set(p.cycle_key, getPointCycleFromKey(p.cycle_key));
+      }
+    }
+    const availableCycles = Array.from(cycleMap.values()).sort((a, b) => b.cycleKey.localeCompare(a.cycleKey));
+
+    // Staff-scoped metrics (used by Staff Portal & notifications)
+    const staffScopedPoints = (staffId || staffUuid)
+      ? normalized.filter((p) => doesPointMatchStaff(p, staffId, staffUuid))
+      : normalized;
+
+    const pendingForStaff = (staffId || staffUuid)
+      ? staffScopedPoints.filter((p) => p.status !== 'ACKNOWLEDGED')
+      : [];
+
+    const currentCycleTotalForStaff = (staffId || staffUuid)
+      ? staffScopedPoints
+          .filter((p) => p.cycle_key === currentCycle.cycleKey)
+          .reduce((sum, p) => sum + Number(p.points || 0), 0)
+      : 0;
+
+    // Cycle filter
+    let cycleFiltered = staffScopedPoints;
+    if (targetCycleKey !== 'ALL') {
+      cycleFiltered = staffScopedPoints.filter((p) => p.cycle_key === targetCycleKey);
+    }
+
+    // Status filter
+    let pointsFiltered = cycleFiltered;
+    if (status && status !== 'ALL') {
+      pointsFiltered = cycleFiltered.filter((p) => p.status === status);
+    }
+
+    // Build per-staff summary across selected cycle (for Manager & AM cut-off calculation)
+    const summaryMap = new Map();
+    for (const st of staffList || []) {
+      const stKey = String(st.id || st.legacy_code || st.uuid);
+      summaryMap.set(stKey, {
+        staff_id: st.id || st.legacy_code || st.uuid,
+        staff_uuid: st.uuid || st.id,
+        staff_name: st.name,
+        staff_venue: st.venue || 'JP Karaoke',
+        staff_division: st.division || st.role || 'Staff',
+        staff_role: st.role || 'Staff',
+        total_points: 0,
+        violation_count: 0,
+        pending_count: 0,
+        acknowledged_count: 0,
+        last_point_at: null
+      });
+    }
+
+    // Match points into summary map (using cycleFiltered without status filter so totals match cutoff)
+    const allCyclePoints = targetCycleKey === 'ALL'
+      ? normalized
+      : normalized.filter((p) => p.cycle_key === targetCycleKey);
+
+    for (const p of allCyclePoints) {
+      let matchedKey = null;
+      for (const [k, row] of summaryMap.entries()) {
+        if (doesPointMatchStaff(p, row.staff_id, row.staff_uuid)) {
+          matchedKey = k;
+          break;
+        }
+      }
+      if (!matchedKey) {
+        matchedKey = String(p.staff_id || p.staff_uuid);
+        summaryMap.set(matchedKey, {
+          staff_id: p.staff_id,
+          staff_uuid: p.staff_uuid || p.staff_id,
+          staff_name: p.staff_name || 'Staff',
+          staff_venue: p.staff_venue || '-',
+          staff_division: p.staff_division || '-',
+          staff_role: p.staff_role || 'Staff',
+          total_points: 0,
+          violation_count: 0,
+          pending_count: 0,
+          acknowledged_count: 0,
+          last_point_at: null
+        });
+      }
+      const entry = summaryMap.get(matchedKey);
+      entry.total_points = Math.round((entry.total_points + Number(p.points || 0)) * 100) / 100;
+      entry.violation_count += 1;
+      if (p.status === 'ACKNOWLEDGED') {
+        entry.acknowledged_count += 1;
+      } else {
+        entry.pending_count += 1;
+      }
+      if (!entry.last_point_at || new Date(p.created_at) > new Date(entry.last_point_at)) {
+        entry.last_point_at = p.created_at;
+      }
+    }
+
+    const staffTotals = Array.from(summaryMap.values()).sort((a, b) => {
+      if (b.total_points !== a.total_points) return b.total_points - a.total_points;
+      if (b.violation_count !== a.violation_count) return b.violation_count - a.violation_count;
+      return (a.staff_name || '').localeCompare(b.staff_name || '');
+    });
+
+    return res.json({
+      currentCycle,
+      selectedCycle: targetCycleKey === 'ALL' ? null : getPointCycleFromKey(targetCycleKey),
+      availableCycles,
+      points: pointsFiltered,
+      pendingForStaff,
+      currentCycleTotalForStaff: Math.round(currentCycleTotalForStaff * 100) / 100,
+      staffTotals
+    });
+  } catch (err) {
+    console.error('Error fetching points:', err);
+    return res.status(500).json({ error: 'Gagal memuat data poin: ' + err.message });
+  }
+});
+
+router.post('/points', async (req, res) => {
+  const { pin, staffId, points, reason } = req.body || {};
+
+  const auth = await verifyManagementAuth(pin);
+  if (!auth.authorized) {
+    return res.status(403).json({
+      error: 'Akses ditolak: Hanya Operational Manager atau Assistant Manager yang dapat memberikan poin.'
+    });
+  }
+
+  if (!staffId) {
+    return res.status(400).json({ error: 'Silakan pilih staff terlebih dahulu.' });
+  }
+
+  const numericPoints = Number(points);
+  if (!Number.isFinite(numericPoints) || numericPoints === 0) {
+    return res.status(400).json({ error: 'Jumlah poin harus berupa angka yang valid (tidak boleh 0).' });
+  }
+
+  if (!reason || !String(reason).trim()) {
+    return res.status(400).json({ error: 'Alasan pemberian poin wajib diisi.' });
+  }
+
+  // Locate target staff in Supabase or SQLite
+  let staff = null;
+  if (isSupabaseConfigured) {
+    const supa = await findStaffInSupabase(staffId);
+    if (supa) {
+      staff = { ...supa, id: supa.legacy_code || supa.id, uuid: supa.id };
+    }
+  }
+  if (!staff) {
+    staff = db.prepare('SELECT * FROM staff WHERE id = ? OR uuid = ?').get(staffId, staffId);
+  }
+  if (!staff) {
+    return res.status(404).json({ error: 'Data staff tidak ditemukan.' });
+  }
+
+  const now = new Date();
+  const nowIso = now.toISOString();
+  const cycle = getPointCycleInfo(now);
+  const witaDate = getWitaDateYMD(now);
+  const roundedPoints = Number.isInteger(numericPoints)
+    ? numericPoints
+    : Math.round(numericPoints * 100) / 100;
+
+  const pointRecord = {
+    id: `pt_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+    staff_id: String(staff.id),
+    staff_uuid: String(staff.uuid || staff.id),
+    staff_name: staff.name,
+    staff_role: staff.role || 'Staff',
+    staff_venue: staff.venue || 'JP Karaoke',
+    staff_division: staff.division || 'Staff',
+    points: roundedPoints,
+    reason: String(reason).trim(),
+    cycle_key: cycle.cycleKey,
+    cycle_label: cycle.label,
+    wita_date: witaDate,
+    given_by: auth.reviewerName,
+    given_by_role: auth.role === 'MANAGER' ? 'OPERATIONAL_MANAGER' : 'ASSISTANT_MANAGER',
+    status: 'PENDING',
+    agreed_pledge: null,
+    acknowledged_at: null,
+    acknowledged_by: null,
+    created_at: nowIso,
+    updated_at: nowIso
+  };
+
+  try {
+    if (isSupabaseConfigured) {
+      await cloudDb.createStaffPoint(pointRecord);
+    }
+
+    try {
+      db.prepare(`
+        INSERT INTO staff_points (
+          id, staff_id, staff_uuid, staff_name, staff_role, staff_venue, staff_division,
+          points, reason, cycle_key, cycle_label, wita_date, given_by, given_by_role,
+          status, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', ?, ?)
+      `).run(
+        pointRecord.id,
+        pointRecord.staff_id,
+        pointRecord.staff_uuid,
+        pointRecord.staff_name,
+        pointRecord.staff_role,
+        pointRecord.staff_venue,
+        pointRecord.staff_division,
+        pointRecord.points,
+        pointRecord.reason,
+        pointRecord.cycle_key,
+        pointRecord.cycle_label,
+        pointRecord.wita_date,
+        pointRecord.given_by,
+        pointRecord.given_by_role,
+        nowIso,
+        nowIso
+      );
+    } catch (e) {
+      console.warn('SQLite staff_points insert note:', e.message);
+    }
+
+    broadcastEvent('POINT_UPDATE', { action: 'CREATED', point: pointRecord });
+
+    const notifyPointsEnabled = getSetting('notify_points') !== 0 && getSetting('notify_points') !== 'false';
+    if (notifyPointsEnabled) {
+      sendPushNotification({
+        staffIds: [pointRecord.staff_id, pointRecord.staff_uuid].filter(Boolean),
+        title: '⚠️ Pemberitahuan Poin Pelanggaran',
+        body: `Anda terkena pelanggaran atas alasan "${pointRecord.reason}" dan dibebankan poin sebesar ${pointRecord.points} Poin.`,
+        url: '/',
+        tag: `point_${pointRecord.id}`
+      }).catch((errPush) => console.warn('Push point notification note:', errPush.message));
+    }
+
+    return res.json({
+      success: true,
+      message: `Poin sebesar ${pointRecord.points} Poin berhasil diberikan kepada ${pointRecord.staff_name}.`,
+      point: pointRecord
+    });
+  } catch (err) {
+    console.error('Error creating staff point:', err);
+    return res.status(500).json({ error: 'Gagal menyimpan poin pelanggaran: ' + err.message });
+  }
+});
+
+router.post('/points/:id/acknowledge', async (req, res) => {
+  const { id } = req.params;
+  const { staffId, staffUuid, staffName, agreedTerms } = req.body || {};
+
+  if (agreedTerms !== true) {
+    return res.status(400).json({
+      error: 'Anda wajib mencentang pernyataan janji perbaikan terlebih dahulu sebelum menekan "Saya Mengerti".'
+    });
+  }
+
+  try {
+    let updated = null;
+    if (isSupabaseConfigured) {
+      updated = await cloudDb.acknowledgeStaffPoint(id, {
+        staffId,
+        staffUuid,
+        staffName,
+        agreedPledge: POINT_PLEDGE_TEXT
+      });
+    }
+
+    const nowIso = new Date().toISOString();
+    try {
+      db.prepare(`
+        UPDATE staff_points
+        SET status = 'ACKNOWLEDGED',
+            agreed_pledge = ?,
+            acknowledged_at = COALESCE(acknowledged_at, ?),
+            acknowledged_by = COALESCE(acknowledged_by, ?),
+            updated_at = ?
+        WHERE id = ?
+      `).run(POINT_PLEDGE_TEXT, nowIso, staffName || 'Staff', nowIso, id);
+
+      if (!updated) {
+        updated = db.prepare('SELECT * FROM staff_points WHERE id = ?').get(id);
+      }
+    } catch (e) {
+      console.warn('SQLite staff_points acknowledge note:', e.message);
+    }
+
+    if (!updated) {
+      return res.status(404).json({ error: 'Catatan poin tidak ditemukan.' });
+    }
+
+    broadcastEvent('POINT_UPDATE', { action: 'ACKNOWLEDGED', point: updated });
+
+    return res.json({
+      success: true,
+      message: 'Terima kasih, persetujuan dan janji perbaikan Anda telah tercatat.',
+      point: updated
+    });
+  } catch (err) {
+    console.error('Error acknowledging staff point:', err);
+    return res.status(500).json({ error: 'Gagal menyimpan konfirmasi: ' + err.message });
+  }
+});
+
+router.delete('/points/:id', async (req, res) => {
+  const { id } = req.params;
+  const { pin } = req.body || {};
+
+  const auth = await verifyManagementAuth(pin);
+  if (!auth.authorized || auth.role !== 'MANAGER') {
+    return res.status(403).json({
+      error: 'Akses ditolak: Hanya Operational Manager yang berwenang menghapus catatan poin.'
+    });
+  }
+
+  try {
+    let deleted = false;
+    if (isSupabaseConfigured) {
+      deleted = await cloudDb.deleteStaffPoint(id);
+    }
+    try {
+      const info = db.prepare('DELETE FROM staff_points WHERE id = ?').run(id);
+      if (info.changes > 0) deleted = true;
+    } catch {}
+
+    if (!deleted) {
+      return res.status(404).json({ error: 'Catatan poin tidak ditemukan.' });
+    }
+
+    broadcastEvent('POINT_UPDATE', { action: 'DELETED', id });
+    return res.json({ success: true, message: 'Catatan poin berhasil dihapus.' });
+  } catch (err) {
+    console.error('Error deleting staff point:', err);
+    return res.status(500).json({ error: 'Gagal menghapus catatan poin: ' + err.message });
   }
 });
 

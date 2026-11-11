@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Camera, Sparkles, QrCode, LogOut, CheckCircle, Clock, Building2, User, Coffee, ArrowRight, ShieldCheck, Star, Eye, Trophy, Palmtree, Megaphone, AlertCircle } from 'lucide-react';
+import { Camera, Sparkles, QrCode, LogOut, CheckCircle, Clock, Building2, User, Coffee, ArrowRight, ShieldCheck, Star, Eye, Trophy, Palmtree, Megaphone, AlertCircle, Award } from 'lucide-react';
 
 export default function KioskPortalScreen({
   staff,
@@ -14,7 +14,11 @@ export default function KioskPortalScreen({
   leaveUpdateCount = 0,
   announcements = [],
   unreadAnnouncementsCount = 0,
-  onOpenAnnouncements
+  onOpenAnnouncements,
+  pointTotal = 0,
+  pointCycleLabel = '',
+  pendingPointsCount = 0,
+  onOpenPointHistory
 }) {
   const isCheckedIn = Boolean(activeShift);
   const breakStatus = activeShift?.break_status || 'NONE';
@@ -139,6 +143,57 @@ export default function KioskPortalScreen({
         }`}>
           {isOnBreak ? 'Istirahat' : isCheckedIn ? 'On Duty' : 'Off Duty'}
         </span>
+      </div>
+
+      {/* Staff Monthly Point Accumulation Card (Reset tgl 17 -> tgl 13) */}
+      <div
+        onClick={onOpenPointHistory}
+        className={`p-4 rounded-2xl border transition flex items-center justify-between gap-3 cursor-pointer shadow-md ${
+          pendingPointsCount > 0
+            ? 'bg-rose-950/35 border-rose-500/50 ring-1 ring-rose-500/30'
+            : pointTotal > 0
+            ? 'bg-[#1a1620] border-amber-500/35 hover:border-amber-400/50'
+            : 'bg-[#161b24] border-slate-800 hover:border-slate-700'
+        }`}
+      >
+        <div className="flex items-center space-x-3 min-w-0">
+          <div className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 ${
+            pointTotal > 0
+              ? 'bg-rose-500/20 border border-rose-500/40 text-rose-300'
+              : 'bg-emerald-500/15 border border-emerald-500/30 text-emerald-300'
+          }`}>
+            <Award className="w-5 h-5 stroke-[2.2]" />
+          </div>
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                Akumulasi Poin Bulan Ini
+              </span>
+              {pendingPointsCount > 0 && (
+                <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-rose-600 text-white animate-pulse">
+                  {pendingPointsCount} Perlu Persetujuan
+                </span>
+              )}
+            </div>
+            <div className="flex flex-wrap items-baseline gap-2 mt-0.5">
+              <span className={`text-lg font-mono font-bold ${
+                pointTotal > 0 ? 'text-rose-300' : 'text-emerald-300'
+              }`}>
+                {pointTotal} Poin
+              </span>
+              <span className="text-[11px] text-slate-400 font-medium truncate">
+                {pointCycleLabel ? `Periode ${pointCycleLabel}` : 'Reset tgl 17 s/d tgl 13'}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          className="px-3 py-1.5 rounded-xl bg-[#1c2230] hover:bg-[#252d3f] border border-slate-700 text-xs font-bold text-slate-200 shrink-0 cursor-pointer"
+        >
+          Riwayat →
+        </button>
       </div>
 
       {/* Management Announcements Banner */}

@@ -172,6 +172,29 @@ db.exec(`
     read_at TEXT DEFAULT (datetime('now')),
     FOREIGN KEY(announcement_id) REFERENCES announcements(id)
   );
+
+  CREATE TABLE IF NOT EXISTS staff_points (
+    id TEXT PRIMARY KEY,
+    staff_id TEXT NOT NULL,
+    staff_uuid TEXT,
+    staff_name TEXT NOT NULL,
+    staff_role TEXT,
+    staff_venue TEXT,
+    staff_division TEXT,
+    points REAL NOT NULL,
+    reason TEXT NOT NULL,
+    cycle_key TEXT NOT NULL,
+    cycle_label TEXT,
+    wita_date TEXT,
+    given_by TEXT NOT NULL,
+    given_by_role TEXT NOT NULL,
+    status TEXT DEFAULT 'PENDING',
+    agreed_pledge TEXT,
+    acknowledged_at TEXT,
+    acknowledged_by TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now'))
+  );
 `);
 
 // Safe column migrations

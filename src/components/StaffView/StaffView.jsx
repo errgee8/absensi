@@ -8,8 +8,10 @@ import ToiletChecklistForm from '../ToiletChecklist/ToiletChecklistForm';
 import StaffLeaveModal from './StaffLeaveModal';
 import StaffAnnouncementModal from './StaffAnnouncementModal';
 import MandatoryNotificationModal from './MandatoryNotificationModal';
+import StaffPointNoticeModal from './StaffPointNoticeModal';
+import StaffPointHistoryModal from './StaffPointHistoryModal';
 import { getNotificationPermission } from '../../utils/pushNotifications';
-import { verifyStaffPin, getAnnouncements, acknowledgeAnnouncement, getLeaveRequests, subscribeRealtimeEvents, sendPresenceHeartbeat } from '../../utils/api';
+import { verifyStaffPin, getAnnouncements, acknowledgeAnnouncement, getLeaveRequests, getPoints, acknowledgeStaffPoint, subscribeRealtimeEvents, sendPresenceHeartbeat } from '../../utils/api';
 import { RESTROOM_LOCATIONS } from '../../utils/toiletService';
 import { CheckCircle2 } from 'lucide-react';
 
@@ -45,6 +47,12 @@ export default function StaffView({
   const [announcementInitialView, setAnnouncementInitialView] = useState('AUTO'); // 'AUTO' | 'LIST' | 'DETAIL'
   const [showNotificationPrompt, setShowNotificationPrompt] = useState(false);
   const [leaveUpdateCount, setLeaveUpdateCount] = useState(0);
+
+  // Violation Points state
+  const [pendingPoints, setPendingPoints] = useState([]);
+  const [staffPointTotal, setStaffPointTotal] = useState(0);
+  const [staffPointCycleLabel, setStaffPointCycleLabel] = useState('');
+  const [pointHistoryModalOpen, setPointHistoryModalOpen] = useState(false);
 
   // Live Presence Heartbeat for active logged-in staff
   useEffect(() => {
@@ -92,19 +100,27 @@ export default function StaffView({
     }
   }, []);
 
-  // Load Staff Notifications (Leave updates and active announcements)
+  // Load Staff Notifications (Leave updates, active announcements, and violation points)
   const loadStaffNotifications = async (staff) => {
     if (!staff?.id) return;
     try {
-      const [annData, leaveData] = await Promise.all([
+      const [annData, leaveData, pointsRes] = await Promise.all([
         getAnnouncements({ staffId: staff.id, venue: staff.venue, activeOnly: true }),
-        getLeaveRequests({ staffId: staff.id })
+        getLeaveRequests({ staffId: staff.id }),
+        getPoints({ staffId: staff.id, staffUuid: staff.uuid || '', cycleKey: 'CURRENT' }).catch(() => null)
       ]);
 
       const annList = Array.isArray(annData) ? annData : [];
       setAnnouncements(annList);
       const unreadAnns = annList.filter(a => !a.isRead);
       setUnreadAnnouncementsCount(unreadAnns.length);
+
+      // Update violation points & pending mandatory acknowledgments
+      if (pointsRes) {
+        setPendingPoints(Array.isArray(pointsRes.pendingForStaff) ? pointsRes.pendingForStaff : []);
+        setStaffPointTotal(Number(pointsRes.currentCycleTotalForStaff || 0));
+        setStaffPointCycleLabel(pointsRes.currentCycle?.label || '');
+      }
 
       // If there is any unread URGENT announcement, auto-open pop-up modal so staff sees it immediately!
       const hasUrgentUnread = unreadAnns.some(a => a.urgency === 'URGENT');
@@ -131,15 +147,26 @@ export default function StaffView({
     }
   }, [loggedInStaff]);
 
-  // Realtime subscription for announcements and leave requests
+  // Realtime subscription for announcements, leave requests, and points
   useEffect(() => {
     const unsubscribe = subscribeRealtimeEvents((eventType) => {
-      if ((eventType === 'ANNOUNCEMENT_UPDATE' || eventType === 'ANNOUNCEMENT_READ' || eventType === 'LEAVE_UPDATE') && loggedInStaff) {
+      if ((eventType === 'ANNOUNCEMENT_UPDATE' || eventType === 'ANNOUNCEMENT_READ' || eventType === 'LEAVE_UPDATE' || eventType === 'POINT_UPDATE') && loggedInStaff) {
         loadStaffNotifications(loggedInStaff);
       }
     });
     return () => unsubscribe();
   }, [loggedInStaff]);
+
+  const handleAcknowledgePoint = async (pointId) => {
+    if (!loggedInStaff) return;
+    await acknowledgeStaffPoint(pointId, {
+      staffId: loggedInStaff.id,
+      staffUuid: loggedInStaff.uuid || '',
+      staffName: loggedInStaff.name,
+      agreedTerms: true
+    });
+    await loadStaffNotifications(loggedInStaff);
+  };
 
   const handleAcknowledgeAnnouncement = async (announcementId) => {
     if (!loggedInStaff) return;
@@ -205,6 +232,10 @@ export default function StaffView({
     setError(null);
     setConfirmedShift(null);
     setToiletSuccessAlert(null);
+    setPendingPoints([]);
+    setStaffPointTotal(0);
+    setStaffPointCycleLabel('');
+    setPointHistoryModalOpen(false);
   };
 
   return (
@@ -255,7 +286,7 @@ export default function StaffView({
           }}
           onOpenMonitoring={() => {
             if (onOpenViewOnly) {
-              onOpenViewOnly(loggedInStaff);
+              onOpenViewOnly({ ...loggedInStaff, pin });
             }
           }}
           onTriggerCamera={(type, shift) => {
@@ -271,6 +302,10 @@ export default function StaffView({
             setAnnouncementInitialView('LIST');
             setAnnouncementModalOpen(true);
           }}
+          pointTotal={staffPointTotal}
+          pointCycleLabel={staffPointCycleLabel}
+          pendingPointsCount={pendingPoints.length}
+          onOpenPointHistory={() => setPointHistoryModalOpen(true)}
         />
       )}
 
@@ -375,6 +410,24 @@ export default function StaffView({
           staff={loggedInStaff}
           initialView={announcementInitialView}
           onAcknowledge={handleAcknowledgeAnnouncement}
+        />
+      )}
+
+      {/* Mandatory Violation Point Notice Modal (Auto-shown on login until acknowledged) */}
+      {step === 'PORTAL' && loggedInStaff && pendingPoints.length > 0 && (
+        <StaffPointNoticeModal
+          pendingPoints={pendingPoints}
+          staff={loggedInStaff}
+          onAcknowledge={handleAcknowledgePoint}
+        />
+      )}
+
+      {/* Staff Personal Point History Modal */}
+      {pointHistoryModalOpen && loggedInStaff && (
+        <StaffPointHistoryModal
+          isOpen={pointHistoryModalOpen}
+          onClose={() => setPointHistoryModalOpen(false)}
+          staff={loggedInStaff}
         />
       )}
     </div>

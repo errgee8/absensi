@@ -219,3 +219,82 @@ export function detectShiftSchedule(schedules, checkinTime = new Date()) {
     max_break_end: cutoffTimeStr
   };
 }
+
+const MONTH_SHORT_ID = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+
+/**
+ * Builds monthly point cycle info from a start year/month (cutoff cycle: 17th to 13th next month).
+ */
+export function buildPointCycle(startYear, startMonth) {
+  let endYear = startYear;
+  let endMonth = startMonth + 1;
+  if (endMonth > 12) {
+    endMonth = 1;
+    endYear += 1;
+  }
+  const startDate = `${startYear}-${String(startMonth).padStart(2, '0')}-17`;
+  const cutoffDate = `${endYear}-${String(endMonth).padStart(2, '0')}-13`;
+  const label = `17 ${MONTH_SHORT_ID[startMonth - 1]} ${startYear} – 13 ${MONTH_SHORT_ID[endMonth - 1]} ${endYear}`;
+  return {
+    cycleKey: startDate,
+    startDate,
+    cutoffDate,
+    label
+  };
+}
+
+export function getPointCycleFromKey(cycleKey) {
+  if (!cycleKey || typeof cycleKey !== 'string') return getPointCycleInfo(new Date());
+  const parts = cycleKey.split('-').map(Number);
+  if (parts.length < 2 || isNaN(parts[0]) || isNaN(parts[1])) {
+    return getPointCycleInfo(new Date());
+  }
+  return buildPointCycle(parts[0], parts[1]);
+}
+
+/**
+ * Returns the active monthly point accumulation cycle in WITA:
+ * Resets on the 17th of each month and runs through the 13th of next month.
+ */
+export function getPointCycleInfo(date = new Date()) {
+  const d = typeof date === 'string' ? new Date(date) : (date || new Date());
+  const validDate = isNaN(d.getTime()) ? new Date() : d;
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Makassar',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).formatToParts(validDate);
+
+  const day = parseInt(parts.find((p) => p.type === 'day')?.value || '1', 10);
+  const month = parseInt(parts.find((p) => p.type === 'month')?.value || '1', 10);
+  const year = parseInt(parts.find((p) => p.type === 'year')?.value || '2026', 10);
+
+  let startYear = year;
+  let startMonth = month;
+  if (day < 17) {
+    startMonth -= 1;
+    if (startMonth < 1) {
+      startMonth = 12;
+      startYear -= 1;
+    }
+  }
+  return buildPointCycle(startYear, startMonth);
+}
+
+export function getRecentPointCycles(count = 6, refDate = new Date()) {
+  const current = getPointCycleInfo(refDate);
+  const [startY, startM] = current.cycleKey.split('-').map(Number);
+  const cycles = [];
+  let y = startY;
+  let m = startM;
+  for (let i = 0; i < count; i++) {
+    cycles.push(buildPointCycle(y, m));
+    m -= 1;
+    if (m < 1) {
+      m = 12;
+      y -= 1;
+    }
+  }
+  return cycles;
+}

@@ -17,8 +17,9 @@ export default function AdminPinModal({ isOpen, onClose, onSuccess }) {
 
     try {
       const authData = await verifyAdminPin(pin);
+      const enteredPin = pin;
       setPin('');
-      onSuccess(authData);
+      onSuccess({ ...authData, pin: enteredPin });
     } catch (err) {
       setError('PIN Manager / Assistant Manager salah. Akses ditolak.');
       setPin('');

@@ -395,6 +395,12 @@ export function subscribeRealtimeEvents(onEvent) {
     } catch {}
   });
 
+  eventSource.addEventListener('POINT_UPDATE', (e) => {
+    try {
+      onEvent('POINT_UPDATE', JSON.parse(e.data));
+    } catch {}
+  });
+
   return () => {
     eventSource.close();
   };
@@ -420,4 +426,51 @@ export async function getLivePresence() {
   const res = await fetch(`${API_BASE}/presence`);
   if (!res.ok) throw new Error('Failed to load live presence');
   return res.json();
+}
+
+// Violation Points System API
+export async function getPoints(params = {}) {
+  const q = new URLSearchParams();
+  if (params.staffId) q.append('staffId', params.staffId);
+  if (params.staffUuid) q.append('staffUuid', params.staffUuid);
+  if (params.cycleKey) q.append('cycleKey', params.cycleKey);
+  if (params.status) q.append('status', params.status);
+
+  const res = await fetch(`${API_BASE}/points?${q.toString()}`);
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Gagal memuat data poin');
+  return data;
+}
+
+export async function createStaffPoint(payload) {
+  const res = await fetch(`${API_BASE}/points`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Gagal memberikan poin');
+  return data;
+}
+
+export async function acknowledgeStaffPoint(id, payload) {
+  const res = await fetch(`${API_BASE}/points/${encodeURIComponent(id)}/acknowledge`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Gagal menyetujui pemberitahuan poin');
+  return data;
+}
+
+export async function deleteStaffPoint(id, pin) {
+  const res = await fetch(`${API_BASE}/points/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ pin })
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Gagal menghapus catatan poin');
+  return data;
 }

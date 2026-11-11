@@ -1190,5 +1190,91 @@ export const cloudDb = {
       console.warn(`Failed to save setting ${key} to Supabase:`, e.message);
       return null;
     }
+  },
+
+  // 13. Staff Violation Points System (17th -> 13th monthly cutoff cycle)
+  async getStaffPoints() {
+    if (!supabase) return [];
+    try {
+      const { data, error } = await supabase
+        .from('app_settings')
+        .select('value')
+        .eq('key', 'staff_points')
+        .maybeSingle();
+      if (error) throw error;
+      const list = Array.isArray(data?.value) ? data.value : [];
+      return [...list].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    } catch (e) {
+      console.warn('Failed to fetch staff points from Supabase:', e.message);
+      return [];
+    }
+  },
+
+  async createStaffPoint(pointRecord) {
+    if (!supabase) return pointRecord;
+    const list = await this.getStaffPoints();
+    const updatedList = [pointRecord, ...list];
+    const { error } = await supabase
+      .from('app_settings')
+      .upsert({
+        key: 'staff_points',
+        value: updatedList,
+        description: 'Staff Violation Points Log & Acknowledgments',
+        updated_at: new Date().toISOString()
+      });
+    if (error) throw error;
+    return pointRecord;
+  },
+
+  async acknowledgeStaffPoint(pointId, { staffId, staffUuid, staffName, agreedPledge }) {
+    if (!supabase) return null;
+    const list = await this.getStaffPoints();
+    const index = list.findIndex((p) => String(p.id) === String(pointId));
+    if (index === -1) return null;
+
+    const item = { ...list[index] };
+    // Verify staff ownership if IDs are provided
+    const ids = new Set([staffId, staffUuid].filter(Boolean).map(String));
+    const itemIds = [item.staff_id, item.staff_uuid].filter(Boolean).map(String);
+    if (ids.size > 0 && itemIds.length > 0 && !itemIds.some((id) => ids.has(id))) {
+      throw new Error('Poin ini bukan milik akun staff tersebut.');
+    }
+
+    const now = new Date().toISOString();
+    item.status = 'ACKNOWLEDGED';
+    item.agreed_pledge = agreedPledge;
+    item.acknowledged_at = item.acknowledged_at || now;
+    item.acknowledged_by = item.acknowledged_by || staffName || item.staff_name;
+    item.updated_at = now;
+
+    list[index] = item;
+
+    const { error } = await supabase
+      .from('app_settings')
+      .upsert({
+        key: 'staff_points',
+        value: list,
+        description: 'Staff Violation Points Log & Acknowledgments',
+        updated_at: now
+      });
+    if (error) throw error;
+    return item;
+  },
+
+  async deleteStaffPoint(pointId) {
+    if (!supabase) return false;
+    const list = await this.getStaffPoints();
+    const filtered = list.filter((p) => String(p.id) !== String(pointId));
+    if (filtered.length === list.length) return false;
+    const { error } = await supabase
+      .from('app_settings')
+      .upsert({
+        key: 'staff_points',
+        value: filtered,
+        description: 'Staff Violation Points Log & Acknowledgments',
+        updated_at: new Date().toISOString()
+      });
+    if (error) throw error;
+    return true;
   }
 };
