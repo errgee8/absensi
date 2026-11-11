@@ -41,7 +41,7 @@ export async function getNetworkStatus() {
 
 export async function getStaffList(venue = 'ALL') {
   const query = venue && venue !== 'ALL' ? `?venue=${encodeURIComponent(venue)}` : '';
-  const res = await fetch(`${API_BASE}/staff${query}`);
+  const res = await fetch(`${API_BASE}/staff${query}`, { cache: 'no-store' });
   if (!res.ok) throw new Error('Gagal memuat daftar karyawan');
   return res.json();
 }
@@ -436,7 +436,7 @@ export async function getPoints(params = {}) {
   if (params.cycleKey) q.append('cycleKey', params.cycleKey);
   if (params.status) q.append('status', params.status);
 
-  const res = await fetch(`${API_BASE}/points?${q.toString()}`);
+  const res = await fetch(`${API_BASE}/points?${q.toString()}`, { cache: 'no-store' });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'Gagal memuat data poin');
   return data;

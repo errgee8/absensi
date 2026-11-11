@@ -1210,10 +1210,11 @@ export const cloudDb = {
     }
   },
 
-  async createStaffPoint(pointRecord) {
-    if (!supabase) return pointRecord;
+  async createStaffPoints(pointRecords) {
+    const records = Array.isArray(pointRecords) ? pointRecords : [pointRecords];
+    if (!supabase || records.length === 0) return records;
     const list = await this.getStaffPoints();
-    const updatedList = [pointRecord, ...list];
+    const updatedList = [...records, ...list];
     const { error } = await supabase
       .from('app_settings')
       .upsert({
@@ -1223,6 +1224,11 @@ export const cloudDb = {
         updated_at: new Date().toISOString()
       });
     if (error) throw error;
+    return records;
+  },
+
+  async createStaffPoint(pointRecord) {
+    await this.createStaffPoints([pointRecord]);
     return pointRecord;
   },
 

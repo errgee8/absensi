@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Camera, Sparkles, QrCode, LogOut, CheckCircle, Clock, Building2, User, Coffee, ArrowRight, ShieldCheck, Star, Eye, Trophy, Palmtree, Megaphone, AlertCircle, Award } from 'lucide-react';
+import { Camera, Sparkles, QrCode, LogOut, CheckCircle, Clock, Building2, User, Coffee, ArrowRight, ShieldCheck, Star, Eye, Trophy, Palmtree, Megaphone, AlertCircle, Award, Bell } from 'lucide-react';
 
 export default function KioskPortalScreen({
   staff,
@@ -18,7 +18,8 @@ export default function KioskPortalScreen({
   pointTotal = 0,
   pointCycleLabel = '',
   pendingPointsCount = 0,
-  onOpenPointHistory
+  onOpenPointHistory,
+  onOpenPendingPoints
 }) {
   const isCheckedIn = Boolean(activeShift);
   const breakStatus = activeShift?.break_status || 'NONE';
@@ -145,6 +146,37 @@ export default function KioskPortalScreen({
         </span>
       </div>
 
+      {/* Clickable New Violation Point Notification Badge */}
+      {pendingPointsCount > 0 && (
+        <button
+          type="button"
+          onClick={() => (onOpenPendingPoints ? onOpenPendingPoints() : onOpenPointHistory?.())}
+          className="w-full p-4 rounded-2xl bg-gradient-to-r from-rose-950/90 via-rose-900/55 to-[#161b24] border border-rose-500/60 hover:border-rose-400 ring-1 ring-rose-500/35 shadow-lg shadow-rose-950/30 transition flex items-center justify-between gap-3 text-left cursor-pointer group"
+        >
+          <div className="flex items-center space-x-3 min-w-0">
+            <div className="relative w-11 h-11 rounded-2xl bg-rose-600/25 border border-rose-400/50 text-rose-300 flex items-center justify-center shrink-0">
+              <Bell className="w-5 h-5 stroke-[2.2]" />
+              <span className="absolute -top-1.5 -right-1.5 min-w-[20px] h-5 px-1 rounded-full bg-rose-600 text-white text-[10px] font-bold flex items-center justify-center shadow animate-pulse">
+                {pendingPointsCount}
+              </span>
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-rose-600 text-white">
+                  {pendingPointsCount} Notifikasi Poin Baru
+                </span>
+              </div>
+              <p className="text-xs font-bold text-white mt-1 truncate">
+                Klik di sini untuk baca detail poin, alasan, waktu &amp; pemberi poin
+              </p>
+            </div>
+          </div>
+          <span className="px-3 py-1.5 rounded-xl bg-rose-600 group-hover:bg-rose-500 text-white text-xs font-bold shrink-0 transition">
+            Buka →
+          </span>
+        </button>
+      )}
+
       {/* Staff Monthly Point Accumulation Card (Reset tgl 17 -> tgl 13) */}
       <div
         onClick={onOpenPointHistory}
@@ -170,9 +202,20 @@ export default function KioskPortalScreen({
                 Akumulasi Poin Bulan Ini
               </span>
               {pendingPointsCount > 0 && (
-                <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-rose-600 text-white animate-pulse">
-                  {pendingPointsCount} Perlu Persetujuan
-                </span>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (onOpenPendingPoints) {
+                      onOpenPendingPoints();
+                    } else if (onOpenPointHistory) {
+                      onOpenPointHistory();
+                    }
+                  }}
+                  className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-rose-600 hover:bg-rose-500 text-white animate-pulse cursor-pointer"
+                >
+                  {pendingPointsCount} Notifikasi Baru • Klik Baca
+                </button>
               )}
             </div>
             <div className="flex flex-wrap items-baseline gap-2 mt-0.5">

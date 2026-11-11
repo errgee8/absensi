@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { AlertTriangle, CheckCircle2, ShieldAlert, Clock, UserCheck, CheckSquare } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Clock, UserCheck, X } from 'lucide-react';
 import { formatWitaDateTime } from '../../utils/time';
 import { showToast } from '../Common/Toast';
 
 const PLEDGE_TEXT = 'dengan menyetujui ini saya berjanji akan memperbaiki kesalahan saya dan tidak mengulangi lagi';
 
 export default function StaffPointNoticeModal({
+  isOpen = true,
+  onClose,
   pendingPoints = [],
   staff,
   onAcknowledge
@@ -17,9 +19,9 @@ export default function StaffPointNoticeModal({
 
   useEffect(() => {
     setChecked(false);
-  }, [currentPoint?.id]);
+  }, [currentPoint?.id, isOpen]);
 
-  if (!currentPoint) return null;
+  if (!isOpen || !currentPoint) return null;
 
   const handleConfirm = async (e) => {
     e.preventDefault();
@@ -40,13 +42,13 @@ export default function StaffPointNoticeModal({
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md animate-fade-in">
       <div className="bg-[#161b24] border border-rose-500/50 rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl shadow-rose-950/50 animate-scale-up text-slate-200 flex flex-col max-h-[92vh]">
-        {/* Urgent Warning Header */}
-        <div className="p-5 bg-gradient-to-r from-rose-950 via-red-900/90 to-[#161b24] border-b border-rose-500/30 flex items-center justify-between">
-          <div className="flex items-center space-x-3">
+        {/* Notification Header */}
+        <div className="p-5 bg-gradient-to-r from-rose-950 via-red-900/90 to-[#161b24] border-b border-rose-500/30 flex items-center justify-between gap-3">
+          <div className="flex items-center space-x-3 min-w-0">
             <div className="w-11 h-11 rounded-2xl bg-rose-500/20 border border-rose-400/40 text-rose-300 flex items-center justify-center shrink-0">
               <AlertTriangle className="w-6 h-6 stroke-[2.2]" />
             </div>
-            <div>
+            <div className="min-w-0">
               <div className="flex items-center space-x-2">
                 <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-rose-600 text-white">
                   Pemberitahuan Pelanggaran
@@ -57,11 +59,21 @@ export default function StaffPointNoticeModal({
                   </span>
                 )}
               </div>
-              <h3 className="text-base sm:text-lg font-bold text-white mt-0.5">
+              <h3 className="text-base sm:text-lg font-bold text-white mt-0.5 truncate">
                 Pencatatan Poin Staff ({staff?.name})
               </h3>
             </div>
           </div>
+          {onClose && (
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-2 rounded-xl bg-black/25 hover:bg-black/45 text-slate-300 hover:text-white transition shrink-0 cursor-pointer"
+              title="Tutup sementara"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
         </div>
 
         {/* Body */}

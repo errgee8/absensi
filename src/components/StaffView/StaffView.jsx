@@ -52,6 +52,7 @@ export default function StaffView({
   const [pendingPoints, setPendingPoints] = useState([]);
   const [staffPointTotal, setStaffPointTotal] = useState(0);
   const [staffPointCycleLabel, setStaffPointCycleLabel] = useState('');
+  const [pointNoticeModalOpen, setPointNoticeModalOpen] = useState(false);
   const [pointHistoryModalOpen, setPointHistoryModalOpen] = useState(false);
 
   // Live Presence Heartbeat for active logged-in staff
@@ -117,7 +118,11 @@ export default function StaffView({
 
       // Update violation points & pending mandatory acknowledgments
       if (pointsRes) {
-        setPendingPoints(Array.isArray(pointsRes.pendingForStaff) ? pointsRes.pendingForStaff : []);
+        const nextPending = Array.isArray(pointsRes.pendingForStaff) ? pointsRes.pendingForStaff : [];
+        setPendingPoints(nextPending);
+        if (nextPending.length === 0) {
+          setPointNoticeModalOpen(false);
+        }
         setStaffPointTotal(Number(pointsRes.currentCycleTotalForStaff || 0));
         setStaffPointCycleLabel(pointsRes.currentCycle?.label || '');
       }
@@ -235,6 +240,7 @@ export default function StaffView({
     setPendingPoints([]);
     setStaffPointTotal(0);
     setStaffPointCycleLabel('');
+    setPointNoticeModalOpen(false);
     setPointHistoryModalOpen(false);
   };
 
@@ -306,6 +312,7 @@ export default function StaffView({
           pointCycleLabel={staffPointCycleLabel}
           pendingPointsCount={pendingPoints.length}
           onOpenPointHistory={() => setPointHistoryModalOpen(true)}
+          onOpenPendingPoints={() => setPointNoticeModalOpen(true)}
         />
       )}
 
@@ -413,9 +420,11 @@ export default function StaffView({
         />
       )}
 
-      {/* Mandatory Violation Point Notice Modal (Auto-shown on login until acknowledged) */}
-      {step === 'PORTAL' && loggedInStaff && pendingPoints.length > 0 && (
+      {/* Violation Point Detail & Acknowledge Modal (Opened when staff clicks notification badge) */}
+      {step === 'PORTAL' && loggedInStaff && pointNoticeModalOpen && pendingPoints.length > 0 && (
         <StaffPointNoticeModal
+          isOpen={pointNoticeModalOpen}
+          onClose={() => setPointNoticeModalOpen(false)}
           pendingPoints={pendingPoints}
           staff={loggedInStaff}
           onAcknowledge={handleAcknowledgePoint}
@@ -428,6 +437,7 @@ export default function StaffView({
           isOpen={pointHistoryModalOpen}
           onClose={() => setPointHistoryModalOpen(false)}
           staff={loggedInStaff}
+          onOpenNoticeModal={() => setPointNoticeModalOpen(true)}
         />
       )}
     </div>

@@ -3,6 +3,7 @@ import ExcelJS from 'exceljs';
 import {
   AlertTriangle,
   Award,
+  Check,
   CheckCircle2,
   Clock,
   Download,
@@ -42,7 +43,7 @@ export default function PointManagementTab({ adminAuth, isReadOnly = false, onPo
   // Give Point Form State
   const [staffSearchQuery, setStaffSearchQuery] = useState('');
   const [formVenueFilter, setFormVenueFilter] = useState('ALL');
-  const [selectedStaffId, setSelectedStaffId] = useState('');
+  const [selectedStaffIds, setSelectedStaffIds] = useState([]);
   const [pointAmount, setPointAmount] = useState('');
   const [reason, setReason] = useState('');
   const [pinInput, setPinInput] = useState(adminAuth?.pin || '');
@@ -88,9 +89,9 @@ export default function PointManagementTab({ adminAuth, isReadOnly = false, onPo
 
   useEffect(() => {
     const unsubscribe = subscribeRealtimeEvents((eventType) => {
-      if (eventType === 'POINT_UPDATE') {
+      if (eventType === 'POINT_UPDATE' || eventType === 'STAFF_UPDATE') {
         loadData(true);
-        if (onPointsUpdated) onPointsUpdated();
+        if (eventType === 'POINT_UPDATE' && onPointsUpdated) onPointsUpdated();
       }
     });
     return () => unsubscribe();
@@ -119,10 +120,40 @@ export default function PointManagementTab({ adminAuth, isReadOnly = false, onPo
       .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
   }, [staffList, staffSearchQuery, formVenueFilter]);
 
-  const selectedStaffObj = useMemo(
-    () => staffList.find((s) => String(s.id) === String(selectedStaffId) || String(s.uuid) === String(selectedStaffId)),
-    [staffList, selectedStaffId]
+  const selectedStaffObjs = useMemo(
+    () =>
+      selectedStaffIds
+        .map((id) => staffList.find((s) => String(s.id) === String(id) || String(s.uuid) === String(id)))
+        .filter(Boolean),
+    [staffList, selectedStaffIds]
   );
+
+  const toggleStaffSelection = (staffId) => {
+    const targetId = String(staffId);
+    setSelectedStaffIds((prev) =>
+      prev.some((id) => String(id) === targetId)
+        ? prev.filter((id) => String(id) !== targetId)
+        : [...prev, staffId]
+    );
+  };
+
+  const selectAllFilteredStaff = () => {
+    setSelectedStaffIds((prev) => {
+      const next = [...prev];
+      const existing = new Set(prev.map((id) => String(id)));
+      selectableStaff.forEach((s) => {
+        if (!existing.has(String(s.id))) {
+          existing.add(String(s.id));
+          next.push(s.id);
+        }
+      });
+      return next;
+    });
+  };
+
+  const clearSelectedStaff = () => {
+    setSelectedStaffIds([]);
+  };
 
   // KPI metrics for selected period
   const stats = useMemo(() => {
@@ -183,8 +214,8 @@ export default function PointManagementTab({ adminAuth, isReadOnly = false, onPo
       showToast('Masukkan PIN otorisasi Operational Manager / Assistant Manager terlebih dahulu.', 'error');
       return;
     }
-    if (!selectedStaffId) {
-      showToast('Pilih nama staff yang akan diberikan poin.', 'error');
+    if (selectedStaffIds.length === 0) {
+      showToast('Pilih minimal 1 nama staff yang akan diberikan poin.', 'error');
       return;
     }
     const numPts = Number(pointAmount);
@@ -201,12 +232,12 @@ export default function PointManagementTab({ adminAuth, isReadOnly = false, onPo
     try {
       const res = await createStaffPoint({
         pin: effectivePin,
-        staffId: selectedStaffId,
+        staffIds: selectedStaffIds,
         points: numPts,
         reason: reason.trim()
       });
       showToast(res.message || 'Poin pelanggaran berhasil diberikan & notifikasi dikirim.', 'success');
-      setSelectedStaffId('');
+      setSelectedStaffIds([]);
       setStaffSearchQuery('');
       setPointAmount('');
       setReason('');
@@ -346,11 +377,10 @@ export default function PointManagementTab({ adminAuth, isReadOnly = false, onPo
   };
 
   const quickSelectStaff = (staffId) => {
-    setSelectedStaffId(staffId);
-    const target = staffList.find((s) => String(s.id) === String(staffId));
-    if (target) {
-      setStaffSearchQuery(target.name);
-    }
+    const targetId = String(staffId);
+    setSelectedStaffIds((prev) =>
+      prev.some((id) => String(id) === targetId) ? prev : [...prev, staffId]
+    );
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -471,9 +501,31 @@ export default function PointManagementTab({ adminAuth, isReadOnly = false, onPo
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
           {/* Staff Search & Selection (5 cols) */}
           <div className="lg:col-span-5 space-y-2.5">
-            <label className="text-xs font-bold text-slate-200 block">
-              1. Cari &amp; Pilih Nama Staff
-            </label>
+            <div className="flex items-center justify-between gap-2">
+              <label className="text-xs font-bold text-slate-200 block">
+                1. Cari &amp; Pilih Nama Staff (Multi-Select)
+              </label>
+              <div className="flex items-center gap-1.5">
+                {selectableStaff.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={selectAllFilteredStaff}
+                    className="text-[10px] font-bold text-blue-400 hover:text-blue-300 px-2 py-0.5 rounded-lg bg-blue-950/40 border border-blue-500/20 cursor-pointer"
+                  >
+                    Pilih Semua
+                  </button>
+                )}
+                {selectedStaffIds.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={clearSelectedStaff}
+                    className="text-[10px] font-bold text-slate-400 hover:text-white px-2 py-0.5 rounded-lg bg-slate-800 border border-slate-700 cursor-pointer"
+                  >
+                    Bersihkan ({selectedStaffIds.length})
+                  </button>
+                )}
+              </div>
+            </div>
 
             <div className="flex items-center gap-2">
               <div className="relative flex-1">
@@ -505,22 +557,33 @@ export default function PointManagementTab({ adminAuth, isReadOnly = false, onPo
                 </div>
               ) : (
                 selectableStaff.map((s) => {
-                  const isSelected = String(selectedStaffId) === String(s.id);
+                  const isSelected = selectedStaffIds.some((id) => String(id) === String(s.id));
                   return (
                     <button
                       key={s.id}
                       type="button"
-                      onClick={() => setSelectedStaffId(s.id)}
+                      onClick={() => toggleStaffSelection(s.id)}
                       className={`w-full px-3 py-2.5 text-left flex items-center justify-between transition cursor-pointer ${
                         isSelected
                           ? 'bg-blue-600/20 text-white border-l-4 border-l-blue-500'
                           : 'hover:bg-slate-800/60 text-slate-300'
                       }`}
                     >
-                      <div className="min-w-0">
-                        <div className="text-xs font-bold truncate">{s.name}</div>
-                        <div className="text-[10px] text-slate-400 truncate">
-                          {s.venue} • {s.division || s.role}
+                      <div className="flex items-center space-x-2.5 min-w-0">
+                        <span
+                          className={`w-4 h-4 rounded-md border flex items-center justify-center shrink-0 transition ${
+                            isSelected
+                              ? 'bg-blue-600 border-blue-500 text-white'
+                              : 'border-slate-600 bg-slate-900/80'
+                          }`}
+                        >
+                          {isSelected && <Check className="w-3 h-3" />}
+                        </span>
+                        <div className="min-w-0">
+                          <div className="text-xs font-bold truncate">{s.name}</div>
+                          <div className="text-[10px] text-slate-400 truncate">
+                            {s.venue} • {s.division || s.role}
+                          </div>
                         </div>
                       </div>
                       {isSelected && (
@@ -534,18 +597,38 @@ export default function PointManagementTab({ adminAuth, isReadOnly = false, onPo
               )}
             </div>
 
-            {selectedStaffObj && (
-              <div className="px-3 py-2 rounded-xl bg-blue-950/40 border border-blue-500/30 text-xs text-blue-200 flex items-center justify-between">
-                <span>
-                  Target: <strong>{selectedStaffObj.name}</strong> ({selectedStaffObj.venue})
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setSelectedStaffId('')}
-                  className="text-slate-400 hover:text-white cursor-pointer"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
+            {selectedStaffObjs.length > 0 && (
+              <div className="px-3 py-2.5 rounded-xl bg-blue-950/40 border border-blue-500/30 text-xs text-blue-200 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold">
+                    Target Terpilih: <span className="text-white">{selectedStaffObjs.length} Staff</span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={clearSelectedStaff}
+                    className="text-[10px] text-slate-400 hover:text-white cursor-pointer"
+                  >
+                    Hapus semua
+                  </button>
+                </div>
+                <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto">
+                  {selectedStaffObjs.map((s) => (
+                    <span
+                      key={s.id}
+                      className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-lg bg-blue-600/30 border border-blue-500/40 text-[11px] font-semibold text-white"
+                    >
+                      <span>{s.name}</span>
+                      <button
+                        type="button"
+                        onClick={() => toggleStaffSelection(s.id)}
+                        className="text-blue-200 hover:text-white cursor-pointer"
+                        title={`Hapus ${s.name}`}
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
               </div>
             )}
           </div>
@@ -626,11 +709,17 @@ export default function PointManagementTab({ adminAuth, isReadOnly = false, onPo
             <div className="pt-1 flex justify-end">
               <button
                 type="submit"
-                disabled={submitting || !selectedStaffId || !pointAmount || !reason.trim()}
+                disabled={submitting || selectedStaffIds.length === 0 || !pointAmount || !reason.trim()}
                 className="w-full sm:w-auto px-5 py-3 rounded-2xl bg-rose-600 hover:bg-rose-500 disabled:bg-slate-800 disabled:text-slate-500 text-white text-xs font-bold shadow-lg shadow-rose-600/25 transition flex items-center justify-center space-x-2 cursor-pointer"
               >
                 <Send className="w-4 h-4" />
-                <span>{submitting ? 'Menyimpan & Mengirim...' : 'Berikan Poin & Kirim Notifikasi'}</span>
+                <span>
+                  {submitting
+                    ? 'Menyimpan & Mengirim...'
+                    : selectedStaffIds.length > 1
+                      ? `Berikan Poin ke ${selectedStaffIds.length} Staff & Kirim Notifikasi`
+                      : 'Berikan Poin & Kirim Notifikasi'}
+                </span>
               </button>
             </div>
           </div>

@@ -3715,11 +3715,16 @@ router.get('/points', async (req, res) => {
       }
     }
 
-    const staffTotals = Array.from(summaryMap.values()).sort((a, b) => {
-      if (b.total_points !== a.total_points) return b.total_points - a.total_points;
-      if (b.violation_count !== a.violation_count) return b.violation_count - a.violation_count;
-      return (a.staff_name || '').localeCompare(b.staff_name || '');
-    });
+    const isStaffScoped = Boolean(staffId || staffUuid);
+
+    let staffTotals = [];
+    if (!isStaffScoped) {
+      staffTotals = Array.from(summaryMap.values()).sort((a, b) => {
+        if (b.total_points !== a.total_points) return b.total_points - a.total_points;
+        if (b.violation_count !== a.violation_count) return b.violation_count - a.violation_count;
+        return (a.staff_name || '').localeCompare(b.staff_name || '');
+      });
+    }
 
     return res.json({
       currentCycle,
@@ -3737,7 +3742,7 @@ router.get('/points', async (req, res) => {
 });
 
 router.post('/points', async (req, res) => {
-  const { pin, staffId, points, reason } = req.body || {};
+  const { pin, staffId, staffIds, points, reason } = req.body || {};
 
   const auth = await verifyManagementAuth(pin);
   if (!auth.authorized) {
@@ -3746,8 +3751,13 @@ router.post('/points', async (req, res) => {
     });
   }
 
-  if (!staffId) {
-    return res.status(400).json({ error: 'Silakan pilih staff terlebih dahulu.' });
+  const targetStaffIds = [...new Set([
+    ...(Array.isArray(staffIds) ? staffIds : []),
+    ...(staffId ? [staffId] : [])
+  ].filter(Boolean).map(String))];
+
+  if (targetStaffIds.length === 0) {
+    return res.status(400).json({ error: 'Silakan pilih minimal 1 staff terlebih dahulu.' });
   }
 
   const numericPoints = Number(points);
@@ -3759,19 +3769,23 @@ router.post('/points', async (req, res) => {
     return res.status(400).json({ error: 'Alasan pemberian poin wajib diisi.' });
   }
 
-  // Locate target staff in Supabase or SQLite
-  let staff = null;
-  if (isSupabaseConfigured) {
-    const supa = await findStaffInSupabase(staffId);
-    if (supa) {
-      staff = { ...supa, id: supa.legacy_code || supa.id, uuid: supa.id };
+  // Resolve each target staff individually so every record stays private & isolated per person
+  const resolvedStaffList = [];
+  for (const targetId of targetStaffIds) {
+    let staff = null;
+    if (isSupabaseConfigured) {
+      const supa = await findStaffInSupabase(targetId);
+      if (supa) {
+        staff = { ...supa, id: supa.legacy_code || supa.id, uuid: supa.id };
+      }
     }
-  }
-  if (!staff) {
-    staff = db.prepare('SELECT * FROM staff WHERE id = ? OR uuid = ?').get(staffId, staffId);
-  }
-  if (!staff) {
-    return res.status(404).json({ error: 'Data staff tidak ditemukan.' });
+    if (!staff) {
+      staff = db.prepare('SELECT * FROM staff WHERE id = ? OR uuid = ?').get(targetId, targetId);
+    }
+    if (!staff) {
+      return res.status(404).json({ error: `Data staff (${targetId}) tidak ditemukan.` });
+    }
+    resolvedStaffList.push(staff);
   }
 
   const now = new Date();
@@ -3781,9 +3795,10 @@ router.post('/points', async (req, res) => {
   const roundedPoints = Number.isInteger(numericPoints)
     ? numericPoints
     : Math.round(numericPoints * 100) / 100;
+  const cleanReason = String(reason).trim();
 
-  const pointRecord = {
-    id: `pt_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+  const createdRecords = resolvedStaffList.map((staff, idx) => ({
+    id: `pt_${Date.now()}_${idx}_${Math.random().toString(36).substring(2, 6)}`,
     staff_id: String(staff.id),
     staff_uuid: String(staff.uuid || staff.id),
     staff_name: staff.name,
@@ -3791,7 +3806,7 @@ router.post('/points', async (req, res) => {
     staff_venue: staff.venue || 'JP Karaoke',
     staff_division: staff.division || 'Staff',
     points: roundedPoints,
-    reason: String(reason).trim(),
+    reason: cleanReason,
     cycle_key: cycle.cycleKey,
     cycle_label: cycle.label,
     wita_date: witaDate,
@@ -3803,59 +3818,70 @@ router.post('/points', async (req, res) => {
     acknowledged_by: null,
     created_at: nowIso,
     updated_at: nowIso
-  };
+  }));
 
   try {
     if (isSupabaseConfigured) {
-      await cloudDb.createStaffPoint(pointRecord);
+      await cloudDb.createStaffPoints(createdRecords);
     }
 
-    try {
-      db.prepare(`
-        INSERT INTO staff_points (
-          id, staff_id, staff_uuid, staff_name, staff_role, staff_venue, staff_division,
-          points, reason, cycle_key, cycle_label, wita_date, given_by, given_by_role,
-          status, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', ?, ?)
-      `).run(
-        pointRecord.id,
-        pointRecord.staff_id,
-        pointRecord.staff_uuid,
-        pointRecord.staff_name,
-        pointRecord.staff_role,
-        pointRecord.staff_venue,
-        pointRecord.staff_division,
-        pointRecord.points,
-        pointRecord.reason,
-        pointRecord.cycle_key,
-        pointRecord.cycle_label,
-        pointRecord.wita_date,
-        pointRecord.given_by,
-        pointRecord.given_by_role,
-        nowIso,
-        nowIso
-      );
-    } catch (e) {
-      console.warn('SQLite staff_points insert note:', e.message);
-    }
+    const insertStmt = db.prepare(`
+      INSERT INTO staff_points (
+        id, staff_id, staff_uuid, staff_name, staff_role, staff_venue, staff_division,
+        points, reason, cycle_key, cycle_label, wita_date, given_by, given_by_role,
+        status, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', ?, ?)
+    `);
 
-    broadcastEvent('POINT_UPDATE', { action: 'CREATED', point: pointRecord });
+    for (const pointRecord of createdRecords) {
+      try {
+        insertStmt.run(
+          pointRecord.id,
+          pointRecord.staff_id,
+          pointRecord.staff_uuid,
+          pointRecord.staff_name,
+          pointRecord.staff_role,
+          pointRecord.staff_venue,
+          pointRecord.staff_division,
+          pointRecord.points,
+          pointRecord.reason,
+          pointRecord.cycle_key,
+          pointRecord.cycle_label,
+          pointRecord.wita_date,
+          pointRecord.given_by,
+          pointRecord.given_by_role,
+          nowIso,
+          nowIso
+        );
+      } catch (e) {
+        console.warn('SQLite staff_points insert note:', e.message);
+      }
+    }
 
     const notifyPointsEnabled = getSetting('notify_points') !== 0 && getSetting('notify_points') !== 'false';
-    if (notifyPointsEnabled) {
-      sendPushNotification({
-        staffIds: [pointRecord.staff_id, pointRecord.staff_uuid].filter(Boolean),
-        title: '⚠️ Pemberitahuan Poin Pelanggaran',
-        body: `Anda terkena pelanggaran atas alasan "${pointRecord.reason}" dan dibebankan poin sebesar ${pointRecord.points} Poin.`,
-        url: '/',
-        tag: `point_${pointRecord.id}`
-      }).catch((errPush) => console.warn('Push point notification note:', errPush.message));
+    for (const pointRecord of createdRecords) {
+      broadcastEvent('POINT_UPDATE', { action: 'CREATED', point: pointRecord });
+      if (notifyPointsEnabled) {
+        sendPushNotification({
+          staffIds: [pointRecord.staff_id, pointRecord.staff_uuid].filter(Boolean),
+          title: '⚠️ Pemberitahuan Poin Pelanggaran',
+          body: `Anda terkena pelanggaran atas alasan "${pointRecord.reason}" dan dibebankan poin sebesar ${pointRecord.points} Poin.`,
+          url: '/',
+          tag: `point_${pointRecord.id}`
+        }).catch((errPush) => console.warn('Push point notification note:', errPush.message));
+      }
     }
+
+    const summaryMsg = createdRecords.length === 1
+      ? `Poin sebesar ${roundedPoints} Poin berhasil diberikan kepada ${createdRecords[0].staff_name}.`
+      : `Poin sebesar ${roundedPoints} Poin berhasil diberikan kepada ${createdRecords.length} staff terpilih secara terpisah.`;
 
     return res.json({
       success: true,
-      message: `Poin sebesar ${pointRecord.points} Poin berhasil diberikan kepada ${pointRecord.staff_name}.`,
-      point: pointRecord
+      count: createdRecords.length,
+      message: summaryMsg,
+      point: createdRecords[0],
+      points: createdRecords
     });
   } catch (err) {
     console.error('Error creating staff point:', err);
