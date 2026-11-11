@@ -102,6 +102,90 @@ export async function uploadPhotoToSupabase(base64Data, filenamePrefix = 'selfie
   return publicData.publicUrl;
 }
 
+const SIGNED_URL_TTL_SECONDS = 3600;
+const SIGNED_URL_CACHE_BUFFER_MS = 10 * 60 * 1000;
+const signedPhotoCache = new Map();
+
+export function extractAttendancePhotoPath(url) {
+  if (!url || typeof url !== 'string') return null;
+  const match = url.match(/\/storage\/v1\/object\/(?:public|sign|authenticated)\/attendance-photos\/([^?]+)/);
+  if (!match || !match[1]) return null;
+  try {
+    return decodeURIComponent(match[1]);
+  } catch {
+    return match[1];
+  }
+}
+
+export async function resolveAttendancePhotoUrls(
+  items,
+  fields = ['checkin_photo', 'break_start_photo', 'break_end_photo', 'checkout_photo', 'late_photo_url']
+) {
+  if (!isSupabaseConfigured || !supabase || !Array.isArray(items) || items.length === 0) {
+    return items;
+  }
+
+  const now = Date.now();
+  const pathToSigned = new Map();
+  const uncachedPaths = new Set();
+
+  for (const item of items) {
+    if (!item || typeof item !== 'object') continue;
+    for (const field of fields) {
+      const storagePath = extractAttendancePhotoPath(item[field]);
+      if (!storagePath) continue;
+
+      const cached = signedPhotoCache.get(storagePath);
+      if (cached && now + SIGNED_URL_CACHE_BUFFER_MS < cached.expiresAt) {
+        pathToSigned.set(storagePath, cached.url);
+      } else {
+        uncachedPaths.add(storagePath);
+      }
+    }
+  }
+
+  const pathsList = [...uncachedPaths];
+  if (signedPhotoCache.size > 2000) {
+    signedPhotoCache.clear();
+  }
+
+  const BATCH_SIZE = 100;
+  for (let i = 0; i < pathsList.length; i += BATCH_SIZE) {
+    const batch = pathsList.slice(i, i + BATCH_SIZE);
+    try {
+      const { data, error } = await supabase.storage
+        .from('attendance-photos')
+        .createSignedUrls(batch, SIGNED_URL_TTL_SECONDS);
+
+      if (!error && Array.isArray(data)) {
+        const expiresAt = now + SIGNED_URL_TTL_SECONDS * 1000;
+        for (let idx = 0; idx < data.length; idx++) {
+          const entry = data[idx];
+          const p = entry?.path || batch[idx];
+          if (p && entry?.signedUrl && !entry.error) {
+            signedPhotoCache.set(p, { url: entry.signedUrl, expiresAt });
+            pathToSigned.set(p, entry.signedUrl);
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Signed photo URL batch note:', e.message);
+    }
+  }
+
+  for (const item of items) {
+    if (!item || typeof item !== 'object') continue;
+    for (const field of fields) {
+      const storagePath = extractAttendancePhotoPath(item[field]);
+      if (storagePath && pathToSigned.has(storagePath)) {
+        item[field] = pathToSigned.get(storagePath);
+      }
+    }
+  }
+
+  return items;
+}
+
 const LEGACY_ALIAS_MAP = {
   'JP-CSH-01': 'JP-CAS-01', // Ica
   'JP-CSH-02': 'JP-CAS-02', // Adis
@@ -693,6 +777,14 @@ export const cloudDb = {
       formatted = formatted.filter(r => r.flags.length === 0);
     }
 
+    await resolveAttendancePhotoUrls(formatted, [
+      'checkin_photo',
+      'break_start_photo',
+      'break_end_photo',
+      'checkout_photo',
+      'late_photo_url'
+    ]);
+
     return formatted;
   },
 
@@ -885,6 +977,7 @@ export const cloudDb = {
       }
 
       list.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+      await resolveAttendancePhotoUrls(list, ['photo_url', 'document_url']);
       return list;
     } catch (e) {
       console.warn('Failed to fetch leave requests:', e.message);

@@ -1,4 +1,4 @@
-import { supabase } from './supabase.js';
+import { supabase, resolveAttendancePhotoUrls } from './supabase.js';
 import { createClient } from '@supabase/supabase-js';
 
 const TOILET_SUPABASE_URL = 'https://nrrhkylpgitezjocgune.supabase.co';
@@ -436,6 +436,11 @@ export async function computeLeaderboard(targetMonthStr) {
     });
     needsImprovement = sortedImprovement[0] || null;
   }
+
+  await Promise.all([
+    resolveAttendancePhotoUrls(attendanceRanked, ['photo_url']),
+    resolveAttendancePhotoUrls(toiletRanked, ['photo_url'])
+  ]);
 
   return {
     period: {

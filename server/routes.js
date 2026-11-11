@@ -5,7 +5,7 @@ import { db, getSetting, setSetting, uploadsDir } from './db.js';
 import { calculateDistanceMeters, isWithinGeofence } from './geofence.js';
 import { getClientIp, validateClientNetwork } from './network.js';
 import { evaluateCheckinFlags, evaluateCheckoutFlags, evaluateBreakFlags, auditOpenShifts, FLAG_TYPES } from './flags.js';
-import { isSupabaseConfigured, uploadPhotoToSupabase, cloudDb, supabase, findStaffInSupabase } from './supabase.js';
+import { isSupabaseConfigured, uploadPhotoToSupabase, resolveAttendancePhotoUrls, cloudDb, supabase, findStaffInSupabase } from './supabase.js';
 import { detectShiftSchedule, getBreakCutoff, isBreakAllowedNow, getWitaTimeString, getWitaDateYMD, getOperationalDateYMD, getOperationalYesterdayYMD } from './shifts.js';
 import { computeLeaderboard } from './leaderboard.js';
 import { getVapidPublicKey, savePushSubscription, sendPushNotification } from './push.js';
@@ -1203,6 +1203,10 @@ router.post('/staff/verify-pin', async (req, res) => {
   const isLuckyCatVenue = (normVenue || '').toLowerCase().includes('luckycat');
   const staffAllowsBreak = (detectedShift?.allows_break !== 0 && detectedShift?.allows_break !== false) || isLuckyCatVenue || staff.allows_break === 1;
 
+  if (activeShift) {
+    await resolveAttendancePhotoUrls([activeShift]);
+  }
+
   res.json({
     success: true,
     staff: {
@@ -1614,12 +1618,15 @@ router.post('/checkin', async (req, res) => {
   `).get(result.lastInsertRowid);
   if (newShift) newShift.flags = flags;
 
-  broadcastEvent('SHIFT_UPDATE', { action: 'CHECKIN', shift: newShift || supaShift });
+  const shiftResponse = newShift || supaShift;
+  if (shiftResponse) await resolveAttendancePhotoUrls([shiftResponse]);
+
+  broadcastEvent('SHIFT_UPDATE', { action: 'CHECKIN', shift: shiftResponse });
 
   res.json({
     success: true,
     message: 'Absensi Masuk Berhasil Dicatat!',
-    shift: newShift || supaShift,
+    shift: shiftResponse,
     flags
   });
 });
@@ -1760,6 +1767,8 @@ router.post('/break/start', async (req, res) => {
       staff_division: staff.division
     };
   }
+
+  if (updatedShift) await resolveAttendancePhotoUrls([updatedShift]);
 
   broadcastEvent('SHIFT_UPDATE', { action: 'BREAK_START', shift: updatedShift });
 
@@ -1955,6 +1964,8 @@ router.post('/break/end', async (req, res) => {
       flags: updatedFlags
     };
   }
+
+  if (updatedShift) await resolveAttendancePhotoUrls([updatedShift]);
 
   broadcastEvent('SHIFT_UPDATE', { action: 'BREAK_END', shift: updatedShift });
 
@@ -2235,6 +2246,8 @@ router.post('/checkout', async (req, res) => {
       flags: finalFlags
     };
   }
+
+  if (updatedShift) await resolveAttendancePhotoUrls([updatedShift]);
 
   broadcastEvent('SHIFT_UPDATE', { action: 'CHECKOUT', shift: updatedShift });
 
@@ -2971,6 +2984,8 @@ router.post('/leave-requests', async (req, res) => {
     } catch (e) {
       console.warn('SQLite leave_requests insert note:', e.message);
     }
+
+    await resolveAttendancePhotoUrls([newRequest], ['photo_url', 'document_url']);
 
     broadcastEvent('LEAVE_UPDATE', { action: 'CREATED', request: newRequest });
 
