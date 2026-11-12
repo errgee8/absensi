@@ -221,3 +221,65 @@ export function getPointCycleInfo(date = getAppNow()) {
   }
   return buildPointCycle(startYear, startMonth);
 }
+
+/**
+ * Evaluates whether Absen Pulang (Check-Out) is locked until 30 minutes before shift end.
+ */
+export function computeCheckoutLockState({ activeShift, staff, now = getAppNow(), isManagement = false, hasApprovedEarlyLeave = false }) {
+  if (!activeShift) {
+    return { locked: true, unlockLabel: '🔒 Off', reason: 'Belum absen masuk.' };
+  }
+  if (isManagement || hasApprovedEarlyLeave) {
+    return { locked: false, unlockLabel: 'Foto →', reason: null };
+  }
+
+  const shiftStartStr = activeShift.scheduled_start || staff?.shift_start || '13:00';
+  const shiftEndStr = activeShift.scheduled_end || staff?.shift_end || '22:00';
+  if (!shiftEndStr || shiftEndStr === 'FLEXIBLE' || (shiftStartStr === '00:00' && shiftEndStr === '23:59')) {
+    return { locked: false, unlockLabel: 'Foto →', reason: null };
+  }
+
+  const [sH, sM] = shiftStartStr.split(':').map((n) => parseInt(n, 10) || 0);
+  const [eH, eM] = shiftEndStr.split(':').map((n) => parseInt(n, 10) || 0);
+  const startTotalM = sH * 60 + sM;
+  const endTotalM = eH * 60 + eM;
+
+  const opDateStr = activeShift.shift_date || activeShift.date || getOperationalDateYMD(activeShift.checkin_time || now);
+  if (!opDateStr || !/^\d{4}-\d{2}-\d{2}$/.test(opDateStr)) {
+    return { locked: false, unlockLabel: 'Foto →', reason: null };
+  }
+
+  const [y, m, d] = opDateStr.split('-').map(Number);
+  const endDateObj = new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
+  if (endTotalM <= startTotalM) {
+    endDateObj.setUTCDate(endDateObj.getUTCDate() + 1);
+  }
+  const endY = endDateObj.getUTCFullYear();
+  const endM = String(endDateObj.getUTCMonth() + 1).padStart(2, '0');
+  const endD = String(endDateObj.getUTCDate()).padStart(2, '0');
+  const endIsoWita = `${endY}-${endM}-${endD}T${String(eH).padStart(2, '0')}:${String(eM).padStart(2, '0')}:00+08:00`;
+  const shiftEndMs = new Date(endIsoWita).getTime();
+  if (isNaN(shiftEndMs)) {
+    return { locked: false, unlockLabel: 'Foto →', reason: null };
+  }
+
+  const unlockMs = shiftEndMs - 30 * 60 * 1000;
+  const unlockTimeStr = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Makassar',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  }).format(new Date(unlockMs));
+
+  const appNowMs = (now instanceof Date ? now : getAppNow()).getTime();
+  if (appNowMs >= unlockMs) {
+    return { locked: false, unlockLabel: 'Foto →', unlockTimeStr, reason: null };
+  }
+
+  return {
+    locked: true,
+    unlockTimeStr,
+    unlockLabel: `🔒 ${unlockTimeStr}`,
+    reason: `Absen Pulang terkunci hingga ${unlockTimeStr} WITA (30 menit sebelum jam shift berakhir). Gunakan Pengajuan → Izin Pulang Awal jika perlu pulang lebih awal.`
+  };
+}

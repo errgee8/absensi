@@ -474,3 +474,26 @@ export async function deleteStaffPoint(id, pin) {
   if (!res.ok) throw new Error(data.error || 'Gagal menghapus catatan poin');
   return data;
 }
+
+// Custom Staff Profile Photo (Gallery photo only) & Daily Emoji Mood
+export async function updateStaffProfilePhoto(staffId, photoBase64) {
+  const res = await fetch(`${API_BASE}/staff/${encodeURIComponent(staffId)}/profile-photo`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ photoBase64 })
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Gagal menyimpan foto profil');
+  return data;
+}
+
+export async function updateStaffMood(staffId, emoji) {
+  const res = await fetch(`${API_BASE}/staff/${encodeURIComponent(staffId)}/mood`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ emoji })
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Gagal menyimpan mood hari ini');
+  return data;
+}

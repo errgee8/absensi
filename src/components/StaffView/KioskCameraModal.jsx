@@ -283,7 +283,8 @@ export default function KioskCameraModal({
         timestamp: new Date().toISOString(),
         confirmedShift: confirmedShift || null,
         lateReason: isCheckinLate ? lateReason.trim() : null,
-        latePhotoBase64: isCheckinLate ? latePhotoBase64 : null
+        latePhotoBase64: isCheckinLate ? latePhotoBase64 : null,
+        moodEmoji: staff?.mood_emoji || null
       };
 
       let res;

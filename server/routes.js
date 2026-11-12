@@ -1207,27 +1207,96 @@ router.post('/staff/verify-pin', async (req, res) => {
     await resolveAttendancePhotoUrls([activeShift]);
   }
 
+  // Monthly calendar stats (Strictly current calendar month, 1st -> last day, NOT point cycle)
+  const nowWitaParts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Makassar',
+    year: 'numeric',
+    month: '2-digit'
+  }).formatToParts(new Date());
+  const witaYear = nowWitaParts.find((p) => p.type === 'year')?.value || '2026';
+  const witaMonth = nowWitaParts.find((p) => p.type === 'month')?.value || '01';
+  const currentYearMonth = `${witaYear}-${witaMonth}`;
+  const currentOpDate = getOperationalDateYMD(new Date());
+
+  let monthlyStats = null;
+  if (isSupabaseConfigured && (staff.uuid || staff.id)) {
+    monthlyStats = await cloudDb.getStaffMonthlyStats(staff.uuid || staff.id, currentYearMonth);
+  }
+  if (!monthlyStats) {
+    try {
+      const sqlLogs = db.prepare(`
+        SELECT date, flags, notes
+        FROM shifts
+        WHERE staff_id = ? AND date >= ? AND date <= ?
+      `).all(staff.id, `${currentYearMonth}-01`, `${currentYearMonth}-31`);
+      const workDates = new Set();
+      let lateCount = 0;
+      for (const row of sqlLogs) {
+        if (row.date) workDates.add(row.date);
+        let rowFlags = [];
+        try { rowFlags = JSON.parse(row.flags || '[]'); } catch {}
+        let rowNotes = {};
+        try {
+          if (typeof row.notes === 'string' && row.notes.startsWith('{')) rowNotes = JSON.parse(row.notes);
+        } catch {}
+        const isLate = rowFlags.some((f) => String(f).toLowerCase().includes('late'));
+        if (isLate && rowNotes.late_status !== 'EXCUSED') {
+          lateCount += 1;
+        }
+      }
+      monthlyStats = { workDays: workDates.size, lateCount, monthKey: currentYearMonth };
+    } catch {
+      monthlyStats = { workDays: 0, lateCount: 0, monthKey: currentYearMonth };
+    }
+  }
+
+  // Resolve Custom Profile Photo & Today's Mood Emoji
+  let profilesMap = getSetting('staff_profiles') || {};
+  let moodsMap = getSetting('staff_moods') || {};
+  if (isSupabaseConfigured) {
+    try {
+      const [pMap, mMap] = await Promise.all([
+        cloudDb.getStaffProfilesMap(),
+        cloudDb.getStaffMoodsMap()
+      ]);
+      if (pMap && Object.keys(pMap).length > 0) profilesMap = pMap;
+      if (mMap && Object.keys(mMap).length > 0) moodsMap = mMap;
+    } catch {}
+  }
+
+  const profileEntry = profilesMap?.[staff.uuid] || profilesMap?.[staff.id] || null;
+  const moodEntry = moodsMap?.[staff.uuid] || moodsMap?.[staff.id] || null;
+  const staffPayload = {
+    id: staff.id,
+    uuid: staff.uuid || null,
+    name: staff.name,
+    venue: staff.venue,
+    division: staff.division,
+    role: staff.role,
+    department: staff.department,
+    shift_start: detectedShift?.start_time || staff.shift_start || '13:00',
+    shift_end: detectedShift?.end_time || staff.shift_end || '22:00',
+    standard_hours: staff.standard_hours,
+    allows_break: staffAllowsBreak ? 1 : 0,
+    break_start_time: breakStartTime,
+    max_break_end: detectedShift?.max_break_end || breakCutoffTime,
+    breakAllowed,
+    breakCutoffTime,
+    isWithin2HoursOfEnd: false,
+    detectedShift: detectedShift || null,
+    availableSchedules: schedules,
+    profile_photo_url: profileEntry?.photo_url || null,
+    mood_emoji: moodEntry && moodEntry.date_ymd === currentOpDate ? moodEntry.emoji : null,
+    monthlyStats
+  };
+
+  if (staffPayload.profile_photo_url) {
+    await resolveAttendancePhotoUrls([staffPayload], ['profile_photo_url']);
+  }
+
   res.json({
     success: true,
-    staff: {
-      id: staff.id,
-      name: staff.name,
-      venue: staff.venue,
-      division: staff.division,
-      role: staff.role,
-      department: staff.department,
-      shift_start: detectedShift?.start_time || staff.shift_start || '13:00',
-      shift_end: detectedShift?.end_time || staff.shift_end || '22:00',
-      standard_hours: staff.standard_hours,
-      allows_break: staffAllowsBreak ? 1 : 0,
-      break_start_time: breakStartTime,
-      max_break_end: detectedShift?.max_break_end || breakCutoffTime,
-      breakAllowed,
-      breakCutoffTime,
-      isWithin2HoursOfEnd: false,
-      detectedShift: detectedShift || null,
-      availableSchedules: schedules
-    },
+    staff: staffPayload,
     activeShift: activeShift || null
   });
 });
@@ -1403,6 +1472,137 @@ router.delete('/staff/:id', async (req, res) => {
   res.json({ success: true, message: 'Karyawan berhasil dihapus dari sistem.' });
 });
 
+const ALLOWED_MOOD_EMOJIS = ['😊', '🔥', '😐', '😴', '😮‍💨', '😢', '😡', '💔'];
+
+// 9c. Staff Custom Profile Photo (Real gallery photo only, no emoji avatars)
+router.post('/staff/:id/profile-photo', async (req, res) => {
+  const { id } = req.params;
+  const { photoBase64 } = req.body || {};
+
+  if (!photoBase64 || typeof photoBase64 !== 'string' || !photoBase64.startsWith('data:image/')) {
+    return res.status(400).json({ error: 'Pastikan memilih file foto asli dari galeri HP Anda.' });
+  }
+
+  try {
+    let staff = null;
+    if (isSupabaseConfigured) {
+      const supa = await findStaffInSupabase(id);
+      if (supa) {
+        staff = { ...supa, id: supa.legacy_code || supa.id, uuid: supa.id };
+      }
+    }
+    if (!staff) {
+      staff = db.prepare('SELECT * FROM staff WHERE id = ? OR uuid = ?').get(id, id);
+    }
+    if (!staff) {
+      return res.status(404).json({ error: 'Staff tidak ditemukan.' });
+    }
+
+    const photoUrl = await savePhoto(photoBase64, `profile_${staff.id}`);
+    if (!photoUrl) {
+      return res.status(400).json({ error: 'Gagal memproses file foto profil.' });
+    }
+
+    const record = { photo_url: photoUrl, updated_at: new Date().toISOString() };
+    const localMap = getSetting('staff_profiles') || {};
+    const nextLocalMap = { ...localMap };
+    if (staff.uuid) nextLocalMap[String(staff.uuid)] = record;
+    if (staff.id) nextLocalMap[String(staff.id)] = record;
+    setSetting('staff_profiles', nextLocalMap);
+
+    if (isSupabaseConfigured) {
+      await cloudDb.saveStaffProfilePhoto({
+        staffId: staff.id,
+        staffUuid: staff.uuid,
+        photoUrl
+      });
+    }
+
+    const resolvedObj = { profile_photo_url: photoUrl };
+    await resolveAttendancePhotoUrls([resolvedObj], ['profile_photo_url']);
+
+    broadcastEvent('STAFF_UPDATE', { action: 'PROFILE_PHOTO_UPDATED', staffId: staff.id });
+    return res.json({
+      success: true,
+      message: 'Foto profil berhasil diperbarui.',
+      profile_photo_url: resolvedObj.profile_photo_url
+    });
+  } catch (err) {
+    console.error('Error saving profile photo:', err);
+    return res.status(500).json({ error: 'Gagal menyimpan foto profil: ' + err.message });
+  }
+});
+
+// 9d. Staff Daily Mood Emoji ("my mood today :" - emoji only)
+router.post('/staff/:id/mood', async (req, res) => {
+  const { id } = req.params;
+  const { emoji } = req.body || {};
+
+  if (!emoji || !ALLOWED_MOOD_EMOJIS.includes(String(emoji).trim())) {
+    return res.status(400).json({ error: 'Pilih emoji mood yang valid.' });
+  }
+
+  const cleanEmoji = String(emoji).trim();
+  const dateYmd = getOperationalDateYMD(new Date());
+
+  try {
+    let staff = null;
+    if (isSupabaseConfigured) {
+      const supa = await findStaffInSupabase(id);
+      if (supa) {
+        staff = { ...supa, id: supa.legacy_code || supa.id, uuid: supa.id };
+      }
+    }
+    if (!staff) {
+      staff = db.prepare('SELECT * FROM staff WHERE id = ? OR uuid = ?').get(id, id);
+    }
+    if (!staff) {
+      return res.status(404).json({ error: 'Staff tidak ditemukan.' });
+    }
+
+    const record = { emoji: cleanEmoji, date_ymd: dateYmd, updated_at: new Date().toISOString() };
+    const localMap = getSetting('staff_moods') || {};
+    const nextLocalMap = { ...localMap };
+    if (staff.uuid) nextLocalMap[String(staff.uuid)] = record;
+    if (staff.id) nextLocalMap[String(staff.id)] = record;
+    setSetting('staff_moods', nextLocalMap);
+
+    // Sync to today's SQLite shift notes if already checked in
+    try {
+      const activeSqlShift = db.prepare('SELECT id, notes FROM shifts WHERE staff_id = ? AND date = ? ORDER BY id DESC LIMIT 1').get(staff.id, dateYmd);
+      if (activeSqlShift) {
+        let parsedNotes = {};
+        try {
+          if (typeof activeSqlShift.notes === 'string' && activeSqlShift.notes.startsWith('{')) {
+            parsedNotes = JSON.parse(activeSqlShift.notes);
+          }
+        } catch {}
+        parsedNotes.mood_emoji = cleanEmoji;
+        db.prepare('UPDATE shifts SET notes = ?, updated_at = datetime(\'now\') WHERE id = ?').run(JSON.stringify(parsedNotes), activeSqlShift.id);
+      }
+    } catch {}
+
+    if (isSupabaseConfigured) {
+      await cloudDb.saveStaffMood({
+        staffId: staff.id,
+        staffUuid: staff.uuid,
+        emoji: cleanEmoji,
+        dateYmd
+      });
+    }
+
+    broadcastEvent('SHIFT_UPDATE', { action: 'MOOD_UPDATED', staffId: staff.id, emoji: cleanEmoji });
+    return res.json({
+      success: true,
+      mood_emoji: cleanEmoji,
+      date_ymd: dateYmd
+    });
+  } catch (err) {
+    console.error('Error saving staff mood:', err);
+    return res.status(500).json({ error: 'Gagal menyimpan mood hari ini: ' + err.message });
+  }
+});
+
 // 10. Staff Check-In
 router.post('/checkin', async (req, res) => {
   const { staffId, pin, lat, lng, accuracy, photoBase64, timestamp, confirmedShift, lateReason, latePhotoBase64 } = req.body;
@@ -1543,6 +1743,24 @@ router.post('/checkin', async (req, res) => {
     }
   }
 
+  // Resolve today's mood emoji if staff already selected it before check-in
+  let checkinMoodEmoji = req.body.moodEmoji && ALLOWED_MOOD_EMOJIS.includes(String(req.body.moodEmoji).trim())
+    ? String(req.body.moodEmoji).trim()
+    : null;
+  if (!checkinMoodEmoji) {
+    try {
+      let moodsMap = getSetting('staff_moods') || {};
+      if (isSupabaseConfigured) {
+        const cloudMoods = await cloudDb.getStaffMoodsMap();
+        if (cloudMoods && Object.keys(cloudMoods).length > 0) moodsMap = cloudMoods;
+      }
+      const mEntry = moodsMap?.[staff.uuid] || moodsMap?.[staff.id] || null;
+      if (mEntry && mEntry.date_ymd === dateStr) {
+        checkinMoodEmoji = mEntry.emoji;
+      }
+    } catch {}
+  }
+
   // Sync to Supabase Cloud if connected
   let supaShift = null;
   if (isSupabaseConfigured) {
@@ -1562,7 +1780,8 @@ router.post('/checkin', async (req, res) => {
         shiftNumber,
         shiftName,
         lateReason,
-        latePhotoUrl
+        latePhotoUrl,
+        moodEmoji: checkinMoodEmoji
       });
     } catch (e) {
       console.warn('Supabase Checkin Cloud Sync Note:', e.message);
@@ -1575,6 +1794,7 @@ router.post('/checkin', async (req, res) => {
     scheduled_end: scheduledEnd,
     shift_number: shiftNumber,
     shift_name: shiftName,
+    mood_emoji: checkinMoodEmoji || null,
     late_reason: lateReason || null,
     late_photo_url: latePhotoUrl || null,
     late_status: isLate ? (lateReason ? 'PENDING_REVIEW' : null) : null
@@ -2317,10 +2537,24 @@ router.get('/shifts', async (req, res) => {
 
   const rows = db.prepare(query).all(...params);
 
-  let processed = rows.map(r => ({
-    ...r,
-    flags: JSON.parse(r.flags || '[]')
-  }));
+  const localProfiles = getSetting('staff_profiles') || {};
+  const localMoods = getSetting('staff_moods') || {};
+
+  let processed = rows.map(r => {
+    let parsedNotes = {};
+    try {
+      if (typeof r.notes === 'string' && r.notes.startsWith('{')) parsedNotes = JSON.parse(r.notes);
+    } catch {}
+    const moodEntry = localMoods?.[r.staff_id] || null;
+    const resolvedMood = (moodEntry && moodEntry.date_ymd === r.date ? moodEntry.emoji : null) || parsedNotes.mood_emoji || null;
+    const profEntry = localProfiles?.[r.staff_id] || null;
+    return {
+      ...r,
+      flags: JSON.parse(r.flags || '[]'),
+      mood_emoji: resolvedMood,
+      staff_profile_photo_url: profEntry?.photo_url || null
+    };
+  });
 
   if (flagFilter === 'FLAGS_ONLY') {
     processed = processed.filter(r => r.flags.length > 0);

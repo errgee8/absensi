@@ -103,7 +103,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0f131a] text-slate-100 flex flex-col font-sans selection:bg-blue-600 selection:text-white">
+    <div className="min-h-screen bg-[#111318] text-slate-100 flex flex-col font-sans selection:bg-blue-600 selection:text-white">
       {/* PWA Home Screen Banner - Sleek Dark Indigo Accent */}
       {!isInstalled && (
         <div className="no-print bg-[#131b2e] border-b border-blue-500/30 text-slate-200 px-4 py-2.5 flex items-center justify-between text-xs font-semibold shadow-md">

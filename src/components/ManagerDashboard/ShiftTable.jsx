@@ -162,29 +162,48 @@ export default function ShiftTable({ shifts = [], schedules = [], onInspectPhoto
 
                   {/* Staff Name & ID */}
                   <td className="py-3 px-3 whitespace-nowrap">
-                    <div className="flex items-center space-x-1.5">
-                      <span className="font-black text-slate-100 text-sm">{shift.staff_name}</span>
-                      {hasActiveAnnouncement && (
-                        readersSet?.has(String(shift.staff_id)) ? (
-                          <span
-                            title="Sudah membaca pengumuman management ✓"
-                            className="inline-flex items-center space-x-0.5 px-1.5 py-0.2 rounded text-[8px] font-black bg-emerald-500/15 text-emerald-300 border border-emerald-500/30"
-                          >
-                            <CheckCircle className="w-2.5 h-2.5 text-emerald-400 stroke-[2.5]" />
-                            <span>Paham ✓</span>
-                          </span>
-                        ) : (
-                          <span
-                            title="Belum membaca pengumuman management"
-                            className="inline-flex items-center space-x-0.5 px-1.5 py-0.2 rounded text-[8px] font-black bg-rose-500/15 text-rose-300 border border-rose-500/30"
-                          >
-                            <AlertTriangle className="w-2.5 h-2.5 text-rose-400 stroke-[2.5]" />
-                            <span>Belum Baca</span>
-                          </span>
-                        )
+                    <div className="flex items-center space-x-2">
+                      {shift.staff_profile_photo_url && (
+                        <img
+                          src={shift.staff_profile_photo_url}
+                          alt={shift.staff_name}
+                          className="w-7 h-7 rounded-lg object-cover border border-slate-700 shrink-0"
+                        />
                       )}
+                      <div className="min-w-0">
+                        <div className="flex items-center space-x-1.5">
+                          <span className="font-black text-slate-100 text-sm">{shift.staff_name}</span>
+                          {shift.mood_emoji && (
+                            <span
+                              className="text-base leading-none"
+                              title={`Mood hari ini: ${shift.mood_emoji}`}
+                            >
+                              {shift.mood_emoji}
+                            </span>
+                          )}
+                          {hasActiveAnnouncement && (
+                            readersSet?.has(String(shift.staff_id)) ? (
+                              <span
+                                title="Sudah membaca pengumuman management ✓"
+                                className="inline-flex items-center space-x-0.5 px-1.5 py-0.2 rounded text-[8px] font-black bg-emerald-500/15 text-emerald-300 border border-emerald-500/30"
+                              >
+                                <CheckCircle className="w-2.5 h-2.5 text-emerald-400 stroke-[2.5]" />
+                                <span>Paham ✓</span>
+                              </span>
+                            ) : (
+                              <span
+                                title="Belum membaca pengumuman management"
+                                className="inline-flex items-center space-x-0.5 px-1.5 py-0.2 rounded text-[8px] font-black bg-rose-500/15 text-rose-300 border border-rose-500/30"
+                              >
+                                <AlertTriangle className="w-2.5 h-2.5 text-rose-400 stroke-[2.5]" />
+                                <span>Belum Baca</span>
+                              </span>
+                            )
+                          )}
+                        </div>
+                        <div className="text-[10px] text-slate-400 font-mono font-bold">{shift.staff_id}</div>
+                      </div>
                     </div>
-                    <div className="text-[10px] text-slate-400 font-mono font-bold">{shift.staff_id}</div>
                   </td>
 
                   {/* Outlet & Division */}

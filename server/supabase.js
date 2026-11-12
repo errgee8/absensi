@@ -316,7 +316,7 @@ export const cloudDb = {
   },
 
   // 3. Record Check-In in attendance_logs
-  async recordCheckin({ staffId, userLat, userLng, accuracy, distance, photoUrl, clientIp, wifiPass, flags, scheduledStart, scheduledEnd, shiftNumber, shiftName, lateReason, latePhotoUrl }) {
+  async recordCheckin({ staffId, userLat, userLng, accuracy, distance, photoUrl, clientIp, wifiPass, flags, scheduledStart, scheduledEnd, shiftNumber, shiftName, lateReason, latePhotoUrl, moodEmoji }) {
     if (!supabase) return null;
     const staff = await findStaffInSupabase(staffId);
     if (!staff) throw new Error('Staff record not found: ' + staffId);
@@ -329,6 +329,7 @@ export const cloudDb = {
       scheduled_end: scheduledEnd || staff.shift_end || '22:00',
       shift_number: shiftNumber != null ? Number(shiftNumber) : null,
       shift_name: shiftName || null,
+      mood_emoji: moodEmoji || null,
       late_reason: lateReason || null,
       late_photo_url: latePhotoUrl || null,
       late_status: isLate ? (lateReason ? 'PENDING_REVIEW' : null) : null,
@@ -679,7 +680,11 @@ export const cloudDb = {
       query = query.lte('shift_date', endDate);
     }
 
-    const { data, error } = await query;
+    const [{ data, error }, profilesMap, moodsMap] = await Promise.all([
+      query,
+      this.getStaffProfilesMap().catch(() => ({})),
+      this.getStaffMoodsMap().catch(() => ({}))
+    ]);
     if (error) throw error;
 
     let formatted = (data || []).map(row => {
@@ -702,17 +707,30 @@ export const cloudDb = {
         ? 'ON_BREAK'
         : (row.break_logs && row.break_logs.length > 0 ? 'COMPLETED' : 'NONE');
 
+      const shiftDateYmd = row.shift_date || (row.check_in_time ? getWitaDateYMD(row.check_in_time) : '');
+      const staffCode = st.legacy_code || st.id || row.staff_id;
+      const staffUuid = st.id || row.staff_id;
+      const profileEntry = profilesMap?.[staffUuid] || profilesMap?.[staffCode] || null;
+      const moodEntry = moodsMap?.[staffUuid] || moodsMap?.[staffCode] || null;
+      const resolvedMoodEmoji =
+        (moodEntry && moodEntry.date_ymd === shiftDateYmd ? moodEntry.emoji : null) ||
+        parsedNotes.mood_emoji ||
+        null;
+
       return {
         id: row.id,
         supabase_id: row.id,
-        staff_id: st.legacy_code || st.id || row.staff_id,
+        staff_id: staffCode,
+        staff_uuid: staffUuid,
         staff_name: st.name || 'Staff',
+        staff_profile_photo_url: profileEntry?.photo_url || null,
+        mood_emoji: resolvedMoodEmoji,
         staff_venue: st.venue || 'JP Karaoke',
         staff_division: st.division || st.role || 'Server and Cashier',
         staff_role: st.role || 'Staff',
         staff_department: st.department || 'Operations',
         standard_hours: st.standard_hours || 8.5,
-        date: row.shift_date || (row.check_in_time ? getWitaDateYMD(row.check_in_time) : ''),
+        date: shiftDateYmd,
         scheduled_start: parsedNotes.scheduled_start || st.shift_start || '13:00',
         scheduled_end: parsedNotes.scheduled_end || st.shift_end || '22:00',
         shift_number: parsedNotes.shift_number != null ? Number(parsedNotes.shift_number) : null,
@@ -782,7 +800,8 @@ export const cloudDb = {
       'break_start_photo',
       'break_end_photo',
       'checkout_photo',
-      'late_photo_url'
+      'late_photo_url',
+      'staff_profile_photo_url'
     ]);
 
     return formatted;
@@ -1282,5 +1301,131 @@ export const cloudDb = {
       });
     if (error) throw error;
     return true;
+  },
+
+  // 14. Custom Staff Profile Photos (Gallery photo only) & Daily Emoji Mood
+  async getStaffProfilesMap() {
+    if (!supabase) return {};
+    try {
+      const val = await this.getSetting('staff_profiles');
+      return val && typeof val === 'object' && !Array.isArray(val) ? val : {};
+    } catch {
+      return {};
+    }
+  },
+
+  async saveStaffProfilePhoto({ staffId, staffUuid, photoUrl }) {
+    if (!supabase || !photoUrl) return null;
+    const current = await this.getStaffProfilesMap();
+    const now = new Date().toISOString();
+    const record = { photo_url: photoUrl, updated_at: now };
+    const next = { ...current };
+    if (staffUuid) next[String(staffUuid)] = record;
+    if (staffId) next[String(staffId)] = record;
+    await this.saveSetting('staff_profiles', next, 'Custom Staff Profile Photos');
+    return record;
+  },
+
+  async getStaffMoodsMap() {
+    if (!supabase) return {};
+    try {
+      const val = await this.getSetting('staff_moods');
+      return val && typeof val === 'object' && !Array.isArray(val) ? val : {};
+    } catch {
+      return {};
+    }
+  },
+
+  async saveStaffMood({ staffId, staffUuid, emoji, dateYmd }) {
+    if (!supabase || !emoji) return null;
+    const current = await this.getStaffMoodsMap();
+    const now = new Date().toISOString();
+    const record = { emoji, date_ymd: dateYmd, updated_at: now };
+    const next = { ...current };
+    if (staffUuid) next[String(staffUuid)] = record;
+    if (staffId) next[String(staffId)] = record;
+    await this.saveSetting('staff_moods', next, 'Daily Staff Mood Emojis');
+
+    // Sync today's active shift notes if already checked in today
+    if (staffUuid && dateYmd) {
+      try {
+        const { data: openLog } = await supabase
+          .from('attendance_logs')
+          .select('id, notes')
+          .eq('staff_id', staffUuid)
+          .eq('shift_date', dateYmd)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (openLog) {
+          let parsedNotes = {};
+          try {
+            if (typeof openLog.notes === 'string' && openLog.notes.startsWith('{')) {
+              parsedNotes = JSON.parse(openLog.notes);
+            }
+          } catch {}
+          parsedNotes.mood_emoji = emoji;
+          await supabase
+            .from('attendance_logs')
+            .update({ notes: JSON.stringify(parsedNotes), updated_at: now })
+            .eq('id', openLog.id);
+        }
+      } catch (e) {
+        console.warn('Mood sync to attendance_logs note:', e.message);
+      }
+    }
+
+    return record;
+  },
+
+  async getStaffMonthlyStats(staffUuid, yearMonthStr) {
+    if (!supabase || !staffUuid || !yearMonthStr) return null;
+    try {
+      const [yrStr, moStr] = String(yearMonthStr).split('-');
+      const lastDay = new Date(Date.UTC(Number(yrStr), Number(moStr), 0)).getUTCDate();
+      const startDate = `${yearMonthStr}-01`;
+      const endDate = `${yearMonthStr}-${String(lastDay).padStart(2, '0')}`;
+      const { data: logs, error } = await supabase
+        .from('attendance_logs')
+        .select('shift_date, status, flags, notes')
+        .eq('staff_id', staffUuid)
+        .gte('shift_date', startDate)
+        .lte('shift_date', endDate);
+      if (error) throw error;
+
+      const workDates = new Set();
+      let lateCount = 0;
+
+      for (const row of logs || []) {
+        if (row.shift_date) workDates.add(row.shift_date);
+
+        let flags = [];
+        if (Array.isArray(row.flags)) {
+          flags = row.flags;
+        } else if (typeof row.flags === 'string') {
+          try { flags = JSON.parse(row.flags || '[]'); } catch {}
+        }
+
+        let parsedNotes = {};
+        if (typeof row.notes === 'string' && row.notes.startsWith('{')) {
+          try { parsedNotes = JSON.parse(row.notes); } catch {}
+        }
+
+        const isLate = flags.some((f) => String(f).toLowerCase().includes('late'));
+        if (isLate && parsedNotes.late_status !== 'EXCUSED') {
+          lateCount += 1;
+        }
+      }
+
+      return {
+        workDays: workDates.size,
+        lateCount,
+        monthKey: yearMonthStr
+      };
+    } catch (e) {
+      console.warn('Monthly stats Supabase fetch note:', e.message);
+      return null;
+    }
   }
 };

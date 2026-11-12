@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Camera, CheckCircle, Clock, ArrowLeft, Shirt, AlertCircle, Coffee, Play, Check, Sparkles } from 'lucide-react';
-import { formatWitaTimeOnly, formatTimerSeconds } from '../../utils/time';
+import { Camera, CheckCircle, Clock, ArrowLeft, Shirt, AlertCircle, Coffee, Play, Check, Sparkles, Lock } from 'lucide-react';
+import { formatWitaTimeOnly, formatTimerSeconds, computeCheckoutLockState } from '../../utils/time';
 
 export default function KioskActionScreen({
   staff,
   activeShift,
+  hasApprovedEarlyLeave = false,
   onTriggerCamera,
   onLogout,
   onBackToPortal,
@@ -46,6 +47,12 @@ export default function KioskActionScreen({
   const normVenue = (staff?.venue || '').replace(/\s+/g, '').toLowerCase();
   const shiftAllowsBreak = !isManagement && (staff?.allows_break !== 0 || normVenue === 'luckycat' || activeShift?.allows_break !== 0);
   const canTakeBreak = !isManagement && isCheckedIn && !isOnBreak && !hasTakenBreak && shiftAllowsBreak;
+  const checkoutLock = computeCheckoutLockState({
+    activeShift,
+    staff,
+    isManagement,
+    hasApprovedEarlyLeave
+  });
 
   // Live timer for active shift
   useEffect(() => {
@@ -201,12 +208,39 @@ export default function KioskActionScreen({
 
                   {/* Button 2: Check Out */}
                   <button
-                    onClick={() => onTriggerCamera('checkout')}
-                    className="w-full py-4 px-6 bg-rose-600 hover:bg-rose-500 text-white font-black text-base rounded-2xl shadow-lg shadow-rose-600/30 active:scale-[0.98] transition flex items-center justify-center space-x-2.5 cursor-pointer"
+                    type="button"
+                    disabled={checkoutLock.locked}
+                    onClick={() => !checkoutLock.locked && onTriggerCamera('checkout')}
+                    className={`w-full py-4 px-6 font-black text-base rounded-2xl transition flex items-center justify-center space-x-2.5 ${
+                      checkoutLock.locked
+                        ? 'bg-slate-800/80 text-slate-400 border border-slate-700 cursor-not-allowed'
+                        : 'bg-rose-600 hover:bg-rose-500 text-white shadow-lg shadow-rose-600/30 active:scale-[0.98] cursor-pointer'
+                    }`}
                   >
-                    <Camera className="w-5 h-5 stroke-[2.5]" />
-                    <span>AMBIL FOTO & CHECK-OUT</span>
+                    {checkoutLock.locked ? (
+                      <>
+                        <Lock className="w-5 h-5 stroke-[2.5]" />
+                        <span>
+                          CHECK-OUT TERKUNCI ({checkoutLock.unlockTimeStr ? `BUKA ${checkoutLock.unlockTimeStr}` : 'H-30M'})
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <Camera className="w-5 h-5 stroke-[2.5]" />
+                        <span>AMBIL FOTO & CHECK-OUT</span>
+                      </>
+                    )}
                   </button>
+
+                  {checkoutLock.locked && onOpenEarlyDeparture && (
+                    <button
+                      type="button"
+                      onClick={onOpenEarlyDeparture}
+                      className="w-full py-2.5 px-4 bg-slate-800/60 hover:bg-slate-800 border border-slate-700 text-amber-300 text-xs font-bold rounded-xl transition cursor-pointer"
+                    >
+                      Darurat pulang lebih cepat? Ajukan Izin Pulang Awal →
+                    </button>
+                  )}
 
                   <p className="text-xs text-slate-400 text-center font-medium">
                     Istirahat hanya diperbolehkan 1x per shift selama maksimal 1 jam (60 menit).
@@ -216,12 +250,39 @@ export default function KioskActionScreen({
                 /* ONLY 1 BUTTON: CHECKOUT (Either break already taken or not allowed) */
                 <div className="space-y-3">
                   <button
-                    onClick={() => onTriggerCamera('checkout')}
-                    className="w-full py-5 px-6 bg-rose-600 hover:bg-rose-500 text-white font-black text-lg rounded-2xl shadow-xl shadow-rose-600/35 active:scale-[0.98] transition flex items-center justify-center space-x-3 cursor-pointer"
+                    type="button"
+                    disabled={checkoutLock.locked}
+                    onClick={() => !checkoutLock.locked && onTriggerCamera('checkout')}
+                    className={`w-full py-5 px-6 font-black text-lg rounded-2xl transition flex items-center justify-center space-x-3 ${
+                      checkoutLock.locked
+                        ? 'bg-slate-800/80 text-slate-400 border border-slate-700 cursor-not-allowed'
+                        : 'bg-rose-600 hover:bg-rose-500 text-white shadow-xl shadow-rose-600/35 active:scale-[0.98] cursor-pointer'
+                    }`}
                   >
-                    <Camera className="w-6 h-6 stroke-[2.5]" />
-                    <span className="tracking-wide">AMBIL FOTO & CHECK-OUT</span>
+                    {checkoutLock.locked ? (
+                      <>
+                        <Lock className="w-6 h-6 stroke-[2.5]" />
+                        <span className="tracking-wide text-sm sm:text-base">
+                          CHECK-OUT TERKUNCI ({checkoutLock.unlockTimeStr ? `BUKA ${checkoutLock.unlockTimeStr}` : 'H-30M'})
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <Camera className="w-6 h-6 stroke-[2.5]" />
+                        <span className="tracking-wide">AMBIL FOTO & CHECK-OUT</span>
+                      </>
+                    )}
                   </button>
+
+                  {checkoutLock.locked && onOpenEarlyDeparture && (
+                    <button
+                      type="button"
+                      onClick={onOpenEarlyDeparture}
+                      className="w-full py-2.5 px-4 bg-slate-800/60 hover:bg-slate-800 border border-slate-700 text-amber-300 text-xs font-bold rounded-xl transition cursor-pointer"
+                    >
+                      Darurat pulang lebih cepat? Ajukan Izin Pulang Awal →
+                    </button>
+                  )}
 
                   {hasTakenBreak ? (
                     <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-xs text-emerald-300 font-bold flex items-center justify-center space-x-2">

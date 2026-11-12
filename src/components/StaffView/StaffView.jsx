@@ -12,6 +12,7 @@ import StaffPointNoticeModal from './StaffPointNoticeModal';
 import StaffPointHistoryModal from './StaffPointHistoryModal';
 import { getNotificationPermission } from '../../utils/pushNotifications';
 import { verifyStaffPin, getAnnouncements, acknowledgeAnnouncement, getLeaveRequests, getPoints, acknowledgeStaffPoint, subscribeRealtimeEvents, sendPresenceHeartbeat } from '../../utils/api';
+import { getOperationalDateYMD } from '../../utils/time';
 import { RESTROOM_LOCATIONS } from '../../utils/toiletService';
 import { CheckCircle2 } from 'lucide-react';
 
@@ -101,6 +102,8 @@ export default function StaffView({
     }
   }, []);
 
+  const [hasApprovedEarlyLeaveToday, setHasApprovedEarlyLeaveToday] = useState(false);
+
   // Load Staff Notifications (Leave updates, active announcements, and violation points)
   const loadStaffNotifications = async (staff) => {
     if (!staff?.id) return;
@@ -141,6 +144,18 @@ export default function StaffView({
         return new Date(r.updated_at || r.created_at) > new Date(lastViewed);
       });
       setLeaveUpdateCount(newUpdates.length);
+
+      const todayOpYmd = getOperationalDateYMD();
+      const earlyApproved = (leaveData || []).some(r => {
+        if (r.status !== 'APPROVED') return false;
+        const kind = r.leave_type || r.category || '';
+        if (kind !== 'IZIN_PULANG_AWAL') return false;
+        const startYmd = (r.start_date || '').slice(0, 10);
+        const endYmd = (r.end_date || startYmd).slice(0, 10);
+        if (!startYmd) return true;
+        return startYmd <= todayOpYmd && todayOpYmd <= endYmd;
+      });
+      setHasApprovedEarlyLeaveToday(earlyApproved);
     } catch (e) {
       console.warn('Failed to load staff notifications:', e);
     }
@@ -242,6 +257,7 @@ export default function StaffView({
     setStaffPointCycleLabel('');
     setPointNoticeModalOpen(false);
     setPointHistoryModalOpen(false);
+    setHasApprovedEarlyLeaveToday(false);
   };
 
   return (
@@ -283,6 +299,7 @@ export default function StaffView({
         <KioskPortalScreen
           staff={loggedInStaff}
           activeShift={activeShift}
+          hasApprovedEarlyLeaveToday={hasApprovedEarlyLeaveToday}
           onSelectAttendance={() => setStep('ATTENDANCE')}
           onSelectToilet={() => setToiletScannerOpen(true)}
           onOpenLeaderboard={onOpenLeaderboard}
@@ -313,6 +330,12 @@ export default function StaffView({
           pendingPointsCount={pendingPoints.length}
           onOpenPointHistory={() => setPointHistoryModalOpen(true)}
           onOpenPendingPoints={() => setPointNoticeModalOpen(true)}
+          onProfilePhotoUpdated={(url) =>
+            setLoggedInStaff((prev) => (prev ? { ...prev, profile_photo_url: url } : prev))
+          }
+          onMoodUpdated={(emoji) =>
+            setLoggedInStaff((prev) => (prev ? { ...prev, mood_emoji: emoji } : prev))
+          }
         />
       )}
 
@@ -321,6 +344,7 @@ export default function StaffView({
         <KioskActionScreen
           staff={loggedInStaff}
           activeShift={activeShift}
+          hasApprovedEarlyLeave={hasApprovedEarlyLeaveToday}
           onTriggerCamera={(type, shift) => {
             setCameraActionType(type);
             setConfirmedShift(shift || null);
