@@ -713,9 +713,10 @@ export const cloudDb = {
       const profileEntry = profilesMap?.[staffUuid] || profilesMap?.[staffCode] || null;
       const moodEntry = moodsMap?.[staffUuid] || moodsMap?.[staffCode] || null;
       const resolvedMoodEmoji =
-        (moodEntry && moodEntry.date_ymd === shiftDateYmd ? moodEntry.emoji : null) ||
         parsedNotes.mood_emoji ||
-        null;
+        (moodEntry && moodEntry.date_ymd === shiftDateYmd ? moodEntry.emoji : null) ||
+        moodEntry?.emoji ||
+        '😊';
 
       return {
         id: row.id,

@@ -1,14 +1,17 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import ExcelJS from 'exceljs';
 import {
   AlertTriangle,
   Award,
+  Camera,
   Check,
   CheckCircle2,
   Clock,
   Download,
+  Eye,
   FileSpreadsheet,
   History,
+  Image,
   Lock,
   Plus,
   RefreshCw,
@@ -46,6 +49,10 @@ export default function PointManagementTab({ adminAuth, isReadOnly = false, onPo
   const [selectedStaffIds, setSelectedStaffIds] = useState([]);
   const [pointAmount, setPointAmount] = useState('');
   const [reason, setReason] = useState('');
+  const [proofPhoto, setProofPhoto] = useState(null);
+  const [proofPhotoPreview, setProofPhotoPreview] = useState(null);
+  const [previewPhotoModal, setPreviewPhotoModal] = useState(null);
+  const fileInputRef = useRef(null);
   const [pinInput, setPinInput] = useState(adminAuth?.pin || '');
   const [submitting, setSubmitting] = useState(false);
 
@@ -55,6 +62,51 @@ export default function PointManagementTab({ adminAuth, isReadOnly = false, onPo
   const [deleting, setDeleting] = useState(false);
 
   const [exporting, setExporting] = useState(false);
+
+  const handleProofPhotoChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      showToast('File yang dipilih harus berupa gambar/foto.', 'error');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onerror = () => showToast('Gagal membaca file gambar.', 'error');
+    reader.onload = () => {
+      const img = new window.Image();
+      img.onerror = () => showToast('Gambar tidak valid.', 'error');
+      img.onload = () => {
+        const maxSize = 1024;
+        let width = img.width;
+        let height = img.height;
+        if (width > maxSize || height > maxSize) {
+          if (width > height) {
+            height = Math.round((height * maxSize) / width);
+            width = maxSize;
+          } else {
+            width = Math.round((width * maxSize) / height);
+            height = maxSize;
+          }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          showToast('Browser tidak mendukung canvas.', 'error');
+          return;
+        }
+        ctx.drawImage(img, 0, 0, width, height);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+        setProofPhoto(dataUrl);
+        setProofPhotoPreview(dataUrl);
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  };
 
   useEffect(() => {
     if (adminAuth?.pin && !pinInput) {
@@ -234,13 +286,17 @@ export default function PointManagementTab({ adminAuth, isReadOnly = false, onPo
         pin: effectivePin,
         staffIds: selectedStaffIds,
         points: numPts,
-        reason: reason.trim()
+        reason: reason.trim(),
+        proofPhotoBase64: proofPhoto || null
       });
       showToast(res.message || 'Poin pelanggaran berhasil diberikan & notifikasi dikirim.', 'success');
       setSelectedStaffIds([]);
       setStaffSearchQuery('');
       setPointAmount('');
       setReason('');
+      setProofPhoto(null);
+      setProofPhotoPreview(null);
+      if (fileInputRef.current) fileInputRef.current.value = '';
       await loadData(true);
       if (onPointsUpdated) onPointsUpdated();
     } catch (err) {
@@ -687,6 +743,74 @@ export default function PointManagementTab({ adminAuth, isReadOnly = false, onPo
               />
             </div>
 
+            {/* Step 4: Optional Proof Photo */}
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-xs font-bold text-slate-200 flex items-center space-x-1.5">
+                  <Camera className="w-3.5 h-3.5 text-blue-400" />
+                  <span>4. Bukti Foto Pelanggaran (Opsional)</span>
+                </label>
+                {proofPhotoPreview && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setProofPhoto(null);
+                      setProofPhotoPreview(null);
+                      if (fileInputRef.current) fileInputRef.current.value = '';
+                    }}
+                    className="text-[10px] text-rose-400 hover:text-rose-300 font-bold cursor-pointer"
+                  >
+                    Hapus Foto ✕
+                  </button>
+                )}
+              </div>
+
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleProofPhotoChange}
+                className="hidden"
+              />
+
+              {proofPhotoPreview ? (
+                <div className="rounded-2xl border border-slate-700 bg-[#12161f] p-2.5 flex items-center space-x-3">
+                  <img
+                    src={proofPhotoPreview}
+                    alt="Preview Bukti Foto"
+                    className="w-14 h-14 rounded-xl object-cover border border-slate-600 cursor-pointer shrink-0"
+                    onClick={() => setPreviewPhotoModal(proofPhotoPreview)}
+                    title="Klik untuk perbesar"
+                  />
+                  <div className="flex-1 min-w-0 text-xs">
+                    <p className="font-bold text-emerald-300 flex items-center space-x-1">
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      <span>Foto bukti siap disertakan</span>
+                    </p>
+                    <p className="text-[10px] text-slate-400 mt-0.5 truncate">
+                      Foto akan tersimpan & dapat dilihat oleh staff dan management.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-[11px] font-bold text-slate-200 border border-slate-700 cursor-pointer shrink-0"
+                  >
+                    Ganti
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-full py-2.5 px-3 rounded-xl border border-dashed border-slate-700 hover:border-blue-500 bg-[#12161f]/60 hover:bg-[#12161f] text-slate-400 hover:text-slate-200 text-xs font-semibold flex items-center justify-center space-x-2 transition cursor-pointer"
+                >
+                  <Camera className="w-4 h-4 text-slate-400" />
+                  <span>Ambil Foto / Pilih Gambar Bukti Pelanggaran</span>
+                </button>
+              )}
+            </div>
+
             {/* PIN Input only if not already cached in session */}
             {!adminAuth?.pin && (
               <div>
@@ -881,7 +1005,7 @@ export default function PointManagementTab({ adminAuth, isReadOnly = false, onPo
                           </span>
                         )}
                       </td>
-                      <td className="py-3 px-4 text-right">
+                      <td className="py-3 px-4 text-right space-x-1.5 whitespace-nowrap">
                         <button
                           type="button"
                           onClick={() => quickSelectStaff(row.staff_id)}
@@ -889,6 +1013,19 @@ export default function PointManagementTab({ adminAuth, isReadOnly = false, onPo
                         >
                           + Beri Poin
                         </button>
+                        {row.violation_count > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSearch(row.staff_name);
+                              setSubTab('LOG');
+                            }}
+                            className="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 text-[11px] font-bold transition cursor-pointer"
+                            title="Buka log riwayat poin staff ini untuk memeriksa atau menghapus poin"
+                          >
+                            Kelola Log →
+                          </button>
+                        )}
                       </td>
                     </tr>
                   ))
@@ -939,10 +1076,21 @@ export default function PointManagementTab({ adminAuth, isReadOnly = false, onPo
                             {pt.points > 0 ? `+${pt.points}` : pt.points} Poin
                           </span>
                         </td>
-                        <td className="py-3 px-3 max-w-xs">
+                        <td className="py-3 px-3 max-w-xs space-y-1.5">
                           <p className="text-slate-200 font-medium leading-relaxed whitespace-pre-wrap">
                             {pt.reason}
                           </p>
+                          {pt.proof_photo_url && (
+                            <button
+                              type="button"
+                              onClick={() => setPreviewPhotoModal(pt.proof_photo_url)}
+                              className="inline-flex items-center space-x-1.5 px-2 py-1 rounded-lg bg-blue-950/60 hover:bg-blue-900 border border-blue-500/40 text-blue-300 text-[10px] font-bold transition cursor-pointer"
+                              title="Klik untuk melihat bukti foto pelanggaran"
+                            >
+                              <Camera className="w-3 h-3 text-blue-400" />
+                              <span>Lihat Bukti Foto 📷</span>
+                            </button>
+                          )}
                         </td>
                         <td className="py-3 px-3 whitespace-nowrap">
                           <span className="text-slate-200 font-semibold">{pt.given_by}</span>
@@ -969,14 +1117,15 @@ export default function PointManagementTab({ adminAuth, isReadOnly = false, onPo
                           )}
                         </td>
                         {!isReadOnly && (
-                          <td className="py-3 px-4 text-right">
+                          <td className="py-3 px-4 text-right whitespace-nowrap">
                             <button
                               type="button"
                               onClick={() => setDeleteTarget(pt)}
-                              className="p-2 rounded-xl bg-rose-950/50 hover:bg-rose-600 text-rose-400 hover:text-white border border-rose-500/30 transition cursor-pointer"
-                              title="Hapus Catatan Poin"
+                              className="px-2.5 py-1.5 rounded-xl bg-rose-950/50 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/40 transition cursor-pointer inline-flex items-center space-x-1.5 text-xs font-bold"
+                              title="Hapus Catatan Poin (Operational Manager)"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
+                              <span>Hapus</span>
                             </button>
                           </td>
                         )}
@@ -996,7 +1145,7 @@ export default function PointManagementTab({ adminAuth, isReadOnly = false, onPo
           <div className="bg-[#161b24] border border-slate-800 rounded-3xl max-w-md w-full p-5 space-y-4 shadow-2xl text-slate-200">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <h4 className="text-sm font-bold text-white flex items-center space-x-2">
-                <AlertTriangle className="w-4 h-4 text-rose-400" />
+                <Trash2 className="w-4 h-4 text-rose-400" />
                 <span>Hapus Catatan Poin Pelanggaran?</span>
               </h4>
               <button
@@ -1007,22 +1156,41 @@ export default function PointManagementTab({ adminAuth, isReadOnly = false, onPo
                 <X className="w-4 h-4" />
               </button>
             </div>
-            <div className="p-3 rounded-2xl bg-[#12161f] border border-slate-800 text-xs space-y-1">
+            <div className="p-3.5 rounded-2xl bg-[#12161f] border border-slate-800 text-xs space-y-1.5">
               <div>Staff: <strong className="text-white">{deleteTarget.staff_name}</strong></div>
-              <div>Poin: <strong className="text-rose-300">{deleteTarget.points} Poin</strong></div>
+              <div>Poin: <strong className="text-rose-300 font-mono">{deleteTarget.points} Poin</strong></div>
               <div>Alasan: <span className="text-slate-300">{deleteTarget.reason}</span></div>
+              {deleteTarget.proof_photo_url && (
+                <div className="pt-1">
+                  <span className="text-[10px] text-slate-400 block mb-1">Bukti Foto:</span>
+                  <img
+                    src={deleteTarget.proof_photo_url}
+                    alt="Bukti Foto"
+                    className="w-16 h-16 rounded-xl object-cover border border-slate-700 cursor-pointer"
+                    onClick={() => setPreviewPhotoModal(deleteTarget.proof_photo_url)}
+                  />
+                </div>
+              )}
+              <div className="text-[11px] text-amber-300/90 pt-1.5 border-t border-slate-800/80">
+                Poin akan langsung dihapus dari akumulasi staff tanpa perlu persetujuan staff dan tanpa harus memberikan alasan.
+              </div>
             </div>
             <form onSubmit={handleConfirmDelete} className="space-y-3">
               {!adminAuth?.pin && (
-                <input
-                  type="password"
-                  inputMode="numeric"
-                  value={deletePin}
-                  onChange={(e) => setDeletePin(e.target.value)}
-                  placeholder="Masukkan PIN Operational Manager"
-                  className="w-full bg-[#12161f] border border-slate-700 rounded-xl px-3 py-2 text-xs font-mono text-white"
-                  required
-                />
+                <div>
+                  <label className="text-xs text-slate-300 font-bold block mb-1">
+                    Masukkan PIN Operational Manager (8980)
+                  </label>
+                  <input
+                    type="password"
+                    inputMode="numeric"
+                    value={deletePin}
+                    onChange={(e) => setDeletePin(e.target.value)}
+                    placeholder="PIN Operational Manager"
+                    className="w-full bg-[#12161f] border border-slate-700 rounded-xl px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-rose-500"
+                    required
+                  />
+                </div>
               )}
               <div className="flex space-x-2">
                 <button
@@ -1035,12 +1203,49 @@ export default function PointManagementTab({ adminAuth, isReadOnly = false, onPo
                 <button
                   type="submit"
                   disabled={deleting}
-                  className="flex-1 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-xs font-bold text-white cursor-pointer"
+                  className="flex-1 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-xs font-bold text-white shadow-lg shadow-rose-600/30 cursor-pointer"
                 >
-                  {deleting ? 'Menghapus...' : 'Ya, Hapus'}
+                  {deleting ? 'Menghapus...' : 'Ya, Hapus Poin Sekarang'}
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Proof Photo Fullview Modal */}
+      {previewPhotoModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm animate-fade-in">
+          <div className="bg-[#161b24] border border-slate-800 rounded-3xl max-w-lg w-full p-4 space-y-3 shadow-2xl">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-white flex items-center space-x-1.5">
+                <Camera className="w-4 h-4 text-blue-400" />
+                <span>Bukti Foto Pelanggaran</span>
+              </span>
+              <button
+                type="button"
+                onClick={() => setPreviewPhotoModal(null)}
+                className="p-1 rounded-lg bg-slate-800 text-slate-400 hover:text-white cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="rounded-2xl overflow-hidden border border-slate-700 max-h-[70vh] flex items-center justify-center bg-black">
+              <img
+                src={previewPhotoModal}
+                alt="Bukti Foto"
+                className="w-full h-full object-contain max-h-[70vh]"
+              />
+            </div>
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={() => setPreviewPhotoModal(null)}
+                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-200 cursor-pointer"
+              >
+                Tutup
+              </button>
+            </div>
           </div>
         </div>
       )}

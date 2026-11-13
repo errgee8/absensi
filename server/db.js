@@ -208,6 +208,7 @@ const ensureColumn = (tableName, columnName, definition) => {
 
 ensureColumn('staff', 'venue', "TEXT DEFAULT 'JP Karaoke'");
 ensureColumn('staff', 'division', "TEXT DEFAULT 'Server and Cashier'");
+ensureColumn('staff_points', 'proof_photo_url', 'TEXT');
 ensureColumn('staff', 'shift_id', 'INTEGER');
 ensureColumn('staff', 'uuid', 'TEXT');
 

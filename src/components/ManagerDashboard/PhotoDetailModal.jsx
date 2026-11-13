@@ -108,8 +108,17 @@ export default function PhotoDetailModal({ shift, type = 'in', onClose, onShiftU
                 {shift.staff_venue === 'JP Karaoke' ? '🎤 JP Karaoke' : '🐱 LuckyCat'}
               </span>
             </div>
-            <h3 className="text-lg font-black text-slate-100 mt-1">
-              {shift.staff_name} • <span className="text-slate-400 font-bold">{shift.staff_division || shift.staff_role}</span>
+            <h3 className="text-lg font-black text-slate-100 mt-1 flex items-center space-x-2">
+              <span>{shift.staff_name}</span>
+              {shift.mood_emoji && (
+                <span
+                  className="inline-flex items-center justify-center text-sm px-1.5 py-0.5 rounded-lg bg-slate-800 border border-slate-700 shadow-xs"
+                  title={`Mood hari ini: ${shift.mood_emoji}`}
+                >
+                  {shift.mood_emoji}
+                </span>
+              )}
+              <span className="text-slate-400 font-bold">• {shift.staff_division || shift.staff_role}</span>
             </h3>
           </div>
 

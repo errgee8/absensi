@@ -175,7 +175,7 @@ export default function ShiftTable({ shifts = [], schedules = [], onInspectPhoto
                           <span className="font-black text-slate-100 text-sm">{shift.staff_name}</span>
                           {shift.mood_emoji && (
                             <span
-                              className="text-base leading-none"
+                              className="inline-flex items-center justify-center text-sm px-1.5 py-0.5 rounded-lg bg-slate-800/90 border border-slate-700/70 shadow-xs cursor-default shrink-0"
                               title={`Mood hari ini: ${shift.mood_emoji}`}
                             >
                               {shift.mood_emoji}

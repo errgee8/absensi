@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { AlertTriangle, CheckCircle2, Clock, UserCheck, X } from 'lucide-react';
+import { AlertTriangle, Camera, CheckCircle2, Clock, UserCheck, X } from 'lucide-react';
 import { formatWitaDateTime } from '../../utils/time';
 import { showToast } from '../Common/Toast';
 
@@ -85,6 +85,24 @@ export default function StaffPointNoticeModal({
             <div className="p-3.5 rounded-xl bg-rose-950/40 border border-rose-500/30 text-sm font-bold text-rose-100 whitespace-pre-wrap leading-relaxed">
               "{currentPoint.reason}"
             </div>
+
+            {currentPoint.proof_photo_url && (
+              <div className="space-y-1.5 pt-1">
+                <span className="text-xs font-bold text-slate-300 flex items-center space-x-1.5">
+                  <Camera className="w-3.5 h-3.5 text-rose-400" />
+                  <span>Bukti Foto dari Management:</span>
+                </span>
+                <div className="rounded-xl overflow-hidden border border-slate-700 bg-black/60 max-h-56 flex items-center justify-center">
+                  <img
+                    src={currentPoint.proof_photo_url}
+                    alt="Bukti Foto Pelanggaran"
+                    className="w-full h-full object-contain max-h-56 cursor-pointer"
+                    onClick={() => window.open(currentPoint.proof_photo_url, '_blank')}
+                  />
+                </div>
+                <p className="text-[10px] text-slate-400 text-center">Ketuk gambar untuk melihat ukuran penuh</p>
+              </div>
+            )}
 
             <div className="flex items-center justify-between pt-2 border-t border-slate-800">
               <span className="text-xs text-slate-400 font-semibold">

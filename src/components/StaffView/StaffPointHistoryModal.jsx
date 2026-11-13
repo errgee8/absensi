@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, AlertTriangle, CheckCircle2, Clock, Calendar, Award, ShieldCheck } from 'lucide-react';
+import { X, AlertTriangle, Camera, CheckCircle2, Clock, Calendar, Award, ShieldCheck } from 'lucide-react';
 import { getPoints } from '../../utils/api';
 import { formatWitaDateTime, getPointCycleInfo } from '../../utils/time';
 
@@ -181,6 +181,18 @@ export default function StaffPointHistoryModal({
                         <p className="text-xs sm:text-sm font-bold text-white leading-snug pt-0.5">
                           {pt.reason}
                         </p>
+                        {pt.proof_photo_url && (
+                          <div className="pt-1">
+                            <button
+                              type="button"
+                              onClick={() => window.open(pt.proof_photo_url, '_blank')}
+                              className="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-lg bg-blue-950/60 hover:bg-blue-900 border border-blue-500/40 text-blue-300 text-[11px] font-bold transition cursor-pointer"
+                            >
+                              <Camera className="w-3.5 h-3.5 text-blue-400" />
+                              <span>Lihat Bukti Foto 📷</span>
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </div>
 

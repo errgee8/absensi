@@ -467,8 +467,11 @@ export async function acknowledgeStaffPoint(id, payload) {
 export async function deleteStaffPoint(id, pin) {
   const res = await fetch(`${API_BASE}/points/${encodeURIComponent(id)}`, {
     method: 'DELETE',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ pin })
+    headers: {
+      'Content-Type': 'application/json',
+      'x-manager-pin': String(pin || '').trim()
+    },
+    body: JSON.stringify({ pin: String(pin || '').trim() })
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'Gagal menghapus catatan poin');

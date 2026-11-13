@@ -1755,10 +1755,13 @@ router.post('/checkin', async (req, res) => {
         if (cloudMoods && Object.keys(cloudMoods).length > 0) moodsMap = cloudMoods;
       }
       const mEntry = moodsMap?.[staff.uuid] || moodsMap?.[staff.id] || null;
-      if (mEntry && mEntry.date_ymd === dateStr) {
+      if (mEntry && (mEntry.date_ymd === dateStr || mEntry.emoji)) {
         checkinMoodEmoji = mEntry.emoji;
       }
     } catch {}
+  }
+  if (!checkinMoodEmoji) {
+    checkinMoodEmoji = '😊';
   }
 
   // Sync to Supabase Cloud if connected
@@ -2546,7 +2549,7 @@ router.get('/shifts', async (req, res) => {
       if (typeof r.notes === 'string' && r.notes.startsWith('{')) parsedNotes = JSON.parse(r.notes);
     } catch {}
     const moodEntry = localMoods?.[r.staff_id] || null;
-    const resolvedMood = (moodEntry && moodEntry.date_ymd === r.date ? moodEntry.emoji : null) || parsedNotes.mood_emoji || null;
+    const resolvedMood = parsedNotes.mood_emoji || (moodEntry && moodEntry.date_ymd === r.date ? moodEntry.emoji : null) || moodEntry?.emoji || '😊';
     const profEntry = localProfiles?.[r.staff_id] || null;
     return {
       ...r,
@@ -3960,6 +3963,9 @@ router.get('/points', async (req, res) => {
       });
     }
 
+    await resolveAttendancePhotoUrls(pointsFiltered, ['proof_photo_url']);
+    await resolveAttendancePhotoUrls(pendingForStaff, ['proof_photo_url']);
+
     return res.json({
       currentCycle,
       selectedCycle: targetCycleKey === 'ALL' ? null : getPointCycleFromKey(targetCycleKey),
@@ -3976,7 +3982,7 @@ router.get('/points', async (req, res) => {
 });
 
 router.post('/points', async (req, res) => {
-  const { pin, staffId, staffIds, points, reason } = req.body || {};
+  const { pin, staffId, staffIds, points, reason, proofPhotoBase64, proofPhoto } = req.body || {};
 
   const auth = await verifyManagementAuth(pin);
   if (!auth.authorized) {
@@ -4001,6 +4007,17 @@ router.post('/points', async (req, res) => {
 
   if (!reason || !String(reason).trim()) {
     return res.status(400).json({ error: 'Alasan pemberian poin wajib diisi.' });
+  }
+
+  // Handle optional violation proof photo
+  let savedProofPhotoUrl = null;
+  const rawPhoto = proofPhotoBase64 || proofPhoto;
+  if (rawPhoto && typeof rawPhoto === 'string' && rawPhoto.startsWith('data:image/')) {
+    try {
+      savedProofPhotoUrl = await savePhoto(rawPhoto, `point_proof_${Date.now()}`);
+    } catch (err) {
+      console.warn('Failed to save point proof photo:', err.message);
+    }
   }
 
   // Resolve each target staff individually so every record stays private & isolated per person
@@ -4041,6 +4058,7 @@ router.post('/points', async (req, res) => {
     staff_division: staff.division || 'Staff',
     points: roundedPoints,
     reason: cleanReason,
+    proof_photo_url: savedProofPhotoUrl || null,
     cycle_key: cycle.cycleKey,
     cycle_label: cycle.label,
     wita_date: witaDate,
@@ -4062,9 +4080,9 @@ router.post('/points', async (req, res) => {
     const insertStmt = db.prepare(`
       INSERT INTO staff_points (
         id, staff_id, staff_uuid, staff_name, staff_role, staff_venue, staff_division,
-        points, reason, cycle_key, cycle_label, wita_date, given_by, given_by_role,
+        points, reason, proof_photo_url, cycle_key, cycle_label, wita_date, given_by, given_by_role,
         status, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', ?, ?)
     `);
 
     for (const pointRecord of createdRecords) {
@@ -4079,6 +4097,7 @@ router.post('/points', async (req, res) => {
           pointRecord.staff_division,
           pointRecord.points,
           pointRecord.reason,
+          pointRecord.proof_photo_url || null,
           pointRecord.cycle_key,
           pointRecord.cycle_label,
           pointRecord.wita_date,
@@ -4182,10 +4201,10 @@ router.post('/points/:id/acknowledge', async (req, res) => {
 
 router.delete('/points/:id', async (req, res) => {
   const { id } = req.params;
-  const { pin } = req.body || {};
+  const pin = req.body?.pin || req.query?.pin || req.headers['x-admin-pin'] || req.headers['x-manager-pin'];
 
   const auth = await verifyManagementAuth(pin);
-  if (!auth.authorized || auth.role !== 'MANAGER') {
+  if (!auth.authorized || (auth.role !== 'MANAGER' && auth.role !== 'FULL_ADMIN')) {
     return res.status(403).json({
       error: 'Akses ditolak: Hanya Operational Manager yang berwenang menghapus catatan poin.'
     });
