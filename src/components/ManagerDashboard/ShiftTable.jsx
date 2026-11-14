@@ -1,9 +1,26 @@
-import React from 'react';
-import { Eye, AlertTriangle, CheckCircle, Clock, Coffee, MapPin, ShieldCheck, ShieldAlert, LogIn, LogOut } from 'lucide-react';
+import React, { useState } from 'react';
+import { Eye, AlertTriangle, CheckCircle, Clock, Coffee, MapPin, ShieldCheck, ShieldAlert, LogIn, LogOut, ChevronDown, ChevronUp, Award, Calendar, AlertCircle } from 'lucide-react';
 import { formatWitaTimeOnly, formatWitaDateOnly, formatDuration } from '../../utils/time';
 import { resolveShift } from '../../utils/shiftResolver';
 
-export default function ShiftTable({ shifts = [], schedules = [], onInspectPhoto, onReviewLate, readersSet, hasActiveAnnouncement }) {
+export default function ShiftTable({
+  shifts = [],
+  schedules = [],
+  onInspectPhoto,
+  onReviewLate,
+  readersSet,
+  hasActiveAnnouncement,
+  density = 'compact'
+}) {
+  const [expandedRows, setExpandedRows] = useState({});
+
+  const toggleRow = (shiftId) => {
+    setExpandedRows((prev) => ({
+      ...prev,
+      [shiftId]: !prev[shiftId]
+    }));
+  };
+
   if (shifts.length === 0) {
     return (
       <div className="bg-[#161b24] border border-slate-800 rounded-3xl p-12 text-center shadow-lg">
@@ -13,6 +30,53 @@ export default function ShiftTable({ shifts = [], schedules = [], onInspectPhoto
       </div>
     );
   }
+
+  // Detect actionable follow-ups for each staff/shift
+  const getStaffActionItems = (shift) => {
+    const actions = [];
+    const flags = shift.flags || [];
+
+    const isLateApproved = shift?.late_status === 'APPROVED' || flags.includes('FLAG_LATE_EXCUSED');
+    const isLatePending = shift?.late_status === 'PENDING_REVIEW' || (flags.some(f => String(f).includes('Late Check-In')) && !shift?.late_status);
+
+    if (isLatePending) {
+      actions.push({
+        type: 'LATE_REVIEW',
+        label: 'Review Telat',
+        severity: 'warning',
+        description: 'Alasan & foto bukti keterlambatan menunggu persetujuan (ACC/Tolak) oleh manajer.'
+      });
+    }
+
+    if (shift.face_recog_status === 'MISMATCH') {
+      actions.push({
+        type: 'FACE_MISMATCH',
+        label: 'Wajah Beda',
+        severity: 'danger',
+        description: 'Sistem mendeteksi foto selfie masuk tidak cocok dengan biometrik referensi.'
+      });
+    }
+
+    if (shift.break_status === 'ON_BREAK' && flags.some(f => String(f).includes('Break Exceeded'))) {
+      actions.push({
+        type: 'OVERDUE_BREAK',
+        label: 'Break > 1 Jam',
+        severity: 'warning',
+        description: 'Durasi istirahat staf telah melebihi batas toleransi 60 menit.'
+      });
+    }
+
+    if (hasActiveAnnouncement && !readersSet?.has(String(shift.staff_id))) {
+      actions.push({
+        type: 'UNREAD_ANNOUNCEMENT',
+        label: 'Belum Baca',
+        severity: 'info',
+        description: 'Staf belum membaca pengumuman resmi dari management.'
+      });
+    }
+
+    return actions;
+  };
 
   const renderFlagBadges = (flags = [], shift = null) => {
     const isLateApproved = shift?.late_status === 'APPROVED' || flags?.includes('FLAG_LATE_EXCUSED');
@@ -189,23 +253,27 @@ export default function ShiftTable({ shifts = [], schedules = [], onInspectPhoto
     return null;
   };
 
+  const isCompact = density === 'compact';
+  const cellPy = isCompact ? 'py-2.5' : 'py-3.5';
+
   return (
     <div className="bg-[#161b24] border border-slate-800 rounded-3xl overflow-hidden shadow-xl">
       <div className="overflow-x-auto">
         <table className="w-full text-left text-xs text-slate-200 border-collapse">
           <thead className="bg-[#12161f] text-slate-300 uppercase text-[10px] tracking-wider font-black border-b border-slate-800">
             <tr>
-              <th className="py-3.5 px-3">Tanggal</th>
-              <th className="py-3.5 px-3">Staff &amp; Mood</th>
-              <th className="py-3.5 px-3">Outlet &amp; Divisi</th>
-              <th className="py-3.5 px-3">Jadwal Shift</th>
-              <th className="py-3.5 px-3">Masuk &amp; Face Recog</th>
-              <th className="py-3.5 px-3">Istirahat (Before / After)</th>
-              <th className="py-3.5 px-3">Pulang</th>
-              <th className="py-3.5 px-2">Durasi &amp; Jarak GPS</th>
-              <th className="py-3.5 px-3">Late Review</th>
-              <th className="py-3.5 px-3">Status / Anomali</th>
-              <th className="py-3.5 px-2 text-right">Detail</th>
+              <th className="py-3 px-2 w-7 text-center"></th>
+              <th className="py-3 px-3">Tanggal</th>
+              <th className="py-3 px-3">Staff &amp; Aksi</th>
+              <th className="py-3 px-3">Outlet &amp; Divisi</th>
+              <th className="py-3 px-3">Jadwal Shift</th>
+              <th className="py-3 px-3">Masuk &amp; Face Recog</th>
+              <th className="py-3 px-3">Istirahat</th>
+              <th className="py-3 px-3">Pulang</th>
+              <th className="py-3 px-2">Durasi &amp; GPS</th>
+              <th className="py-3 px-3">Late Review</th>
+              <th className="py-3 px-3">Status / Anomali</th>
+              <th className="py-3 px-2 text-right">Detail</th>
             </tr>
           </thead>
 
@@ -214,287 +282,466 @@ export default function ShiftTable({ shifts = [], schedules = [], onInspectPhoto
               const hasFlags = shift.flags && shift.flags.length > 0;
               const shiftInfo = resolveShift(shift, schedules);
               const isActive = !shift.checkout_time || shift.status === 'IN_PROGRESS' || shift.status === 'ON_DUTY' || shift.status === 'ON_BREAK';
+              const actionItems = getStaffActionItems(shift);
+              const isExpanded = Boolean(expandedRows[shift.id]);
 
               return (
-                <tr
-                  key={shift.id}
-                  className={`hover:bg-slate-800/40 transition-colors ${
-                    hasFlags ? 'bg-amber-500/5' : ''
-                  }`}
-                >
-                  {/* Date */}
-                  <td className="py-3 px-3 font-mono text-slate-100 font-bold whitespace-nowrap">
-                    {formatWitaDateOnly(shift.shift_date || shift.date || shift.checkin_time)}
-                  </td>
+                <React.Fragment key={shift.id}>
+                  <tr
+                    className={`hover:bg-slate-800/40 transition-colors ${
+                      hasFlags ? 'bg-amber-500/5' : ''
+                    } ${isExpanded ? 'bg-indigo-950/20' : ''}`}
+                  >
+                    {/* Expand/Collapse Chevron Button */}
+                    <td className={`${cellPy} px-2 text-center`}>
+                      <button
+                        type="button"
+                        onClick={() => toggleRow(shift.id)}
+                        className={`p-1 rounded-lg transition cursor-pointer ${
+                          isExpanded
+                            ? 'bg-indigo-600 text-white'
+                            : 'bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white'
+                        }`}
+                        title={isExpanded ? 'Tutup Detail Kartu' : 'Buka Detail Kartu (Poin, Hari Kerja, Aksi)'}
+                      >
+                        {isExpanded ? (
+                          <ChevronUp className="w-3.5 h-3.5 stroke-[2.5]" />
+                        ) : (
+                          <ChevronDown className="w-3.5 h-3.5 stroke-[2.5]" />
+                        )}
+                      </button>
+                    </td>
 
-                  {/* Staff Name, Real Photo, Mood & Announcement */}
-                  <td className="py-3 px-3 whitespace-nowrap">
-                    <div className="flex items-center space-x-2.5">
-                      {shift.staff_profile_photo_url ? (
-                        <img
-                          src={shift.staff_profile_photo_url}
-                          alt={shift.staff_name}
-                          className="w-8 h-8 rounded-xl object-cover border border-slate-700 shrink-0 shadow-xs"
-                        />
-                      ) : (
-                        <div className="w-8 h-8 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center text-[11px] font-black text-slate-400 shrink-0">
-                          {shift.staff_name ? shift.staff_name.slice(0, 2).toUpperCase() : 'ST'}
-                        </div>
-                      )}
-                      <div className="min-w-0">
-                        <div className="flex items-center space-x-1.5">
-                          <span className="font-black text-slate-100 text-sm">{shift.staff_name}</span>
-                          {shift.mood_emoji && (
-                            <span
-                              className="inline-flex items-center justify-center text-sm px-1.5 py-0.2 rounded-lg bg-slate-800/90 border border-slate-700/70 shadow-xs cursor-default shrink-0"
-                              title={`Mood staff hari ini: ${shift.mood_emoji}`}
-                            >
-                              {shift.mood_emoji}
-                            </span>
-                          )}
-                          {hasActiveAnnouncement && (
-                            readersSet?.has(String(shift.staff_id)) ? (
+                    {/* Date */}
+                    <td className={`${cellPy} px-3 font-mono text-slate-100 font-bold whitespace-nowrap`}>
+                      {formatWitaDateOnly(shift.shift_date || shift.date || shift.checkin_time)}
+                    </td>
+
+                    {/* Staff Name, Action Badges, Real Photo & Mood */}
+                    <td className={`${cellPy} px-3 whitespace-nowrap`}>
+                      <div className="flex items-center space-x-2.5">
+                        {shift.staff_profile_photo_url ? (
+                          <img
+                            src={shift.staff_profile_photo_url}
+                            alt={shift.staff_name}
+                            className={`${isCompact ? 'w-7 h-7' : 'w-8 h-8'} rounded-xl object-cover border border-slate-700 shrink-0 shadow-xs`}
+                          />
+                        ) : (
+                          <div className={`${isCompact ? 'w-7 h-7' : 'w-8 h-8'} rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center text-[10px] font-black text-slate-400 shrink-0`}>
+                            {shift.staff_name ? shift.staff_name.slice(0, 2).toUpperCase() : 'ST'}
+                          </div>
+                        )}
+                        <div className="min-w-0">
+                          <div className="flex items-center space-x-1.5 flex-wrap gap-y-1">
+                            <span className="font-black text-slate-100 text-sm">{shift.staff_name}</span>
+                            {shift.mood_emoji && (
+                              <span
+                                className="inline-flex items-center justify-center text-xs px-1 py-0.2 rounded bg-slate-800/90 border border-slate-700/70 shadow-xs cursor-default shrink-0"
+                                title={`Mood staff hari ini: ${shift.mood_emoji}`}
+                              >
+                                {shift.mood_emoji}
+                              </span>
+                            )}
+
+                            {/* Prominent Action Badges next to Staff Name */}
+                            {actionItems.map((action, aIdx) => (
+                              <span
+                                key={aIdx}
+                                className={`inline-flex items-center space-x-1 px-1.5 py-0.2 rounded-md text-[9px] font-black border ${
+                                  action.severity === 'danger'
+                                    ? 'bg-rose-500/20 text-rose-300 border-rose-500/40'
+                                    : action.severity === 'warning'
+                                      ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                                      : 'bg-blue-500/20 text-blue-300 border-blue-500/40'
+                                }`}
+                                title={action.description}
+                              >
+                                <span>{action.severity === 'danger' ? '⚠️' : action.severity === 'warning' ? '⏳' : '📢'}</span>
+                                <span>{action.label}</span>
+                              </span>
+                            ))}
+
+                            {/* Clean announcement badge if already read */}
+                            {hasActiveAnnouncement && readersSet?.has(String(shift.staff_id)) && (
                               <span
                                 title="Sudah membaca pengumuman management ✓"
-                                className="inline-flex items-center space-x-0.5 px-1.5 py-0.2 rounded text-[8px] font-black bg-emerald-500/15 text-emerald-300 border border-emerald-500/30"
+                                className="inline-flex items-center space-x-0.5 px-1 py-0.2 rounded text-[8px] font-black bg-emerald-500/15 text-emerald-300 border border-emerald-500/30"
                               >
                                 <CheckCircle className="w-2.5 h-2.5 text-emerald-400 stroke-[2.5]" />
                                 <span>Paham ✓</span>
                               </span>
-                            ) : (
-                              <span
-                                title="Belum membaca pengumuman management"
-                                className="inline-flex items-center space-x-0.5 px-1.5 py-0.2 rounded text-[8px] font-black bg-rose-500/15 text-rose-300 border border-rose-500/30"
-                              >
-                                <AlertTriangle className="w-2.5 h-2.5 text-rose-400 stroke-[2.5]" />
-                                <span>Belum Baca</span>
-                              </span>
-                            )
-                          )}
-                        </div>
-                        <div className="text-[10px] text-slate-400 font-mono font-bold">{shift.staff_id}</div>
-                      </div>
-                    </div>
-                  </td>
-
-                  {/* Outlet & Division */}
-                  <td className="py-3 px-3 whitespace-nowrap">
-                    <div className="font-black text-slate-200">
-                      {shift.staff_venue === 'JP Karaoke' ? '🎤 JP Karaoke' : '🐱 LuckyCat'}
-                    </div>
-                    <div className="text-[10px] text-blue-400 font-black">
-                      {shift.staff_division || shift.staff_role}
-                    </div>
-                  </td>
-
-                  {/* Shift Indicator & Schedule */}
-                  <td className="py-3 px-3 whitespace-nowrap">
-                    <div className="flex flex-col gap-1 items-start">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-lg text-[11px] font-black border ${shiftInfo.badgeClass}`}>
-                        <span className="w-1.5 h-1.5 rounded-full mr-1.5 bg-current opacity-70"></span>
-                        {shiftInfo.badgeLabel}
-                      </span>
-                      <span className="text-[10px] font-mono text-slate-400 font-bold">
-                        🕒 {shiftInfo.timeRange}
-                      </span>
-                      {isActive && (
-                        <span className="inline-flex items-center space-x-1 px-1.5 py-0.5 rounded text-[9px] font-black bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 animate-pulse">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-                          <span>Sedang Berjalan</span>
-                        </span>
-                      )}
-                    </div>
-                  </td>
-
-                  {/* Masuk & Face Recog Status */}
-                  <td className="py-3 px-3 whitespace-nowrap">
-                    <div className="flex items-center space-x-2.5">
-                      {shift.checkin_photo ? (
-                        <button
-                          type="button"
-                          onClick={() => onInspectPhoto(shift, 'in')}
-                          className="group relative inline-block rounded-xl overflow-hidden border border-slate-700 hover:border-emerald-500 transition shadow-sm bg-slate-900 shrink-0"
-                          title="Lihat Foto Selfie Masuk"
-                        >
-                          <img
-                            src={shift.checkin_photo}
-                            alt="Check-in Selfie"
-                            onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                            className="w-10 h-10 object-cover group-hover:scale-110 transition duration-200"
-                          />
-                          <div className="absolute inset-0 bg-emerald-950/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition">
-                            <Eye className="w-3.5 h-3.5 text-white stroke-[2.5]" />
+                            )}
                           </div>
-                        </button>
-                      ) : (
-                        <div className="w-10 h-10 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center text-[10px] text-slate-500 font-mono shrink-0">
-                          -
+                          <div className="text-[10px] text-slate-400 font-mono font-bold">{shift.staff_id}</div>
                         </div>
-                      )}
-                      <div className="flex flex-col gap-1">
-                        <span className="font-mono text-emerald-400 font-black text-xs">
-                          {formatWitaTimeOnly(shift.checkin_time)}
-                        </span>
-                        {renderFaceRecogBadge(shift)}
                       </div>
-                    </div>
-                  </td>
+                    </td>
 
-                  {/* Istirahat (Status, Jam Selesai & Foto Before/After) */}
-                  <td className="py-3 px-3 whitespace-nowrap">
-                    {shift.staff_division === 'Management' ? (
-                      <span className="text-[10px] text-blue-400 font-mono font-black">Fleksibel (Mgmt)</span>
-                    ) : shift.staff_venue === 'JP Karaoke' ? (
-                      <span className="text-[10px] text-slate-500 font-mono font-bold">No Break (JP)</span>
-                    ) : (
-                      <div className="space-y-1.5">
-                        {/* Break Status & Time */}
-                        <div className="text-[11px]">
-                          {shift.break_status === 'ON_BREAK' ? (
-                            <span className="px-2 py-0.5 rounded-lg text-[10px] font-black bg-sky-500/15 text-sky-300 border border-sky-500/30 animate-pulse">
-                              Sedang Break ({formatWitaTimeOnly(shift.break_start_time)})
-                            </span>
-                          ) : shift.break_duration_minutes != null || shift.break_end_time ? (
-                            <div className="leading-tight">
-                              <span className="font-mono text-sky-300 font-black">
-                                Selesai {shift.break_duration_minutes != null ? `${shift.break_duration_minutes}m` : ''}
+                    {/* Outlet & Division */}
+                    <td className={`${cellPy} px-3 whitespace-nowrap`}>
+                      <div className="font-black text-slate-200">
+                        {shift.staff_venue === 'JP Karaoke' ? '🎤 JP Karaoke' : '🐱 LuckyCat'}
+                      </div>
+                      <div className="text-[10px] text-blue-400 font-black">
+                        {shift.staff_division || shift.staff_role}
+                      </div>
+                    </td>
+
+                    {/* Shift Indicator & Schedule */}
+                    <td className={`${cellPy} px-3 whitespace-nowrap`}>
+                      <div className="flex flex-col gap-1 items-start">
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-lg text-[10px] font-black border ${shiftInfo.badgeClass}`}>
+                          <span className="w-1.5 h-1.5 rounded-full mr-1 bg-current opacity-70"></span>
+                          {shiftInfo.badgeLabel}
+                        </span>
+                        <span className="text-[10px] font-mono text-slate-400 font-bold">
+                          🕒 {shiftInfo.timeRange}
+                        </span>
+                        {isActive && (
+                          <span className="inline-flex items-center space-x-1 px-1.5 py-0.2 rounded text-[8.5px] font-black bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 animate-pulse">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                            <span>Sedang Berjalan</span>
+                          </span>
+                        )}
+                      </div>
+                    </td>
+
+                    {/* Masuk & Face Recog Status */}
+                    <td className={`${cellPy} px-3 whitespace-nowrap`}>
+                      <div className="flex items-center space-x-2">
+                        {shift.checkin_photo ? (
+                          <button
+                            type="button"
+                            onClick={() => onInspectPhoto(shift, 'in')}
+                            className="group relative inline-block rounded-xl overflow-hidden border border-slate-700 hover:border-emerald-500 transition shadow-sm bg-slate-900 shrink-0 cursor-pointer"
+                            title="Lihat Foto Selfie Masuk"
+                          >
+                            <img
+                              src={shift.checkin_photo}
+                              alt="Check-in Selfie"
+                              onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                              className={`${isCompact ? 'w-8 h-8' : 'w-10 h-10'} object-cover group-hover:scale-110 transition duration-200`}
+                            />
+                            <div className="absolute inset-0 bg-emerald-950/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition">
+                              <Eye className="w-3.5 h-3.5 text-white stroke-[2.5]" />
+                            </div>
+                          </button>
+                        ) : (
+                          <div className={`${isCompact ? 'w-8 h-8' : 'w-10 h-10'} rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center text-[10px] text-slate-500 font-mono shrink-0`}>
+                            -
+                          </div>
+                        )}
+                        <div className="flex flex-col gap-0.5">
+                          <span className="font-mono text-emerald-400 font-black text-xs">
+                            {formatWitaTimeOnly(shift.checkin_time)}
+                          </span>
+                          {renderFaceRecogBadge(shift)}
+                        </div>
+                      </div>
+                    </td>
+
+                    {/* Istirahat (Status, Jam Selesai & Foto Before/After) */}
+                    <td className={`${cellPy} px-3 whitespace-nowrap`}>
+                      {shift.staff_division === 'Management' ? (
+                        <span className="text-[10px] text-blue-400 font-mono font-black">Fleksibel (Mgmt)</span>
+                      ) : shift.staff_venue === 'JP Karaoke' ? (
+                        <span className="text-[10px] text-slate-500 font-mono font-bold">No Break (JP)</span>
+                      ) : (
+                        <div className="space-y-1">
+                          <div className="text-[10px]">
+                            {shift.break_status === 'ON_BREAK' ? (
+                              <span className="px-2 py-0.5 rounded-lg text-[9px] font-black bg-sky-500/15 text-sky-300 border border-sky-500/30 animate-pulse">
+                                Sedang Break ({formatWitaTimeOnly(shift.break_start_time)})
                               </span>
-                              {shift.break_end_time && (
-                                <div className="text-[10px] font-mono text-slate-400">
-                                  jam {formatWitaTimeOnly(shift.break_end_time)}
-                                </div>
+                            ) : shift.break_duration_minutes != null || shift.break_end_time ? (
+                              <div className="leading-tight">
+                                <span className="font-mono text-sky-300 font-black">
+                                  Selesai {shift.break_duration_minutes != null ? `${shift.break_duration_minutes}m` : ''}
+                                </span>
+                                {shift.break_end_time && (
+                                  <div className="text-[9px] font-mono text-slate-400">
+                                    jam {formatWitaTimeOnly(shift.break_end_time)}
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-[10px] text-slate-500 font-mono font-bold">Belum Diambil</span>
+                            )}
+                          </div>
+
+                          {(shift.break_start_photo || shift.break_end_photo) && (
+                            <div className="flex items-center space-x-1.5 pt-0.5">
+                              {shift.break_start_photo && (
+                                <button
+                                  type="button"
+                                  onClick={() => onInspectPhoto(shift, 'break_start')}
+                                  className="group relative rounded-lg overflow-hidden border border-slate-700 hover:border-sky-500 transition shadow-xs bg-slate-900 cursor-pointer"
+                                  title="Lihat Foto Mulai Istirahat (Before)"
+                                >
+                                  <img
+                                    src={shift.break_start_photo}
+                                    alt="Break Start"
+                                    className="w-6 h-6 object-cover group-hover:scale-110 transition duration-200"
+                                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                                  />
+                                  <span className="absolute bottom-0 inset-x-0 bg-black/75 text-[6.5px] text-sky-200 text-center font-bold">
+                                    Before
+                                  </span>
+                                </button>
+                              )}
+                              {shift.break_end_photo && (
+                                <button
+                                  type="button"
+                                  onClick={() => onInspectPhoto(shift, 'break_end')}
+                                  className="group relative rounded-lg overflow-hidden border border-slate-700 hover:border-sky-500 transition shadow-xs bg-slate-900 cursor-pointer"
+                                  title="Lihat Foto Selesai Istirahat (After)"
+                                >
+                                  <img
+                                    src={shift.break_end_photo}
+                                    alt="Break End"
+                                    className="w-6 h-6 object-cover group-hover:scale-110 transition duration-200"
+                                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                                  />
+                                  <span className="absolute bottom-0 inset-x-0 bg-black/75 text-[6.5px] text-emerald-200 text-center font-bold">
+                                    After
+                                  </span>
+                                </button>
                               )}
                             </div>
-                          ) : (
-                            <span className="text-[10px] text-slate-500 font-mono font-bold">Belum Diambil</span>
                           )}
                         </div>
-
-                        {/* Foto Before (Mulai) & After (Selesai) Break */}
-                        {(shift.break_start_photo || shift.break_end_photo) && (
-                          <div className="flex items-center space-x-2 pt-0.5">
-                            {/* Before Photo */}
-                            {shift.break_start_photo && (
-                              <button
-                                type="button"
-                                onClick={() => onInspectPhoto(shift, 'break_start')}
-                                className="group relative rounded-lg overflow-hidden border border-slate-700 hover:border-sky-500 transition shadow-xs bg-slate-900"
-                                title="Lihat Foto Mulai Istirahat (Before)"
-                              >
-                                <img
-                                  src={shift.break_start_photo}
-                                  alt="Break Start"
-                                  className="w-7 h-7 object-cover group-hover:scale-110 transition duration-200"
-                                  onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                                />
-                                <span className="absolute bottom-0 inset-x-0 bg-black/75 text-[7px] text-sky-200 text-center font-bold">
-                                  Before
-                                </span>
-                              </button>
-                            )}
-
-                            {/* After Photo */}
-                            {shift.break_end_photo && (
-                              <button
-                                type="button"
-                                onClick={() => onInspectPhoto(shift, 'break_end')}
-                                className="group relative rounded-lg overflow-hidden border border-slate-700 hover:border-sky-500 transition shadow-xs bg-slate-900"
-                                title="Lihat Foto Selesai Istirahat (After)"
-                              >
-                                <img
-                                  src={shift.break_end_photo}
-                                  alt="Break End"
-                                  className="w-7 h-7 object-cover group-hover:scale-110 transition duration-200"
-                                  onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                                />
-                                <span className="absolute bottom-0 inset-x-0 bg-black/75 text-[7px] text-emerald-200 text-center font-bold">
-                                  After
-                                </span>
-                              </button>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </td>
-
-                  {/* Pulang (Check-Out Time & Photo) */}
-                  <td className="py-3 px-3 whitespace-nowrap">
-                    <div className="flex items-center space-x-2.5">
-                      {shift.checkout_photo ? (
-                        <button
-                          type="button"
-                          onClick={() => onInspectPhoto(shift, 'out')}
-                          className="group relative inline-block rounded-xl overflow-hidden border border-slate-700 hover:border-indigo-500 transition shadow-sm bg-slate-900 shrink-0"
-                          title="Lihat Foto Selfie Pulang"
-                        >
-                          <img
-                            src={shift.checkout_photo}
-                            alt="Checkout Selfie"
-                            onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                            className="w-10 h-10 object-cover group-hover:scale-110 transition duration-200"
-                          />
-                          <div className="absolute inset-0 bg-indigo-950/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition">
-                            <Eye className="w-3.5 h-3.5 text-white stroke-[2.5]" />
-                          </div>
-                        </button>
-                      ) : (
-                        <div className="w-10 h-10 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center text-[10px] text-slate-500 font-mono shrink-0">
-                          -
-                        </div>
                       )}
-                      <div>
-                        {shift.checkout_time ? (
-                          <span className="text-indigo-300 font-mono font-black text-xs">
-                            {formatWitaTimeOnly(shift.checkout_time)}
-                          </span>
+                    </td>
+
+                    {/* Pulang (Check-Out Time & Photo) */}
+                    <td className={`${cellPy} px-3 whitespace-nowrap`}>
+                      <div className="flex items-center space-x-2">
+                        {shift.checkout_photo ? (
+                          <button
+                            type="button"
+                            onClick={() => onInspectPhoto(shift, 'out')}
+                            className="group relative inline-block rounded-xl overflow-hidden border border-slate-700 hover:border-indigo-500 transition shadow-sm bg-slate-900 shrink-0 cursor-pointer"
+                            title="Lihat Foto Selfie Pulang"
+                          >
+                            <img
+                              src={shift.checkout_photo}
+                              alt="Checkout Selfie"
+                              onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                              className={`${isCompact ? 'w-8 h-8' : 'w-10 h-10'} object-cover group-hover:scale-110 transition duration-200`}
+                            />
+                            <div className="absolute inset-0 bg-indigo-950/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition">
+                              <Eye className="w-3.5 h-3.5 text-white stroke-[2.5]" />
+                            </div>
+                          </button>
                         ) : (
-                          <span className="inline-block px-2 py-0.5 rounded-lg text-[10px] font-black bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
-                            Aktif Bertugas
-                          </span>
+                          <div className={`${isCompact ? 'w-8 h-8' : 'w-10 h-10'} rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center text-[10px] text-slate-500 font-mono shrink-0`}>
+                            -
+                          </div>
                         )}
+                        <div>
+                          {shift.checkout_time ? (
+                            <span className="text-indigo-300 font-mono font-black text-xs">
+                              {formatWitaTimeOnly(shift.checkout_time)}
+                            </span>
+                          ) : (
+                            <span className="inline-block px-2 py-0.5 rounded-lg text-[9px] font-black bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                              Aktif Bertugas
+                            </span>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  </td>
+                    </td>
 
-                  {/* Durasi Kerja & Jarak GPS (Dibuat sangat jelas & tidak ambigu) */}
-                  <td className="py-3 px-2 whitespace-nowrap">
-                    <div className="font-mono text-slate-200 font-bold text-xs flex items-center space-x-1">
-                      <span className="text-[11px]">⏱️</span>
-                      <span>
-                        {isActive && (!shift.duration_minutes || shift.duration_minutes === 0)
-                          ? 'Sedang Berjalan'
-                          : formatDuration(shift.duration_minutes)}
-                      </span>
-                    </div>
-                    <div className="text-[10.5px] font-mono mt-1 flex items-center space-x-1">
-                      <span>📍</span>
-                      <span className={shift.checkin_distance > 150 ? 'text-rose-400 font-black' : 'text-slate-300 font-semibold'}>
-                        {shift.checkin_distance != null ? `${shift.checkin_distance} meter` : '-'}
-                      </span>
-                    </div>
-                  </td>
+                    {/* Durasi Kerja & Jarak GPS */}
+                    <td className={`${cellPy} px-2 whitespace-nowrap`}>
+                      <div className="font-mono text-slate-200 font-bold text-xs flex items-center space-x-1">
+                        <span className="text-[11px]">⏱️</span>
+                        <span>
+                          {isActive && (!shift.duration_minutes || shift.duration_minutes === 0)
+                            ? 'Berjalan'
+                            : formatDuration(shift.duration_minutes)}
+                        </span>
+                      </div>
+                      <div className="text-[10px] font-mono mt-0.5 flex items-center space-x-1">
+                        <span>📍</span>
+                        <span className={shift.checkin_distance > 150 ? 'text-rose-400 font-black' : 'text-slate-300 font-semibold'}>
+                          {shift.checkin_distance != null ? `${shift.checkin_distance}m` : '-'}
+                        </span>
+                      </div>
+                    </td>
 
-                  {/* Late Review */}
-                  <td className="py-3 px-3 whitespace-nowrap">
-                    {renderLateReviewBadge(shift)}
-                  </td>
+                    {/* Late Review */}
+                    <td className={`${cellPy} px-3 whitespace-nowrap`}>
+                      {renderLateReviewBadge(shift)}
+                    </td>
 
-                  {/* Flags / Anomali */}
-                  <td className="py-3 px-3 max-w-xs">{renderFlagBadges(shift.flags, shift)}</td>
+                    {/* Flags / Anomali */}
+                    <td className={`${cellPy} px-3 max-w-xs`}>
+                      {renderFlagBadges(shift.flags, shift)}
+                    </td>
 
-                  {/* Inspect Detail Button */}
-                  <td className="py-3 px-2 text-right">
-                    <button
-                      type="button"
-                      onClick={() => onInspectPhoto(shift, shift.checkout_photo ? 'out' : 'in')}
-                      className="p-2 rounded-xl bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/30 transition shadow-xs cursor-pointer"
-                      title="Buka audit lengkap shift"
-                    >
-                      <Eye className="w-4 h-4 stroke-[2.5]" />
-                    </button>
-                  </td>
-                </tr>
+                    {/* Inspect Detail Button */}
+                    <td className={`${cellPy} px-2 text-right`}>
+                      <button
+                        type="button"
+                        onClick={() => onInspectPhoto(shift, shift.checkout_photo ? 'out' : 'in')}
+                        className="p-1.5 rounded-xl bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/30 transition shadow-xs cursor-pointer"
+                        title="Buka audit lengkap shift"
+                      >
+                        <Eye className="w-4 h-4 stroke-[2.5]" />
+                      </button>
+                    </td>
+                  </tr>
+
+                  {/* EXPANDED ACCORDION ROW: Complete Staff Info & Required Actions */}
+                  {isExpanded && (
+                    <tr className="bg-[#121620] border-y border-indigo-500/40 animate-fade-in">
+                      <td colSpan={12} className="p-4 sm:p-5">
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+                            <div className="flex items-center space-x-2">
+                              <span className="text-xs font-black uppercase text-indigo-300 tracking-wider">
+                                Kartu Rekap Staff &amp; Panduan Tindakan:
+                              </span>
+                              <span className="text-xs font-bold text-white font-mono">
+                                {shift.staff_name} ({shift.staff_id})
+                              </span>
+                            </div>
+                            <span className="text-[10px] text-slate-400 font-medium">
+                              Outlet: {shift.staff_venue} &bull; Divisi: {shift.staff_division || shift.staff_role}
+                            </span>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+                            {/* Card 1: Jumlah Point */}
+                            <div className="bg-[#181e2b] p-3.5 rounded-2xl border border-slate-700/80 shadow-md">
+                              <div className="flex items-center justify-between text-slate-400 mb-1">
+                                <span className="text-[10px] font-black uppercase tracking-wider">Jumlah Poin</span>
+                                <Award className="w-4 h-4 text-amber-400" />
+                              </div>
+                              <div className="flex items-baseline space-x-1.5">
+                                <span className={`text-2xl font-black font-mono ${
+                                  (shift.active_points_total || 0) > 0 ? 'text-amber-400' : 'text-emerald-400'
+                                }`}>
+                                  {shift.active_points_total || 0}
+                                </span>
+                                <span className="text-[10px] text-slate-400 font-bold">Poin Aktif</span>
+                              </div>
+                              <p className="text-[10px] text-slate-400 mt-1 font-medium leading-tight">
+                                Akumulasi penalti poin pelanggaran pada siklus berjalan.
+                              </p>
+                            </div>
+
+                            {/* Card 2: Hari Kerja Bulan Ini */}
+                            <div className="bg-[#181e2b] p-3.5 rounded-2xl border border-slate-700/80 shadow-md">
+                              <div className="flex items-center justify-between text-slate-400 mb-1">
+                                <span className="text-[10px] font-black uppercase tracking-wider">Hari Kerja Bulan Ini</span>
+                                <Calendar className="w-4 h-4 text-blue-400" />
+                              </div>
+                              <div className="flex items-baseline space-x-1.5">
+                                <span className="text-2xl font-black font-mono text-blue-300">
+                                  {shift.monthly_work_days || 1}
+                                </span>
+                                <span className="text-[10px] text-slate-400 font-bold">Hari Kehadiran</span>
+                              </div>
+                              <p className="text-[10px] text-slate-400 mt-1 font-medium leading-tight">
+                                Total shift kerja terdata pada bulan {new Date().toLocaleString('id-ID', { month: 'long', year: 'numeric' })}.
+                              </p>
+                            </div>
+
+                            {/* Card 3: Total Keterlambatan */}
+                            <div className="bg-[#181e2b] p-3.5 rounded-2xl border border-slate-700/80 shadow-md">
+                              <div className="flex items-center justify-between text-slate-400 mb-1">
+                                <span className="text-[10px] font-black uppercase tracking-wider">Total Keterlambatan</span>
+                                <Clock className="w-4 h-4 text-rose-400" />
+                              </div>
+                              <div className="flex items-baseline space-x-1.5">
+                                <span className={`text-2xl font-black font-mono ${
+                                  (shift.monthly_late_count || 0) > 0 ? 'text-rose-400' : 'text-emerald-400'
+                                }`}>
+                                  {shift.monthly_late_count || 0}
+                                </span>
+                                <span className="text-[10px] text-slate-400 font-bold">Kali Telat</span>
+                              </div>
+                              <p className="text-[10px] text-slate-400 mt-1 font-medium leading-tight">
+                                Akumulasi frekuensi check-in melebihi batas jadwal bulan ini.
+                              </p>
+                            </div>
+
+                            {/* Card 4: Aksi yang Harus Diambil */}
+                            <div className={`p-3.5 rounded-2xl border shadow-md flex flex-col justify-between ${
+                              actionItems.length > 0
+                                ? 'bg-amber-950/30 border-amber-500/40'
+                                : 'bg-emerald-950/20 border-emerald-500/30'
+                            }`}>
+                              <div>
+                                <div className="flex items-center justify-between mb-1.5">
+                                  <span className={`text-[10px] font-black uppercase tracking-wider ${
+                                    actionItems.length > 0 ? 'text-amber-300' : 'text-emerald-300'
+                                  }`}>
+                                    Aksi yang Harus Diambil
+                                  </span>
+                                  <AlertCircle className={`w-4 h-4 ${
+                                    actionItems.length > 0 ? 'text-amber-400' : 'text-emerald-400'
+                                  }`} />
+                                </div>
+
+                                {actionItems.length > 0 ? (
+                                  <div className="space-y-1.5 mb-2">
+                                    {actionItems.map((act, i) => (
+                                      <div key={i} className="text-[10px] text-slate-200 font-bold flex items-start space-x-1.5">
+                                        <span className="text-amber-400 mt-0.5">•</span>
+                                        <span>{act.label}: <span className="font-normal text-slate-300">{act.description}</span></span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <p className="text-[11px] text-emerald-300 font-medium leading-tight mb-2">
+                                    ✓ Status Tertib — Tidak ada tindakan perbaikan yang diperlukan untuk shift ini.
+                                  </p>
+                                )}
+                              </div>
+
+                              {/* Interactive Action Trigger Buttons */}
+                              <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                                {actionItems.some(a => a.type === 'LATE_REVIEW') && (
+                                  <button
+                                    type="button"
+                                    onClick={() => onReviewLate?.(shift)}
+                                    className="px-2.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-[10px] uppercase tracking-wider shadow-sm transition cursor-pointer flex items-center space-x-1"
+                                  >
+                                    <Clock className="w-3 h-3" />
+                                    <span>Review Alasan Telat ➔</span>
+                                  </button>
+                                )}
+
+                                {shift.face_recog_status === 'MISMATCH' && (
+                                  <button
+                                    type="button"
+                                    onClick={() => onInspectPhoto?.(shift, 'in')}
+                                    className="px-2.5 py-1.5 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 text-rose-200 border border-rose-500/40 font-black text-[10px] uppercase tracking-wider transition cursor-pointer flex items-center space-x-1"
+                                  >
+                                    <Eye className="w-3 h-3" />
+                                    <span>Periksa Foto Wajah ➔</span>
+                                  </button>
+                                )}
+
+                                <button
+                                  type="button"
+                                  onClick={() => onInspectPhoto?.(shift, shift.checkout_photo ? 'out' : 'in')}
+                                  className="px-2.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-black text-[10px] uppercase tracking-wider transition cursor-pointer shadow-sm flex items-center space-x-1"
+                                >
+                                  <Eye className="w-3 h-3" />
+                                  <span>Buka Audit Lengkap ➔</span>
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </React.Fragment>
               );
             })}
           </tbody>

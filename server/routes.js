@@ -1263,21 +1263,25 @@ router.post('/staff/verify-pin', async (req, res) => {
     }
   }
 
-  // Resolve Custom Profile Photo & Today's Mood Emoji
+  // Resolve Custom Profile Photo, Official Biometric Reference & Today's Mood Emoji
   let profilesMap = getSetting('staff_profiles') || {};
+  let biometricsMap = getSetting('staff_biometrics') || {};
   let moodsMap = getSetting('staff_moods') || {};
   if (isSupabaseConfigured) {
     try {
-      const [pMap, mMap] = await Promise.all([
+      const [pMap, bMap, mMap] = await Promise.all([
         cloudDb.getStaffProfilesMap(),
+        cloudDb.getStaffBiometricsMap(),
         cloudDb.getStaffMoodsMap()
       ]);
       if (pMap && Object.keys(pMap).length > 0) profilesMap = pMap;
+      if (bMap && Object.keys(bMap).length > 0) biometricsMap = bMap;
       if (mMap && Object.keys(mMap).length > 0) moodsMap = mMap;
     } catch {}
   }
 
   const profileEntry = profilesMap?.[staff.uuid] || profilesMap?.[staff.id] || null;
+  const biometricEntry = biometricsMap?.[staff.uuid] || biometricsMap?.[staff.id] || null;
   const moodEntry = moodsMap?.[staff.uuid] || moodsMap?.[staff.id] || null;
   const staffPayload = {
     id: staff.id,
@@ -1299,12 +1303,17 @@ router.post('/staff/verify-pin', async (req, res) => {
     detectedShift: detectedShift || null,
     availableSchedules: schedules,
     profile_photo_url: profileEntry?.photo_url || null,
+    face_biometrics_registered: Boolean(biometricEntry?.photo_url),
+    biometric_photo_url: biometricEntry?.photo_url || null,
     mood_emoji: moodEntry && moodEntry.date_ymd === currentOpDate ? moodEntry.emoji : null,
     monthlyStats
   };
 
   if (staffPayload.profile_photo_url) {
     await resolveAttendancePhotoUrls([staffPayload], ['profile_photo_url']);
+  }
+  if (staffPayload.biometric_photo_url) {
+    await resolveAttendancePhotoUrls([staffPayload], ['biometric_photo_url']);
   }
 
   res.json({
@@ -1546,6 +1555,62 @@ router.post('/staff/:id/profile-photo', async (req, res) => {
   }
 });
 
+// 9e. Register Official Staff Biometric Face Reference (Liveness verified & separated from profile photo)
+router.post('/staff/:id/biometrics', async (req, res) => {
+  const { id } = req.params;
+  const { photoBase64, livenessVerified } = req.body || {};
+
+  if (!photoBase64) {
+    return res.status(400).json({ error: 'Foto biometrik wajah wajib diambil.' });
+  }
+
+  let staff = null;
+  if (isSupabaseConfigured) {
+    const supaStaff = await findStaffInSupabase(id);
+    if (supaStaff) staff = { ...supaStaff, id: supaStaff.legacy_code || supaStaff.id, uuid: supaStaff.id };
+  }
+  if (!staff) {
+    staff = db.prepare('SELECT * FROM staff WHERE id = ? OR uuid = ?').get(id, id);
+  }
+  if (!staff) return res.status(404).json({ error: 'Karyawan tidak ditemukan.' });
+
+  try {
+    const photoUrl = await savePhoto(photoBase64, `biometric_${staff.id}`);
+    if (!photoUrl) {
+      return res.status(400).json({ error: 'Gagal memproses file foto biometrik.' });
+    }
+
+    const record = { photo_url: photoUrl, liveness_verified: Boolean(livenessVerified), updated_at: new Date().toISOString() };
+    const localMap = getSetting('staff_biometrics') || {};
+    const nextLocalMap = { ...localMap };
+    if (staff.uuid) nextLocalMap[String(staff.uuid)] = record;
+    if (staff.id) nextLocalMap[String(staff.id)] = record;
+    setSetting('staff_biometrics', nextLocalMap);
+
+    if (isSupabaseConfigured) {
+      await cloudDb.saveStaffBiometricPhoto({
+        staffId: staff.id,
+        staffUuid: staff.uuid,
+        photoUrl,
+        livenessVerified: Boolean(livenessVerified)
+      });
+    }
+
+    const resolvedObj = { biometric_photo_url: photoUrl };
+    await resolveAttendancePhotoUrls([resolvedObj], ['biometric_photo_url']);
+
+    broadcastEvent('STAFF_UPDATE', { action: 'BIOMETRICS_REGISTERED', staffId: staff.id });
+    return res.json({
+      success: true,
+      message: 'Biometrik wajah berhasil didaftarkan.',
+      biometric_photo_url: resolvedObj.biometric_photo_url
+    });
+  } catch (err) {
+    console.error('Error registering biometrics:', err);
+    return res.status(500).json({ error: 'Gagal mendaftarkan biometrik: ' + err.message });
+  }
+});
+
 // 9d. Staff Daily Mood Emoji ("my mood today :" - emoji only)
 router.post('/staff/:id/mood', async (req, res) => {
   const { id } = req.params;
@@ -1775,28 +1840,28 @@ router.post('/checkin', async (req, res) => {
   }
   // Mood is optional: null if staff hasn't selected a mood
 
-  // Biometric Face Recognition Verification against registered Staff Profile Photo
-  let refProfilePhoto = null;
+  // Biometric Face Recognition Verification against registered Official Staff Biometrics (Separated from Profile Photos)
+  let refBiometricPhoto = null;
   try {
-    let profilesMap = getSetting('staff_profiles') || {};
+    let biometricsMap = getSetting('staff_biometrics') || {};
     if (isSupabaseConfigured) {
-      const cloudProfiles = await cloudDb.getStaffProfilesMap();
-      if (cloudProfiles && Object.keys(cloudProfiles).length > 0) profilesMap = cloudProfiles;
+      const cloudBiometrics = await cloudDb.getStaffBiometricsMap();
+      if (cloudBiometrics && Object.keys(cloudBiometrics).length > 0) biometricsMap = cloudBiometrics;
     }
-    const pEntry = profilesMap?.[staff.uuid] || profilesMap?.[staff.id] || null;
-    if (pEntry?.photo_url) {
-      const resolvedTarget = [{ photo_url: pEntry.photo_url }];
+    const bEntry = biometricsMap?.[staff.uuid] || biometricsMap?.[staff.id] || null;
+    if (bEntry?.photo_url) {
+      const resolvedTarget = [{ photo_url: bEntry.photo_url }];
       await resolveAttendancePhotoUrls(resolvedTarget, ['photo_url']);
-      refProfilePhoto = resolvedTarget[0].photo_url;
+      refBiometricPhoto = resolvedTarget[0].photo_url;
     }
   } catch (err) {
-    console.warn('Error resolving staff profile photo for face match:', err.message);
+    console.warn('Error resolving staff biometric photo for face match:', err.message);
   }
 
   let faceRecogResult = { verified: null, status: 'NO_REFERENCE', similarity: null, distance: null };
-  if (refProfilePhoto && photoBase64) {
+  if (refBiometricPhoto && photoBase64) {
     try {
-      faceRecogResult = await verifyFaceMatch(photoBase64, refProfilePhoto);
+      faceRecogResult = await verifyFaceMatch(photoBase64, refBiometricPhoto);
       if (faceRecogResult.status === 'MISMATCH') {
         flags.push(FLAG_TYPES.FACE_MISMATCH);
       }

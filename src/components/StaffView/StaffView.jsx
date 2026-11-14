@@ -234,8 +234,8 @@ export default function StaffView({
       }
       setStep('PORTAL');
 
-      // Check if staff has NEVER registered face biometrics
-      if (!data.staff?.profile_photo_url) {
+      // Check if staff has NEVER registered official face biometrics (separated from profile photos)
+      if (!data.staff?.face_biometrics_registered) {
         setFaceRegistrationModalOpen(true);
       }
     } catch (err) {
@@ -247,8 +247,8 @@ export default function StaffView({
   };
 
   const handleTriggerCamera = (type, shift) => {
-    // If staff hasn't registered face biometrics yet, require face registration first!
-    if (type === 'checkin' && !loggedInStaff?.profile_photo_url) {
+    // If staff hasn't registered official face biometrics yet, require face registration first!
+    if (type === 'checkin' && !loggedInStaff?.face_biometrics_registered) {
       setFaceRegistrationModalOpen(true);
       return;
     }
@@ -257,8 +257,12 @@ export default function StaffView({
     setCameraModalOpen(true);
   };
 
-  const handleFaceRegistered = (newPhotoUrl) => {
-    setLoggedInStaff((prev) => (prev ? { ...prev, profile_photo_url: newPhotoUrl } : prev));
+  const handleFaceRegistered = (newBiometricUrl) => {
+    setLoggedInStaff((prev) => (prev ? {
+      ...prev,
+      face_biometrics_registered: true,
+      biometric_photo_url: newBiometricUrl
+    } : prev));
     setFaceRegistrationModalOpen(false);
 
     // Langsung lanjut absen menggunakan face recog yang telah didaftarkan!

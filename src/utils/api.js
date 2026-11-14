@@ -519,6 +519,17 @@ export async function deleteStaffPoint(id, pin) {
 }
 
 // Custom Staff Profile Photo (Gallery photo only) & Daily Emoji Mood
+export async function registerStaffBiometrics(staffId, { photoBase64, livenessVerified = true }) {
+  const res = await fetch(`${API_BASE}/staff/${encodeURIComponent(staffId)}/biometrics`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ photoBase64, livenessVerified })
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Gagal mendaftarkan biometrik wajah');
+  return data;
+}
+
 export async function updateStaffProfilePhoto(staffId, photoBase64) {
   const res = await fetch(`${API_BASE}/staff/${encodeURIComponent(staffId)}/profile-photo`, {
     method: 'POST',

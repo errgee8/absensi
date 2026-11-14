@@ -683,12 +683,38 @@ export const cloudDb = {
       query = query.lte('shift_date', endDate);
     }
 
-    const [{ data, error }, profilesMap, moodsMap] = await Promise.all([
+    const [{ data, error }, profilesMap, moodsMap, pointsList] = await Promise.all([
       query,
       this.getStaffProfilesMap().catch(() => ({})),
-      this.getStaffMoodsMap().catch(() => ({}))
+      this.getStaffMoodsMap().catch(() => ({})),
+      this.getStaffPoints().catch(() => ([]))
     ]);
     if (error) throw error;
+
+    const currentMonthKey = new Date().toISOString().substring(0, 7);
+    const monthlyStatsMap = {};
+    for (const row of (data || [])) {
+      const sId = row.staff_id;
+      const rDate = row.shift_date || '';
+      if (rDate.startsWith(currentMonthKey)) {
+        if (!monthlyStatsMap[sId]) {
+          monthlyStatsMap[sId] = { dates: new Set(), lateCount: 0 };
+        }
+        monthlyStatsMap[sId].dates.add(rDate);
+        const fl = Array.isArray(row.flags) ? row.flags : (typeof row.flags === 'string' ? JSON.parse(row.flags || '[]') : []);
+        if (fl.some(f => String(f).includes('Late') || String(f).includes('LATE'))) {
+          monthlyStatsMap[sId].lateCount++;
+        }
+      }
+    }
+
+    const pointsMap = {};
+    for (const pt of (pointsList || [])) {
+      if (pt.status !== 'REVOKED') {
+        const sId = String(pt.staff_id || pt.staffId || pt.staff_uuid);
+        pointsMap[sId] = (pointsMap[sId] || 0) + (Number(pt.points) || 0);
+      }
+    }
 
     let formatted = (data || []).map(row => {
       const st = row.staff || {};
@@ -720,6 +746,10 @@ export const cloudDb = {
         (moodEntry && moodEntry.date_ymd === shiftDateYmd ? moodEntry.emoji : null) ||
         null;
 
+      const monthlyDays = monthlyStatsMap[staffUuid]?.dates?.size || monthlyStatsMap[staffCode]?.dates?.size || 1;
+      const monthlyLate = monthlyStatsMap[staffUuid]?.lateCount || monthlyStatsMap[staffCode]?.lateCount || 0;
+      const activePts = pointsMap[staffUuid] || pointsMap[staffCode] || 0;
+
       return {
         id: row.id,
         supabase_id: row.id,
@@ -728,6 +758,9 @@ export const cloudDb = {
         staff_name: st.name || 'Staff',
         staff_profile_photo_url: profileEntry?.photo_url || null,
         mood_emoji: resolvedMoodEmoji,
+        monthly_work_days: monthlyDays,
+        monthly_late_count: monthlyLate,
+        active_points_total: activePts,
         staff_venue: st.venue || 'JP Karaoke',
         staff_division: st.division || st.role || 'Server and Cashier',
         staff_role: st.role || 'Staff',
@@ -1318,6 +1351,28 @@ export const cloudDb = {
     } catch {
       return {};
     }
+  },
+
+  async getStaffBiometricsMap() {
+    if (!supabase) return {};
+    try {
+      const val = await this.getSetting('staff_biometrics');
+      return val && typeof val === 'object' && !Array.isArray(val) ? val : {};
+    } catch {
+      return {};
+    }
+  },
+
+  async saveStaffBiometricPhoto({ staffId, staffUuid, photoUrl, livenessVerified = true }) {
+    if (!supabase || !photoUrl) return null;
+    const current = await this.getStaffBiometricsMap();
+    const now = new Date().toISOString();
+    const record = { photo_url: photoUrl, liveness_verified: livenessVerified, updated_at: now };
+    const next = { ...current };
+    if (staffUuid) next[String(staffUuid)] = record;
+    if (staffId) next[String(staffId)] = record;
+    await this.saveSetting('staff_biometrics', next, 'Official Staff Biometric Face Reference');
+    return record;
   },
 
   async saveStaffProfilePhoto({ staffId, staffUuid, photoUrl }) {

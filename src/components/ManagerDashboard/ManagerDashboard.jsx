@@ -54,6 +54,26 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
   const [recoveryModalOpen, setRecoveryModalOpen] = useState(false);
   const [lateReviewShift, setLateReviewShift] = useState(null);
 
+  const [density, setDensity] = useState(() => {
+    try { return localStorage.getItem('dashboard_density') || 'compact'; } catch { return 'compact'; }
+  });
+  const [isCardsCollapsed, setIsCardsCollapsed] = useState(() => {
+    try { return localStorage.getItem('dashboard_cards_collapsed') === 'true'; } catch { return false; }
+  });
+
+  const handleToggleDensity = (mode) => {
+    setDensity(mode);
+    try { localStorage.setItem('dashboard_density', mode); } catch {}
+  };
+
+  const handleToggleCards = () => {
+    setIsCardsCollapsed(prev => {
+      const next = !prev;
+      try { localStorage.setItem('dashboard_cards_collapsed', String(next)); } catch {}
+      return next;
+    });
+  };
+
   const departments = [
     'Server and Cashier',
     'Cleaning Service',
@@ -456,6 +476,10 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
               isReadOnly={isReadOnly}
               onRefresh={loadData}
               loading={loading}
+              isCardsCollapsed={isCardsCollapsed}
+              onToggleCards={handleToggleCards}
+              density={density}
+              onToggleDensity={handleToggleDensity}
             />
 
             {/* Official Management Announcement Compliance Bar */}
@@ -595,6 +619,7 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
               schedules={schedules}
               readersSet={announcementCompliance?.readersSet}
               hasActiveAnnouncement={Boolean(activeAnnouncement)}
+              density={density}
               onInspectPhoto={(shift, type) => setInspectData({ shift, type })}
               onReviewLate={(shift) => setLateReviewShift(shift)}
             />

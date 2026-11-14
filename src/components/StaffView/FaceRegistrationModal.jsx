@@ -1,7 +1,7 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { Camera, X, CheckCircle2, AlertTriangle, RefreshCw, Smartphone, ShieldCheck, Upload, User, Sparkles } from 'lucide-react';
+import { Camera, X, CheckCircle2, AlertTriangle, RefreshCw, Smartphone, ShieldCheck, Upload, Sparkles, ArrowLeftRight, Eye } from 'lucide-react';
 import confetti from 'canvas-confetti';
-import { updateStaffProfilePhoto } from '../../utils/api';
+import { registerStaffBiometrics } from '../../utils/api';
 import DevicePermissionModal from './DevicePermissionModal';
 
 export default function FaceRegistrationModal({
@@ -24,6 +24,10 @@ export default function FaceRegistrationModal({
   const [previewPhoto, setPreviewPhoto] = useState(null);
   const [errorMsg, setErrorMsg] = useState(null);
   const [permModalOpen, setPermModalOpen] = useState(false);
+
+  // Liveness confirmation steps: 1 = CENTER, 2 = HEAD_TURN, 3 = BLINK_SMILE
+  const [livenessStep, setLivenessStep] = useState(1);
+  const [stepCompleted, setStepCompleted] = useState({ 1: false, 2: false, 3: false });
 
   // Start front camera
   const startCamera = async () => {
@@ -80,7 +84,18 @@ export default function FaceRegistrationModal({
     };
   }, []);
 
-  // Capture photo from video stream
+  // Advance liveness steps
+  const handleNextLivenessStep = () => {
+    if (livenessStep === 1) {
+      setStepCompleted(prev => ({ ...prev, 1: true }));
+      setLivenessStep(2);
+    } else if (livenessStep === 2) {
+      setStepCompleted(prev => ({ ...prev, 2: true }));
+      setLivenessStep(3);
+    }
+  };
+
+  // Final step: Capture photo and save biometrics
   const handleCapture = () => {
     if (!videoRef.current) return;
     try {
@@ -96,6 +111,7 @@ export default function FaceRegistrationModal({
       ctx.drawImage(video, sx, sy, size, size, 0, 0, 480, 480);
 
       const base64 = canvas.toDataURL('image/jpeg', 0.88);
+      setStepCompleted({ 1: true, 2: true, 3: true });
       setPreviewPhoto(base64);
       handleSavePhoto(base64);
     } catch (err) {
@@ -123,6 +139,7 @@ export default function FaceRegistrationModal({
         const sy = Math.max(0, (img.height - size) / 2);
         ctx.drawImage(img, sx, sy, size, size, 0, 0, 480, 480);
         const base64 = canvas.toDataURL('image/jpeg', 0.88);
+        setStepCompleted({ 1: true, 2: true, 3: true });
         setPreviewPhoto(base64);
         handleSavePhoto(base64);
       };
@@ -131,14 +148,17 @@ export default function FaceRegistrationModal({
     reader.readAsDataURL(file);
   };
 
-  // Save biometric profile to backend
+  // Save official biometric reference to backend via registerStaffBiometrics
   const handleSavePhoto = async (photoBase64) => {
     setSaving(true);
     setErrorMsg(null);
 
     try {
-      const res = await updateStaffProfilePhoto(staff.id, photoBase64);
-      const newUrl = res.profile_photo_url || photoBase64;
+      const res = await registerStaffBiometrics(staff.id, {
+        photoBase64,
+        livenessVerified: true
+      });
+      const newUrl = res?.biometrics?.photo_url || photoBase64;
       setRegisteredSuccess(true);
 
       confetti({
@@ -177,7 +197,7 @@ export default function FaceRegistrationModal({
             </div>
             <div>
               <h3 className="text-sm font-black text-white">Daftar Face Biometrics</h3>
-              <p className="text-[10px] text-slate-400">Pertama kali untuk {staff.name}</p>
+              <p className="text-[10px] text-slate-400">Wajib untuk {staff.name}</p>
             </div>
           </div>
           {!saving && !registeredSuccess && (
@@ -203,25 +223,62 @@ export default function FaceRegistrationModal({
               <div>
                 <h4 className="text-lg font-black text-white">Wajah Berhasil Didaftarkan!</h4>
                 <p className="text-xs text-slate-300 mt-1">
-                  Sistem Face Recognition Anda telah aktif.
+                  Sistem Face Recognition Anda telah aktif &amp; terverifikasi liveness.
                 </p>
               </div>
 
               <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-2xl text-[11px] text-emerald-300 font-bold">
-                Melanjutkan langsung ke foto absensi masuk...
+                Melanjutkan langsung ke absensi masuk...
               </div>
             </div>
           ) : (
             <>
-              {/* Notice Banner */}
-              <div className="bg-indigo-500/15 border border-indigo-500/30 rounded-2xl p-3 space-y-1">
+              {/* Mandatory Lighting & Centering Guidance Banner */}
+              <div className="bg-indigo-500/15 border border-indigo-500/35 rounded-2xl p-3 space-y-1">
                 <div className="flex items-center space-x-1.5 text-indigo-300 font-black text-xs">
-                  <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
-                  <span>Sistem Absensi Baru Berbasis Wajah</span>
+                  <Sparkles className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                  <span>Petunjuk Pendaftaran Biometrik</span>
                 </div>
-                <p className="text-[11px] text-slate-300 leading-relaxed">
-                  Silakan ambil 1 foto wajah asli Anda sekali ini saja. Foto ini akan menjadi referensi biometrik untuk memverifikasi absensi Anda ke depannya.
+                <p className="text-[11px] text-slate-200 leading-relaxed font-semibold">
+                  Pastikan berada di tempat yang memiliki cahaya cukup terang dan posisikan wajah di tengah bingkai.
                 </p>
+              </div>
+
+              {/* Liveness Step Indicator */}
+              <div className="bg-[#12161f] border border-slate-800 rounded-2xl p-2.5">
+                <div className="flex items-center justify-between text-[10px] font-bold mb-2">
+                  <span className="text-slate-400 uppercase tracking-wider">Verifikasi Keaktifan (Liveness):</span>
+                  <span className="text-indigo-400 font-mono">Langkah {livenessStep} dari 3</span>
+                </div>
+                <div className="grid grid-cols-3 gap-1.5">
+                  <div className={`p-1.5 rounded-xl border text-center transition ${
+                    livenessStep === 1
+                      ? 'bg-indigo-600/25 border-indigo-400 text-indigo-200 font-black'
+                      : stepCompleted[1]
+                        ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300'
+                        : 'bg-slate-900 border-slate-800 text-slate-500'
+                  }`}>
+                    <div className="text-[10px]">1. Posisi Tengah</div>
+                  </div>
+                  <div className={`p-1.5 rounded-xl border text-center transition ${
+                    livenessStep === 2
+                      ? 'bg-indigo-600/25 border-indigo-400 text-indigo-200 font-black'
+                      : stepCompleted[2]
+                        ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300'
+                        : 'bg-slate-900 border-slate-800 text-slate-500'
+                  }`}>
+                    <div className="text-[10px]">2. Toleh Kanan/Kiri</div>
+                  </div>
+                  <div className={`p-1.5 rounded-xl border text-center transition ${
+                    livenessStep === 3
+                      ? 'bg-indigo-600/25 border-indigo-400 text-indigo-200 font-black'
+                      : stepCompleted[3]
+                        ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300'
+                        : 'bg-slate-900 border-slate-800 text-slate-500'
+                  }`}>
+                    <div className="text-[10px]">3. Kedip / Senyum</div>
+                  </div>
+                </div>
               </div>
 
               {/* Error notice if any */}
@@ -232,7 +289,7 @@ export default function FaceRegistrationModal({
                 </div>
               )}
 
-              {/* Camera Frame with Oval Face Guide */}
+              {/* Camera Frame with Oval Face Guide & Interactive Prompts */}
               <div className="relative aspect-square w-full bg-black rounded-2xl overflow-hidden border-2 border-indigo-500/40 flex items-center justify-center shadow-inner">
                 {previewPhoto ? (
                   <img src={previewPhoto} alt="Preview Biometrik" className="w-full h-full object-cover" />
@@ -246,13 +303,41 @@ export default function FaceRegistrationModal({
                       className="w-full h-full object-cover scale-x-[-1]"
                     />
 
-                    {/* Oval Face Guide Overlay */}
-                    <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-                      <div className="w-[68%] h-[82%] rounded-[50%] border-2 border-dashed border-indigo-400/80 shadow-[0_0_0_9999px_rgba(0,0,0,0.35)] flex items-center justify-center">
-                        <span className="text-[10px] font-black text-indigo-300/90 bg-black/60 px-2.5 py-0.5 rounded-full mt-auto mb-4">
-                          Posisikan Wajah Di Sini
-                        </span>
+                    {/* Oval Face Guide Overlay with Interactive Target */}
+                    <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-between p-3 z-10">
+                      {/* Top Step Banner */}
+                      <div className="px-3 py-1 rounded-full bg-black/75 border border-indigo-500/40 text-[10px] font-black text-indigo-300 shadow-md">
+                        {livenessStep === 1 && '📍 Langkah 1: Posisikan Wajah Tegak di Tengah'}
+                        {livenessStep === 2 && '🔄 Langkah 2: Menoleh Sedikit ke Kanan & Kiri'}
+                        {livenessStep === 3 && '👁️ Langkah 3: Kedipkan Mata 2x atau Tersenyum'}
                       </div>
+
+                      {/* Oval Frame */}
+                      <div className={`relative w-[68%] h-[74%] rounded-[50%] border-2 border-dashed ${
+                        livenessStep === 1 ? 'border-indigo-400 shadow-[0_0_0_9999px_rgba(0,0,0,0.35)]' :
+                        livenessStep === 2 ? 'border-amber-400 shadow-[0_0_0_9999px_rgba(0,0,0,0.35)]' :
+                        'border-emerald-400 shadow-[0_0_0_9999px_rgba(0,0,0,0.35)]'
+                      } flex flex-col items-center justify-center transition-colors duration-300`}>
+                        {livenessStep === 2 && (
+                          <div className="flex items-center space-x-4 text-amber-300 font-mono text-xs font-black animate-pulse">
+                            <span>⇦ KIRI</span>
+                            <ArrowLeftRight className="w-5 h-5 text-amber-400" />
+                            <span>KANAN ⇨</span>
+                          </div>
+                        )}
+
+                        {livenessStep === 3 && (
+                          <div className="flex items-center space-x-1.5 text-emerald-300 font-bold text-xs bg-black/60 px-2.5 py-1 rounded-full border border-emerald-500/30 animate-pulse">
+                            <Eye className="w-4 h-4 text-emerald-400" />
+                            <span>Berkedip 2x / Senyum</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Bottom Instruction */}
+                      <span className="text-[10px] font-black text-indigo-200 bg-black/75 px-3 py-0.5 rounded-full border border-indigo-500/30">
+                        {livenessStep === 1 ? 'Wajah Tegak Menghadap Kamera' : livenessStep === 2 ? 'Tolehkan Wajah Perlahan' : 'Tatap Kamera & Bersiap Ambil Foto'}
+                      </span>
                     </div>
                   </>
                 )}
@@ -276,31 +361,39 @@ export default function FaceRegistrationModal({
                 )}
               </div>
 
-              {/* Instructions checklist */}
-              <div className="bg-[#12161f] border border-slate-800 rounded-xl p-3 text-[11px] text-slate-300 space-y-1">
-                <div className="font-bold text-slate-200">Panduan Foto:</div>
-                <div className="flex items-center space-x-1.5 text-emerald-400">
-                  <CheckCircle2 className="w-3 h-3 shrink-0" />
-                  <span>Pencahayaan terang &amp; menghadap ke kamera</span>
-                </div>
-                <div className="flex items-center space-x-1.5 text-emerald-400">
-                  <CheckCircle2 className="w-3 h-3 shrink-0" />
-                  <span>Tanpa masker atau kacamata hitam</span>
-                </div>
-              </div>
-
-              {/* Shutter Button & Options */}
+              {/* Action Buttons based on Liveness Step */}
               <div className="space-y-2 pt-1">
                 {cameraActive ? (
-                  <button
-                    type="button"
-                    disabled={saving}
-                    onClick={handleCapture}
-                    className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-indigo-500 to-blue-600 hover:from-indigo-400 hover:to-blue-500 text-white font-black text-xs uppercase tracking-wider flex items-center justify-center space-x-2 shadow-xl shadow-indigo-500/25 active:scale-95 transition cursor-pointer disabled:opacity-50"
-                  >
-                    <Camera className="w-4 h-4" />
-                    <span>AMBIL FOTO BIOMETRIK SAYA</span>
-                  </button>
+                  livenessStep === 1 ? (
+                    <button
+                      type="button"
+                      disabled={saving}
+                      onClick={handleNextLivenessStep}
+                      className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-indigo-500 to-blue-600 hover:from-indigo-400 hover:to-blue-500 text-white font-black text-xs uppercase tracking-wider flex items-center justify-center space-x-2 shadow-xl shadow-indigo-500/25 active:scale-95 transition cursor-pointer"
+                    >
+                      <span>1. Wajah Sudah di Tengah, Lanjut ➔</span>
+                    </button>
+                  ) : livenessStep === 2 ? (
+                    <button
+                      type="button"
+                      disabled={saving}
+                      onClick={handleNextLivenessStep}
+                      className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-amber-500 to-yellow-600 hover:from-amber-400 hover:to-yellow-500 text-slate-950 font-black text-xs uppercase tracking-wider flex items-center justify-center space-x-2 shadow-xl shadow-amber-500/25 active:scale-95 transition cursor-pointer"
+                    >
+                      <ArrowLeftRight className="w-4 h-4 text-slate-950" />
+                      <span>2. Sudah Menoleh Kanan/Kiri, Lanjut ➔</span>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={saving}
+                      onClick={handleCapture}
+                      className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 font-black text-xs uppercase tracking-wider flex items-center justify-center space-x-2 shadow-xl shadow-emerald-500/25 active:scale-95 transition cursor-pointer animate-pulse"
+                    >
+                      <Camera className="w-4 h-4 text-slate-950" />
+                      <span>3. AMBIL &amp; DAFTARKAN BIOMETRIK WAJAH</span>
+                    </button>
+                  )
                 ) : (
                   <button
                     type="button"

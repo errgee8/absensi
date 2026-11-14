@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { Camera, X, CheckCircle2, AlertCircle, RefreshCw, Smartphone, Loader2, SwitchCamera, Upload, AlertTriangle } from 'lucide-react';
+import { Camera, X, CheckCircle2, AlertCircle, RefreshCw, Smartphone, Loader2, SwitchCamera, Upload, AlertTriangle, Sparkles } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { captureAndWatermark, watermarkFile } from '../../utils/watermark';
 import { checkIn, checkOut, startBreak, endBreak } from '../../utils/api';
@@ -679,6 +679,14 @@ export default function KioskCameraModal({
                   </div>
                 )}
               </div>
+
+              {/* Mandatory Lighting & Centering Guidance Banner */}
+              {!capturedPreview && (
+                <div className="flex items-center space-x-2 px-3 py-2 rounded-xl bg-slate-900/90 border border-emerald-500/30 text-emerald-300 text-[11px] leading-tight font-medium shadow-sm">
+                  <Sparkles className="w-4 h-4 shrink-0 text-emerald-400" />
+                  <span>Pastikan berada di tempat yang memiliki cahaya cukup terang dan posisikan wajah di tengah bingkai</span>
+                </div>
+              )}
 
               {/* Camera Frame */}
               <div className="relative aspect-[4/3] w-full bg-slate-950 rounded-2xl overflow-hidden border border-slate-800 flex items-center justify-center">
