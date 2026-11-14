@@ -136,7 +136,7 @@ export default function AnnouncementManagementModal({
   const handleCreateAnnouncement = async (e) => {
     e.preventDefault();
     if (!pin.trim()) {
-      setError('PIN Operational Manager (8980) wajib diisi untuk otorisasi penerbitan.');
+      setError('PIN Operational Manager wajib diisi untuk otorisasi penerbitan.');
       return;
     }
 
@@ -664,7 +664,7 @@ export default function AnnouncementManagementModal({
                     maxLength={8}
                     value={pin}
                     onChange={(e) => setPin(e.target.value)}
-                    placeholder="PIN Manager (8980)"
+                    placeholder="PIN Manager"
                     required
                     className="w-full bg-slate-50 border-2 border-slate-300 rounded-xl pl-9 pr-3 py-2 text-xs font-mono font-black text-slate-950 tracking-widest focus:outline-none focus:border-blue-600 focus:bg-white"
                   />

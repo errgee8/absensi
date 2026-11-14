@@ -226,7 +226,7 @@ export default function MonitoringAuditTab({ adminAuth }) {
                 {latestOpMgrLog ? formatWitaDateTime(latestOpMgrLog.login_at) : 'Sesi aktif saat ini'}
               </div>
               <div className="text-[10px] text-slate-400 font-bold mt-1">
-                PIN 8980 • Otoritas Penuh Seluruh Outlet &amp; Sistem
+                Full Manager • Otoritas Penuh Seluruh Outlet &amp; Sistem
               </div>
             </div>
           </div>

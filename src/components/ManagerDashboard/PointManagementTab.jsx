@@ -1326,7 +1326,7 @@ export default function PointManagementTab({ adminAuth, isReadOnly = false, onPo
               {!adminAuth?.pin && (
                 <div>
                   <label className="text-xs text-slate-300 font-bold block mb-1">
-                    Masukkan PIN Operational Manager (8980)
+                    Masukkan PIN Operational Manager
                   </label>
                   <input
                     type="password"

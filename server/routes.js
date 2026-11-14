@@ -3891,7 +3891,7 @@ router.post('/announcements', async (req, res) => {
 
   const auth = await verifyManagementAuth(pin);
   if (!auth.authorized || (auth.role !== 'FULL_ADMIN' && auth.role !== 'MANAGER')) {
-    return res.status(403).json({ error: 'Akses ditolak: Hanya Operational Manager (PIN 8980) yang berwenang membuat pengumuman resmi.' });
+    return res.status(403).json({ error: 'Akses ditolak: Hanya Operational Manager yang berwenang membuat pengumuman resmi.' });
   }
 
   if (!title || !title.trim()) return res.status(400).json({ error: 'Judul pengumuman wajib diisi.' });
@@ -3992,7 +3992,7 @@ router.put('/announcements/:id', async (req, res) => {
 
   const auth = await verifyManagementAuth(pin);
   if (!auth.authorized || (auth.role !== 'FULL_ADMIN' && auth.role !== 'MANAGER')) {
-    return res.status(403).json({ error: 'Akses ditolak: Hanya Operational Manager (PIN 8980) yang berwenang mengubah pengumuman.' });
+    return res.status(403).json({ error: 'Akses ditolak: Hanya Operational Manager yang berwenang mengubah pengumuman.' });
   }
 
   const now = new Date().toISOString();
