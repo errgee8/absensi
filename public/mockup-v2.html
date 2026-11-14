@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Manager Dashboard 2.0 Mockup - Ultra Compact & Collapsible</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap');
+    body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #0b0f17; color: #f1f5f9; }
+    .font-mono { font-family: 'JetBrains Mono', monospace; }
+    .glass-card { background: rgba(22, 28, 42, 0.75); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.08); }
+    .glass-card-hover:hover { background: rgba(26, 34, 52, 0.85); border-color: rgba(99, 102, 241, 0.3); }
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: #0b0f17; }
+    ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #334155; }
+  </style>
+</head>
+<body class="p-3 sm:p-6 min-h-screen">
+
+  <div class="max-w-7xl mx-auto space-y-4">
+    
+    <!-- TOP BAR: Streamlined Header with Density Toggle & Operational Status -->
+    <header class="glass-card rounded-2xl p-4 flex flex-wrap items-center justify-between gap-4 shadow-xl">
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-blue-500 flex items-center justify-center text-white shadow-lg shadow-indigo-500/25">
+          <i class="fa-solid fa-shield-halved text-lg"></i>
+        </div>
+        <div>
+          <div class="flex items-center space-x-2">
+            <h1 class="text-base sm:text-lg font-extrabold tracking-tight text-white">Operations Command</h1>
+            <span class="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span> Live
+            </span>
+          </div>
+          <p class="text-xs text-slate-400 font-medium">LuckyCat Billiard &bull; JPE KTV &bull; WITA</p>
+        </div>
+      </div>
+
+      <!-- Controls: Density Mode & Quick Filter -->
+      <div class="flex items-center space-x-2">
+        <div class="bg-slate-900/90 p-1 rounded-xl border border-slate-800 flex items-center space-x-1 text-xs">
+          <button id="densityCompactBtn" onclick="toggleDensity('compact')" class="px-2.5 py-1 rounded-lg font-bold bg-indigo-600 text-white transition flex items-center gap-1.5">
+            <i class="fa-solid fa-compress text-[10px]"></i>
+            <span class="hidden sm:inline">Compact</span>
+          </button>
+          <button id="densityComfortBtn" onclick="toggleDensity('comfort')" class="px-2.5 py-1 rounded-lg font-bold text-slate-400 hover:text-white transition flex items-center gap-1.5">
+            <i class="fa-solid fa-expand text-[10px]"></i>
+            <span class="hidden sm:inline">Comfortable</span>
+          </button>
+        </div>
+
+        <button onclick="toggleSummaryCards()" class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-300 border border-slate-700 transition flex items-center gap-1.5">
+          <i id="summaryToggleIcon" class="fa-solid fa-chevron-up"></i>
+          <span class="hidden sm:inline">KPI Cards</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- COLLAPSIBLE SECTION: Executive Metrics & Quick Filters (Can be folded in 1-click) -->
+    <div id="summaryCardsContainer" class="grid grid-cols-2 lg:grid-cols-4 gap-3 transition-all duration-300">
+      
+      <!-- Card 1: On Floor Live -->
+      <div class="glass-card rounded-2xl p-3.5 relative overflow-hidden group">
+        <div class="flex items-center justify-between">
+          <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Sedang Bertugas</span>
+          <div class="w-7 h-7 rounded-lg bg-emerald-500/15 text-emerald-400 flex items-center justify-center text-xs">
+            <i class="fa-solid fa-user-check"></i>
+          </div>
+        </div>
+        <div class="mt-2 flex items-baseline space-x-2">
+          <span class="text-2xl font-black text-white font-mono">14</span>
+          <span class="text-[10px] text-emerald-400 font-bold">/ 18 Staff Hari Ini</span>
+        </div>
+        <div class="mt-2 w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
+          <div class="bg-emerald-500 h-full w-[78%]"></div>
+        </div>
+      </div>
+
+      <!-- Card 2: On Break -->
+      <div class="glass-card rounded-2xl p-3.5 relative overflow-hidden group">
+        <div class="flex items-center justify-between">
+          <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Sedang Istirahat</span>
+          <div class="w-7 h-7 rounded-lg bg-sky-500/15 text-sky-400 flex items-center justify-center text-xs">
+            <i class="fa-solid fa-mug-saucer"></i>
+          </div>
+        </div>
+        <div class="mt-2 flex items-baseline space-x-2">
+          <span class="text-2xl font-black text-sky-400 font-mono">3</span>
+          <span class="text-[10px] text-slate-400 font-medium">Batas Maks 1 Jam</span>
+        </div>
+        <div class="mt-2 text-[10px] text-slate-400 truncate">
+          Hendy (42m) &bull; Rian (18m) &bull; Dodi (5m)
+        </div>
+      </div>
+
+      <!-- Card 3: Late Reviews Needed -->
+      <div class="glass-card rounded-2xl p-3.5 relative overflow-hidden group border-amber-500/30">
+        <div class="flex items-center justify-between">
+          <span class="text-[11px] font-bold uppercase tracking-wider text-amber-300">Review Telat</span>
+          <div class="w-7 h-7 rounded-lg bg-amber-500/15 text-amber-400 flex items-center justify-center text-xs">
+            <i class="fa-solid fa-clock-rotate-left"></i>
+          </div>
+        </div>
+        <div class="mt-2 flex items-baseline space-x-2">
+          <span class="text-2xl font-black text-amber-400 font-mono">2</span>
+          <span class="text-[10px] text-amber-300/80 font-bold">Menunggu ACC</span>
+        </div>
+        <button class="mt-1 text-[11px] text-amber-400 hover:text-amber-300 font-extrabold flex items-center gap-1">
+          Review Sekarang &rarr;
+        </button>
+      </div>
+
+      <!-- Card 4: Restroom Hygiene -->
+      <div class="glass-card rounded-2xl p-3.5 relative overflow-hidden group">
+        <div class="flex items-center justify-between">
+          <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Inspeksi Toilet QR</span>
+          <div class="w-7 h-7 rounded-lg bg-purple-500/15 text-purple-400 flex items-center justify-center text-xs">
+            <i class="fa-solid fa-qrcode"></i>
+          </div>
+        </div>
+        <div class="mt-2 flex items-baseline space-x-2">
+          <span class="text-2xl font-black text-purple-400 font-mono">4/4</span>
+          <span class="text-[10px] text-emerald-400 font-bold">Bersih (Clean)</span>
+        </div>
+        <div class="mt-2 text-[10px] text-slate-400 truncate">
+          Terakhir dicek 24 menit lalu
+        </div>
+      </div>
+
+    </div>
+
+    <!-- MAIN INTERACTIVE WORKSPACE -->
+    <div class="glass-card rounded-2xl p-3 sm:p-5 space-y-4">
+      
+      <!-- TAB NAVIGATION & QUICK SEARCH BAR -->
+      <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3 border-b border-slate-800 pb-3">
+        <!-- Segmented Tab Pills -->
+        <div class="flex items-center space-x-1 overflow-x-auto pb-1 sm:pb-0 text-xs">
+          <button class="px-3.5 py-2 rounded-xl font-extrabold bg-indigo-600 text-white shadow-md shadow-indigo-600/30 flex items-center gap-2 whitespace-nowrap">
+            <i class="fa-solid fa-list-check"></i>
+            <span>Presensi Hari Ini</span>
+            <span class="px-1.5 py-0.2 rounded-full text-[10px] bg-white/20">18</span>
+          </button>
+
+          <button class="px-3.5 py-2 rounded-xl font-bold text-slate-400 hover:text-white hover:bg-slate-800/60 transition flex items-center gap-2 whitespace-nowrap">
+            <i class="fa-solid fa-calendar-days"></i>
+            <span>Jadwal Shift</span>
+          </button>
+
+          <button class="px-3.5 py-2 rounded-xl font-bold text-slate-400 hover:text-white hover:bg-slate-800/60 transition flex items-center gap-2 whitespace-nowrap">
+            <i class="fa-solid fa-soap"></i>
+            <span>Toilet QR</span>
+          </button>
+
+          <button class="px-3.5 py-2 rounded-xl font-bold text-slate-400 hover:text-white hover:bg-slate-800/60 transition flex items-center gap-2 whitespace-nowrap">
+            <i class="fa-solid fa-bullhorn"></i>
+            <span>Pengumuman</span>
+          </button>
+
+          <button class="px-3.5 py-2 rounded-xl font-bold text-slate-400 hover:text-white hover:bg-slate-800/60 transition flex items-center gap-2 whitespace-nowrap">
+            <i class="fa-solid fa-award"></i>
+            <span>Point</span>
+          </button>
+        </div>
+
+        <!-- Filter Pill Chips -->
+        <div class="flex items-center space-x-2 text-xs">
+          <select class="bg-slate-900 border border-slate-700 rounded-xl px-2.5 py-1.5 text-xs font-bold text-slate-200 focus:outline-none focus:border-indigo-500">
+            <option>Semua Outlet (ALL)</option>
+            <option>JP Karaoke</option>
+            <option>LuckyCat Billiard</option>
+          </select>
+
+          <select class="bg-slate-900 border border-slate-700 rounded-xl px-2.5 py-1.5 text-xs font-bold text-slate-200 focus:outline-none focus:border-indigo-500">
+            <option>Semua Shift</option>
+            <option>Shift 1 (Siang)</option>
+            <option>Shift 2 (Sore)</option>
+            <option>Shift 3 (Malam)</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- ULTRA-COMPACT ADAPTIVE SHIFT CARDS & TABLE -->
+      <!-- In 2.0 UX, on Tablets/Mobiles each shift can be collapsed/expanded to view full biometric & GPS evidence instantly -->
+      <div id="shiftRecordsList" class="space-y-2.5">
+        
+        <!-- ROW 1: Normal Verified Check-In -->
+        <div class="glass-card rounded-xl p-3 border-slate-800 hover:border-slate-700 transition">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            
+            <!-- Staff Info + Mood -->
+            <div class="flex items-center space-x-3 min-w-[200px]">
+              <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80" class="w-9 h-9 rounded-xl object-cover border border-slate-700">
+              <div>
+                <div class="flex items-center space-x-1.5">
+                  <span class="text-sm font-extrabold text-white">Sherly Putri</span>
+                  <span class="text-xs" title="Mood: Senang">😊</span>
+                  <span class="px-1.5 py-0.2 rounded text-[9px] font-black bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">Paham ✓</span>
+                </div>
+                <div class="text-[10px] text-slate-400 font-medium">Cashier &bull; LuckyCat Billiard</div>
+              </div>
+            </div>
+
+            <!-- Shift Badge -->
+            <div class="text-left">
+              <span class="px-2 py-0.5 rounded-lg text-[10px] font-black bg-blue-500/20 text-blue-300 border border-blue-500/30">Shift 1 (13:00 - 22:00)</span>
+              <div class="text-[10px] text-slate-400 mt-0.5 font-mono">🕒 9 Jam Target</div>
+            </div>
+
+            <!-- Check-in Time & Biometrics -->
+            <div class="flex items-center space-x-2">
+              <div class="w-8 h-8 rounded-lg bg-slate-900 border border-slate-800 overflow-hidden relative group cursor-pointer">
+                <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80" class="w-full h-full object-cover">
+              </div>
+              <div>
+                <div class="text-xs font-mono font-black text-emerald-400">12:54 WITA</div>
+                <span class="inline-flex items-center gap-1 text-[9px] font-black text-emerald-300 bg-emerald-500/10 px-1.5 py-0.2 rounded border border-emerald-500/30">
+                  <i class="fa-solid fa-face-smile text-[8px]"></i> Lolos (94%)
+                </span>
+              </div>
+            </div>
+
+            <!-- Break Status -->
+            <div class="text-left">
+              <span class="text-[10px] text-slate-400 font-bold block">Status Istirahat:</span>
+              <span class="px-2 py-0.5 rounded-lg text-[10px] font-black bg-slate-800 text-slate-300 border border-slate-700">Belum Diambil</span>
+            </div>
+
+            <!-- Location Distance -->
+            <div class="text-right">
+              <span class="text-xs font-bold text-slate-200 block font-mono">0m (Di Venue)</span>
+              <span class="text-[10px] text-emerald-400 font-medium">GPS ±8m Akurat</span>
+            </div>
+
+            <!-- Action Expand Button -->
+            <button onclick="toggleRowDetails('row1')" class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition">
+              <i id="row1-icon" class="fa-solid fa-chevron-down text-xs"></i>
+            </button>
+          </div>
+
+          <!-- COLLAPSIBLE ACCORDION DETAILS (Hidden by default, expands on tap) -->
+          <div id="row1-details" class="hidden mt-3 pt-3 border-t border-slate-800 text-xs grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div class="bg-slate-900/80 p-2.5 rounded-xl border border-slate-800">
+              <span class="text-[10px] font-bold text-slate-400 uppercase block mb-1">Audit Bukti Masuk</span>
+              <p class="text-[11px] text-slate-300">Foto selfie diverifikasi biometrik dengan kemiripan 94%. Disematkan watermark koordinat satelit (-8.780981, 115.176863).</p>
+            </div>
+            <div class="bg-slate-900/80 p-2.5 rounded-xl border border-slate-800">
+              <span class="text-[10px] font-bold text-slate-400 uppercase block mb-1">Ketepatan Waktu</span>
+              <p class="text-[11px] text-emerald-400 font-bold">Tepat Waktu (Masuk 6 menit sebelum jam mulai).</p>
+            </div>
+            <div class="bg-slate-900/80 p-2.5 rounded-xl border border-slate-800 flex items-center justify-between">
+              <div>
+                <span class="text-[10px] font-bold text-slate-400 uppercase block mb-1">Aksi Cepat</span>
+                <span class="text-[11px] text-slate-300">Hubungi atau Beri Catatan</span>
+              </div>
+              <button class="px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-[10px]">Detail Shift</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ROW 2: Flagged Check-In with Face Mismatch (Calm Subtle Notice, No Blinking) -->
+        <div class="glass-card rounded-xl p-3 border-slate-800 hover:border-slate-700 transition">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            
+            <!-- Staff Info + Mood -->
+            <div class="flex items-center space-x-3 min-w-[200px]">
+              <div class="w-9 h-9 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center font-black text-slate-300 text-xs">TT</div>
+              <div>
+                <div class="flex items-center space-x-1.5">
+                  <span class="text-sm font-extrabold text-white">testt (Hendy)</span>
+                  <span class="text-xs" title="Mood: Marah">😡</span>
+                </div>
+                <div class="text-[10px] text-slate-400 font-medium">Server &bull; LuckyCat Billiard</div>
+              </div>
+            </div>
+
+            <!-- Shift Badge -->
+            <div class="text-left">
+              <span class="px-2 py-0.5 rounded-lg text-[10px] font-black bg-purple-500/20 text-purple-300 border border-purple-500/30">Shift 3 (18:30 - 03:30)</span>
+              <div class="text-[10px] text-slate-400 mt-0.5 font-mono">🕒 Midnight Cutoff</div>
+            </div>
+
+            <!-- Check-in Time & Biometrics (CALM NOTICE) -->
+            <div class="flex items-center space-x-2">
+              <div class="w-8 h-8 rounded-lg bg-slate-900 border border-slate-800 overflow-hidden relative cursor-pointer">
+                <!-- Example photo of wall -->
+                <div class="w-full h-full bg-slate-800 flex items-center justify-center text-[10px] text-slate-500 font-bold">WALL</div>
+              </div>
+              <div>
+                <div class="text-xs font-mono font-black text-emerald-400">18:22 WITA</div>
+                <!-- Clean Static Warning Badge (No blinking) -->
+                <span class="inline-flex items-center gap-1 text-[9px] font-bold text-rose-300 bg-slate-800 px-1.5 py-0.2 rounded border border-rose-500/30">
+                  <i class="fa-solid fa-triangle-exclamation text-[8px] text-rose-400"></i> Beda Wajah (51%)
+                </span>
+              </div>
+            </div>
+
+            <!-- Break Status -->
+            <div class="text-left">
+              <span class="text-[10px] text-slate-400 font-bold block">Status Istirahat:</span>
+              <span class="px-2 py-0.5 rounded-lg text-[10px] font-black bg-sky-500/15 text-sky-300 border border-sky-500/30">Sedang Break (19:40)</span>
+            </div>
+
+            <!-- Location Distance -->
+            <div class="text-right">
+              <span class="text-xs font-bold text-slate-200 block font-mono">12m (Di Venue)</span>
+              <span class="text-[10px] text-emerald-400 font-medium">GPS ±10m Akurat</span>
+            </div>
+
+            <!-- Action Expand Button -->
+            <button onclick="toggleRowDetails('row2')" class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition">
+              <i id="row2-icon" class="fa-solid fa-chevron-down text-xs"></i>
+            </button>
+          </div>
+
+          <!-- COLLAPSIBLE ACCORDION DETAILS -->
+          <div id="row2-details" class="hidden mt-3 pt-3 border-t border-slate-800 text-xs grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div class="bg-rose-950/30 p-2.5 rounded-xl border border-rose-500/20">
+              <span class="text-[10px] font-bold text-rose-300 uppercase block mb-1">Catatan Biometrik</span>
+              <p class="text-[11px] text-rose-200">Foto selfie masuk tidak cocok dengan wajah asli (Kemiripan hanya 51%). Terdeteksi foto objek/dinding. Disarankan verifikasi fisik.</p>
+            </div>
+            <div class="bg-slate-900/80 p-2.5 rounded-xl border border-slate-800">
+              <span class="text-[10px] font-bold text-slate-400 uppercase block mb-1">Durasi Istirahat</span>
+              <p class="text-[11px] text-sky-300 font-bold">Mulai 19:40 WITA (Berjalan 24 menit &bull; Maksimal jam 20:40 WITA).</p>
+            </div>
+            <div class="bg-slate-900/80 p-2.5 rounded-xl border border-slate-800 flex items-center justify-between">
+              <div>
+                <span class="text-[10px] font-bold text-slate-400 uppercase block mb-1">Aksi Manajer</span>
+                <span class="text-[11px] text-slate-300">Beri Peringatan / Point</span>
+              </div>
+              <button class="px-2.5 py-1 rounded-lg bg-amber-600 hover:bg-amber-500 text-white font-bold text-[10px]">Tindak Lanjuti</button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- BENEFIT SUMMARY CALLOUT -->
+    <div class="glass-card rounded-2xl p-4 text-xs space-y-2 border-indigo-500/20">
+      <div class="flex items-center space-x-2 text-indigo-400 font-black text-sm">
+        <i class="fa-solid fa-wand-magic-sparkles"></i>
+        <span>Mengapa Desain 2.0 Ini Mendorong Skor UI dari 88 &rarr; 96/100?</span>
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1 text-slate-300">
+        <div class="bg-slate-900/60 p-2 rounded-xl">
+          <strong class="text-white block mb-0.5">1. Card Accordion (Hemat Layar)</strong>
+          Data detail seperti alasan telat dan catatan biometrik disembunyikan di dalam card yang bisa dibuka-tutup dengan 1 klik, membuat tampilan utama tetap ringkas di HP/Tablet.
+        </div>
+        <div class="bg-slate-900/60 p-2 rounded-xl">
+          <strong class="text-white block mb-0.5">2. Density Toggle (Kerapatan)</strong>
+          Manajer bisa memilih mode "Compact" (tampilan rapat ala Excel untuk melihat banyak staff sekaligus) atau "Comfortable" (tampilan lapang dengan foto besar).
+        </div>
+        <div class="bg-slate-900/60 p-2 rounded-xl">
+          <strong class="text-white block mb-0.5">3. Zero Visual Clutter</strong>
+          Menghilangkan animasi blinking/kedip yang mengganggu mata dan menggantinya dengan pill badge beraksen tenang.
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    function toggleSummaryCards() {
+      const container = document.getElementById('summaryCardsContainer');
+      const icon = document.getElementById('summaryToggleIcon');
+      if (container.classList.contains('hidden')) {
+        container.classList.remove('hidden');
+        icon.classList.remove('fa-chevron-down');
+        icon.classList.add('fa-chevron-up');
+      } else {
+        container.classList.add('hidden');
+        icon.classList.remove('fa-chevron-up');
+        icon.classList.add('fa-chevron-down');
+      }
+    }
+
+    function toggleRowDetails(rowId) {
+      const details = document.getElementById(`${rowId}-details`);
+      const icon = document.getElementById(`${rowId}-icon`);
+      if (details.classList.contains('hidden')) {
+        details.classList.remove('hidden');
+        icon.classList.remove('fa-chevron-down');
+        icon.classList.add('fa-chevron-up');
+      } else {
+        details.classList.add('hidden');
+        icon.classList.remove('fa-chevron-up');
+        icon.classList.add('fa-chevron-down');
+      }
+    }
+
+    function toggleDensity(mode) {
+      const compactBtn = document.getElementById('densityCompactBtn');
+      const comfortBtn = document.getElementById('densityComfortBtn');
+      const list = document.getElementById('shiftRecordsList');
+
+      if (mode === 'compact') {
+        compactBtn.className = "px-2.5 py-1 rounded-lg font-bold bg-indigo-600 text-white transition flex items-center gap-1.5";
+        comfortBtn.className = "px-2.5 py-1 rounded-lg font-bold text-slate-400 hover:text-white transition flex items-center gap-1.5";
+        list.className = "space-y-1.5";
+      } else {
+        comfortBtn.className = "px-2.5 py-1 rounded-lg font-bold bg-indigo-600 text-white transition flex items-center gap-1.5";
+        compactBtn.className = "px-2.5 py-1 rounded-lg font-bold text-slate-400 hover:text-white transition flex items-center gap-1.5";
+        list.className = "space-y-3.5";
+      }
+    }
+  </script>
+</body>
+</html>
