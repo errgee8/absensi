@@ -90,8 +90,8 @@ export default function ShiftTable({ shifts = [], schedules = [], onInspectPhoto
     if (status === 'MISMATCH') {
       return (
         <span
-          className="inline-flex items-center space-x-1 px-1.5 py-0.5 rounded-md text-[9px] font-black bg-rose-500/20 text-rose-300 border border-rose-500/40 animate-pulse"
-          title={`Peringatan: Wajah selfie tidak cocok (${sim != null ? `${sim}%` : 'Rendah'})`}
+          className="inline-flex items-center space-x-1 px-1.5 py-0.5 rounded-md text-[9px] font-bold bg-rose-500/15 text-rose-300 border border-rose-500/30"
+          title={`Catatan: Wajah selfie tidak cocok (${sim != null ? `${sim}%` : 'Rendah'})`}
         >
           <ShieldAlert className="w-2.5 h-2.5 text-rose-400 stroke-[2.5]" />
           <span>Beda Wajah {sim != null ? `(${sim}%)` : '✕'}</span>
@@ -219,11 +219,7 @@ export default function ShiftTable({ shifts = [], schedules = [], onInspectPhoto
                 <tr
                   key={shift.id}
                   className={`hover:bg-slate-800/40 transition-colors ${
-                    shift.flags?.includes('FLAG_FACE_MISMATCH')
-                      ? 'bg-rose-500/10'
-                      : hasFlags
-                      ? 'bg-amber-500/5'
-                      : ''
+                    hasFlags ? 'bg-amber-500/5' : ''
                   }`}
                 >
                   {/* Date */}

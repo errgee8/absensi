@@ -262,7 +262,7 @@ export default function PhotoDetailModal({ shift, type = 'in', onClose, onShiftU
                 </span>
               )}
               {shift.face_recog_status === 'MISMATCH' && (
-                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-rose-500/20 text-rose-300 border border-rose-500/40 animate-pulse">
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/15 text-rose-300 border border-rose-500/30">
                   ⚠ WAJAH TIDAK COCOK ({shift.face_recog_similarity}%)
                 </span>
               )}

@@ -33,6 +33,7 @@ export default function KioskCameraModal({
   const [successMessage, setSuccessMessage] = useState('');
   const [submitError, setSubmitError] = useState(null);
   const [countdown, setCountdown] = useState(3);
+  const [faceMismatchAlert, setFaceMismatchAlert] = useState(false);
   const [permModalOpen, setPermModalOpen] = useState(false);
 
   const [userLocation, setUserLocation] = useState(null);
@@ -320,6 +321,11 @@ export default function KioskCameraModal({
         res = await checkIn(payload);
       }
 
+      const isMismatch = res?.faceRecog?.status === 'MISMATCH' || (res?.flags || []).includes('FLAG_FACE_MISMATCH');
+      if (isMismatch) {
+        setFaceMismatchAlert(true);
+      }
+
       setSuccessMessage(res.message || config.successMsg);
 
       setTimeout(() => {
@@ -333,8 +339,9 @@ export default function KioskCameraModal({
           origin: { y: 0.6 }
         });
 
-        // 3-second auto logout timer
-        let count = 3;
+        // 5-second auto logout timer for face mismatch notice, otherwise 3-second
+        let count = isMismatch ? 5 : 3;
+        setCountdown(count);
         const timer = setInterval(() => {
           count -= 1;
           setCountdown(count);
@@ -503,35 +510,56 @@ export default function KioskCameraModal({
         {/* Viewfinder or Success */}
         <div className="p-4">
           {submitSuccess ? (
-            <div className="py-8 text-center space-y-4">
-              <div className="w-20 h-20 rounded-full bg-emerald-500/20 text-emerald-400 mx-auto flex items-center justify-center border-2 border-emerald-500/40 animate-bounce">
-                <CheckCircle2 className="w-12 h-12" />
-              </div>
+            <div className="py-6 text-center space-y-4">
+              {faceMismatchAlert ? (
+                <div className="w-16 h-16 rounded-full bg-amber-500/20 text-amber-400 mx-auto flex items-center justify-center border-2 border-amber-500/40">
+                  <AlertTriangle className="w-8 h-8" />
+                </div>
+              ) : (
+                <div className="w-16 h-16 rounded-full bg-emerald-500/20 text-emerald-400 mx-auto flex items-center justify-center border-2 border-emerald-500/40 animate-bounce">
+                  <CheckCircle2 className="w-8 h-8" />
+                </div>
+              )}
 
               <div>
-                <h4 className="text-xl font-black text-white">Absensi Berhasil Dicatat!</h4>
+                <h4 className="text-lg font-black text-white">
+                  {faceMismatchAlert ? 'Absensi Masuk Tercatat' : 'Absensi Berhasil Dicatat!'}
+                </h4>
                 <p className="text-xs text-slate-300 mt-1">{successMessage}</p>
               </div>
 
-              {/* 3-Second Countdown Progress Bar */}
+              {/* Face Mismatch Staff Notice */}
+              {faceMismatchAlert && (
+                <div className="bg-amber-950/70 border border-amber-500/40 rounded-2xl p-3 text-left space-y-1.5 shadow-md">
+                  <div className="flex items-center space-x-1.5 text-amber-300 font-bold text-xs">
+                    <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+                    <span>Peringatan: Wajah Tidak Cocok</span>
+                  </div>
+                  <p className="text-[11px] text-amber-200/90 leading-relaxed font-medium">
+                    Sistem mendeteksi foto selfie ini tidak sesuai dengan wajah Anda yang terdaftar. Absensi tetap masuk ke sistem, namun <strong>status ketidakcocokan wajah telah dilaporkan ke Manajer</strong> untuk ditinjau.
+                  </p>
+                </div>
+              )}
+
+              {/* Countdown Progress Bar */}
               <div className="bg-slate-950 border border-slate-800 rounded-2xl p-3 text-xs">
                 <span className="text-slate-400 block mb-1 font-medium">
                   Kembali ke layar PIN dalam:
                 </span>
-                <span className="text-2xl font-black text-emerald-400 font-mono">
+                <span className={`text-2xl font-black font-mono ${faceMismatchAlert ? 'text-amber-400' : 'text-emerald-400'}`}>
                   {countdown} detik
                 </span>
                 <div className="w-full bg-slate-800 h-1.5 rounded-full mt-2 overflow-hidden">
                   <div
-                    className="bg-emerald-500 h-full transition-all duration-1000 ease-linear"
-                    style={{ width: `${(countdown / 3) * 100}%` }}
+                    className={`h-full transition-all duration-1000 ease-linear ${faceMismatchAlert ? 'bg-amber-500' : 'bg-emerald-500'}`}
+                    style={{ width: `${(countdown / (faceMismatchAlert ? 5 : 3)) * 100}%` }}
                   />
                 </div>
               </div>
 
               <button
                 onClick={onCompleteAndAutoLogout}
-                className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold transition"
+                className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold transition cursor-pointer"
               >
                 Selesai Sekarang
               </button>

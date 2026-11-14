@@ -1894,9 +1894,14 @@ router.post('/checkin', async (req, res) => {
 
   broadcastEvent('SHIFT_UPDATE', { action: 'CHECKIN', shift: shiftResponse });
 
+  let responseMessage = 'Absensi Masuk Berhasil Dicatat!';
+  if (faceRecogResult.status === 'MISMATCH') {
+    responseMessage = 'Absensi Masuk Tercatat (Catatan: Wajah Tidak Cocok & Dilaporkan ke Manajer)';
+  }
+
   res.json({
     success: true,
-    message: 'Absensi Masuk Berhasil Dicatat!',
+    message: responseMessage,
     shift: shiftResponse,
     flags,
     faceRecog: faceRecogResult
