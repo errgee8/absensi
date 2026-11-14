@@ -210,12 +210,31 @@ export default function PointManagementTab({ adminAuth, isReadOnly = false, onPo
 
   // KPI metrics for selected period
   const stats = useMemo(() => {
-    const totalPoints = allPoints.reduce((sum, p) => sum + Number(p.points || 0), 0);
+    let plusSum = 0;
+    let violationSum = 0;
+    let plusCount = 0;
+    let violationCount = 0;
+    allPoints.forEach((p) => {
+      const isPlus = p.point_type === 'PLUS' || p.type === 'PLUS';
+      const pts = Math.abs(Number(p.points || 0));
+      if (isPlus) {
+        plusSum += pts;
+        plusCount += 1;
+      } else {
+        violationSum += pts;
+        violationCount += 1;
+      }
+    });
+    const netPoints = Math.round((plusSum - violationSum) * 100) / 100;
     const totalEntries = allPoints.length;
     const acknowledged = allPoints.filter((p) => p.status === 'ACKNOWLEDGED').length;
     const pending = totalEntries - acknowledged;
     return {
-      totalPoints: Math.round(totalPoints * 100) / 100,
+      netPoints,
+      plusSum: Math.round(plusSum * 100) / 100,
+      violationSum: Math.round(violationSum * 100) / 100,
+      plusCount,
+      violationCount,
       totalEntries,
       acknowledged,
       pending
@@ -227,7 +246,7 @@ export default function PointManagementTab({ adminAuth, isReadOnly = false, onPo
     const q = search.trim().toLowerCase();
     return staffTotals.filter((row) => {
       if (venueFilter !== 'ALL' && row.staff_venue !== venueFilter) return false;
-      if (onlyWithPoints && Number(row.total_points || 0) === 0 && Number(row.violation_count || 0) === 0) return false;
+      if (onlyWithPoints && Number(row.total_points || 0) === 0 && Number(row.violation_count || 0) === 0 && Number(row.plus_count || 0) === 0) return false;
       if (q) {
         return (
           (row.staff_name && row.staff_name.toLowerCase().includes(q)) ||
@@ -497,19 +516,38 @@ export default function PointManagementTab({ adminAuth, isReadOnly = false, onPo
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 pt-1">
           <div className="p-3.5 rounded-2xl bg-[#12161f] border border-slate-800">
             <span className="text-[10px] font-bold uppercase text-slate-400 block">
-              Total Poin Periode Terpilih
+              Total Poin Bersih Periode
             </span>
-            <div className="text-2xl font-mono font-bold text-rose-400 mt-1">
-              {stats.totalPoints} <span className="text-xs text-slate-400 font-sans">Poin</span>
+            <div className={`text-2xl font-mono font-bold mt-1 ${
+              stats.netPoints > 0
+                ? 'text-emerald-400'
+                : stats.netPoints < 0
+                ? 'text-rose-400'
+                : 'text-slate-300'
+            }`}>
+              {stats.netPoints > 0 ? `+${stats.netPoints}` : stats.netPoints}{' '}
+              <span className="text-xs text-slate-400 font-sans">Poin</span>
             </div>
+            {(stats.plusSum > 0 || stats.violationSum > 0) && (
+              <div className="text-[10px] text-slate-400 mt-1 font-mono">
+                {stats.plusSum > 0 && <span className="text-emerald-400">+{stats.plusSum} plus</span>}
+                {stats.plusSum > 0 && stats.violationSum > 0 && <span> • </span>}
+                {stats.violationSum > 0 && <span className="text-rose-400">-{stats.violationSum} sanksi</span>}
+              </div>
+            )}
           </div>
 
           <div className="p-3.5 rounded-2xl bg-[#12161f] border border-slate-800">
             <span className="text-[10px] font-bold uppercase text-slate-400 block">
-              Total Catatan Pelanggaran
+              Total Catatan Poin
             </span>
             <div className="text-2xl font-mono font-bold text-white mt-1">
               {stats.totalEntries} <span className="text-xs text-slate-400 font-sans">Catatan</span>
+            </div>
+            <div className="text-[10px] text-slate-400 mt-1">
+              <span className="text-emerald-400 font-medium">{stats.plusCount} Plus</span>
+              {' • '}
+              <span className="text-rose-400 font-medium">{stats.violationCount} Sanksi</span>
             </div>
           </div>
 
@@ -1041,7 +1079,7 @@ export default function PointManagementTab({ adminAuth, isReadOnly = false, onPo
                   <th className="py-3 px-4">Nama Staff</th>
                   <th className="py-3 px-3">Outlet &amp; Divisi</th>
                   <th className="py-3 px-3 text-center">Pelanggaran</th>
-                  <th className="py-3 px-3 text-center">Total Poin Cut-Off</th>
+                  <th className="py-3 px-3 text-center">Total Poin Bersih</th>
                   <th className="py-3 px-3">Status Persetujuan</th>
                   <th className="py-3 px-4 text-right">Aksi Cepat</th>
                 </tr>
@@ -1073,20 +1111,22 @@ export default function PointManagementTab({ adminAuth, isReadOnly = false, onPo
                       <td className="py-3 px-3 text-center">
                         <span className={`inline-block px-3 py-1 rounded-xl font-mono font-bold text-xs ${
                           row.total_points > 0
-                            ? 'bg-rose-500/20 text-rose-300 border border-rose-500/35'
-                            : row.total_points < 0
                             ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/35'
+                            : row.total_points < 0
+                            ? 'bg-rose-500/20 text-rose-300 border border-rose-500/35'
                             : 'bg-slate-700/40 text-slate-300 border border-slate-600/40'
                         }`}>
                           {row.total_points > 0
-                            ? `${row.total_points} Poin Sanksi`
+                            ? `+${row.total_points} Poin`
                             : row.total_points < 0
-                            ? `+${Math.abs(row.total_points)} Poin Plus`
+                            ? `${row.total_points} Poin`
                             : '0 Poin'}
                         </span>
-                        {row.plus_points > 0 && row.violation_points > 0 && (
-                          <div className="text-[10px] text-slate-400 mt-0.5">
-                            <span className="text-rose-400">-{row.violation_points}</span> / <span className="text-emerald-400">+{row.plus_points}</span>
+                        {(row.plus_points > 0 || row.violation_points > 0) && (
+                          <div className="text-[10px] text-slate-400 mt-0.5 space-x-1 font-mono">
+                            {row.plus_points > 0 && <span className="text-emerald-400">+{row.plus_points}</span>}
+                            {row.plus_points > 0 && row.violation_points > 0 && <span>/</span>}
+                            {row.violation_points > 0 && <span className="text-rose-400">-{row.violation_points}</span>}
                           </div>
                         )}
                       </td>

@@ -144,7 +144,7 @@ export default function StaffPointNoticeModal({
                   ? 'bg-emerald-600 shadow-emerald-600/30'
                   : 'bg-rose-600 shadow-rose-600/30'
               }`}>
-                {isPlusPoint ? `+${currentPoint.points}` : currentPoint.points} Poin
+                {isPlusPoint ? `+${Math.abs(currentPoint.points)}` : `-${Math.abs(currentPoint.points)}`} Poin
               </span>
             </div>
           </div>

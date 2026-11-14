@@ -711,11 +711,16 @@ export const cloudDb = {
     const pointsMap = {};
     for (const pt of (pointsList || [])) {
       if (pt.status !== 'REVOKED') {
-        const sId = String(pt.staff_id || pt.staffId || pt.staff_uuid);
-        if (pt.point_type === 'PLUS' || pt.type === 'PLUS') {
-          pointsMap[sId] = Math.max(0, (pointsMap[sId] || 0) - Math.abs(Number(pt.points) || 0));
-        } else {
-          pointsMap[sId] = (pointsMap[sId] || 0) + (Number(pt.points) || 0);
+        const pts = Math.abs(Number(pt.points) || 0);
+        const isPlus = pt.point_type === 'PLUS' || pt.type === 'PLUS';
+        const delta = isPlus ? pts : -pts;
+        const sId = String(pt.staff_id || pt.staffId || pt.staff_uuid || '');
+        if (sId) {
+          pointsMap[sId] = (pointsMap[sId] || 0) + delta;
+        }
+        if (pt.staff_uuid && String(pt.staff_uuid) !== sId) {
+          const uId = String(pt.staff_uuid);
+          pointsMap[uId] = (pointsMap[uId] || 0) + delta;
         }
       }
     }
@@ -752,7 +757,7 @@ export const cloudDb = {
 
       const monthlyDays = monthlyStatsMap[staffUuid]?.dates?.size || monthlyStatsMap[staffCode]?.dates?.size || 1;
       const monthlyLate = monthlyStatsMap[staffUuid]?.lateCount || monthlyStatsMap[staffCode]?.lateCount || 0;
-      const activePts = pointsMap[staffUuid] || pointsMap[staffCode] || 0;
+      const activePts = pointsMap[staffUuid] ?? pointsMap[staffCode] ?? 0;
 
       return {
         id: row.id,

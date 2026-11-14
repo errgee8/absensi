@@ -4236,7 +4236,11 @@ router.get('/points', async (req, res) => {
     const currentCycleTotalForStaff = (staffId || staffUuid)
       ? staffScopedPoints
           .filter((p) => p.cycle_key === currentCycle.cycleKey)
-          .reduce((sum, p) => sum + Number(p.points || 0), 0)
+          .reduce((sum, p) => {
+            const isPlus = p.point_type === 'PLUS' || p.type === 'PLUS';
+            const pts = Math.abs(Number(p.points || 0));
+            return isPlus ? sum + pts : sum - pts;
+          }, 0)
       : 0;
 
     // Cycle filter
@@ -4307,14 +4311,15 @@ router.get('/points', async (req, res) => {
       }
       const entry = summaryMap.get(matchedKey);
       const isPlus = p.point_type === 'PLUS' || p.type === 'PLUS';
+      const pts = Math.abs(Number(p.points || 0));
       if (isPlus) {
-        entry.plus_points = Math.round(((entry.plus_points || 0) + Math.abs(Number(p.points || 0))) * 100) / 100;
+        entry.plus_points = Math.round(((entry.plus_points || 0) + pts) * 100) / 100;
         entry.plus_count = (entry.plus_count || 0) + 1;
-        entry.total_points = Math.round((entry.total_points - Math.abs(Number(p.points || 0))) * 100) / 100;
+        entry.total_points = Math.round(((entry.total_points || 0) + pts) * 100) / 100;
       } else {
-        entry.violation_points = Math.round(((entry.violation_points || 0) + Number(p.points || 0)) * 100) / 100;
+        entry.violation_points = Math.round(((entry.violation_points || 0) + pts) * 100) / 100;
         entry.violation_count += 1;
-        entry.total_points = Math.round((entry.total_points + Number(p.points || 0)) * 100) / 100;
+        entry.total_points = Math.round(((entry.total_points || 0) - pts) * 100) / 100;
       }
 
       if (p.status === 'ACKNOWLEDGED') {
@@ -4332,7 +4337,7 @@ router.get('/points', async (req, res) => {
     let staffTotals = [];
     if (!isStaffScoped) {
       staffTotals = Array.from(summaryMap.values()).sort((a, b) => {
-        if (b.total_points !== a.total_points) return b.total_points - a.total_points;
+        if (a.total_points !== b.total_points) return a.total_points - b.total_points;
         if (b.violation_count !== a.violation_count) return b.violation_count - a.violation_count;
         return (a.staff_name || '').localeCompare(b.staff_name || '');
       });

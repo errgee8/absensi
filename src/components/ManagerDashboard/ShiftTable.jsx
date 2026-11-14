@@ -617,18 +617,34 @@ export default function ShiftTable({
                             <div className="bg-[#181e2b] p-3.5 rounded-2xl border border-slate-700/80 shadow-md">
                               <div className="flex items-center justify-between text-slate-400 mb-1">
                                 <span className="text-[10px] font-black uppercase tracking-wider">Jumlah Poin</span>
-                                <Award className="w-4 h-4 text-amber-400" />
+                                <Award className={`w-4 h-4 ${
+                                  (shift.active_points_total || 0) > 0
+                                    ? 'text-emerald-400'
+                                    : (shift.active_points_total || 0) < 0
+                                    ? 'text-rose-400'
+                                    : 'text-slate-400'
+                                }`} />
                               </div>
                               <div className="flex items-baseline space-x-1.5">
                                 <span className={`text-2xl font-black font-mono ${
-                                  (shift.active_points_total || 0) > 0 ? 'text-amber-400' : 'text-emerald-400'
+                                  (shift.active_points_total || 0) > 0
+                                    ? 'text-emerald-400'
+                                    : (shift.active_points_total || 0) < 0
+                                    ? 'text-rose-400'
+                                    : 'text-slate-300'
                                 }`}>
-                                  {shift.active_points_total || 0}
+                                  {(shift.active_points_total || 0) > 0
+                                    ? `+${shift.active_points_total}`
+                                    : (shift.active_points_total || 0)}
                                 </span>
-                                <span className="text-[10px] text-slate-400 font-bold">Poin Aktif</span>
+                                <span className="text-[10px] text-slate-400 font-bold">Total Poin</span>
                               </div>
                               <p className="text-[10px] text-slate-400 mt-1 font-medium leading-tight">
-                                Akumulasi penalti poin pelanggaran pada siklus berjalan.
+                                {(shift.active_points_total || 0) > 0
+                                  ? 'Apresiasi & poin plus aktif staff.'
+                                  : (shift.active_points_total || 0) < 0
+                                  ? 'Akumulasi pengurangan poin sanksi berjalan.'
+                                  : 'Staff tertib tanpa catatan poin.'}
                               </p>
                             </div>
 

@@ -40,7 +40,11 @@ export default function StaffPointHistoryModal({
 
   const currentCycle = data?.currentCycle || getPointCycleInfo();
   const points = data?.points || [];
-  const totalInSelectedCycle = points.reduce((sum, p) => sum + Number(p.points || 0), 0);
+  const totalInSelectedCycle = points.reduce((sum, p) => {
+    const isPlus = p.point_type === 'PLUS' || p.type === 'PLUS';
+    const pts = Math.abs(Number(p.points || 0));
+    return isPlus ? sum + pts : sum - pts;
+  }, 0);
   const currentTotal = data?.currentCycleTotalForStaff ?? 0;
   const pendingCount = (data?.pendingForStaff || []).length;
 
@@ -54,7 +58,7 @@ export default function StaffPointHistoryModal({
               <Award className="w-5 h-5 stroke-[2.2]" />
             </div>
             <div>
-              <h3 className="text-base font-bold text-white">Akumulasi Poin Pelanggaran</h3>
+              <h3 className="text-base font-bold text-white">Riwayat &amp; Akumulasi Poin Staff</h3>
               <p className="text-xs text-slate-400 font-medium">{staff.name} • {staff.venue}</p>
             </div>
           </div>
@@ -73,16 +77,22 @@ export default function StaffPointHistoryModal({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className={`p-4 rounded-2xl border ${
               currentTotal > 0
+                ? 'bg-emerald-950/35 border-emerald-500/40'
+                : currentTotal < 0
                 ? 'bg-rose-950/35 border-rose-500/40'
-                : 'bg-emerald-950/30 border-emerald-500/30'
+                : 'bg-slate-900 border-slate-800'
             }`}>
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-                Total Poin Periode Aktif
+                Total Poin Bersih Periode Aktif
               </span>
               <div className={`text-2xl font-mono font-bold mt-1 ${
-                currentTotal > 0 ? 'text-rose-300' : 'text-emerald-300'
+                currentTotal > 0
+                  ? 'text-emerald-300'
+                  : currentTotal < 0
+                  ? 'text-rose-300'
+                  : 'text-slate-300'
               }`}>
-                {currentTotal} Poin
+                {currentTotal > 0 ? `+${currentTotal}` : currentTotal} Poin
               </div>
               <span className="text-[11px] text-slate-400 font-medium mt-0.5 block">
                 {currentCycle.label}
@@ -132,8 +142,14 @@ export default function StaffPointHistoryModal({
                 ))}
                 <option value="ALL">Semua Riwayat</option>
               </select>
-              <span className="px-2.5 py-1.5 rounded-xl bg-slate-800 text-xs font-mono font-bold text-slate-200">
-                Total: {totalInSelectedCycle} Poin
+              <span className={`px-2.5 py-1.5 rounded-xl text-xs font-mono font-bold ${
+                totalInSelectedCycle > 0
+                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/35'
+                  : totalInSelectedCycle < 0
+                  ? 'bg-rose-500/20 text-rose-300 border border-rose-500/35'
+                  : 'bg-slate-800 text-slate-300 border border-slate-700'
+              }`}>
+                Total: {totalInSelectedCycle > 0 ? `+${totalInSelectedCycle}` : totalInSelectedCycle} Poin
               </span>
             </div>
           </div>
@@ -171,7 +187,7 @@ export default function StaffPointHistoryModal({
                               ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
                               : 'bg-rose-600/20 text-rose-300 border-rose-500/30'
                           }`}>
-                            {isPlus ? `+${pt.points} Poin Plus` : `${pt.points} Poin Pelanggaran`}
+                            {isPlus ? `+${Math.abs(pt.points)} Poin Plus` : `-${Math.abs(pt.points)} Poin Sanksi`}
                           </span>
                           {isAck ? (
                             <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-950 text-emerald-300 border border-emerald-500/30">
