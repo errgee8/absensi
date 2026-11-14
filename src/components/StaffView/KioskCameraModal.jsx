@@ -686,6 +686,30 @@ export default function KioskCameraModal({
                       } ${cameraActive ? 'block' : 'hidden'}`}
                     />
 
+                    {/* Biometric Face Recognition Oval Guide Overlay */}
+                    {cameraActive && !capturedPreview && !submitting && facingMode === 'user' && (
+                      <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center z-10">
+                        <div className="relative w-[68%] h-[82%] rounded-[50%] border-2 border-dashed border-emerald-400/80 shadow-[0_0_0_9999px_rgba(0,0,0,0.30)] flex flex-col items-center justify-between p-3">
+                          {/* Top biometric corner badge */}
+                          <div className="w-full flex justify-between items-center text-[9px] font-mono font-bold text-emerald-400 px-2.5 bg-slate-950/70 rounded-full py-0.5 mt-1 border border-emerald-500/20">
+                            <span>[ FACE BIOMETRIC ]</span>
+                            <span className="flex items-center space-x-1">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping inline-block" />
+                              <span>LIVE SCAN</span>
+                            </span>
+                          </div>
+
+                          {/* Center scan line pulse */}
+                          <div className="w-full h-0.5 bg-gradient-to-r from-transparent via-emerald-400/80 to-transparent animate-pulse" />
+
+                          {/* Bottom alignment instruction text */}
+                          <span className="text-[10px] font-black text-emerald-300 bg-slate-950/85 px-3 py-0.5 rounded-full border border-emerald-500/40 shadow-lg mb-1">
+                            Posisikan Wajah Di Sini
+                          </span>
+                        </div>
+                      </div>
+                    )}
+
                     {/* Quick Rotate Camera Floating Overlay */}
                     {cameraActive && !capturedPreview && !submitting && (
                       <button
