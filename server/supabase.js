@@ -915,9 +915,11 @@ export const cloudDb = {
 
     let attendanceDeleted = 0;
     let toiletDeleted = 0;
+    let leavesDeleted = 0;
+    let pointsDeleted = 0;
 
     // 1. Wipe Attendance & Break Logs (Supabase Cloud)
-    if (scope === 'attendance' || scope === 'all') {
+    if (scope === 'attendance' || scope === 'all' || scope === 'master_reset') {
       try {
         // Delete child break logs first
         let breakQuery = supabase.from('break_logs').delete();
@@ -944,8 +946,8 @@ export const cloudDb = {
       }
     }
 
-    // 2. Wipe Toilet Inspections if scope is 'toilet' or 'all'
-    if (scope === 'toilet' || scope === 'all') {
+    // 2. Wipe Toilet Inspections if scope is 'toilet' or 'all' or 'master_reset'
+    if (scope === 'toilet' || scope === 'all' || scope === 'master_reset') {
       try {
         const TOILET_SUPABASE_URL = 'https://nrrhkylpgitezjocgune.supabase.co';
         const TOILET_SUPABASE_ANON_KEY = 'sb_publishable_GRzOFx-NzqaaBPCl3Oqr2A_1f8xpUNj';
@@ -965,12 +967,53 @@ export const cloudDb = {
         } else {
           toiletDeleted = 1;
         }
+
+        // Reset last_inspected status on restroom_locations
+        try {
+          await toiletClient
+            .from('restroom_locations')
+            .update({ last_inspected_at: null, last_inspected_by: null, last_status: null })
+            .not('id', 'is', null);
+        } catch (locErr) {
+          console.warn('Toilet locations status reset note:', locErr.message);
+        }
       } catch (err) {
         console.warn('Error wiping toilet inspections:', err.message);
       }
     }
 
-    return { success: true, scope, attendanceDeleted, toiletDeleted };
+    // 3. Wipe Points & Leave Requests (Izin, Cuti, Sakit) when scope is 'all' or 'master_reset'
+    // Stored in app_settings (Supabase key-value storage)
+    if (scope === 'all' || scope === 'master_reset') {
+      try {
+        await this.saveSetting('staff_points', [], 'Staff Disciplinary & Plus Points');
+        pointsDeleted = 1;
+      } catch (err) {
+        console.warn('Failed to wipe staff_points in Supabase:', err.message);
+      }
+
+      try {
+        await this.saveSetting('leave_requests', [], 'Staff Leave Requests');
+        leavesDeleted = 1;
+      } catch (err) {
+        console.warn('Failed to wipe leave_requests in Supabase:', err.message);
+      }
+
+      try {
+        await this.saveSetting('staff_moods', {}, 'Daily Staff Mood Emojis');
+      } catch (err) {
+        console.warn('Failed to wipe staff_moods in Supabase:', err.message);
+      }
+    }
+
+    return {
+      success: true,
+      scope,
+      attendanceDeleted,
+      toiletDeleted,
+      leavesDeleted,
+      pointsDeleted
+    };
   },
 
   async reviewLateCheckin({ shiftId, action, managerNotes, reviewerName }) {

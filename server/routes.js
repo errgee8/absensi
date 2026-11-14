@@ -3174,6 +3174,20 @@ router.post('/admin/wipe-leaderboard', async (req, res) => {
         }
       }
 
+      // If scope === 'all', also wipe SQLite leave_requests & clear points/leaves/moods settings
+      if (scope === 'all') {
+        try {
+          if (db) {
+            try { db.prepare('DELETE FROM leave_requests').run(); } catch (e) {}
+          }
+          setSetting('staff_points', []);
+          setSetting('leave_requests', []);
+          setSetting('staff_moods', {});
+        } catch (sqliteErr) {
+          console.warn('SQLite leave/points wipe note:', sqliteErr.message);
+        }
+      }
+
       // 2. Wipe Supabase Cloud tables
       let result = { success: true };
       if (isSupabaseConfigured) {
@@ -3183,11 +3197,13 @@ router.post('/admin/wipe-leaderboard', async (req, res) => {
       // 3. Broadcast real-time update events
       broadcastEvent('SHIFT_UPDATE');
       broadcastEvent('LEADERBOARD_UPDATE');
+      broadcastEvent('POINT_UPDATE');
+      broadcastEvent('LEAVE_UPDATE');
 
       return res.json({
         success: true,
         mode: 'wipe_records',
-        message: 'Data riwayat trial berhasil dihapus permanen. Leaderboard telah di-reset dan dimulai bersih dari nol.',
+        message: 'Master Reset Berhasil! Semua data trial (poin, absensi, keterlambatan, hari kerja, izin/cuti, toilet) telah kembali bersih ke 0. Nama staf, PIN, foto profil, dan biometrik wajah tetap aman.',
         scope,
         result
       });

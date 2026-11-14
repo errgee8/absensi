@@ -160,16 +160,16 @@ export default function DashboardHeader({
             <span>Print / PDF</span>
           </button>
 
-          {/* Reset Leaderboard & Trial Data Button - Manager Only */}
+          {/* Master Reset / Wipe Trial Data Button - Manager Only */}
           {!isReadOnly && onOpenResetLeaderboard && (
             <button
               type="button"
               onClick={onOpenResetLeaderboard}
-              className="px-3 py-1.5 bg-[#1c2230] hover:bg-[#252d3f] text-amber-300 rounded-xl text-xs font-bold flex items-center space-x-1.5 border border-amber-500/30 shadow-xs transition active:scale-95 cursor-pointer"
-              title="Reset Poin Leaderboard ke Nol atau Wipe Data Trial"
+              className="px-3 py-1.5 bg-[#261719] hover:bg-[#381e22] text-rose-300 rounded-xl text-xs font-bold flex items-center space-x-1.5 border border-rose-500/40 shadow-xs transition active:scale-95 cursor-pointer"
+              title="Master Reset Data Trial (Poin, Absensi, Cuti, Inspeksi) atau Reset Leaderboard"
             >
-              <RotateCcw className="w-3.5 h-3.5 text-amber-300 stroke-[2]" />
-              <span className="hidden lg:inline">Reset Leaderboard</span>
+              <RotateCcw className="w-3.5 h-3.5 text-rose-400 stroke-[2.5]" />
+              <span className="hidden sm:inline">Master Reset / Wipe</span>
             </button>
           )}
 
