@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { AlertTriangle, Camera, CheckCircle2, Clock, UserCheck, X } from 'lucide-react';
+import { AlertTriangle, Camera, CheckCircle2, Clock, UserCheck, X, Award, Sparkles } from 'lucide-react';
 import { formatWitaDateTime } from '../../utils/time';
 import { showToast } from '../Common/Toast';
 
-const PLEDGE_TEXT = 'dengan menyetujui ini saya berjanji akan memperbaiki kesalahan saya dan tidak mengulangi lagi';
+const VIOLATION_PLEDGE = 'Dengan menyetujui ini saya berjanji akan memperbaiki kesalahan saya dan tidak mengulangi lagi.';
+const PLUS_PLEDGE = 'Dengan menyetujui ini saya bersyukur atas apresiasi Poin Plus ini dan berkomitmen untuk terus mempertahankan kinerja terbaik.';
 
 export default function StaffPointNoticeModal({
   isOpen = true,
@@ -23,6 +24,8 @@ export default function StaffPointNoticeModal({
 
   if (!isOpen || !currentPoint) return null;
 
+  const isPlusPoint = currentPoint.point_type === 'PLUS' || currentPoint.type === 'PLUS' || (currentPoint.points > 0 && String(currentPoint.points).startsWith('+'));
+
   const handleConfirm = async (e) => {
     e.preventDefault();
     if (!checked || submitting) return;
@@ -31,7 +34,7 @@ export default function StaffPointNoticeModal({
     try {
       await onAcknowledge(currentPoint.id);
       setChecked(false);
-      showToast('Konfirmasi persetujuan poin telah dicatat.', 'success');
+      showToast(isPlusPoint ? 'Apresiasi Poin Plus telah diterima!' : 'Konfirmasi persetujuan poin telah dicatat.', 'success');
     } catch (err) {
       showToast(err.message || 'Gagal mencatat konfirmasi poin.', 'error');
     } finally {
@@ -41,17 +44,35 @@ export default function StaffPointNoticeModal({
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md animate-fade-in">
-      <div className="bg-[#161b24] border border-rose-500/50 rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl shadow-rose-950/50 animate-scale-up text-slate-200 flex flex-col max-h-[92vh]">
+      <div className={`bg-[#161b24] border rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl animate-scale-up text-slate-200 flex flex-col max-h-[92vh] ${
+        isPlusPoint
+          ? 'border-emerald-500/50 shadow-emerald-950/50'
+          : 'border-rose-500/50 shadow-rose-950/50'
+      }`}>
         {/* Notification Header */}
-        <div className="p-5 bg-gradient-to-r from-rose-950 via-red-900/90 to-[#161b24] border-b border-rose-500/30 flex items-center justify-between gap-3">
+        <div className={`p-5 border-b flex items-center justify-between gap-3 ${
+          isPlusPoint
+            ? 'bg-gradient-to-r from-emerald-950 via-teal-900/90 to-[#161b24] border-emerald-500/30'
+            : 'bg-gradient-to-r from-rose-950 via-red-900/90 to-[#161b24] border-rose-500/30'
+        }`}>
           <div className="flex items-center space-x-3 min-w-0">
-            <div className="w-11 h-11 rounded-2xl bg-rose-500/20 border border-rose-400/40 text-rose-300 flex items-center justify-center shrink-0">
-              <AlertTriangle className="w-6 h-6 stroke-[2.2]" />
+            <div className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 border ${
+              isPlusPoint
+                ? 'bg-emerald-500/20 border-emerald-400/40 text-emerald-300'
+                : 'bg-rose-500/20 border-rose-400/40 text-rose-300'
+            }`}>
+              {isPlusPoint ? (
+                <Award className="w-6 h-6 stroke-[2.2]" />
+              ) : (
+                <AlertTriangle className="w-6 h-6 stroke-[2.2]" />
+              )}
             </div>
             <div className="min-w-0">
               <div className="flex items-center space-x-2">
-                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-rose-600 text-white">
-                  Pemberitahuan Pelanggaran
+                <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider text-white ${
+                  isPlusPoint ? 'bg-emerald-600' : 'bg-rose-600'
+                }`}>
+                  {isPlusPoint ? 'Pemberian Poin Plus (+)' : 'Pemberitahuan Pelanggaran'}
                 </span>
                 {pendingPoints.length > 1 && (
                   <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500 text-slate-950">
@@ -60,7 +81,7 @@ export default function StaffPointNoticeModal({
                 )}
               </div>
               <h3 className="text-base sm:text-lg font-bold text-white mt-0.5 truncate">
-                Pencatatan Poin Staff ({staff?.name})
+                {isPlusPoint ? `Apresiasi Poin Plus (${staff?.name})` : `Pencatatan Poin Staff (${staff?.name})`}
               </h3>
             </div>
           </div>
@@ -78,24 +99,34 @@ export default function StaffPointNoticeModal({
 
         {/* Body */}
         <form onSubmit={handleConfirm} className="p-5 space-y-4 overflow-y-auto">
-          <div className="p-4 rounded-2xl bg-[#10141c] border border-rose-500/30 space-y-3">
+          <div className={`p-4 rounded-2xl border space-y-3 ${
+            isPlusPoint
+              ? 'bg-[#10171c] border-emerald-500/35'
+              : 'bg-[#10141c] border-rose-500/30'
+          }`}>
             <p className="text-xs sm:text-sm text-slate-200 leading-relaxed font-medium">
-              Anda terkena pelanggaran atas alasan:
+              {isPlusPoint
+                ? 'Selamat! Manajemen memberikan Anda Poin Plus atas prestasi / apresiasi:'
+                : 'Anda terkena pelanggaran atas alasan:'}
             </p>
-            <div className="p-3.5 rounded-xl bg-rose-950/40 border border-rose-500/30 text-sm font-bold text-rose-100 whitespace-pre-wrap leading-relaxed">
+            <div className={`p-3.5 rounded-xl border text-sm font-bold whitespace-pre-wrap leading-relaxed ${
+              isPlusPoint
+                ? 'bg-emerald-950/40 border-emerald-500/30 text-emerald-100'
+                : 'bg-rose-950/40 border-rose-500/30 text-rose-100'
+            }`}>
               "{currentPoint.reason}"
             </div>
 
             {currentPoint.proof_photo_url && (
               <div className="space-y-1.5 pt-1">
                 <span className="text-xs font-bold text-slate-300 flex items-center space-x-1.5">
-                  <Camera className="w-3.5 h-3.5 text-rose-400" />
-                  <span>Bukti Foto dari Management:</span>
+                  <Camera className={`w-3.5 h-3.5 ${isPlusPoint ? 'text-emerald-400' : 'text-rose-400'}`} />
+                  <span>Foto Pendukung dari Management:</span>
                 </span>
                 <div className="rounded-xl overflow-hidden border border-slate-700 bg-black/60 max-h-56 flex items-center justify-center">
                   <img
                     src={currentPoint.proof_photo_url}
-                    alt="Bukti Foto Pelanggaran"
+                    alt="Foto Pendukung"
                     className="w-full h-full object-contain max-h-56 cursor-pointer"
                     onClick={() => window.open(currentPoint.proof_photo_url, '_blank')}
                   />
@@ -106,10 +137,14 @@ export default function StaffPointNoticeModal({
 
             <div className="flex items-center justify-between pt-2 border-t border-slate-800">
               <span className="text-xs text-slate-400 font-semibold">
-                Dan dibebankan poin sebesar:
+                {isPlusPoint ? 'Menerima Poin Plus sebesar:' : 'Dan dibebankan poin sebesar:'}
               </span>
-              <span className="px-3.5 py-1.5 rounded-xl bg-rose-600 text-white font-mono text-base font-bold shadow-md shadow-rose-600/30">
-                {currentPoint.points} Poin
+              <span className={`px-3.5 py-1.5 rounded-xl text-white font-mono text-base font-black shadow-md ${
+                isPlusPoint
+                  ? 'bg-emerald-600 shadow-emerald-600/30'
+                  : 'bg-rose-600 shadow-rose-600/30'
+              }`}>
+                {isPlusPoint ? `+${currentPoint.points}` : currentPoint.points} Poin
               </span>
             </div>
           </div>
@@ -140,7 +175,7 @@ export default function StaffPointNoticeModal({
             <span className="font-mono font-bold text-slate-300">{currentPoint.cycle_label}</span>
           </div>
 
-          {/* Mandatory Pledge Checkbox */}
+          {/* Mandatory Pledge / Agreement Checkbox */}
           <label className={`flex items-start space-x-3 p-3.5 rounded-2xl border transition cursor-pointer select-none ${
             checked
               ? 'bg-emerald-950/35 border-emerald-500/50 text-emerald-100'
@@ -154,7 +189,7 @@ export default function StaffPointNoticeModal({
               required
             />
             <span className="text-xs font-semibold leading-relaxed">
-              {PLEDGE_TEXT}
+              {isPlusPoint ? PLUS_PLEDGE : VIOLATION_PLEDGE}
             </span>
           </label>
 
@@ -162,15 +197,25 @@ export default function StaffPointNoticeModal({
           <button
             type="submit"
             disabled={!checked || submitting}
-            className="w-full py-3.5 px-5 rounded-2xl bg-blue-600 hover:bg-blue-500 disabled:bg-slate-800 disabled:text-slate-500 disabled:cursor-not-allowed text-white font-bold text-sm shadow-lg shadow-blue-600/25 transition flex items-center justify-center space-x-2 cursor-pointer"
+            className={`w-full py-3.5 px-5 rounded-2xl disabled:bg-slate-800 disabled:text-slate-500 disabled:cursor-not-allowed text-white font-bold text-sm shadow-lg transition flex items-center justify-center space-x-2 cursor-pointer ${
+              isPlusPoint
+                ? 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-600/25'
+                : 'bg-blue-600 hover:bg-blue-500 shadow-blue-600/25'
+            }`}
           >
             <CheckCircle2 className="w-4 h-4 stroke-[2.5]" />
-            <span>{submitting ? 'Menyimpan Konfirmasi...' : 'Saya Mengerti'}</span>
+            <span>
+              {submitting
+                ? 'Menyimpan Konfirmasi...'
+                : isPlusPoint
+                ? 'Terima Poin Plus & Apresiasi ✓'
+                : 'Saya Mengerti'}
+            </span>
           </button>
 
           {!checked && (
             <p className="text-[11px] text-center text-amber-400/90 font-medium">
-              Centang pernyataan di atas terlebih dahulu untuk mengaktifkan tombol "Saya Mengerti".
+              Centang pernyataan di atas terlebih dahulu untuk mengaktifkan tombol konfirmasi.
             </p>
           )}
         </form>

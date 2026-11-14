@@ -712,7 +712,11 @@ export const cloudDb = {
     for (const pt of (pointsList || [])) {
       if (pt.status !== 'REVOKED') {
         const sId = String(pt.staff_id || pt.staffId || pt.staff_uuid);
-        pointsMap[sId] = (pointsMap[sId] || 0) + (Number(pt.points) || 0);
+        if (pt.point_type === 'PLUS' || pt.type === 'PLUS') {
+          pointsMap[sId] = Math.max(0, (pointsMap[sId] || 0) - Math.abs(Number(pt.points) || 0));
+        } else {
+          pointsMap[sId] = (pointsMap[sId] || 0) + (Number(pt.points) || 0);
+        }
       }
     }
 

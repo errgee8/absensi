@@ -47,6 +47,7 @@ export default function PointManagementTab({ adminAuth, isReadOnly = false, onPo
   const [staffSearchQuery, setStaffSearchQuery] = useState('');
   const [formVenueFilter, setFormVenueFilter] = useState('ALL');
   const [selectedStaffIds, setSelectedStaffIds] = useState([]);
+  const [pointType, setPointType] = useState('PLUS'); // 'PLUS' | 'VIOLATION'
   const [pointAmount, setPointAmount] = useState('');
   const [reason, setReason] = useState('');
   const [proofPhoto, setProofPhoto] = useState(null);
@@ -285,11 +286,12 @@ export default function PointManagementTab({ adminAuth, isReadOnly = false, onPo
       const res = await createStaffPoint({
         pin: effectivePin,
         staffIds: selectedStaffIds,
-        points: numPts,
+        points: Math.abs(numPts),
+        pointType: pointType,
         reason: reason.trim(),
         proofPhotoBase64: proofPhoto || null
       });
-      showToast(res.message || 'Poin pelanggaran berhasil diberikan & notifikasi dikirim.', 'success');
+      showToast(res.message || 'Poin berhasil diberikan & notifikasi dikirim.', 'success');
       setSelectedStaffIds([]);
       setStaffSearchQuery('');
       setPointAmount('');
@@ -691,9 +693,71 @@ export default function PointManagementTab({ adminAuth, isReadOnly = false, onPo
 
           {/* Points & Reason (7 cols) */}
           <div className="lg:col-span-7 space-y-3">
+            {/* Category Toggle: Poin Plus (+) vs Poin Pelanggaran (-) */}
             <div>
               <label className="text-xs font-bold text-slate-200 block mb-1.5">
-                2. Masukkan Jumlah Poin (Bebas Angka Berapapun)
+                2. Pilih Kategori Poin
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPointType('PLUS');
+                    if (Number(pointAmount) < 0) setPointAmount(String(Math.abs(Number(pointAmount))));
+                  }}
+                  className={`p-3 rounded-2xl border text-left transition flex items-center space-x-2.5 cursor-pointer ${
+                    pointType === 'PLUS'
+                      ? 'bg-emerald-500/20 border-emerald-400 text-white shadow-md shadow-emerald-500/20'
+                      : 'bg-[#12161f] border-slate-700 hover:border-slate-600 text-slate-400'
+                  }`}
+                >
+                  <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
+                    pointType === 'PLUS' ? 'bg-emerald-500 text-slate-950 font-black' : 'bg-slate-800 text-emerald-400'
+                  }`}>
+                    <Plus className="w-5 h-5 stroke-[3]" />
+                  </div>
+                  <div>
+                    <div className={`text-xs font-black ${pointType === 'PLUS' ? 'text-emerald-300' : 'text-slate-200'}`}>
+                      Poin Plus (+) / Apresiasi
+                    </div>
+                    <div className="text-[10px] text-slate-400 font-medium leading-tight">
+                      Reward, apresiasi kerja bagus, pujian tamu
+                    </div>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPointType('VIOLATION');
+                    if (Number(pointAmount) < 0) setPointAmount(String(Math.abs(Number(pointAmount))));
+                  }}
+                  className={`p-3 rounded-2xl border text-left transition flex items-center space-x-2.5 cursor-pointer ${
+                    pointType === 'VIOLATION'
+                      ? 'bg-rose-500/20 border-rose-400 text-white shadow-md shadow-rose-500/20'
+                      : 'bg-[#12161f] border-slate-700 hover:border-slate-600 text-slate-400'
+                  }`}
+                >
+                  <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
+                    pointType === 'VIOLATION' ? 'bg-rose-500 text-white font-black' : 'bg-slate-800 text-rose-400'
+                  }`}>
+                    <AlertTriangle className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <div className={`text-xs font-black ${pointType === 'VIOLATION' ? 'text-rose-300' : 'text-slate-200'}`}>
+                      Poin Pelanggaran / Sanksi
+                    </div>
+                    <div className="text-[10px] text-slate-400 font-medium leading-tight">
+                      Pelanggaran SOP, indisipliner, teguran
+                    </div>
+                  </div>
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label className="text-xs font-bold text-slate-200 block mb-1.5">
+                3. Masukkan Jumlah Poin {pointType === 'PLUS' ? '(Poin Plus +)' : '(Poin Pelanggaran)'}
               </label>
               <div className="flex flex-col sm:flex-row sm:items-center gap-2">
                 <input
@@ -701,43 +765,61 @@ export default function PointManagementTab({ adminAuth, isReadOnly = false, onPo
                   step="any"
                   value={pointAmount}
                   onChange={(e) => setPointAmount(e.target.value)}
-                  placeholder="Contoh: 10 atau 25 atau 100"
-                  className="flex-1 bg-[#12161f] border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm font-mono font-bold text-white placeholder:text-slate-500 focus:outline-none focus:border-blue-500"
+                  placeholder={pointType === 'PLUS' ? 'Contoh: 10 atau 25 (Poin Plus)' : 'Contoh: 10 atau 25 (Poin Pelanggaran)'}
+                  className={`flex-1 bg-[#12161f] border rounded-xl px-3.5 py-2.5 text-sm font-mono font-bold text-white placeholder:text-slate-500 focus:outline-none ${
+                    pointType === 'PLUS' ? 'border-emerald-500/50 focus:border-emerald-400' : 'border-slate-700 focus:border-rose-500'
+                  }`}
                   required
                 />
                 <div className="flex flex-wrap gap-1.5">
-                  {[5, 10, 15, 25, 50, 100].map((preset) => (
+                  {(pointType === 'PLUS' ? [5, 10, 15, 20, 25, 50, 100] : [5, 10, 15, 25, 50, 100]).map((preset) => (
                     <button
                       key={preset}
                       type="button"
                       onClick={() => setPointAmount(String(preset))}
                       className={`px-2.5 py-1.5 rounded-xl text-xs font-mono font-bold border transition cursor-pointer ${
                         String(pointAmount) === String(preset)
-                          ? 'bg-rose-600 text-white border-rose-500'
+                          ? pointType === 'PLUS'
+                            ? 'bg-emerald-600 text-white border-emerald-500'
+                            : 'bg-rose-600 text-white border-rose-500'
                           : 'bg-[#12161f] hover:bg-slate-800 text-slate-300 border-slate-700'
                       }`}
                     >
-                      {preset}
+                      {pointType === 'PLUS' ? `+${preset}` : preset}
                     </button>
                   ))}
                 </div>
               </div>
-              {Number(pointAmount) < 0 && (
-                <p className="text-[11px] text-amber-300 mt-1">
-                  Catatan: Angka negatif akan mengurangi akumulasi poin staff (koreksi/pengurangan poin).
-                </p>
-              )}
+              <p className="text-[11px] mt-1 font-medium">
+                {pointType === 'PLUS' ? (
+                  <span className="text-emerald-400">
+                    ✓ Poin Plus (+) akan dicatat sebagai prestasi/apresiasi dan mengurangi beban penalti staf.
+                  </span>
+                ) : Number(pointAmount) < 0 ? (
+                  <span className="text-amber-300">
+                    Catatan: Angka negatif akan mengurangi akumulasi poin staff (koreksi/pengurangan poin).
+                  </span>
+                ) : (
+                  <span className="text-slate-400">
+                    Poin pelanggaran akan menambah akumulasi sanksi disiplin staf pada siklus berjalan.
+                  </span>
+                )}
+              </p>
             </div>
 
             <div>
               <label className="text-xs font-bold text-slate-200 block mb-1.5">
-                3. Alasan Pemberian Poin / Kesalahan
+                4. {pointType === 'PLUS' ? 'Alasan Pemberian Poin Plus / Apresiasi' : 'Alasan Pemberian Poin Pelanggaran / Kesalahan'}
               </label>
               <textarea
                 rows={3}
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
-                placeholder="Contoh: Tidak memakai seragam lengkap / Terlambat tanpa konfirmasi / Kesalahan SOP kasir..."
+                placeholder={
+                  pointType === 'PLUS'
+                    ? 'Contoh: Bekerja sangat rajin & inisiatif tinggi / Pujian memuaskan dari tamu VIP / Bantuan shift darurat...'
+                    : 'Contoh: Tidak memakai seragam lengkap / Terlambat tanpa konfirmasi / Kesalahan SOP kasir...'
+                }
                 className="w-full bg-[#12161f] border border-slate-700 rounded-xl p-3 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-blue-500"
                 required
               />
@@ -834,15 +916,19 @@ export default function PointManagementTab({ adminAuth, isReadOnly = false, onPo
               <button
                 type="submit"
                 disabled={submitting || selectedStaffIds.length === 0 || !pointAmount || !reason.trim()}
-                className="w-full sm:w-auto px-5 py-3 rounded-2xl bg-rose-600 hover:bg-rose-500 disabled:bg-slate-800 disabled:text-slate-500 text-white text-xs font-bold shadow-lg shadow-rose-600/25 transition flex items-center justify-center space-x-2 cursor-pointer"
+                className={`w-full sm:w-auto px-5 py-3 rounded-2xl text-white text-xs font-bold shadow-lg transition flex items-center justify-center space-x-2 cursor-pointer disabled:bg-slate-800 disabled:text-slate-500 disabled:shadow-none ${
+                  pointType === 'PLUS'
+                    ? 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-600/25'
+                    : 'bg-rose-600 hover:bg-rose-500 shadow-rose-600/25'
+                }`}
               >
                 <Send className="w-4 h-4" />
                 <span>
                   {submitting
                     ? 'Menyimpan & Mengirim...'
                     : selectedStaffIds.length > 1
-                      ? `Berikan Poin ke ${selectedStaffIds.length} Staff & Kirim Notifikasi`
-                      : 'Berikan Poin & Kirim Notifikasi'}
+                      ? `Berikan ${pointType === 'PLUS' ? 'Poin Plus' : 'Poin'} ke ${selectedStaffIds.length} Staff & Kirim Notifikasi`
+                      : `Berikan ${pointType === 'PLUS' ? 'Poin Plus' : 'Poin'} & Kirim Notifikasi`}
                 </span>
               </button>
             </div>
@@ -977,18 +1063,32 @@ export default function PointManagementTab({ adminAuth, isReadOnly = false, onPo
                         <span className="block text-[10px] text-slate-500">{row.staff_division}</span>
                       </td>
                       <td className="py-3 px-3 text-center font-mono font-bold text-slate-300">
-                        {row.violation_count}x
+                        <div>{row.violation_count}x sanksi</div>
+                        {(row.plus_count > 0 || row.plus_points > 0) && (
+                          <div className="text-[10px] text-emerald-400 font-medium">
+                            +{row.plus_count || 1}x plus
+                          </div>
+                        )}
                       </td>
                       <td className="py-3 px-3 text-center">
                         <span className={`inline-block px-3 py-1 rounded-xl font-mono font-bold text-xs ${
                           row.total_points > 0
                             ? 'bg-rose-500/20 text-rose-300 border border-rose-500/35'
                             : row.total_points < 0
-                            ? 'bg-sky-500/20 text-sky-300 border border-sky-500/35'
-                            : 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
+                            ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/35'
+                            : 'bg-slate-700/40 text-slate-300 border border-slate-600/40'
                         }`}>
-                          {row.total_points} Poin
+                          {row.total_points > 0
+                            ? `${row.total_points} Poin Sanksi`
+                            : row.total_points < 0
+                            ? `+${Math.abs(row.total_points)} Poin Plus`
+                            : '0 Poin'}
                         </span>
+                        {row.plus_points > 0 && row.violation_points > 0 && (
+                          <div className="text-[10px] text-slate-400 mt-0.5">
+                            <span className="text-rose-400">-{row.violation_points}</span> / <span className="text-emerald-400">+{row.plus_points}</span>
+                          </div>
+                        )}
                       </td>
                       <td className="py-3 px-3">
                         {row.violation_count === 0 ? (
@@ -1041,7 +1141,7 @@ export default function PointManagementTab({ adminAuth, isReadOnly = false, onPo
                   <th className="py-3 px-4">Waktu (WITA)</th>
                   <th className="py-3 px-3">Staff</th>
                   <th className="py-3 px-3 text-center">Poin</th>
-                  <th className="py-3 px-3">Alasan Pelanggaran</th>
+                  <th className="py-3 px-3">Alasan / Catatan</th>
                   <th className="py-3 px-3">Pemberi Poin</th>
                   <th className="py-3 px-3">Konfirmasi Staff</th>
                   {!isReadOnly && <th className="py-3 px-4 text-right">Hapus</th>}
@@ -1057,6 +1157,7 @@ export default function PointManagementTab({ adminAuth, isReadOnly = false, onPo
                 ) : (
                   filteredLogs.map((pt) => {
                     const isAck = pt.status === 'ACKNOWLEDGED';
+                    const isPlus = pt.point_type === 'PLUS' || pt.type === 'PLUS';
                     return (
                       <tr key={pt.id} className="hover:bg-slate-800/30 transition align-top">
                         <td className="py-3 px-4 whitespace-nowrap">
@@ -1072,9 +1173,15 @@ export default function PointManagementTab({ adminAuth, isReadOnly = false, onPo
                           </div>
                         </td>
                         <td className="py-3 px-3 text-center whitespace-nowrap">
-                          <span className="px-2.5 py-1 rounded-xl font-mono font-bold text-xs bg-rose-500/20 text-rose-300 border border-rose-500/35">
-                            {pt.points > 0 ? `+${pt.points}` : pt.points} Poin
-                          </span>
+                          {isPlus ? (
+                            <span className="px-2.5 py-1 rounded-xl font-mono font-bold text-xs bg-emerald-500/20 text-emerald-300 border border-emerald-500/35">
+                              +{pt.points} Poin Plus
+                            </span>
+                          ) : (
+                            <span className="px-2.5 py-1 rounded-xl font-mono font-bold text-xs bg-rose-500/20 text-rose-300 border border-rose-500/35">
+                              {pt.points > 0 ? `-${pt.points}` : pt.points} Poin
+                            </span>
+                          )}
                         </td>
                         <td className="py-3 px-3 max-w-xs space-y-1.5">
                           <p className="text-slate-200 font-medium leading-relaxed whitespace-pre-wrap">
@@ -1085,7 +1192,7 @@ export default function PointManagementTab({ adminAuth, isReadOnly = false, onPo
                               type="button"
                               onClick={() => setPreviewPhotoModal(pt.proof_photo_url)}
                               className="inline-flex items-center space-x-1.5 px-2 py-1 rounded-lg bg-blue-950/60 hover:bg-blue-900 border border-blue-500/40 text-blue-300 text-[10px] font-bold transition cursor-pointer"
-                              title="Klik untuk melihat bukti foto pelanggaran"
+                              title="Klik untuk melihat bukti foto"
                             >
                               <Camera className="w-3 h-3 text-blue-400" />
                               <span>Lihat Bukti Foto 📷</span>
@@ -1100,19 +1207,19 @@ export default function PointManagementTab({ adminAuth, isReadOnly = false, onPo
                             <div className="space-y-1">
                               <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-950 text-emerald-300 border border-emerald-500/35">
                                 <CheckCircle2 className="w-3 h-3" />
-                                <span>Sudah Disetujui Staff</span>
+                                <span>Sudah Dikonfirmasi</span>
                               </span>
                               <div className="text-[10px] font-mono text-slate-400">
                                 {formatWitaDateTime(pt.acknowledged_at)}
                               </div>
                               <div className="text-[10px] text-emerald-400/80 italic">
-                                Menyetujui janji perbaikan ✓
+                                {isPlus ? 'Menerima apresiasi & poin plus ✓' : 'Menyetujui janji perbaikan ✓'}
                               </div>
                             </div>
                           ) : (
                             <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-950 text-amber-300 border border-amber-500/35 animate-pulse">
                               <Clock className="w-3 h-3" />
-                              <span>Menunggu "Saya Mengerti"</span>
+                              <span>Menunggu Konfirmasi</span>
                             </span>
                           )}
                         </td>

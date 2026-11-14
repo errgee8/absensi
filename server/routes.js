@@ -4263,6 +4263,9 @@ router.get('/points', async (req, res) => {
         staff_division: st.division || st.role || 'Staff',
         staff_role: st.role || 'Staff',
         total_points: 0,
+        plus_points: 0,
+        violation_points: 0,
+        plus_count: 0,
         violation_count: 0,
         pending_count: 0,
         acknowledged_count: 0,
@@ -4293,6 +4296,9 @@ router.get('/points', async (req, res) => {
           staff_division: p.staff_division || '-',
           staff_role: p.staff_role || 'Staff',
           total_points: 0,
+          plus_points: 0,
+          violation_points: 0,
+          plus_count: 0,
           violation_count: 0,
           pending_count: 0,
           acknowledged_count: 0,
@@ -4300,8 +4306,17 @@ router.get('/points', async (req, res) => {
         });
       }
       const entry = summaryMap.get(matchedKey);
-      entry.total_points = Math.round((entry.total_points + Number(p.points || 0)) * 100) / 100;
-      entry.violation_count += 1;
+      const isPlus = p.point_type === 'PLUS' || p.type === 'PLUS';
+      if (isPlus) {
+        entry.plus_points = Math.round(((entry.plus_points || 0) + Math.abs(Number(p.points || 0))) * 100) / 100;
+        entry.plus_count = (entry.plus_count || 0) + 1;
+        entry.total_points = Math.round((entry.total_points - Math.abs(Number(p.points || 0))) * 100) / 100;
+      } else {
+        entry.violation_points = Math.round(((entry.violation_points || 0) + Number(p.points || 0)) * 100) / 100;
+        entry.violation_count += 1;
+        entry.total_points = Math.round((entry.total_points + Number(p.points || 0)) * 100) / 100;
+      }
+
       if (p.status === 'ACKNOWLEDGED') {
         entry.acknowledged_count += 1;
       } else {
@@ -4342,7 +4357,7 @@ router.get('/points', async (req, res) => {
 });
 
 router.post('/points', async (req, res) => {
-  const { pin, staffId, staffIds, points, reason, proofPhotoBase64, proofPhoto } = req.body || {};
+  const { pin, staffId, staffIds, points, pointType, reason, proofPhotoBase64, proofPhoto } = req.body || {};
 
   const auth = await verifyManagementAuth(pin);
   if (!auth.authorized) {
@@ -4368,6 +4383,9 @@ router.post('/points', async (req, res) => {
   if (!reason || !String(reason).trim()) {
     return res.status(400).json({ error: 'Alasan pemberian poin wajib diisi.' });
   }
+
+  const isPlusMode = pointType === 'PLUS' || (pointType !== 'VIOLATION' && String(points).startsWith('+'));
+  const cleanPointType = isPlusMode ? 'PLUS' : 'VIOLATION';
 
   // Handle optional violation proof photo
   let savedProofPhotoUrl = null;
@@ -4404,8 +4422,8 @@ router.post('/points', async (req, res) => {
   const cycle = getPointCycleInfo(now);
   const witaDate = getWitaDateYMD(now);
   const roundedPoints = Number.isInteger(numericPoints)
-    ? numericPoints
-    : Math.round(numericPoints * 100) / 100;
+    ? Math.abs(numericPoints)
+    : Math.round(Math.abs(numericPoints) * 100) / 100;
   const cleanReason = String(reason).trim();
 
   const createdRecords = resolvedStaffList.map((staff, idx) => ({
@@ -4417,6 +4435,7 @@ router.post('/points', async (req, res) => {
     staff_venue: staff.venue || 'JP Karaoke',
     staff_division: staff.division || 'Staff',
     points: roundedPoints,
+    point_type: cleanPointType,
     reason: cleanReason,
     proof_photo_url: savedProofPhotoUrl || null,
     cycle_key: cycle.cycleKey,
@@ -4473,21 +4492,31 @@ router.post('/points', async (req, res) => {
 
     const notifyPointsEnabled = getSetting('notify_points') !== 0 && getSetting('notify_points') !== 'false';
     for (const pointRecord of createdRecords) {
-      broadcastEvent('POINT_UPDATE', { action: 'CREATED', point: pointRecord });
+      broadcastEvent('POINT_UPDATE', {
+        action: 'CREATED',
+        point: pointRecord,
+        pointType: cleanPointType
+      });
       if (notifyPointsEnabled) {
         sendPushNotification({
           staffIds: [pointRecord.staff_id, pointRecord.staff_uuid].filter(Boolean),
-          title: '⚠️ Pemberitahuan Poin Pelanggaran',
-          body: `Anda terkena pelanggaran atas alasan "${pointRecord.reason}" dan dibebankan poin sebesar ${pointRecord.points} Poin.`,
+          title: isPlusMode ? '🎉 Apresiasi Poin Plus (+)' : '⚠️ Pemberitahuan Poin Pelanggaran',
+          body: isPlusMode
+            ? `Selamat! Anda menerima Poin Plus (+${pointRecord.points}) atas "${pointRecord.reason}".`
+            : `Anda terkena pelanggaran atas alasan "${pointRecord.reason}" dan dibebankan poin sebesar ${pointRecord.points} Poin.`,
           url: '/',
           tag: `point_${pointRecord.id}`
         }).catch((errPush) => console.warn('Push point notification note:', errPush.message));
       }
     }
 
-    const summaryMsg = createdRecords.length === 1
-      ? `Poin sebesar ${roundedPoints} Poin berhasil diberikan kepada ${createdRecords[0].staff_name}.`
-      : `Poin sebesar ${roundedPoints} Poin berhasil diberikan kepada ${createdRecords.length} staff terpilih secara terpisah.`;
+    const summaryMsg = isPlusMode
+      ? (createdRecords.length === 1
+          ? `Poin Plus (+${roundedPoints}) berhasil diberikan kepada ${createdRecords[0].staff_name} & notifikasi apresiasi dikirim.`
+          : `Poin Plus (+${roundedPoints}) berhasil diberikan kepada ${createdRecords.length} staff terpilih secara terpisah.`)
+      : (createdRecords.length === 1
+          ? `Poin sebesar ${roundedPoints} Poin berhasil diberikan kepada ${createdRecords[0].staff_name}.`
+          : `Poin sebesar ${roundedPoints} Poin berhasil diberikan kepada ${createdRecords.length} staff terpilih secara terpisah.`);
 
     return res.json({
       success: true,
@@ -4498,7 +4527,7 @@ router.post('/points', async (req, res) => {
     });
   } catch (err) {
     console.error('Error creating staff point:', err);
-    return res.status(500).json({ error: 'Gagal menyimpan poin pelanggaran: ' + err.message });
+    return res.status(500).json({ error: 'Gagal menyimpan poin: ' + err.message });
   }
 });
 

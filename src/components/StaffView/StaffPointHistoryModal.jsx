@@ -151,11 +151,14 @@ export default function StaffPointHistoryModal({
             <div className="space-y-2.5">
               {points.map((pt) => {
                 const isAck = pt.status === 'ACKNOWLEDGED';
+                const isPlus = pt.point_type === 'PLUS' || pt.type === 'PLUS' || (pt.points > 0 && String(pt.points).startsWith('+'));
                 return (
                   <div
                     key={pt.id}
                     className={`p-4 rounded-2xl border space-y-2 ${
-                      isAck
+                      isPlus
+                        ? 'bg-[#10171c] border-emerald-500/35'
+                        : isAck
                         ? 'bg-[#12161f] border-slate-800'
                         : 'bg-rose-950/25 border-rose-500/40'
                     }`}
@@ -163,8 +166,12 @@ export default function StaffPointHistoryModal({
                     <div className="flex items-start justify-between gap-3">
                       <div className="space-y-1 min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
-                          <span className="px-2.5 py-0.5 rounded-lg text-xs font-mono font-bold bg-rose-600/20 text-rose-300 border border-rose-500/30">
-                            +{pt.points} Poin
+                          <span className={`px-2.5 py-0.5 rounded-lg text-xs font-mono font-bold border ${
+                            isPlus
+                              ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                              : 'bg-rose-600/20 text-rose-300 border-rose-500/30'
+                          }`}>
+                            {isPlus ? `+${pt.points} Poin Plus` : `${pt.points} Poin Pelanggaran`}
                           </span>
                           {isAck ? (
                             <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-950 text-emerald-300 border border-emerald-500/30">
@@ -174,7 +181,7 @@ export default function StaffPointHistoryModal({
                           ) : (
                             <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-950 text-amber-300 border border-amber-500/30">
                               <AlertTriangle className="w-3 h-3" />
-                              <span>Menunggu "Saya Mengerti"</span>
+                              <span>{isPlus ? 'Menunggu Konfirmasi' : 'Menunggu "Saya Mengerti"'}</span>
                             </span>
                           )}
                         </div>
