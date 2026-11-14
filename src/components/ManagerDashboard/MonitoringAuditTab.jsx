@@ -67,10 +67,12 @@ export default function MonitoringAuditTab({ adminAuth }) {
 
   useEffect(() => {
     loadData();
-    // Auto-refresh every 20 seconds while manager is viewing this monitoring tab
+    // Auto-refresh periodically only while tab is active and visible (60s throttled)
     const interval = setInterval(() => {
-      loadData(true);
-    }, 20000);
+      if (!document.hidden) {
+        loadData(true);
+      }
+    }, 60000);
     return () => clearInterval(interval);
   }, [loadData]);
 

@@ -3,6 +3,7 @@ import { Camera, X, CheckCircle2, AlertCircle, RefreshCw, Smartphone, Loader2, S
 import confetti from 'canvas-confetti';
 import { captureAndWatermark, watermarkFile } from '../../utils/watermark';
 import { checkIn, checkOut, startBreak, endBreak } from '../../utils/api';
+import { uploadAttendancePhotoClient } from '../../utils/supabaseClient';
 import { isWithinGeofence, calculateDistanceMeters } from '../../utils/distance';
 import { getAppNow } from '../../utils/time';
 import { enqueueOfflineAction } from '../../utils/offlineQueue';
@@ -261,7 +262,7 @@ export default function KioskCameraModal({
 
   const config = getActionConfig();
 
-  // Helper to submit finalized base64 image
+  // Helper to submit finalized image
   const submitAttendancePayload = async (watermarkedBase64) => {
     setCapturedPreview(watermarkedBase64);
     stopCamera();
@@ -274,6 +275,25 @@ export default function KioskCameraModal({
       const currentLat = userLocation?.lat ?? venueLat;
       const currentLng = userLocation?.lng ?? venueLng;
 
+      // Offload storage upload directly to client Supabase Storage when possible (reduces server function memory & duration)
+      let photoRef = watermarkedBase64;
+      try {
+        const clientUploadedUrl = await uploadAttendancePhotoClient(watermarkedBase64, `selfie_${staff.id}`);
+        if (clientUploadedUrl) {
+          photoRef = clientUploadedUrl;
+        }
+      } catch {}
+
+      let latePhotoRef = isCheckinLate ? latePhotoBase64 : null;
+      if (latePhotoRef && latePhotoRef.startsWith('data:image')) {
+        try {
+          const clientLateUrl = await uploadAttendancePhotoClient(latePhotoRef, `late_${staff.id}`);
+          if (clientLateUrl) {
+            latePhotoRef = clientLateUrl;
+          }
+        } catch {}
+      }
+
       const payload = {
         staffId: staff.id,
         pin: staff.pin,
@@ -281,11 +301,11 @@ export default function KioskCameraModal({
         lat: currentLat,
         lng: currentLng,
         accuracy: userLocation?.accuracy ?? 10,
-        photoBase64: watermarkedBase64,
+        photoBase64: photoRef,
         timestamp: new Date().toISOString(),
         confirmedShift: confirmedShift || null,
         lateReason: isCheckinLate ? lateReason.trim() : null,
-        latePhotoBase64: isCheckinLate ? latePhotoBase64 : null,
+        latePhotoBase64: latePhotoRef,
         moodEmoji: staff?.mood_emoji || null
       };
 

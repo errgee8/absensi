@@ -14,8 +14,15 @@ import { verifyFaceMatch } from './faceBiometrics.js';
 
 const router = express.Router();
 
-// Real-Time Server-Sent Events (SSE) Client Pool
+// Real-Time Server-Sent Events (SSE) Client Pool & Supabase Realtime Broadcast
 const sseClients = new Set();
+let realtimeChannel = null;
+if (isSupabaseConfigured && supabase) {
+  try {
+    realtimeChannel = supabase.channel('app-realtime');
+    realtimeChannel.subscribe();
+  } catch {}
+}
 
 export function broadcastEvent(eventType, data = {}) {
   const message = `event: ${eventType}\ndata: ${JSON.stringify({ ...data, timestamp: Date.now() })}\n\n`;
@@ -26,27 +33,29 @@ export function broadcastEvent(eventType, data = {}) {
       sseClients.delete(client);
     }
   }
+
+  // Cross-instance Realtime Broadcast over Supabase (Zero Vercel provisioned memory cost)
+  if (isSupabaseConfigured && supabase) {
+    try {
+      const channel = realtimeChannel || supabase.channel('app-realtime');
+      channel.send({
+        type: 'broadcast',
+        event: eventType,
+        payload: { ...data, timestamp: Date.now() }
+      }).catch(() => {});
+    } catch {}
+  }
 }
 
-// SSE Connection Endpoint
+// SSE Connection Endpoint (Migrated to direct Supabase Realtime; closes immediately to avoid holding serverless functions open)
 router.get('/events', (req, res) => {
   res.writeHead(200, {
     'Content-Type': 'text/event-stream',
-    'Cache-Control': 'no-cache',
-    'Connection': 'keep-alive'
+    'Cache-Control': 'no-cache, no-transform',
+    'Connection': 'close'
   });
-
-  res.write(`event: connected\ndata: ${JSON.stringify({ message: 'Live Sync Active' })}\n\n`);
-  sseClients.add(res);
-
-  const keepAlive = setInterval(() => {
-    res.write(': keepalive\n\n');
-  }, 25000);
-
-  req.on('close', () => {
-    clearInterval(keepAlive);
-    sseClients.delete(res);
-  });
+  res.write(`event: connected\ndata: ${JSON.stringify({ message: 'Live Sync active via Supabase Realtime' })}\n\n`);
+  res.end();
 });
 
 // ==========================================
@@ -262,6 +271,9 @@ function saveBase64Photo(dataUrl, prefix = 'photo') {
 
 // Unified photo saver: uploads directly to Supabase Storage if configured, or falls back to local disk
 async function savePhoto(dataUrl, prefix = 'photo') {
+  if (typeof dataUrl === 'string' && (dataUrl.startsWith('http://') || dataUrl.startsWith('https://'))) {
+    return dataUrl;
+  }
   if (isSupabaseConfigured) {
     try {
       const cloudUrl = await uploadPhotoToSupabase(dataUrl, prefix);

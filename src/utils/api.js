@@ -1,4 +1,5 @@
 import { syncServerTime } from './time';
+import { supabase, isSupabaseClientConfigured, fetchSettingFromSupabase } from './supabaseClient';
 
 const API_BASE = '/api';
 
@@ -305,6 +306,23 @@ export async function reviewLateCheckin(shiftId, payload) {
 
 // Announcements API
 export async function getAnnouncements(params = {}) {
+  // Direct client read from Supabase to bypass serverless execution
+  if (isSupabaseClientConfigured) {
+    try {
+      const data = await fetchSettingFromSupabase('management_announcements');
+      if (Array.isArray(data)) {
+        let list = data;
+        if (params.activeOnly !== false && params.activeOnly !== 'false') {
+          list = list.filter((a) => a.is_active !== false);
+        }
+        if (params.venue && params.venue !== 'ALL') {
+          list = list.filter((a) => !a.target_venue || a.target_venue === 'ALL' || a.target_venue === params.venue);
+        }
+        return { success: true, announcements: list };
+      }
+    } catch {}
+  }
+
   const q = new URLSearchParams();
   if (params.staffId) q.append('staffId', params.staffId);
   if (params.venue) q.append('venue', params.venue);
@@ -357,53 +375,36 @@ export async function getAnnouncementReaders(id) {
 }
 
 export function subscribeRealtimeEvents(onEvent) {
-  const eventSource = new EventSource(`${API_BASE}/events`);
+  // Use direct Supabase Realtime WebSocket (Zero Vercel serverless function invocation)
+  if (isSupabaseClientConfigured && supabase) {
+    const channel = supabase.channel('app-realtime');
 
-  eventSource.addEventListener('SHIFT_UPDATE', (e) => {
-    try {
-      onEvent('SHIFT_UPDATE', JSON.parse(e.data));
-    } catch {}
-  });
+    const handlePayload = (eventType) => ({ payload }) => {
+      try {
+        onEvent(eventType, payload);
+      } catch {}
+    };
 
-  eventSource.addEventListener('LEAVE_UPDATE', (e) => {
-    try {
-      onEvent('LEAVE_UPDATE', JSON.parse(e.data));
-    } catch {}
-  });
+    channel
+      .on('broadcast', { event: 'SHIFT_UPDATE' }, handlePayload('SHIFT_UPDATE'))
+      .on('broadcast', { event: 'LEAVE_UPDATE' }, handlePayload('LEAVE_UPDATE'))
+      .on('broadcast', { event: 'STAFF_UPDATE' }, handlePayload('STAFF_UPDATE'))
+      .on('broadcast', { event: 'SCHEDULES_UPDATE' }, handlePayload('SCHEDULES_UPDATE'))
+      .on('broadcast', { event: 'ANNOUNCEMENT_UPDATE' }, handlePayload('ANNOUNCEMENT_UPDATE'))
+      .on('broadcast', { event: 'ANNOUNCEMENT_READ' }, handlePayload('ANNOUNCEMENT_READ'))
+      .on('broadcast', { event: 'POINT_UPDATE' }, handlePayload('POINT_UPDATE'))
+      .on('broadcast', { event: 'SETTINGS_UPDATE' }, handlePayload('SETTINGS_UPDATE'))
+      .on('broadcast', { event: 'LEADERBOARD_UPDATE' }, handlePayload('LEADERBOARD_UPDATE'))
+      .subscribe();
 
-  eventSource.addEventListener('STAFF_UPDATE', (e) => {
-    try {
-      onEvent('STAFF_UPDATE', JSON.parse(e.data));
-    } catch {}
-  });
+    return () => {
+      try {
+        supabase.removeChannel(channel);
+      } catch {}
+    };
+  }
 
-  eventSource.addEventListener('SCHEDULES_UPDATE', (e) => {
-    try {
-      onEvent('SCHEDULES_UPDATE', JSON.parse(e.data));
-    } catch {}
-  });
-
-  eventSource.addEventListener('ANNOUNCEMENT_UPDATE', (e) => {
-    try {
-      onEvent('ANNOUNCEMENT_UPDATE', JSON.parse(e.data));
-    } catch {}
-  });
-
-  eventSource.addEventListener('ANNOUNCEMENT_READ', (e) => {
-    try {
-      onEvent('ANNOUNCEMENT_READ', JSON.parse(e.data));
-    } catch {}
-  });
-
-  eventSource.addEventListener('POINT_UPDATE', (e) => {
-    try {
-      onEvent('POINT_UPDATE', JSON.parse(e.data));
-    } catch {}
-  });
-
-  return () => {
-    eventSource.close();
-  };
+  return () => {};
 }
 
 export async function getAdminLoginLogs() {
@@ -412,14 +413,36 @@ export async function getAdminLoginLogs() {
   return res.json();
 }
 
+let globalPresenceChannel = null;
+
 export async function sendPresenceHeartbeat(data) {
-  const res = await fetch(`${API_BASE}/presence/heartbeat`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data)
-  });
-  if (!res.ok) throw new Error('Failed to send heartbeat');
-  return res.json();
+  // Direct client tracking via Supabase Realtime Presence (Zero Vercel serverless execution)
+  if (isSupabaseClientConfigured && supabase) {
+    try {
+      if (!globalPresenceChannel) {
+        globalPresenceChannel = supabase.channel('online-presence');
+        await globalPresenceChannel.subscribe();
+      }
+      await globalPresenceChannel.track({
+        ...data,
+        lastSeenIso: new Date().toISOString()
+      });
+      return { success: true, via: 'supabase_presence' };
+    } catch {}
+  }
+
+  // Silent fallback only if Supabase client not present
+  try {
+    const res = await fetch(`${API_BASE}/presence/heartbeat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    if (!res.ok) return { success: false };
+    return res.json();
+  } catch {
+    return { success: false };
+  }
 }
 
 export async function getLivePresence() {
@@ -430,6 +453,23 @@ export async function getLivePresence() {
 
 // Violation Points System API
 export async function getPoints(params = {}) {
+  // Direct client read from Supabase to bypass serverless execution
+  if (isSupabaseClientConfigured && !params.staffUuid && !params.cycleKey) {
+    try {
+      const data = await fetchSettingFromSupabase('staff_points');
+      if (Array.isArray(data)) {
+        let points = data;
+        if (params.staffId) {
+          points = points.filter((p) => String(p.staff_id) === String(params.staffId));
+        }
+        if (params.status && params.status !== 'ALL') {
+          points = points.filter((p) => p.status === params.status);
+        }
+        return { success: true, points };
+      }
+    } catch {}
+  }
+
   const q = new URLSearchParams();
   if (params.staffId) q.append('staffId', params.staffId);
   if (params.staffUuid) q.append('staffUuid', params.staffUuid);

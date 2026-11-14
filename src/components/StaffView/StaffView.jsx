@@ -58,10 +58,11 @@ export default function StaffView({
   const [pointNoticeModalOpen, setPointNoticeModalOpen] = useState(false);
   const [pointHistoryModalOpen, setPointHistoryModalOpen] = useState(false);
 
-  // Live Presence Heartbeat for active logged-in staff
+  // Live Presence Heartbeat for active logged-in staff (direct WebSocket via Supabase Presence)
   useEffect(() => {
     if (!loggedInStaff) return;
     const sendBeat = () => {
+      if (document.hidden) return; // Don't wake up network if tab is in background
       sendPresenceHeartbeat({
         id: loggedInStaff.id,
         name: loggedInStaff.name,
@@ -71,7 +72,8 @@ export default function StaffView({
       }).catch(() => {});
     };
     sendBeat();
-    const interval = setInterval(sendBeat, 30000);
+    // 3-minute keepalive instead of 30s aggressive polling
+    const interval = setInterval(sendBeat, 180000);
     return () => clearInterval(interval);
   }, [loggedInStaff]);
 

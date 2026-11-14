@@ -205,6 +205,7 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
     if (!adminAuth) return;
     const isAsstMgr = adminAuth.role === 'VIEW_ONLY' || isReadOnly;
     const sendBeat = () => {
+      if (document.hidden) return; // Don't track if tab is hidden
       sendPresenceHeartbeat({
         id: isAsstMgr ? 'asst_manager' : 'op_manager',
         name: isAsstMgr ? (adminAuth.staffName || 'Sherly') : 'Operational Manager',
@@ -214,7 +215,8 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
       }).catch(() => {});
     };
     sendBeat();
-    const interval = setInterval(sendBeat, 30000);
+    // 3-minute keepalive instead of 30s aggressive polling
+    const interval = setInterval(sendBeat, 180000);
     return () => clearInterval(interval);
   }, [adminAuth, isReadOnly]);
 
