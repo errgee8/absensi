@@ -16,7 +16,10 @@ import {
   Eye,
   Upload,
   Clock,
-  CheckCircle2
+  CheckCircle2,
+  Smartphone,
+  ShieldCheck,
+  Sparkles
 } from 'lucide-react';
 import {
   getAppNow,
@@ -28,6 +31,7 @@ import {
   updateStaffProfilePhoto,
   updateStaffMood
 } from '../../utils/api';
+import DevicePermissionModal from './DevicePermissionModal';
 
 const MOOD_EMOJIS = ['😊', '🔥', '😐', '😴', '😮‍💨', '😢', '😡', '💔'];
 
@@ -89,11 +93,13 @@ export default function KioskPortalScreen({
   onOpenPointHistory,
   onOpenPendingPoints,
   onProfilePhotoUpdated,
-  onMoodUpdated
+  onMoodUpdated,
+  onOpenFaceRegistration
 }) {
   const [now, setNow] = useState(() => getAppNow());
   const [moodDropdownOpen, setMoodDropdownOpen] = useState(false);
   const [savingMood, setSavingMood] = useState(false);
+  const [permModalOpen, setPermModalOpen] = useState(false);
 
   const [photoModalOpen, setPhotoModalOpen] = useState(false);
   const [photoPreview, setPhotoPreview] = useState(null);
@@ -249,6 +255,13 @@ export default function KioskPortalScreen({
     if (activeShift) {
       setToastMessage('Kamu sudah absen masuk untuk shift ini.');
       return;
+    }
+    // Jika belum pernah face recog, wajib lakukan face recog terlebih dahulu
+    if (!staff?.profile_photo_url) {
+      if (onOpenFaceRegistration) {
+        onOpenFaceRegistration();
+        return;
+      }
     }
     if (isMgmtShift) {
       onTriggerCamera('checkin', detectedShift || {
@@ -531,6 +544,55 @@ export default function KioskPortalScreen({
             </button>
           )}
         </section>
+
+        {/* Mandatory Face Biometrics Registration Alert (If staff hasn't registered yet) */}
+        {!staff?.profile_photo_url && (
+          <div className="bg-gradient-to-r from-indigo-950/80 via-[#1e2238] to-purple-950/80 border border-indigo-400/40 rounded-3xl p-4 shadow-xl flex items-center justify-between gap-3 animate-fade-in">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-10 h-10 rounded-2xl bg-indigo-500 text-white flex items-center justify-center shrink-0 shadow-lg shadow-indigo-500/30">
+                <ShieldCheck className="w-5 h-5" />
+              </div>
+              <div className="min-w-0">
+                <h3 className="text-xs sm:text-sm font-black text-white">Daftarkan Wajah Biometrik Anda</h3>
+                <p className="text-[11px] text-indigo-200 truncate mt-0.5">Wajib 1x sebelum melakukan absensi masuk</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={onOpenFaceRegistration}
+              className="px-3.5 py-2 rounded-xl bg-indigo-500 hover:bg-indigo-400 text-white text-xs font-black shadow-lg shadow-indigo-500/25 shrink-0 transition cursor-pointer active:scale-95"
+            >
+              Daftar →
+            </button>
+          </div>
+        )}
+
+        {/* Tombol Cek & Munculkan Izin Lokasi/Kamera HP (Solusi untuk Anto dkk) */}
+        <button
+          type="button"
+          onClick={() => setPermModalOpen(true)}
+          className="w-full bg-[#181d26] hover:bg-[#1e2430] border border-blue-500/30 rounded-2xl p-3.5 flex items-center justify-between gap-3 text-left transition shadow-md cursor-pointer group"
+        >
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-9 h-9 rounded-xl bg-blue-500/20 text-blue-400 border border-blue-500/30 flex items-center justify-center shrink-0 group-hover:scale-105 transition">
+              <Smartphone className="w-4 h-4" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-xs font-black text-white flex items-center gap-1.5">
+                <span>Izin Lokasi &amp; Kamera HP</span>
+                <span className="text-[9px] px-1.5 py-0.2 rounded-md bg-blue-500/20 text-blue-300 font-bold border border-blue-400/30">
+                  Klik Di Sini
+                </span>
+              </div>
+              <div className="text-[11px] text-slate-400 truncate mt-0.5">
+                Munculkan notifikasi izin di HP Anda jika lokasi/kamera belum aktif
+              </div>
+            </div>
+          </div>
+          <span className="text-xs font-bold text-blue-400 shrink-0">
+            Cek Izin →
+          </span>
+        </button>
 
         {/* 2. LEADERBOARD (Full-width) */}
         <button
@@ -946,6 +1008,12 @@ export default function KioskPortalScreen({
           </div>
         </div>
       )}
+
+      {/* Device Permission Helper Modal */}
+      <DevicePermissionModal
+        isOpen={permModalOpen}
+        onClose={() => setPermModalOpen(false)}
+      />
     </div>
   );
 }

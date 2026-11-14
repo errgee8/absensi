@@ -10,6 +10,7 @@ import StaffAnnouncementModal from './StaffAnnouncementModal';
 import MandatoryNotificationModal from './MandatoryNotificationModal';
 import StaffPointNoticeModal from './StaffPointNoticeModal';
 import StaffPointHistoryModal from './StaffPointHistoryModal';
+import FaceRegistrationModal from './FaceRegistrationModal';
 import { getNotificationPermission } from '../../utils/pushNotifications';
 import { verifyStaffPin, getAnnouncements, acknowledgeAnnouncement, getLeaveRequests, getPoints, acknowledgeStaffPoint, subscribeRealtimeEvents, sendPresenceHeartbeat } from '../../utils/api';
 import { getOperationalDateYMD } from '../../utils/time';
@@ -34,8 +35,9 @@ export default function StaffView({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // Attendance Camera modal state
+  // Attendance Camera & Face Registration modal state
   const [cameraModalOpen, setCameraModalOpen] = useState(false);
+  const [faceRegistrationModalOpen, setFaceRegistrationModalOpen] = useState(false);
   const [cameraActionType, setCameraActionType] = useState('checkin');
   const [confirmedShift, setConfirmedShift] = useState(null);
   const [leaveModalOpen, setLeaveModalOpen] = useState(false);
@@ -229,6 +231,11 @@ export default function StaffView({
         setToiletChecklistOpen(true);
       }
       setStep('PORTAL');
+
+      // Check if staff has NEVER registered face biometrics
+      if (!data.staff?.profile_photo_url) {
+        setFaceRegistrationModalOpen(true);
+      }
     } catch (err) {
       setError(err.message || 'PIN tidak terdaftar. Periksa kembali PIN Anda.');
       setPin('');
@@ -237,9 +244,31 @@ export default function StaffView({
     }
   };
 
+  const handleTriggerCamera = (type, shift) => {
+    // If staff hasn't registered face biometrics yet, require face registration first!
+    if (type === 'checkin' && !loggedInStaff?.profile_photo_url) {
+      setFaceRegistrationModalOpen(true);
+      return;
+    }
+    setCameraActionType(type);
+    setConfirmedShift(shift || null);
+    setCameraModalOpen(true);
+  };
+
+  const handleFaceRegistered = (newPhotoUrl) => {
+    setLoggedInStaff((prev) => (prev ? { ...prev, profile_photo_url: newPhotoUrl } : prev));
+    setFaceRegistrationModalOpen(false);
+
+    // Langsung lanjut absen menggunakan face recog yang telah didaftarkan!
+    setCameraActionType('checkin');
+    setConfirmedShift(null);
+    setCameraModalOpen(true);
+  };
+
   // Reset to initial login screen for next staff
   const handleResetToLogin = () => {
     setCameraModalOpen(false);
+    setFaceRegistrationModalOpen(false);
     setToiletScannerOpen(false);
     setToiletChecklistOpen(false);
     setSelectedToiletLocation(null);
@@ -312,11 +341,8 @@ export default function StaffView({
               onOpenViewOnly({ ...loggedInStaff, pin });
             }
           }}
-          onTriggerCamera={(type, shift) => {
-            setCameraActionType(type);
-            setConfirmedShift(shift || null);
-            setCameraModalOpen(true);
-          }}
+          onTriggerCamera={handleTriggerCamera}
+          onOpenFaceRegistration={() => setFaceRegistrationModalOpen(true)}
           onLogout={handleResetToLogin}
           leaveUpdateCount={leaveUpdateCount}
           announcements={announcements}
@@ -345,17 +371,23 @@ export default function StaffView({
           staff={loggedInStaff}
           activeShift={activeShift}
           hasApprovedEarlyLeave={hasApprovedEarlyLeaveToday}
-          onTriggerCamera={(type, shift) => {
-            setCameraActionType(type);
-            setConfirmedShift(shift || null);
-            setCameraModalOpen(true);
-          }}
+          onTriggerCamera={handleTriggerCamera}
           onOpenEarlyDeparture={() => {
             setLeaveModalInitialCategory('IZIN_PULANG_AWAL');
             setLeaveModalOpen(true);
           }}
           onLogout={handleResetToLogin}
           onBackToPortal={() => setStep('PORTAL')}
+        />
+      )}
+
+      {/* Mandatory First-Time Face Biometrics Registration Modal */}
+      {faceRegistrationModalOpen && loggedInStaff && (
+        <FaceRegistrationModal
+          staff={loggedInStaff}
+          isOpen={faceRegistrationModalOpen}
+          onClose={() => setFaceRegistrationModalOpen(false)}
+          onFaceRegistered={handleFaceRegistered}
         />
       )}
 
@@ -427,6 +459,9 @@ export default function StaffView({
               setToiletChecklistOpen(true);
             }
             setStep('PORTAL');
+            if (!loggedInStaff?.profile_photo_url) {
+              setFaceRegistrationModalOpen(true);
+            }
           }}
           onLogout={handleResetToLogin}
         />

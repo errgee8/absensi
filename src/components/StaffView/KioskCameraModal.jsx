@@ -6,6 +6,7 @@ import { checkIn, checkOut, startBreak, endBreak } from '../../utils/api';
 import { isWithinGeofence, calculateDistanceMeters } from '../../utils/distance';
 import { getAppNow } from '../../utils/time';
 import { enqueueOfflineAction } from '../../utils/offlineQueue';
+import DevicePermissionModal from './DevicePermissionModal';
 
 export default function KioskCameraModal({
   staff,
@@ -31,6 +32,7 @@ export default function KioskCameraModal({
   const [successMessage, setSuccessMessage] = useState('');
   const [submitError, setSubmitError] = useState(null);
   const [countdown, setCountdown] = useState(3);
+  const [permModalOpen, setPermModalOpen] = useState(false);
 
   const [userLocation, setUserLocation] = useState(null);
   const [geoState, setGeoState] = useState({
@@ -583,20 +585,28 @@ export default function KioskCameraModal({
                 )}
 
                 {geoState.status === 'denied' && (
-                  <div className="p-2.5 rounded-xl bg-rose-950/80 border border-rose-700 text-[11px] text-rose-200 space-y-1.5">
+                  <div className="p-2.5 rounded-xl bg-rose-950/80 border border-rose-700 text-[11px] text-rose-200 space-y-2">
                     <div className="flex items-center space-x-1.5 font-bold text-rose-300">
                       <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
                       <span>Izin Lokasi (GPS) Ditolak!</span>
                     </div>
                     <p className="text-[10px] text-rose-200/90 leading-tight">
-                      Klik ikon gembok 🔒 di samping link browser HP Anda, pilih <strong>Izin Situs &rarr; Lokasi &rarr; Izinkan</strong>, lalu klik tombol di bawah.
+                      Browser HP belum mengizinkan akses GPS. Klik tombol di bawah untuk memunculkan notifikasi izin di HP Anda:
                     </p>
                     <button
                       type="button"
-                      onClick={requestGpsPosition}
-                      className="w-full py-1.5 rounded-lg bg-rose-700 hover:bg-rose-600 text-white text-[10px] font-bold flex items-center justify-center space-x-1.5 transition"
+                      onClick={() => setPermModalOpen(true)}
+                      className="w-full py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-[11px] font-black uppercase tracking-wider flex items-center justify-center space-x-1.5 shadow-md shadow-indigo-500/20 transition cursor-pointer"
                     >
-                      <RefreshCw className="w-3.5 h-3.5" />
+                      <Smartphone className="w-3.5 h-3.5" />
+                      <span>Munculkan Izin Lokasi di HP</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={requestGpsPosition}
+                      className="w-full py-1.5 rounded-lg bg-rose-800/80 hover:bg-rose-700 text-white text-[10px] font-bold flex items-center justify-center space-x-1.5 transition cursor-pointer"
+                    >
+                      <RefreshCw className="w-3 h-3" />
                       <span>Coba Deteksi Ulang Lokasi</span>
                     </button>
                   </div>
@@ -682,13 +692,21 @@ export default function KioskCameraModal({
 
                     {/* Camera Error State */}
                     {cameraError && (
-                      <div className="p-4 text-center space-y-3 max-w-[260px]">
+                      <div className="p-4 text-center space-y-2.5 max-w-[260px]">
                         <AlertCircle className="w-8 h-8 text-amber-400 mx-auto" />
                         <p className="text-xs text-slate-300 leading-relaxed">{cameraError}</p>
                         <button
                           type="button"
+                          onClick={() => setPermModalOpen(true)}
+                          className="w-full py-2 px-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition flex items-center justify-center space-x-1.5 shadow cursor-pointer"
+                        >
+                          <Smartphone className="w-3.5 h-3.5" />
+                          <span>Munculkan Izin Kamera di HP</span>
+                        </button>
+                        <button
+                          type="button"
                           onClick={() => fileInputRef.current?.click()}
-                          className="w-full py-2.5 px-3 bg-emerald-500 hover:bg-emerald-400 text-slate-950 rounded-xl text-xs font-bold transition flex items-center justify-center space-x-2 shadow"
+                          className="w-full py-2.5 px-3 bg-emerald-500 hover:bg-emerald-400 text-slate-950 rounded-xl text-xs font-bold transition flex items-center justify-center space-x-2 shadow cursor-pointer"
                         >
                           <Smartphone className="w-4 h-4" />
                           <span>Buka Kamera HP Langsung</span>
@@ -848,6 +866,16 @@ export default function KioskCameraModal({
           )}
         </div>
       </div>
+
+      {/* Device Permission Helper Modal */}
+      <DevicePermissionModal
+        isOpen={permModalOpen}
+        onClose={() => setPermModalOpen(false)}
+        onPermissionsGranted={() => {
+          requestGpsPosition();
+          startCamera();
+        }}
+      />
     </div>
   );
 }
