@@ -1611,6 +1611,229 @@ router.post('/staff/:id/biometrics', async (req, res) => {
   }
 });
 
+// 9f. Staff Personal Attendance History (Late Check-Ins, Absences & Leaves)
+router.get('/staff/:id/attendance-history', async (req, res) => {
+  const { id } = req.params;
+  const { monthKey } = req.query; // optional YYYY-MM
+  
+  let targetMonthKey = monthKey;
+  if (!targetMonthKey || !/^\d{4}-\d{2}$/.test(targetMonthKey)) {
+    const nowWita = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Makassar' }).format(new Date());
+    targetMonthKey = nowWita.substring(0, 7);
+  }
+
+  let staff = null;
+  if (isSupabaseConfigured) {
+    const supaStaff = await findStaffInSupabase(id);
+    if (supaStaff) staff = { ...supaStaff, id: supaStaff.legacy_code || supaStaff.id, uuid: supaStaff.id };
+  }
+  if (!staff) {
+    staff = db.prepare('SELECT * FROM staff WHERE id = ? OR uuid = ?').get(id, id);
+  }
+  if (!staff) return res.status(404).json({ error: 'Karyawan tidak ditemukan.' });
+
+  const staffUuid = staff.uuid || staff.id;
+  const staffCode = staff.id || staff.legacy_code;
+
+  const [yr, mo] = targetMonthKey.split('-').map(Number);
+  const lastDay = new Date(Date.UTC(yr, mo, 0)).getUTCDate();
+  const startDate = `${targetMonthKey}-01`;
+  const endDate = `${targetMonthKey}-${String(lastDay).padStart(2, '0')}`;
+
+  // 1. Fetch shifts
+  let shifts = [];
+  if (isSupabaseConfigured) {
+    try {
+      shifts = await cloudDb.getShifts({ startDate, endDate });
+    } catch (e) {
+      console.warn('Failed to load cloud shifts for staff history:', e.message);
+    }
+  }
+  if (!shifts || shifts.length === 0) {
+    try {
+      shifts = db.prepare(`
+        SELECT s.*, st.name as staff_name, st.venue as staff_venue, st.role as staff_role
+        FROM shifts s
+        JOIN staff st ON s.staff_id = st.id
+        WHERE s.date >= ? AND s.date <= ?
+        ORDER BY s.date DESC, s.id DESC
+      `).all(startDate, endDate);
+    } catch {}
+  }
+
+  // Filter shifts strictly belonging to this staff
+  const staffShifts = (shifts || []).filter(s =>
+    String(s.staff_id) === String(staffCode) ||
+    String(s.staff_id) === String(staffUuid) ||
+    String(s.staff_uuid) === String(staffUuid) ||
+    String(s.staff_uuid) === String(staffCode)
+  );
+
+  // 2. Identify Late Records
+  const lateRecords = [];
+  const workedDates = new Set();
+
+  for (const s of staffShifts) {
+    const shiftDate = s.date || s.shift_date || '';
+    if (shiftDate) workedDates.add(shiftDate);
+
+    const flags = Array.isArray(s.flags) ? s.flags : (typeof s.flags === 'string' ? JSON.parse(s.flags || '[]') : []);
+    const isLateFlag = flags.some(f => String(f).toLowerCase().includes('late'));
+    const isLateStatus = s.late_status === 'PENDING_REVIEW' || s.late_status === 'APPROVED' || s.late_status === 'REJECTED';
+    const isLate = isLateFlag || isLateStatus || Boolean(s.late_reason);
+
+    if (isLate) {
+      const schedStart = s.scheduled_start || s.start_time || staff.shift_start || '13:00';
+      let lateMinutes = 0;
+      let actualTimeWita = '-';
+
+      if (s.checkin_time) {
+        try {
+          const parts = new Intl.DateTimeFormat('en-GB', {
+            timeZone: 'Asia/Makassar',
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false
+          }).formatToParts(new Date(s.checkin_time));
+          const h = parseInt(parts.find(p => p.type === 'hour')?.value || '0', 10);
+          const m = parseInt(parts.find(p => p.type === 'minute')?.value || '0', 10);
+          actualTimeWita = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')} WITA`;
+
+          if (schedStart && schedStart.includes(':')) {
+            const [sh, sm] = schedStart.split(':').map(Number);
+            let diff = (h * 60 + m) - (sh * 60 + sm);
+            if (diff < -720) diff += 1440;
+            if (diff > 720) diff -= 1440;
+            lateMinutes = Math.max(0, diff);
+          }
+        } catch {}
+      }
+
+      lateRecords.push({
+        shift_id: s.id,
+        date: shiftDate,
+        scheduled_start: schedStart,
+        actual_time_wita: actualTimeWita,
+        checkin_time: s.checkin_time,
+        late_minutes: lateMinutes,
+        late_reason: s.late_reason || null,
+        late_photo_url: s.late_photo_url || null,
+        late_status: s.late_status || (flags.includes('FLAG_LATE_EXCUSED') ? 'APPROVED' : 'PENDING_REVIEW'),
+        late_reviewed_by: s.late_reviewed_by || null,
+        late_reviewed_at: s.late_reviewed_at || null,
+        late_manager_note: s.late_manager_note || null
+      });
+    }
+  }
+
+  lateRecords.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+
+  // 3. Identify Leaves & Missed Days
+  let allLeaves = [];
+  if (isSupabaseConfigured) {
+    try {
+      allLeaves = await cloudDb.getLeaveRequests();
+    } catch {}
+  }
+  if (!allLeaves || allLeaves.length === 0) {
+    try {
+      allLeaves = getSetting('leave_requests') || [];
+    } catch {}
+  }
+
+  const staffLeaves = (allLeaves || []).filter(l =>
+    (String(l.staff_id) === String(staffCode) ||
+    String(l.staff_id) === String(staffUuid) ||
+    String(l.staff_name) === String(staff.name)) &&
+    (String(l.start_date || '').startsWith(targetMonthKey) || String(l.end_date || '').startsWith(targetMonthKey))
+  );
+
+  const leaveRecords = [];
+  const leaveDates = new Set();
+
+  for (const l of staffLeaves) {
+    const sDate = l.start_date || '';
+    const eDate = l.end_date || sDate;
+    leaveRecords.push({
+      id: l.id,
+      type: 'LEAVE',
+      category: l.category || l.type || 'IZIN',
+      start_date: sDate,
+      end_date: eDate,
+      requested_days: l.requested_days || 1,
+      reason: l.reason || '-',
+      status: l.status || 'PENDING',
+      reviewed_by: l.reviewed_by || null,
+      reviewed_at: l.reviewed_at || null,
+      manager_notes: l.manager_notes || null,
+      document_url: l.document_url || null
+    });
+
+    if (sDate) {
+      try {
+        const cur = new Date(sDate);
+        const end = new Date(eDate);
+        while (cur <= end) {
+          leaveDates.add(cur.toISOString().substring(0, 10));
+          cur.setDate(cur.getDate() + 1);
+        }
+      } catch {}
+    }
+  }
+
+  // 4. Identify Potential Unexcused Absences (Alpa)
+  const currentOpDate = getOperationalDateYMD(new Date());
+  const unexcusedAbsences = [];
+  const isCurrentMonth = currentOpDate.startsWith(targetMonthKey);
+  const maxDayToCheck = isCurrentMonth 
+    ? Math.max(1, parseInt(currentOpDate.split('-')[2], 10) - 1)
+    : lastDay;
+
+  if (staff.division !== 'Management' && staff.shift_start !== 'FLEXIBLE') {
+    for (let d = 1; d <= maxDayToCheck; d++) {
+      const dayStr = `${targetMonthKey}-${String(d).padStart(2, '0')}`;
+      if (!workedDates.has(dayStr) && !leaveDates.has(dayStr)) {
+        unexcusedAbsences.push({
+          id: `unexcused_${dayStr}`,
+          type: 'UNEXCUSED',
+          category: 'ALPA',
+          start_date: dayStr,
+          end_date: dayStr,
+          date: dayStr,
+          scheduled_hours: staff.standard_hours || 9,
+          scheduled_start: staff.shift_start || '13:00',
+          scheduled_end: staff.shift_end || '22:00',
+          status: 'TIDAK_HADIR',
+          reason: 'Tidak ada data presensi & tidak ada pengajuan izin/cuti yang disetujui.'
+        });
+      }
+    }
+  }
+
+  const allAbsences = [...leaveRecords, ...unexcusedAbsences];
+  allAbsences.sort((a, b) => {
+    const dateA = a.date || a.start_date || '';
+    const dateB = b.date || b.start_date || '';
+    return dateB.localeCompare(dateA);
+  });
+
+  res.json({
+    success: true,
+    monthKey: targetMonthKey,
+    stats: {
+      workDays: workedDates.size,
+      totalLate: lateRecords.length,
+      approvedLate: lateRecords.filter(r => r.late_status === 'APPROVED').length,
+      pendingLate: lateRecords.filter(r => r.late_status === 'PENDING_REVIEW').length,
+      rejectedLate: lateRecords.filter(r => r.late_status === 'REJECTED').length,
+      totalLeave: leaveRecords.length,
+      totalUnexcused: unexcusedAbsences.length
+    },
+    lateRecords,
+    absenceRecords: allAbsences
+  });
+});
+
 // 9d. Staff Daily Mood Emoji ("my mood today :" - emoji only)
 router.post('/staff/:id/mood', async (req, res) => {
   const { id } = req.params;

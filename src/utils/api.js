@@ -551,3 +551,12 @@ export async function updateStaffMood(staffId, emoji) {
   if (!res.ok) throw new Error(data.error || 'Gagal menyimpan mood hari ini');
   return data;
 }
+
+// 9f. Staff Personal Attendance History (Lates, Absences & Leaves)
+export async function getStaffAttendanceHistory(staffId, monthKey) {
+  const query = monthKey ? `?monthKey=${encodeURIComponent(monthKey)}` : '';
+  const res = await fetch(`${API_BASE}/staff/${encodeURIComponent(staffId)}/attendance-history${query}`);
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Gagal memuat riwayat kehadiran');
+  return data;
+}

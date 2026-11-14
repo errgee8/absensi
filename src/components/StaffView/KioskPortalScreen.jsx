@@ -92,6 +92,7 @@ export default function KioskPortalScreen({
   pendingPointsCount = 0,
   onOpenPointHistory,
   onOpenPendingPoints,
+  onOpenAttendanceHistory,
   onProfilePhotoUpdated,
   onMoodUpdated,
   onOpenFaceRegistration
@@ -497,29 +498,39 @@ export default function KioskPortalScreen({
               </div>
             </button>
 
-            <div className="bg-[#131720] border border-white/[0.07] rounded-2xl p-2.5">
-              <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+            <button
+              type="button"
+              onClick={() => onOpenAttendanceHistory?.('LATE')}
+              className="bg-[#131720] hover:bg-[#161b26] border border-white/[0.07] rounded-2xl p-2.5 text-left transition cursor-pointer group"
+              title="Ketuk untuk melihat riwayat telat (tanggal, jam, alasan & status ACC)"
+            >
+              <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 group-hover:text-amber-300 transition">
                 Telat Bln Ini
               </div>
               <div className="text-xl font-black text-white mt-0.5 leading-none">
                 {lateCount}x
               </div>
-              <div className="text-[10px] text-slate-500 mt-1 truncate">
-                Kalender berjalan
+              <div className="text-[10px] text-amber-400/80 mt-1 truncate font-medium">
+                Cek Riwayat →
               </div>
-            </div>
+            </button>
 
-            <div className="bg-[#131720] border border-white/[0.07] rounded-2xl p-2.5">
-              <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+            <button
+              type="button"
+              onClick={() => onOpenAttendanceHistory?.('ABSENT')}
+              className="bg-[#131720] hover:bg-[#161b26] border border-white/[0.07] rounded-2xl p-2.5 text-left transition cursor-pointer group"
+              title="Ketuk untuk melihat riwayat hari kerja & tidak masuk (alpa/izin)"
+            >
+              <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 group-hover:text-blue-300 transition">
                 Hari Kerja
               </div>
               <div className="text-xl font-black text-white mt-0.5 leading-none">
                 {workDays}
               </div>
-              <div className="text-[10px] text-slate-500 mt-1 truncate">
-                Kalender berjalan
+              <div className="text-[10px] text-blue-400/80 mt-1 truncate font-medium">
+                Cek Riwayat →
               </div>
-            </div>
+            </button>
           </div>
 
           {/* Highlighted New Point Notification Strip */}
@@ -662,6 +673,28 @@ export default function KioskPortalScreen({
             }`}
           >
             Buka →
+          </span>
+        </button>
+
+        {/* 3b. RIWAYAT TELAT & TIDAK MASUK (Full-width) */}
+        <button
+          type="button"
+          onClick={() => onOpenAttendanceHistory?.('LATE')}
+          className="w-full bg-[#1b202b] hover:bg-[#222836] active:scale-[0.99] border border-blue-400/25 rounded-2xl px-4 py-3.5 flex items-center justify-between gap-3 text-left shadow-lg transition cursor-pointer"
+        >
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-10 h-10 rounded-xl bg-blue-500/20 border border-blue-400/30 text-blue-300 flex items-center justify-center shrink-0">
+              <Clock className="w-5 h-5" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-sm font-extrabold text-white">Riwayat Telat &amp; Tidak Masuk</div>
+              <div className="text-xs text-slate-400 truncate mt-0.5">
+                Cek tanggal, jam masuk vs jadwal, &amp; status izin/alpa
+              </div>
+            </div>
+          </div>
+          <span className="px-3 py-1.5 rounded-xl bg-blue-500/20 text-blue-200 border border-blue-400/30 text-xs font-bold shrink-0">
+            Lihat →
           </span>
         </button>
 

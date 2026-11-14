@@ -10,6 +10,7 @@ import StaffAnnouncementModal from './StaffAnnouncementModal';
 import MandatoryNotificationModal from './MandatoryNotificationModal';
 import StaffPointNoticeModal from './StaffPointNoticeModal';
 import StaffPointHistoryModal from './StaffPointHistoryModal';
+import StaffAttendanceHistoryModal from './StaffAttendanceHistoryModal';
 import FaceRegistrationModal from './FaceRegistrationModal';
 import { getNotificationPermission } from '../../utils/pushNotifications';
 import { verifyStaffPin, getAnnouncements, acknowledgeAnnouncement, getLeaveRequests, getPoints, acknowledgeStaffPoint, subscribeRealtimeEvents, sendPresenceHeartbeat } from '../../utils/api';
@@ -57,6 +58,8 @@ export default function StaffView({
   const [staffPointCycleLabel, setStaffPointCycleLabel] = useState('');
   const [pointNoticeModalOpen, setPointNoticeModalOpen] = useState(false);
   const [pointHistoryModalOpen, setPointHistoryModalOpen] = useState(false);
+  const [attendanceHistoryModalOpen, setAttendanceHistoryModalOpen] = useState(false);
+  const [attendanceHistoryInitialTab, setAttendanceHistoryInitialTab] = useState('LATE');
 
   // Live Presence Heartbeat for active logged-in staff (direct WebSocket via Supabase Presence)
   useEffect(() => {
@@ -362,6 +365,10 @@ export default function StaffView({
           pendingPointsCount={pendingPoints.length}
           onOpenPointHistory={() => setPointHistoryModalOpen(true)}
           onOpenPendingPoints={() => setPointNoticeModalOpen(true)}
+          onOpenAttendanceHistory={(tab) => {
+            setAttendanceHistoryInitialTab(tab || 'LATE');
+            setAttendanceHistoryModalOpen(true);
+          }}
           onProfilePhotoUpdated={(url) =>
             setLoggedInStaff((prev) => (prev ? { ...prev, profile_photo_url: url } : prev))
           }
@@ -503,6 +510,16 @@ export default function StaffView({
           onClose={() => setPointHistoryModalOpen(false)}
           staff={loggedInStaff}
           onOpenNoticeModal={() => setPointNoticeModalOpen(true)}
+        />
+      )}
+
+      {/* Staff Personal Attendance & Absence History Modal */}
+      {attendanceHistoryModalOpen && loggedInStaff && (
+        <StaffAttendanceHistoryModal
+          isOpen={attendanceHistoryModalOpen}
+          onClose={() => setAttendanceHistoryModalOpen(false)}
+          staff={loggedInStaff}
+          initialTab={attendanceHistoryInitialTab}
         />
       )}
     </div>
