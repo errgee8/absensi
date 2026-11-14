@@ -1,5 +1,5 @@
 import React from 'react';
-import { Eye, AlertTriangle, CheckCircle, Clock, Coffee, MapPin } from 'lucide-react';
+import { Eye, AlertTriangle, CheckCircle, Clock, Coffee, MapPin, ShieldCheck, ShieldAlert, LogIn, LogOut } from 'lucide-react';
 import { formatWitaTimeOnly, formatWitaDateOnly, formatDuration } from '../../utils/time';
 import { resolveShift } from '../../utils/shiftResolver';
 
@@ -19,7 +19,13 @@ export default function ShiftTable({ shifts = [], schedules = [], onInspectPhoto
     const isLatePending = shift?.late_status === 'PENDING_REVIEW' || (flags?.some(f => String(f).includes('Late Check-In')) && !shift?.late_status);
     const isLateRejected = shift?.late_status === 'REJECTED';
 
-    if ((!flags || flags.length === 0) && !isLateApproved && !isLatePending && !isLateRejected) {
+    const nonLateFlags = (flags || []).filter(f => {
+      if (isLateApproved && (f === 'FLAG_LATE_EXCUSED' || String(f).includes('Late Check-In'))) return false;
+      if ((isLatePending || isLateRejected) && String(f).includes('Late Check-In')) return false;
+      return true;
+    });
+
+    if (nonLateFlags.length === 0) {
       return (
         <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
           <CheckCircle className="w-2.5 h-2.5 text-emerald-400 stroke-[2.5]" />
@@ -29,79 +35,24 @@ export default function ShiftTable({ shifts = [], schedules = [], onInspectPhoto
     }
 
     const flagLabels = {
+      FLAG_FACE_MISMATCH: { text: 'Wajah Tidak Cocok', color: 'bg-rose-500/20 text-rose-300 border-rose-500/40' },
       'FLAG: Late Check-In (>10m Grace)': { text: 'Late (>10m Grace)', color: 'bg-rose-500/15 text-rose-300 border-rose-500/30' },
-      FLAG_LATE_EXCUSED: { text: 'Late Di-ACC (Dimaafkan)', color: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30' },
+      FLAG_LATE_EXCUSED: { text: 'Late Di-ACC', color: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30' },
       'FLAG: Unverified Network': { text: 'Unverified Network', color: 'bg-rose-500/15 text-rose-300 border-rose-500/30' },
       FLAG_UNVERIFIED_NETWORK: { text: 'Unverified Network', color: 'bg-rose-500/15 text-rose-300 border-rose-500/30' },
-      'FLAG: Break Exceeded 1 Hour': { text: 'Break > 1 Hr', color: 'bg-amber-500/15 text-amber-300 border-amber-500/30' },
+      'FLAG: Break Exceeded 1 Hour': { text: 'Break > 1 Jam', color: 'bg-amber-500/15 text-amber-300 border-amber-500/30' },
       'FLAG: Break Past Allowed Window': { text: 'Late Break Window', color: 'bg-amber-500/15 text-amber-300 border-amber-500/30' },
-      FLAG_MISSING_CHECKOUT: { text: 'Lupa Check-Out (Auto Cut-Off)', color: 'bg-rose-500/15 text-rose-300 border-rose-500/30' },
+      FLAG_MISSING_CHECKOUT: { text: 'Lupa Check-Out', color: 'bg-rose-500/15 text-rose-300 border-rose-500/30' },
       FLAG_EARLY_CHECKOUT: { text: 'Early Check-Out', color: 'bg-amber-500/15 text-amber-300 border-amber-500/30' },
       FLAG_NETWORK_MISMATCH: { text: 'Network Mismatch', color: 'bg-purple-500/15 text-purple-300 border-purple-500/30' },
-      FLAG_OFF_NETWORK: { text: 'Off-Network Attempt', color: 'bg-rose-500/15 text-rose-300 border-rose-500/30' },
-      FLAG_OUTSIDE_GEOFENCE: { text: 'Outside Geofence', color: 'bg-orange-500/15 text-orange-300 border-orange-500/30' },
+      FLAG_OFF_NETWORK: { text: 'Off-Network', color: 'bg-rose-500/15 text-rose-300 border-rose-500/30' },
+      FLAG_OUTSIDE_GEOFENCE: { text: 'Di Luar Geofence', color: 'bg-orange-500/15 text-orange-300 border-orange-500/30' },
       'FLAG_GPS_IMPRECISE (Perkiraan BTS)': { text: 'Sinyal BTS (±Cellular)', color: 'bg-amber-500/15 text-amber-300 border-amber-500/30' }
     };
 
     return (
       <div className="flex flex-wrap gap-1">
-        {/* Special Late Justification status badge - 1-Click to Review */}
-        {isLateApproved && (
-          <div className="flex flex-col items-start">
-            <button
-              type="button"
-              onClick={() => onReviewLate?.(shift)}
-              className="inline-flex items-center space-x-1 px-1.5 py-0.5 rounded-md text-[9px] font-black border bg-emerald-500/15 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/25 transition cursor-pointer"
-              title={shift?.late_reviewed_by ? `Di-ACC oleh ${shift.late_reviewed_by}. Klik untuk lihat/ubah.` : 'Di-ACC. Klik untuk detail.'}
-            >
-              <CheckCircle className="w-2.5 h-2.5 stroke-[2.5]" />
-              <span>Late Di-ACC ✓</span>
-            </button>
-            {shift?.late_reviewed_by && (
-              <span className="text-[8.5px] font-bold text-slate-400 truncate max-w-[110px]" title={shift.late_reviewed_by}>
-                oleh {shift.late_reviewed_by}
-              </span>
-            )}
-          </div>
-        )}
-        {!isLateApproved && isLatePending && (
-          <button
-            type="button"
-            onClick={() => onReviewLate?.(shift)}
-            className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-md text-[9px] font-black border bg-amber-500 hover:bg-amber-600 text-slate-950 font-black border-amber-400 transition cursor-pointer shadow-sm animate-pulse"
-            title="Klik 1-tombol untuk melihat detail keterlambatan & ACC / Tolak"
-          >
-            <Clock className="w-2.5 h-2.5 stroke-[2.5]" />
-            <span>Review Late ⏳</span>
-          </button>
-        )}
-        {!isLateApproved && isLateRejected && (
-          <div className="flex flex-col items-start">
-            <button
-              type="button"
-              onClick={() => onReviewLate?.(shift)}
-              className="inline-flex items-center space-x-1 px-1.5 py-0.5 rounded-md text-[9px] font-black border bg-rose-500/15 text-rose-300 border-rose-500/40 hover:bg-rose-500/25 transition cursor-pointer"
-              title={shift?.late_reviewed_by ? `Ditolak oleh ${shift.late_reviewed_by}. Klik untuk lihat/ubah.` : 'Ditolak. Klik untuk detail.'}
-            >
-              <AlertTriangle className="w-2.5 h-2.5 stroke-[2.5]" />
-              <span>Late Ditolak ✕</span>
-            </button>
-            {shift?.late_reviewed_by && (
-              <span className="text-[8.5px] font-bold text-slate-400 truncate max-w-[110px]" title={shift.late_reviewed_by}>
-                oleh {shift.late_reviewed_by}
-              </span>
-            )}
-          </div>
-        )}
-
-        {flags?.map((f, idx) => {
-          if (isLateApproved && (f === 'FLAG_LATE_EXCUSED' || String(f).includes('Late Check-In'))) {
-            return null;
-          }
-          if ((isLatePending || isLateRejected) && String(f).includes('Late Check-In')) {
-            return null;
-          }
-
+        {nonLateFlags.map((f, idx) => {
           const conf = flagLabels[f] || {
             text: f.replace('FLAG_', '').replace('FLAG: ', ''),
             color: 'bg-amber-500/15 text-amber-300 border-amber-500/30'
@@ -120,6 +71,124 @@ export default function ShiftTable({ shifts = [], schedules = [], onInspectPhoto
     );
   };
 
+  const renderFaceRecogBadge = (shift) => {
+    const status = shift.face_recog_status;
+    const sim = shift.face_recog_similarity;
+
+    if (status === 'MATCH') {
+      return (
+        <span
+          className="inline-flex items-center space-x-1 px-1.5 py-0.5 rounded-md text-[9px] font-black bg-emerald-500/15 text-emerald-300 border border-emerald-500/30"
+          title={`Biometrik cocok: ${sim}% kemiripan`}
+        >
+          <ShieldCheck className="w-2.5 h-2.5 text-emerald-400 stroke-[2.5]" />
+          <span>Lolos {sim != null ? `(${sim}%)` : '✓'}</span>
+        </span>
+      );
+    }
+
+    if (status === 'MISMATCH') {
+      return (
+        <span
+          className="inline-flex items-center space-x-1 px-1.5 py-0.5 rounded-md text-[9px] font-black bg-rose-500/20 text-rose-300 border border-rose-500/40 animate-pulse"
+          title={`Peringatan: Wajah selfie tidak cocok (${sim != null ? `${sim}%` : 'Rendah'})`}
+        >
+          <ShieldAlert className="w-2.5 h-2.5 text-rose-400 stroke-[2.5]" />
+          <span>Beda Wajah {sim != null ? `(${sim}%)` : '✕'}</span>
+        </span>
+      );
+    }
+
+    if (status === 'NO_REFERENCE') {
+      return (
+        <span
+          className="inline-flex items-center space-x-1 px-1.5 py-0.5 rounded-md text-[8.5px] font-bold text-slate-400 bg-slate-800/80 border border-slate-700/60"
+          title="Staff belum mengatur foto profil asli di aplikasi"
+        >
+          <span className="w-1.5 h-1.5 rounded-full bg-slate-500"></span>
+          <span>No Profil Ref</span>
+        </span>
+      );
+    }
+
+    return null;
+  };
+
+  const renderLateReviewBadge = (shift) => {
+    const flags = shift.flags || [];
+    const isLateApproved = shift?.late_status === 'APPROVED' || flags.includes('FLAG_LATE_EXCUSED');
+    const isLatePending = shift?.late_status === 'PENDING_REVIEW' || (flags.some(f => String(f).includes('Late Check-In')) && !shift?.late_status);
+    const isLateRejected = shift?.late_status === 'REJECTED';
+    const isLate = flags.some(f => String(f).includes('Late') || String(f).includes('LATE')) || shift.late_status;
+
+    if (!isLate && !isLateApproved && !isLatePending && !isLateRejected) {
+      return (
+        <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-md text-[9px] font-bold text-slate-400 bg-slate-800/50 border border-slate-700/50">
+          <CheckCircle className="w-2.5 h-2.5 text-emerald-400" />
+          <span>Tepat Waktu</span>
+        </span>
+      );
+    }
+
+    if (isLateApproved) {
+      return (
+        <div className="flex flex-col items-start">
+          <button
+            type="button"
+            onClick={() => onReviewLate?.(shift)}
+            className="inline-flex items-center space-x-1 px-1.5 py-0.5 rounded-md text-[9px] font-black border bg-emerald-500/15 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/25 transition cursor-pointer"
+            title={shift?.late_reviewed_by ? `Di-ACC oleh ${shift.late_reviewed_by}. Klik untuk lihat/ubah.` : 'Di-ACC. Klik untuk detail.'}
+          >
+            <CheckCircle className="w-2.5 h-2.5 stroke-[2.5]" />
+            <span>Di-ACC ✓</span>
+          </button>
+          {shift?.late_reviewed_by && (
+            <span className="text-[8.5px] font-bold text-slate-400 truncate max-w-[90px]" title={shift.late_reviewed_by}>
+              oleh {shift.late_reviewed_by}
+            </span>
+          )}
+        </div>
+      );
+    }
+
+    if (isLatePending) {
+      return (
+        <button
+          type="button"
+          onClick={() => onReviewLate?.(shift)}
+          className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-md text-[9px] font-black border bg-amber-500 hover:bg-amber-400 text-slate-950 font-black border-amber-400 transition cursor-pointer shadow-sm animate-pulse"
+          title="Klik untuk melihat alasan & foto bukti telat, lalu ACC / Tolak"
+        >
+          <Clock className="w-2.5 h-2.5 stroke-[2.5]" />
+          <span>Review ⏳</span>
+        </button>
+      );
+    }
+
+    if (isLateRejected) {
+      return (
+        <div className="flex flex-col items-start">
+          <button
+            type="button"
+            onClick={() => onReviewLate?.(shift)}
+            className="inline-flex items-center space-x-1 px-1.5 py-0.5 rounded-md text-[9px] font-black border bg-rose-500/15 text-rose-300 border-rose-500/40 hover:bg-rose-500/25 transition cursor-pointer"
+            title={shift?.late_reviewed_by ? `Ditolak oleh ${shift.late_reviewed_by}. Klik untuk lihat/ubah.` : 'Ditolak. Klik untuk detail.'}
+          >
+            <AlertTriangle className="w-2.5 h-2.5 stroke-[2.5]" />
+            <span>Ditolak ✕</span>
+          </button>
+          {shift?.late_reviewed_by && (
+            <span className="text-[8.5px] font-bold text-slate-400 truncate max-w-[90px]" title={shift.late_reviewed_by}>
+              oleh {shift.late_reviewed_by}
+            </span>
+          )}
+        </div>
+      );
+    }
+
+    return null;
+  };
+
   return (
     <div className="bg-[#161b24] border border-slate-800 rounded-3xl overflow-hidden shadow-xl">
       <div className="overflow-x-auto">
@@ -127,16 +196,14 @@ export default function ShiftTable({ shifts = [], schedules = [], onInspectPhoto
           <thead className="bg-[#12161f] text-slate-300 uppercase text-[10px] tracking-wider font-black border-b border-slate-800">
             <tr>
               <th className="py-3.5 px-3">Tanggal</th>
-              <th className="py-3.5 px-3">Nama Staff</th>
+              <th className="py-3.5 px-3">Staff &amp; Mood</th>
               <th className="py-3.5 px-3">Outlet &amp; Divisi</th>
-              <th className="py-3.5 px-3">Indikator Shift</th>
-              <th className="py-3.5 px-3">Masuk</th>
-              <th className="py-3.5 px-2 text-center">Foto Masuk</th>
-              <th className="py-3.5 px-3">Istirahat</th>
+              <th className="py-3.5 px-3">Jadwal Shift</th>
+              <th className="py-3.5 px-3">Masuk &amp; Face Recog</th>
+              <th className="py-3.5 px-3">Istirahat (Before / After)</th>
               <th className="py-3.5 px-3">Pulang</th>
-              <th className="py-3.5 px-2 text-center">Foto Pulang</th>
-              <th className="py-3.5 px-2">Durasi</th>
-              <th className="py-3.5 px-2">Jarak GPS</th>
+              <th className="py-3.5 px-2">Durasi &amp; GPS</th>
+              <th className="py-3.5 px-3">Late Review</th>
               <th className="py-3.5 px-3">Status / Anomali</th>
               <th className="py-3.5 px-2 text-right">Detail</th>
             </tr>
@@ -152,7 +219,11 @@ export default function ShiftTable({ shifts = [], schedules = [], onInspectPhoto
                 <tr
                   key={shift.id}
                   className={`hover:bg-slate-800/40 transition-colors ${
-                    hasFlags ? 'bg-amber-500/5' : ''
+                    shift.flags?.includes('FLAG_FACE_MISMATCH')
+                      ? 'bg-rose-500/10'
+                      : hasFlags
+                      ? 'bg-amber-500/5'
+                      : ''
                   }`}
                 >
                   {/* Date */}
@@ -160,23 +231,27 @@ export default function ShiftTable({ shifts = [], schedules = [], onInspectPhoto
                     {formatWitaDateOnly(shift.shift_date || shift.date || shift.checkin_time)}
                   </td>
 
-                  {/* Staff Name & ID */}
+                  {/* Staff Name, Real Photo, Mood & Announcement */}
                   <td className="py-3 px-3 whitespace-nowrap">
-                    <div className="flex items-center space-x-2">
-                      {shift.staff_profile_photo_url && (
+                    <div className="flex items-center space-x-2.5">
+                      {shift.staff_profile_photo_url ? (
                         <img
                           src={shift.staff_profile_photo_url}
                           alt={shift.staff_name}
-                          className="w-7 h-7 rounded-lg object-cover border border-slate-700 shrink-0"
+                          className="w-8 h-8 rounded-xl object-cover border border-slate-700 shrink-0 shadow-xs"
                         />
+                      ) : (
+                        <div className="w-8 h-8 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center text-[11px] font-black text-slate-400 shrink-0">
+                          {shift.staff_name ? shift.staff_name.slice(0, 2).toUpperCase() : 'ST'}
+                        </div>
                       )}
                       <div className="min-w-0">
                         <div className="flex items-center space-x-1.5">
                           <span className="font-black text-slate-100 text-sm">{shift.staff_name}</span>
                           {shift.mood_emoji && (
                             <span
-                              className="inline-flex items-center justify-center text-sm px-1.5 py-0.5 rounded-lg bg-slate-800/90 border border-slate-700/70 shadow-xs cursor-default shrink-0"
-                              title={`Mood hari ini: ${shift.mood_emoji}`}
+                              className="inline-flex items-center justify-center text-sm px-1.5 py-0.2 rounded-lg bg-slate-800/90 border border-slate-700/70 shadow-xs cursor-default shrink-0"
+                              title={`Mood staff hari ini: ${shift.mood_emoji}`}
                             >
                               {shift.mood_emoji}
                             </span>
@@ -216,7 +291,7 @@ export default function ShiftTable({ shifts = [], schedules = [], onInspectPhoto
                     </div>
                   </td>
 
-                  {/* Shift Indicator */}
+                  {/* Shift Indicator & Schedule */}
                   <td className="py-3 px-3 whitespace-nowrap">
                     <div className="flex flex-col gap-1 items-start">
                       <span className={`inline-flex items-center px-2 py-0.5 rounded-lg text-[11px] font-black border ${shiftInfo.badgeClass}`}>
@@ -235,120 +310,184 @@ export default function ShiftTable({ shifts = [], schedules = [], onInspectPhoto
                     </div>
                   </td>
 
-                  {/* In Time */}
-                  <td className="py-3 px-3 font-mono text-emerald-400 font-black whitespace-nowrap">
-                    {formatWitaTimeOnly(shift.checkin_time)}
-                  </td>
-
-                  {/* In Photo */}
-                  <td className="py-3 px-2 text-center">
-                    {shift.checkin_photo ? (
-                      <button
-                        onClick={() => onInspectPhoto(shift, 'in')}
-                        className="group relative inline-block rounded-xl overflow-hidden border border-slate-700 hover:border-blue-500 transition shadow-sm bg-slate-900"
-                        title="Lihat Foto Masuk"
-                      >
-                        <img
-                          src={shift.checkin_photo}
-                          alt="Check-in Selfie"
-                          onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                          className="w-10 h-10 object-cover group-hover:scale-110 transition duration-200"
-                        />
-                        <div className="absolute inset-0 bg-blue-950/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition">
-                          <Eye className="w-3.5 h-3.5 text-white stroke-[2.5]" />
+                  {/* Masuk & Face Recog Status */}
+                  <td className="py-3 px-3 whitespace-nowrap">
+                    <div className="flex items-center space-x-2.5">
+                      {shift.checkin_photo ? (
+                        <button
+                          type="button"
+                          onClick={() => onInspectPhoto(shift, 'in')}
+                          className="group relative inline-block rounded-xl overflow-hidden border border-slate-700 hover:border-emerald-500 transition shadow-sm bg-slate-900 shrink-0"
+                          title="Lihat Foto Selfie Masuk"
+                        >
+                          <img
+                            src={shift.checkin_photo}
+                            alt="Check-in Selfie"
+                            onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                            className="w-10 h-10 object-cover group-hover:scale-110 transition duration-200"
+                          />
+                          <div className="absolute inset-0 bg-emerald-950/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition">
+                            <Eye className="w-3.5 h-3.5 text-white stroke-[2.5]" />
+                          </div>
+                        </button>
+                      ) : (
+                        <div className="w-10 h-10 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center text-[10px] text-slate-500 font-mono shrink-0">
+                          -
                         </div>
-                      </button>
-                    ) : (
-                      <span className="text-[10px] text-slate-600 font-mono">-</span>
-                    )}
+                      )}
+                      <div className="flex flex-col gap-1">
+                        <span className="font-mono text-emerald-400 font-black text-xs">
+                          {formatWitaTimeOnly(shift.checkin_time)}
+                        </span>
+                        {renderFaceRecogBadge(shift)}
+                      </div>
+                    </div>
                   </td>
 
-                  {/* Break Status / Duration */}
+                  {/* Istirahat (Status, Jam Selesai & Foto Before/After) */}
                   <td className="py-3 px-3 whitespace-nowrap">
                     {shift.staff_division === 'Management' ? (
                       <span className="text-[10px] text-blue-400 font-mono font-black">Fleksibel (Mgmt)</span>
                     ) : shift.staff_venue === 'JP Karaoke' ? (
                       <span className="text-[10px] text-slate-500 font-mono font-bold">No Break (JP)</span>
-                    ) : shift.break_status === 'ON_BREAK' ? (
-                      <span className="px-2 py-0.5 rounded-lg text-[10px] font-black bg-sky-500/15 text-sky-300 border border-sky-500/30 animate-pulse">
-                        Sedang Istirahat
-                      </span>
-                    ) : shift.break_duration_minutes != null ? (
-                      <div>
-                        <span className="font-mono text-sky-300 font-black">
-                          {shift.break_duration_minutes}m istirahat
-                        </span>
-                        {shift.break_end_photo && (
-                          <button
-                            onClick={() => onInspectPhoto(shift, 'break')}
-                            className="ml-1 text-[10px] text-blue-400 hover:text-blue-300 hover:underline inline-flex items-center font-bold"
-                          >
-                            <Coffee className="w-2.5 h-2.5 mr-0.5 stroke-[2.5]" /> Foto
-                          </button>
+                    ) : (
+                      <div className="space-y-1.5">
+                        {/* Break Status & Time */}
+                        <div className="text-[11px]">
+                          {shift.break_status === 'ON_BREAK' ? (
+                            <span className="px-2 py-0.5 rounded-lg text-[10px] font-black bg-sky-500/15 text-sky-300 border border-sky-500/30 animate-pulse">
+                              Sedang Break ({formatWitaTimeOnly(shift.break_start_time)})
+                            </span>
+                          ) : shift.break_duration_minutes != null || shift.break_end_time ? (
+                            <div className="leading-tight">
+                              <span className="font-mono text-sky-300 font-black">
+                                Selesai {shift.break_duration_minutes != null ? `${shift.break_duration_minutes}m` : ''}
+                              </span>
+                              {shift.break_end_time && (
+                                <div className="text-[10px] font-mono text-slate-400">
+                                  jam {formatWitaTimeOnly(shift.break_end_time)}
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-[10px] text-slate-500 font-mono font-bold">Belum Diambil</span>
+                          )}
+                        </div>
+
+                        {/* Foto Before (Mulai) & After (Selesai) Break */}
+                        {(shift.break_start_photo || shift.break_end_photo) && (
+                          <div className="flex items-center space-x-2 pt-0.5">
+                            {/* Before Photo */}
+                            {shift.break_start_photo && (
+                              <button
+                                type="button"
+                                onClick={() => onInspectPhoto(shift, 'break_start')}
+                                className="group relative rounded-lg overflow-hidden border border-slate-700 hover:border-sky-500 transition shadow-xs bg-slate-900"
+                                title="Lihat Foto Mulai Istirahat (Before)"
+                              >
+                                <img
+                                  src={shift.break_start_photo}
+                                  alt="Break Start"
+                                  className="w-7 h-7 object-cover group-hover:scale-110 transition duration-200"
+                                  onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                                />
+                                <span className="absolute bottom-0 inset-x-0 bg-black/75 text-[7px] text-sky-200 text-center font-bold">
+                                  Before
+                                </span>
+                              </button>
+                            )}
+
+                            {/* After Photo */}
+                            {shift.break_end_photo && (
+                              <button
+                                type="button"
+                                onClick={() => onInspectPhoto(shift, 'break_end')}
+                                className="group relative rounded-lg overflow-hidden border border-slate-700 hover:border-sky-500 transition shadow-xs bg-slate-900"
+                                title="Lihat Foto Selesai Istirahat (After)"
+                              >
+                                <img
+                                  src={shift.break_end_photo}
+                                  alt="Break End"
+                                  className="w-7 h-7 object-cover group-hover:scale-110 transition duration-200"
+                                  onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                                />
+                                <span className="absolute bottom-0 inset-x-0 bg-black/75 text-[7px] text-emerald-200 text-center font-bold">
+                                  After
+                                </span>
+                              </button>
+                            )}
+                          </div>
                         )}
                       </div>
-                    ) : (
-                      <span className="text-[10px] text-slate-500 font-mono font-bold">Belum Diambil</span>
                     )}
                   </td>
 
-                  {/* Out Time */}
-                  <td className="py-3 px-3 font-mono whitespace-nowrap">
-                    {shift.checkout_time ? (
-                      <span className="text-indigo-300 font-black">{formatWitaTimeOnly(shift.checkout_time)}</span>
-                    ) : (
-                      <span className="inline-block px-2 py-0.5 rounded-lg text-[10px] font-black bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
-                        Aktif Bertugas
-                      </span>
-                    )}
-                  </td>
-
-                  {/* Out Photo */}
-                  <td className="py-3 px-2 text-center">
-                    {shift.checkout_photo ? (
-                      <button
-                        onClick={() => onInspectPhoto(shift, 'out')}
-                        className="group relative inline-block rounded-xl overflow-hidden border border-slate-700 hover:border-blue-500 transition shadow-sm bg-slate-900"
-                        title="Lihat Foto Pulang"
-                      >
-                        <img
-                          src={shift.checkout_photo}
-                          alt="Checkout Selfie"
-                          onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                          className="w-10 h-10 object-cover group-hover:scale-110 transition duration-200"
-                        />
-                        <div className="absolute inset-0 bg-blue-950/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition">
-                          <Eye className="w-3.5 h-3.5 text-white stroke-[2.5]" />
+                  {/* Pulang (Check-Out Time & Photo) */}
+                  <td className="py-3 px-3 whitespace-nowrap">
+                    <div className="flex items-center space-x-2.5">
+                      {shift.checkout_photo ? (
+                        <button
+                          type="button"
+                          onClick={() => onInspectPhoto(shift, 'out')}
+                          className="group relative inline-block rounded-xl overflow-hidden border border-slate-700 hover:border-indigo-500 transition shadow-sm bg-slate-900 shrink-0"
+                          title="Lihat Foto Selfie Pulang"
+                        >
+                          <img
+                            src={shift.checkout_photo}
+                            alt="Checkout Selfie"
+                            onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                            className="w-10 h-10 object-cover group-hover:scale-110 transition duration-200"
+                          />
+                          <div className="absolute inset-0 bg-indigo-950/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition">
+                            <Eye className="w-3.5 h-3.5 text-white stroke-[2.5]" />
+                          </div>
+                        </button>
+                      ) : (
+                        <div className="w-10 h-10 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center text-[10px] text-slate-500 font-mono shrink-0">
+                          -
                         </div>
-                      </button>
-                    ) : (
-                      <span className="text-[10px] text-slate-600 font-mono">-</span>
-                    )}
+                      )}
+                      <div>
+                        {shift.checkout_time ? (
+                          <span className="text-indigo-300 font-mono font-black text-xs">
+                            {formatWitaTimeOnly(shift.checkout_time)}
+                          </span>
+                        ) : (
+                          <span className="inline-block px-2 py-0.5 rounded-lg text-[10px] font-black bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                            Aktif Bertugas
+                          </span>
+                        )}
+                      </div>
+                    </div>
                   </td>
 
-                  {/* Duration */}
-                  <td className="py-3 px-2 whitespace-nowrap font-mono text-slate-200 font-bold">
-                    {formatDuration(shift.duration_minutes)}
+                  {/* Duration & GPS */}
+                  <td className="py-3 px-2 whitespace-nowrap">
+                    <div className="font-mono text-slate-200 font-bold text-xs">
+                      {formatDuration(shift.duration_minutes)}
+                    </div>
+                    <div className="text-[10px] font-mono mt-0.5">
+                      <span className={shift.checkin_distance > 150 ? 'text-rose-400 font-black' : 'text-slate-400'}>
+                        📍 {shift.checkin_distance != null ? `${shift.checkin_distance}m` : '-'}
+                      </span>
+                    </div>
                   </td>
 
-                  {/* GPS Distance */}
-                  <td className="py-3 px-2 whitespace-nowrap font-mono text-[10px] font-bold">
-                    <span
-                      className={shift.checkin_distance > 150 ? 'text-rose-400 font-black' : 'text-slate-300'}
-                    >
-                      {shift.checkin_distance != null ? `${shift.checkin_distance}m` : '-'}
-                    </span>
+                  {/* Late Review */}
+                  <td className="py-3 px-3 whitespace-nowrap">
+                    {renderLateReviewBadge(shift)}
                   </td>
 
-                  {/* Flags */}
+                  {/* Flags / Anomali */}
                   <td className="py-3 px-3 max-w-xs">{renderFlagBadges(shift.flags, shift)}</td>
 
-                  {/* Inspect Button */}
+                  {/* Inspect Detail Button */}
                   <td className="py-3 px-2 text-right">
                     <button
+                      type="button"
                       onClick={() => onInspectPhoto(shift, shift.checkout_photo ? 'out' : 'in')}
-                      className="p-2 rounded-xl bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/30 transition shadow-xs"
-                      title="Lihat detail audit shift"
+                      className="p-2 rounded-xl bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/30 transition shadow-xs cursor-pointer"
+                      title="Buka audit lengkap shift"
                     >
                       <Eye className="w-4 h-4 stroke-[2.5]" />
                     </button>

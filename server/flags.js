@@ -14,7 +14,8 @@ export const FLAG_TYPES = {
   OFF_NETWORK: 'FLAG_OFF_NETWORK',
   OUTSIDE_GEOFENCE: 'FLAG_OUTSIDE_GEOFENCE',
   BREAK_EXCEEDED: 'FLAG: Break Exceeded 1 Hour',
-  LATE_BREAK: 'FLAG: Break Past Allowed Window'
+  LATE_BREAK: 'FLAG: Break Past Allowed Window',
+  FACE_MISMATCH: 'FLAG_FACE_MISMATCH'
 };
 
 const GRACE_PERIOD_MINUTES = 10;

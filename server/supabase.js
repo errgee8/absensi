@@ -316,7 +316,7 @@ export const cloudDb = {
   },
 
   // 3. Record Check-In in attendance_logs
-  async recordCheckin({ staffId, userLat, userLng, accuracy, distance, photoUrl, clientIp, wifiPass, flags, scheduledStart, scheduledEnd, shiftNumber, shiftName, lateReason, latePhotoUrl, moodEmoji }) {
+  async recordCheckin({ staffId, userLat, userLng, accuracy, distance, photoUrl, clientIp, wifiPass, flags, scheduledStart, scheduledEnd, shiftNumber, shiftName, lateReason, latePhotoUrl, moodEmoji, faceRecogStatus, faceRecogSimilarity, faceRecogDistance }) {
     if (!supabase) return null;
     const staff = await findStaffInSupabase(staffId);
     if (!staff) throw new Error('Staff record not found: ' + staffId);
@@ -335,7 +335,10 @@ export const cloudDb = {
       late_status: isLate ? (lateReason ? 'PENDING_REVIEW' : null) : null,
       late_reviewed_by: null,
       late_reviewed_at: null,
-      late_manager_note: null
+      late_manager_note: null,
+      face_recog_status: faceRecogStatus || null,
+      face_recog_similarity: faceRecogSimilarity != null ? faceRecogSimilarity : null,
+      face_recog_distance: faceRecogDistance != null ? faceRecogDistance : null
     });
 
     const { data, error } = await supabase
@@ -771,6 +774,9 @@ export const cloudDb = {
         late_reviewed_by: parsedNotes.late_reviewed_by || null,
         late_reviewed_at: parsedNotes.late_reviewed_at || null,
         late_manager_note: parsedNotes.late_manager_note || null,
+        face_recog_status: parsedNotes.face_recog_status || null,
+        face_recog_similarity: parsedNotes.face_recog_similarity != null ? Number(parsedNotes.face_recog_similarity) : null,
+        face_recog_distance: parsedNotes.face_recog_distance != null ? Number(parsedNotes.face_recog_distance) : null,
         created_at: row.created_at,
         updated_at: row.updated_at
       };

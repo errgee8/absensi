@@ -10,6 +10,7 @@ import { detectShiftSchedule, getBreakCutoff, isBreakAllowedNow, getWitaTimeStri
 import { computeLeaderboard } from './leaderboard.js';
 import { getVapidPublicKey, savePushSubscription, sendPushNotification } from './push.js';
 import { createSystemSnapshot, listSystemBackups, restoreSystemSnapshot } from './backup.js';
+import { verifyFaceMatch } from './faceBiometrics.js';
 
 const router = express.Router();
 
@@ -1764,6 +1765,37 @@ router.post('/checkin', async (req, res) => {
     checkinMoodEmoji = '😊';
   }
 
+  // Biometric Face Recognition Verification against registered Staff Profile Photo
+  let refProfilePhoto = null;
+  try {
+    let profilesMap = getSetting('staff_profiles') || {};
+    if (isSupabaseConfigured) {
+      const cloudProfiles = await cloudDb.getStaffProfilesMap();
+      if (cloudProfiles && Object.keys(cloudProfiles).length > 0) profilesMap = cloudProfiles;
+    }
+    const pEntry = profilesMap?.[staff.uuid] || profilesMap?.[staff.id] || null;
+    if (pEntry?.photo_url) {
+      const resolvedTarget = [{ photo_url: pEntry.photo_url }];
+      await resolveAttendancePhotoUrls(resolvedTarget, ['photo_url']);
+      refProfilePhoto = resolvedTarget[0].photo_url;
+    }
+  } catch (err) {
+    console.warn('Error resolving staff profile photo for face match:', err.message);
+  }
+
+  let faceRecogResult = { verified: null, status: 'NO_REFERENCE', similarity: null, distance: null };
+  if (refProfilePhoto && photoBase64) {
+    try {
+      faceRecogResult = await verifyFaceMatch(photoBase64, refProfilePhoto);
+      if (faceRecogResult.status === 'MISMATCH') {
+        flags.push(FLAG_TYPES.FACE_MISMATCH);
+      }
+    } catch (err) {
+      console.warn('Face recognition error during checkin:', err.message);
+      faceRecogResult = { verified: null, status: 'ERROR', similarity: null, distance: null, message: err.message };
+    }
+  }
+
   // Sync to Supabase Cloud if connected
   let supaShift = null;
   if (isSupabaseConfigured) {
@@ -1784,7 +1816,10 @@ router.post('/checkin', async (req, res) => {
         shiftName,
         lateReason,
         latePhotoUrl,
-        moodEmoji: checkinMoodEmoji
+        moodEmoji: checkinMoodEmoji,
+        faceRecogStatus: faceRecogResult.status,
+        faceRecogSimilarity: faceRecogResult.similarity,
+        faceRecogDistance: faceRecogResult.distance
       });
     } catch (e) {
       console.warn('Supabase Checkin Cloud Sync Note:', e.message);
@@ -1800,7 +1835,10 @@ router.post('/checkin', async (req, res) => {
     mood_emoji: checkinMoodEmoji || null,
     late_reason: lateReason || null,
     late_photo_url: latePhotoUrl || null,
-    late_status: isLate ? (lateReason ? 'PENDING_REVIEW' : null) : null
+    late_status: isLate ? (lateReason ? 'PENDING_REVIEW' : null) : null,
+    face_recog_status: faceRecogResult.status,
+    face_recog_similarity: faceRecogResult.similarity,
+    face_recog_distance: faceRecogResult.distance
   });
 
   const result = db.prepare(`
@@ -1850,7 +1888,8 @@ router.post('/checkin', async (req, res) => {
     success: true,
     message: 'Absensi Masuk Berhasil Dicatat!',
     shift: shiftResponse,
-    flags
+    flags,
+    faceRecog: faceRecogResult
   });
 });
 
@@ -2555,7 +2594,16 @@ router.get('/shifts', async (req, res) => {
       ...r,
       flags: JSON.parse(r.flags || '[]'),
       mood_emoji: resolvedMood,
-      staff_profile_photo_url: profEntry?.photo_url || null
+      staff_profile_photo_url: profEntry?.photo_url || null,
+      face_recog_status: parsedNotes.face_recog_status || null,
+      face_recog_similarity: parsedNotes.face_recog_similarity != null ? Number(parsedNotes.face_recog_similarity) : null,
+      face_recog_distance: parsedNotes.face_recog_distance != null ? Number(parsedNotes.face_recog_distance) : null,
+      late_reason: parsedNotes.late_reason || null,
+      late_photo_url: parsedNotes.late_photo_url || null,
+      late_status: parsedNotes.late_status || null,
+      late_reviewed_by: parsedNotes.late_reviewed_by || null,
+      late_reviewed_at: parsedNotes.late_reviewed_at || null,
+      late_manager_note: parsedNotes.late_manager_note || null
     };
   });
 
@@ -2564,6 +2612,15 @@ router.get('/shifts', async (req, res) => {
   } else if (flagFilter === 'NORMAL_ONLY') {
     processed = processed.filter(r => r.flags.length === 0);
   }
+
+  await resolveAttendancePhotoUrls(processed, [
+    'checkin_photo',
+    'break_start_photo',
+    'break_end_photo',
+    'checkout_photo',
+    'late_photo_url',
+    'staff_profile_photo_url'
+  ]);
 
   res.json(processed);
 });
