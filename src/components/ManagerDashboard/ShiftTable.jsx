@@ -107,8 +107,8 @@ export default function ShiftTable({
 
     if (nonLateFlags.length === 0) {
       return (
-        <span className="inline-flex items-center space-x-0.5 px-1.5 py-0.2 rounded text-[8.5px] font-black bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
-          <CheckCircle className="w-2 h-2 text-emerald-400 stroke-[2.5]" />
+        <span className="inline-flex items-center space-x-0.5 px-1.5 py-0.5 rounded text-[9px] font-black bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+          <CheckCircle className="w-2.5 h-2.5 text-emerald-400 stroke-[2.5]" />
           <span>Clean</span>
         </span>
       );
@@ -131,7 +131,7 @@ export default function ShiftTable({
     };
 
     return (
-      <div className="flex flex-wrap gap-0.5">
+      <div className="flex flex-wrap gap-1">
         {nonLateFlags.map((f, idx) => {
           const conf = flagLabels[f] || {
             text: f.replace('FLAG_', '').replace('FLAG: ', ''),
@@ -140,9 +140,9 @@ export default function ShiftTable({
           return (
             <span
               key={idx}
-              className={`inline-flex items-center space-x-0.5 px-1 py-0.2 rounded text-[8px] font-bold border ${conf.color}`}
+              className={`inline-flex items-center space-x-0.5 px-1.5 py-0.5 rounded text-[8.5px] font-bold border ${conf.color}`}
             >
-              <AlertTriangle className="w-2 h-2 stroke-[2.5]" />
+              <AlertTriangle className="w-2.5 h-2.5 stroke-[2.5]" />
               <span>{conf.text}</span>
             </span>
           );
@@ -158,10 +158,10 @@ export default function ShiftTable({
     if (status === 'MATCH') {
       return (
         <span
-          className="inline-flex items-center space-x-0.5 px-1 py-0.2 rounded text-[8px] font-black bg-emerald-500/15 text-emerald-300 border border-emerald-500/30"
+          className="inline-flex items-center space-x-0.5 px-1.5 py-0.5 rounded text-[8.5px] font-black bg-emerald-500/15 text-emerald-300 border border-emerald-500/30"
           title={`Biometrik cocok: ${sim}% kemiripan`}
         >
-          <ShieldCheck className="w-2 h-2 text-emerald-400 stroke-[2.5]" />
+          <ShieldCheck className="w-2.5 h-2.5 text-emerald-400 stroke-[2.5]" />
           <span>Lolos {sim != null ? `${sim}%` : '✓'}</span>
         </span>
       );
@@ -170,10 +170,10 @@ export default function ShiftTable({
     if (status === 'MISMATCH') {
       return (
         <span
-          className="inline-flex items-center space-x-0.5 px-1 py-0.2 rounded text-[8px] font-bold bg-rose-500/15 text-rose-300 border border-rose-500/30"
+          className="inline-flex items-center space-x-0.5 px-1.5 py-0.5 rounded text-[8.5px] font-bold bg-rose-500/15 text-rose-300 border border-rose-500/30"
           title={`Wajah selfie tidak cocok (${sim != null ? `${sim}%` : 'Rendah'})`}
         >
-          <ShieldAlert className="w-2 h-2 text-rose-400 stroke-[2.5]" />
+          <ShieldAlert className="w-2.5 h-2.5 text-rose-400 stroke-[2.5]" />
           <span>Beda {sim != null ? `${sim}%` : '✕'}</span>
         </span>
       );
@@ -182,7 +182,7 @@ export default function ShiftTable({
     if (status === 'NO_REFERENCE') {
       return (
         <span
-          className="inline-flex items-center space-x-0.5 px-1 py-0.2 rounded text-[7.5px] font-bold text-slate-400 bg-slate-800/80 border border-slate-700/60"
+          className="inline-flex items-center space-x-0.5 px-1.5 py-0.5 rounded text-[8px] font-bold text-slate-400 bg-slate-800/80 border border-slate-700/60"
           title="Staff belum mendaftarkan biometrik wajah resmi"
         >
           <span>No Ref</span>
@@ -202,8 +202,8 @@ export default function ShiftTable({
 
     if (!isLate && !isLateApproved && !isLatePending && !isLateRejected) {
       return (
-        <span className="inline-flex items-center space-x-0.5 px-1 py-0.2 rounded text-[8.5px] font-bold text-slate-400 bg-slate-800/50 border border-slate-700/50">
-          <CheckCircle className="w-2 h-2 text-emerald-400" />
+        <span className="inline-flex items-center space-x-1 px-1.5 py-0.5 rounded text-[9px] font-bold text-slate-400 bg-slate-800/50 border border-slate-700/50">
+          <CheckCircle className="w-2.5 h-2.5 text-emerald-400" />
           <span>Tepat</span>
         </span>
       );
@@ -215,10 +215,10 @@ export default function ShiftTable({
           <button
             type="button"
             onClick={() => onReviewLate?.(shift)}
-            className="inline-flex items-center space-x-0.5 px-1.5 py-0.5 rounded text-[8.5px] font-black border bg-emerald-500/15 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/25 transition cursor-pointer"
+            className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-md text-[9px] font-black border bg-emerald-500/15 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/25 transition cursor-pointer"
             title={shift?.late_reviewed_by ? `Di-ACC oleh ${shift.late_reviewed_by}. Klik untuk lihat/ubah.` : 'Di-ACC. Klik untuk detail.'}
           >
-            <CheckCircle className="w-2 h-2 stroke-[2.5]" />
+            <CheckCircle className="w-2.5 h-2.5 stroke-[2.5]" />
             <span>Di-ACC ✓</span>
           </button>
         </div>
@@ -230,10 +230,10 @@ export default function ShiftTable({
         <button
           type="button"
           onClick={() => onReviewLate?.(shift)}
-          className="inline-flex items-center space-x-1 px-1.5 py-0.5 rounded text-[8.5px] font-black border bg-amber-500 hover:bg-amber-400 text-slate-950 border-amber-400 transition cursor-pointer shadow-xs animate-pulse"
+          className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-md text-[9px] font-black border bg-amber-500 hover:bg-amber-400 text-slate-950 border-amber-400 transition cursor-pointer shadow-xs animate-pulse"
           title="Klik untuk melihat alasan & foto bukti telat, lalu ACC / Tolak"
         >
-          <Clock className="w-2 h-2 stroke-[2.5]" />
+          <Clock className="w-2.5 h-2.5 stroke-[2.5]" />
           <span>Review ⏳</span>
         </button>
       );
@@ -245,10 +245,10 @@ export default function ShiftTable({
           <button
             type="button"
             onClick={() => onReviewLate?.(shift)}
-            className="inline-flex items-center space-x-0.5 px-1.5 py-0.5 rounded text-[8.5px] font-black border bg-rose-500/15 text-rose-300 border-rose-500/40 hover:bg-rose-500/25 transition cursor-pointer"
+            className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-md text-[9px] font-black border bg-rose-500/15 text-rose-300 border-rose-500/40 hover:bg-rose-500/25 transition cursor-pointer"
             title={shift?.late_reviewed_by ? `Ditolak oleh ${shift.late_reviewed_by}. Klik untuk lihat/ubah.` : 'Ditolak. Klik untuk detail.'}
           >
-            <AlertTriangle className="w-2 h-2 stroke-[2.5]" />
+            <AlertTriangle className="w-2.5 h-2.5 stroke-[2.5]" />
             <span>Tolak ✕</span>
           </button>
         </div>
@@ -259,26 +259,26 @@ export default function ShiftTable({
   };
 
   const isCompact = density === 'compact';
-  const cellPy = isCompact ? 'py-1.5' : 'py-2.5';
+  const cellPy = isCompact ? 'py-2.5' : 'py-3.5';
 
   return (
     <div className="bg-[#161b24] border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
       <div className="overflow-x-auto">
         <table className="w-full text-left text-xs text-slate-200 border-collapse table-auto">
-          <thead className="bg-[#12161f] text-slate-300 uppercase text-[9px] tracking-wider font-black border-b border-slate-800">
+          <thead className="bg-[#12161f] text-slate-300 uppercase text-[9.5px] tracking-wider font-black border-b border-slate-800">
             <tr>
-              <th className="py-2 px-1 w-6 text-center"></th>
-              <th className="py-2 px-1.5 whitespace-nowrap">Tgl</th>
-              <th className="py-2 px-1.5">Staff &amp; Aksi</th>
-              <th className="py-2 px-1.5">Outlet/Divisi</th>
-              <th className="py-2 px-1.5 whitespace-nowrap">Shift</th>
-              <th className="py-2 px-1.5">Masuk</th>
-              <th className="py-2 px-1.5">Istirahat</th>
-              <th className="py-2 px-1.5">Pulang</th>
-              <th className="py-2 px-1 whitespace-nowrap">Durasi/GPS</th>
-              <th className="py-2 px-1.5 whitespace-nowrap">Review</th>
-              <th className="py-2 px-1.5">Anomali</th>
-              <th className="py-2 px-1 text-right w-7"></th>
+              <th className="py-2.5 px-1 w-6 text-center"></th>
+              <th className="py-2.5 px-1.5 whitespace-nowrap">Tgl</th>
+              <th className="py-2.5 px-1.5">Staff &amp; Aksi</th>
+              <th className="py-2.5 px-1.5">Outlet/Divisi</th>
+              <th className="py-2.5 px-1.5 whitespace-nowrap">Shift</th>
+              <th className="py-2.5 px-1.5">Masuk</th>
+              <th className="py-2.5 px-1.5">Istirahat</th>
+              <th className="py-2.5 px-1.5">Pulang</th>
+              <th className="py-2.5 px-1 whitespace-nowrap">Durasi/GPS</th>
+              <th className="py-2.5 px-1.5 whitespace-nowrap">Review</th>
+              <th className="py-2.5 px-1.5">Anomali</th>
+              <th className="py-2.5 px-1 text-right w-7"></th>
             </tr>
           </thead>
 
@@ -302,7 +302,7 @@ export default function ShiftTable({
                       <button
                         type="button"
                         onClick={() => toggleRow(shift.id)}
-                        className={`p-0.5 rounded transition cursor-pointer ${
+                        className={`p-1 rounded-lg transition cursor-pointer ${
                           isExpanded
                             ? 'bg-indigo-600 text-white'
                             : 'bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white'
@@ -310,40 +310,40 @@ export default function ShiftTable({
                         title={isExpanded ? 'Tutup Detail Kartu' : 'Buka Detail Kartu (Poin, Hari Kerja, Aksi)'}
                       >
                         {isExpanded ? (
-                          <ChevronUp className="w-3 h-3 stroke-[2.5]" />
+                          <ChevronUp className="w-3.5 h-3.5 stroke-[2.5]" />
                         ) : (
-                          <ChevronDown className="w-3 h-3 stroke-[2.5]" />
+                          <ChevronDown className="w-3.5 h-3.5 stroke-[2.5]" />
                         )}
                       </button>
                     </td>
 
                     {/* Date */}
-                    <td className={`${cellPy} px-1.5 font-mono text-slate-100 font-bold text-[10.5px] whitespace-nowrap leading-tight`}>
+                    <td className={`${cellPy} px-1.5 font-mono text-slate-100 font-bold text-[11px] whitespace-nowrap leading-snug`}>
                       {formatWitaDateOnly(shift.shift_date || shift.date || shift.checkin_time)}
                     </td>
 
                     {/* Staff Name, Action Badges, Real Photo & Mood */}
                     <td className={`${cellPy} px-1.5`}>
-                      <div className="flex items-center space-x-1.5">
+                      <div className="flex items-center space-x-2">
                         {shift.staff_profile_photo_url ? (
                           <img
                             src={shift.staff_profile_photo_url}
                             alt={shift.staff_name}
-                            className="w-6 h-6 rounded-lg object-cover border border-slate-700 shrink-0"
+                            className="w-8 h-8 rounded-xl object-cover border border-slate-700 shrink-0 shadow-xs"
                           />
                         ) : (
-                          <div className="w-6 h-6 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center text-[9px] font-black text-slate-400 shrink-0">
+                          <div className="w-8 h-8 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center text-[10px] font-black text-slate-400 shrink-0">
                             {shift.staff_name ? shift.staff_name.slice(0, 2).toUpperCase() : 'ST'}
                           </div>
                         )}
                         <div className="min-w-0">
                           <div className="flex items-center space-x-1 flex-wrap gap-y-0.5">
-                            <span className="font-black text-slate-100 text-[11px] truncate max-w-[100px] leading-tight">
+                            <span className="font-black text-slate-100 text-xs truncate max-w-[110px] leading-snug">
                               {shift.staff_name}
                             </span>
                             {shift.mood_emoji && (
                               <span
-                                className="text-[9px] px-0.5 rounded bg-slate-800/90 border border-slate-700/70 shrink-0"
+                                className="text-[10px] px-1 rounded bg-slate-800/90 border border-slate-700/70 shrink-0"
                                 title={`Mood: ${shift.mood_emoji}`}
                               >
                                 {shift.mood_emoji}
@@ -351,12 +351,12 @@ export default function ShiftTable({
                             )}
                           </div>
                           
-                          {/* Action badges under name to save horizontal width */}
+                          {/* Action badges under name */}
                           <div className="flex flex-wrap gap-0.5 mt-0.5">
                             {actionItems.map((action, aIdx) => (
                               <span
                                 key={aIdx}
-                                className={`inline-flex items-center space-x-0.5 px-1 py-0.2 rounded text-[7.5px] font-black border ${
+                                className={`inline-flex items-center space-x-0.5 px-1.5 py-0.2 rounded text-[8px] font-black border ${
                                   action.severity === 'danger'
                                     ? 'bg-rose-500/20 text-rose-300 border-rose-500/40'
                                     : action.severity === 'warning'
@@ -374,54 +374,54 @@ export default function ShiftTable({
                     </td>
 
                     {/* Outlet & Division */}
-                    <td className={`${cellPy} px-1.5 leading-tight`}>
-                      <div className="font-black text-slate-200 text-[10px] whitespace-nowrap">
+                    <td className={`${cellPy} px-1.5 leading-snug`}>
+                      <div className="font-black text-slate-200 text-[10.5px] whitespace-nowrap">
                         {shift.staff_venue === 'JP Karaoke' ? '🎤 JP' : '🐱 LuckyCat'}
                       </div>
-                      <div className="text-[8.5px] text-blue-400 font-bold truncate max-w-[90px]" title={shift.staff_division || shift.staff_role}>
+                      <div className="text-[9px] text-blue-400 font-bold truncate max-w-[95px]" title={shift.staff_division || shift.staff_role}>
                         {shift.staff_division || shift.staff_role}
                       </div>
                     </td>
 
                     {/* Shift Indicator & Schedule */}
-                    <td className={`${cellPy} px-1.5 leading-tight whitespace-nowrap`}>
+                    <td className={`${cellPy} px-1.5 leading-snug whitespace-nowrap`}>
                       <div className="flex flex-col gap-0.5 items-start">
-                        <span className={`inline-flex items-center px-1.5 py-0.2 rounded text-[8.5px] font-black border ${shiftInfo.badgeClass}`}>
+                        <span className={`inline-flex items-center px-1.5 py-0.5 rounded-md text-[9px] font-black border ${shiftInfo.badgeClass}`}>
                           {shiftInfo.badgeLabel}
                         </span>
-                        <span className="text-[8.5px] font-mono text-slate-400">
+                        <span className="text-[9px] font-mono text-slate-400">
                           {shiftInfo.timeRange}
                         </span>
                       </div>
                     </td>
 
                     {/* Masuk & Face Recog Status */}
-                    <td className={`${cellPy} px-1.5 leading-tight`}>
-                      <div className="flex items-center space-x-1">
+                    <td className={`${cellPy} px-1.5 leading-snug`}>
+                      <div className="flex items-center space-x-1.5">
                         {shift.checkin_photo ? (
                           <button
                             type="button"
                             onClick={() => onInspectPhoto(shift, 'in')}
-                            className="group relative rounded-lg overflow-hidden border border-slate-700 hover:border-emerald-500 transition shadow-xs bg-slate-900 shrink-0 cursor-pointer"
+                            className="group relative rounded-xl overflow-hidden border border-slate-700 hover:border-emerald-500 transition shadow-xs bg-slate-900 shrink-0 cursor-pointer"
                             title="Lihat Foto Selfie Masuk"
                           >
                             <img
                               src={shift.checkin_photo}
                               alt="Check-in"
                               onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                              className="w-6 h-6 object-cover"
+                              className="w-8 h-8 object-cover group-hover:scale-110 transition duration-200"
                             />
                             <div className="absolute inset-0 bg-emerald-950/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition">
-                              <Eye className="w-2.5 h-2.5 text-white" />
+                              <Eye className="w-3 h-3 text-white" />
                             </div>
                           </button>
                         ) : (
-                          <div className="w-6 h-6 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-center text-[8px] text-slate-500 font-mono shrink-0">
+                          <div className="w-8 h-8 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center text-[9px] text-slate-500 font-mono shrink-0">
                             -
                           </div>
                         )}
                         <div className="flex flex-col gap-0.5">
-                          <span className="font-mono text-emerald-400 font-black text-[10.5px]">
+                          <span className="font-mono text-emerald-400 font-black text-[11px]">
                             {formatWitaTimeOnly(shift.checkin_time)}
                           </span>
                           {renderFaceRecogBadge(shift)}
@@ -430,30 +430,30 @@ export default function ShiftTable({
                     </td>
 
                     {/* Istirahat */}
-                    <td className={`${cellPy} px-1.5 leading-tight`}>
+                    <td className={`${cellPy} px-1.5 leading-snug`}>
                       {shift.staff_division === 'Management' ? (
-                        <span className="text-[9px] text-blue-400 font-bold">Fleksibel</span>
+                        <span className="text-[9.5px] text-blue-400 font-bold">Fleksibel</span>
                       ) : shift.staff_venue === 'JP Karaoke' ? (
-                        <span className="text-[9px] text-slate-500">No Break</span>
+                        <span className="text-[9.5px] text-slate-500">No Break</span>
                       ) : (
                         <div className="space-y-0.5">
                           {shift.break_status === 'ON_BREAK' ? (
-                            <span className="px-1 py-0.2 rounded text-[8px] font-black bg-sky-500/15 text-sky-300 border border-sky-500/30 animate-pulse whitespace-nowrap">
+                            <span className="px-1.5 py-0.5 rounded text-[8.5px] font-black bg-sky-500/15 text-sky-300 border border-sky-500/30 animate-pulse whitespace-nowrap">
                               Break {formatWitaTimeOnly(shift.break_start_time)}
                             </span>
                           ) : shift.break_duration_minutes != null || shift.break_end_time ? (
                             <div className="leading-tight">
-                              <span className="font-mono text-sky-300 font-black text-[9.5px]">
+                              <span className="font-mono text-sky-300 font-black text-[10px]">
                                 {shift.break_duration_minutes != null ? `${shift.break_duration_minutes}m` : 'Selesai'}
                               </span>
                               {shift.break_end_time && (
-                                <span className="text-[8px] font-mono text-slate-400 ml-1">
+                                <span className="text-[8.5px] font-mono text-slate-400 ml-1">
                                   ({formatWitaTimeOnly(shift.break_end_time)})
                                 </span>
                               )}
                             </div>
                           ) : (
-                            <span className="text-[8.5px] text-slate-500">Belum</span>
+                            <span className="text-[9px] text-slate-500">Belum</span>
                           )}
 
                           {(shift.break_start_photo || shift.break_end_photo) && (
@@ -462,13 +462,13 @@ export default function ShiftTable({
                                 <button
                                   type="button"
                                   onClick={() => onInspectPhoto(shift, 'break_start')}
-                                  className="rounded overflow-hidden border border-slate-700 hover:border-sky-500 bg-slate-900 cursor-pointer"
+                                  className="rounded-lg overflow-hidden border border-slate-700 hover:border-sky-500 bg-slate-900 cursor-pointer shadow-2xs"
                                   title="Foto Mulai Istirahat"
                                 >
                                   <img
                                     src={shift.break_start_photo}
                                     alt="Before"
-                                    className="w-5 h-5 object-cover"
+                                    className="w-6 h-6 object-cover"
                                     onError={(e) => { e.currentTarget.style.display = 'none'; }}
                                   />
                                 </button>
@@ -477,13 +477,13 @@ export default function ShiftTable({
                                 <button
                                   type="button"
                                   onClick={() => onInspectPhoto(shift, 'break_end')}
-                                  className="rounded overflow-hidden border border-slate-700 hover:border-sky-500 bg-slate-900 cursor-pointer"
+                                  className="rounded-lg overflow-hidden border border-slate-700 hover:border-sky-500 bg-slate-900 cursor-pointer shadow-2xs"
                                   title="Foto Selesai Istirahat"
                                 >
                                   <img
                                     src={shift.break_end_photo}
                                     alt="After"
-                                    className="w-5 h-5 object-cover"
+                                    className="w-6 h-6 object-cover"
                                     onError={(e) => { e.currentTarget.style.display = 'none'; }}
                                   />
                                 </button>
@@ -495,37 +495,37 @@ export default function ShiftTable({
                     </td>
 
                     {/* Pulang */}
-                    <td className={`${cellPy} px-1.5 leading-tight`}>
-                      <div className="flex items-center space-x-1">
+                    <td className={`${cellPy} px-1.5 leading-snug`}>
+                      <div className="flex items-center space-x-1.5">
                         {shift.checkout_photo ? (
                           <button
                             type="button"
                             onClick={() => onInspectPhoto(shift, 'out')}
-                            className="group relative rounded-lg overflow-hidden border border-slate-700 hover:border-indigo-500 transition shadow-xs bg-slate-900 shrink-0 cursor-pointer"
+                            className="group relative rounded-xl overflow-hidden border border-slate-700 hover:border-indigo-500 transition shadow-xs bg-slate-900 shrink-0 cursor-pointer"
                             title="Lihat Foto Selfie Pulang"
                           >
                             <img
                               src={shift.checkout_photo}
                               alt="Checkout"
                               onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                              className="w-6 h-6 object-cover"
+                              className="w-8 h-8 object-cover group-hover:scale-110 transition duration-200"
                             />
                             <div className="absolute inset-0 bg-indigo-950/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition">
-                              <Eye className="w-2.5 h-2.5 text-white" />
+                              <Eye className="w-3 h-3 text-white" />
                             </div>
                           </button>
                         ) : (
-                          <div className="w-6 h-6 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-center text-[8px] text-slate-500 font-mono shrink-0">
+                          <div className="w-8 h-8 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center text-[9px] text-slate-500 font-mono shrink-0">
                             -
                           </div>
                         )}
                         <div>
                           {shift.checkout_time ? (
-                            <span className="text-indigo-300 font-mono font-black text-[10.5px]">
+                            <span className="text-indigo-300 font-mono font-black text-[11px]">
                               {formatWitaTimeOnly(shift.checkout_time)}
                             </span>
                           ) : (
-                            <span className="inline-block px-1 py-0.2 rounded text-[7.5px] font-black bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 whitespace-nowrap">
+                            <span className="inline-block px-1.5 py-0.5 rounded text-[8px] font-black bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 whitespace-nowrap">
                               Aktif
                             </span>
                           )}
@@ -534,13 +534,13 @@ export default function ShiftTable({
                     </td>
 
                     {/* Durasi Kerja & Jarak GPS */}
-                    <td className={`${cellPy} px-1 leading-tight whitespace-nowrap`}>
-                      <div className="font-mono text-slate-200 font-bold text-[10px]">
+                    <td className={`${cellPy} px-1 leading-snug whitespace-nowrap`}>
+                      <div className="font-mono text-slate-200 font-bold text-[10.5px]">
                         {isActive && (!shift.duration_minutes || shift.duration_minutes === 0)
                           ? 'Jalan'
                           : formatDuration(shift.duration_minutes)}
                       </div>
-                      <div className="text-[8.5px] font-mono mt-0.5">
+                      <div className="text-[9px] font-mono mt-0.5">
                         <span className={shift.checkin_distance > 150 ? 'text-rose-400 font-black' : 'text-slate-400'}>
                           {shift.checkin_distance != null ? `${shift.checkin_distance}m` : '-'}
                         </span>
@@ -562,7 +562,7 @@ export default function ShiftTable({
                       <button
                         type="button"
                         onClick={() => onInspectPhoto(shift, shift.checkout_photo ? 'out' : 'in')}
-                        className="p-1 rounded-lg bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/30 transition cursor-pointer"
+                        className="p-1.5 rounded-xl bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/30 transition cursor-pointer"
                         title="Buka audit lengkap shift"
                       >
                         <Eye className="w-3.5 h-3.5 stroke-[2.5]" />
