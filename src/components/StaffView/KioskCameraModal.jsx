@@ -286,7 +286,7 @@ export default function KioskCameraModal({
         confirmedShift: confirmedShift || null,
         lateReason: isCheckinLate ? lateReason.trim() : null,
         latePhotoBase64: isCheckinLate ? latePhotoBase64 : null,
-        moodEmoji: staff?.mood_emoji || '😊'
+        moodEmoji: staff?.mood_emoji || null
       };
 
       let res;

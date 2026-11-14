@@ -196,7 +196,7 @@ export default function KioskPortalScreen({
 
   const lateCount = staff?.monthlyStats?.lateCount ?? 0;
   const workDays = staff?.monthlyStats?.workDays ?? 0;
-  const currentMood = staff?.mood_emoji || '😊';
+  const currentMood = staff?.mood_emoji || null;
 
   const handleSelectMood = async (emoji) => {
     setMoodDropdownOpen(false);
@@ -407,7 +407,11 @@ export default function KioskPortalScreen({
                       className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-200 bg-[#232938] hover:bg-[#2c3345] border border-white/10 rounded-full px-2.5 py-1 transition cursor-pointer"
                     >
                       <span className="text-slate-400">my mood today :</span>
-                      <span className="text-sm leading-none">{currentMood}</span>
+                      {currentMood ? (
+                        <span className="text-sm leading-none">{currentMood}</span>
+                      ) : (
+                        <span className="text-[10px] text-slate-400 font-normal italic px-1">pilih</span>
+                      )}
                       <ChevronDown className="w-3 h-3 text-slate-400" />
                     </button>
 

@@ -365,7 +365,7 @@ export default function PhotoDetailModal({ shift, type = 'in', onClose, onShiftU
                 <span className={`font-black ${dist != null && dist <= 150 ? 'text-emerald-400' : 'text-rose-400'}`}>
                   {dist != null && dist <= 150 ? 'DALAM GEOFENCE (VALID)' : (dist != null ? 'DI LUAR GEOFENCE' : 'GPS AKTIF')}
                 </span>
-                <span className="text-slate-400 font-mono text-[11px] font-bold">[{dist != null ? `${dist}m` : 'N/A'}]</span>
+                <span className="text-slate-400 font-mono text-[11px] font-bold">[{dist != null ? `${dist} meter` : 'N/A'}]</span>
               </div>
             </div>
 
@@ -384,7 +384,7 @@ export default function PhotoDetailModal({ shift, type = 'in', onClose, onShiftU
               </span>
               <div className="space-y-0.5">
                 <div className={`font-black ${dist > 150 ? 'text-rose-400' : 'text-emerald-400'}`}>
-                  {dist != null ? `${dist}m dari venue` : 'N/A'}
+                  {dist != null ? `${dist} meter dari venue` : 'N/A'}
                 </div>
                 <div className="text-[10px] text-slate-400 font-medium">
                   Radius toleransi akurasi: <strong className={accuracy && accuracy > 300 ? 'text-amber-400' : 'text-slate-200'}>±{accuracy != null ? `${accuracy}m` : '10m'}</strong>

@@ -1761,9 +1761,7 @@ router.post('/checkin', async (req, res) => {
       }
     } catch {}
   }
-  if (!checkinMoodEmoji) {
-    checkinMoodEmoji = '😊';
-  }
+  // Mood is optional: null if staff hasn't selected a mood
 
   // Biometric Face Recognition Verification against registered Staff Profile Photo
   let refProfilePhoto = null;
@@ -2588,7 +2586,7 @@ router.get('/shifts', async (req, res) => {
       if (typeof r.notes === 'string' && r.notes.startsWith('{')) parsedNotes = JSON.parse(r.notes);
     } catch {}
     const moodEntry = localMoods?.[r.staff_id] || null;
-    const resolvedMood = parsedNotes.mood_emoji || (moodEntry && moodEntry.date_ymd === r.date ? moodEntry.emoji : null) || moodEntry?.emoji || '😊';
+    const resolvedMood = parsedNotes.mood_emoji || (moodEntry && moodEntry.date_ymd === r.date ? moodEntry.emoji : null) || null;
     const profEntry = localProfiles?.[r.staff_id] || null;
     return {
       ...r,

@@ -165,8 +165,8 @@ export function formatDuration(minutes) {
   if (minutes == null || isNaN(minutes)) return '-';
   const h = Math.floor(minutes / 60);
   const m = minutes % 60;
-  if (h === 0) return `${m}m`;
-  return `${h}h ${m}m`;
+  if (h === 0) return `${m} menit`;
+  return `${h} jam ${m} mnt`;
 }
 
 export function formatTimerSeconds(totalSeconds) {

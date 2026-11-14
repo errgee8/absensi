@@ -718,8 +718,7 @@ export const cloudDb = {
       const resolvedMoodEmoji =
         parsedNotes.mood_emoji ||
         (moodEntry && moodEntry.date_ymd === shiftDateYmd ? moodEntry.emoji : null) ||
-        moodEntry?.emoji ||
-        '😊';
+        null;
 
       return {
         id: row.id,

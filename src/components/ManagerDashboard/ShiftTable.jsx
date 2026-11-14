@@ -202,7 +202,7 @@ export default function ShiftTable({ shifts = [], schedules = [], onInspectPhoto
               <th className="py-3.5 px-3">Masuk &amp; Face Recog</th>
               <th className="py-3.5 px-3">Istirahat (Before / After)</th>
               <th className="py-3.5 px-3">Pulang</th>
-              <th className="py-3.5 px-2">Durasi &amp; GPS</th>
+              <th className="py-3.5 px-2">Durasi &amp; Jarak GPS</th>
               <th className="py-3.5 px-3">Late Review</th>
               <th className="py-3.5 px-3">Status / Anomali</th>
               <th className="py-3.5 px-2 text-right">Detail</th>
@@ -461,14 +461,20 @@ export default function ShiftTable({ shifts = [], schedules = [], onInspectPhoto
                     </div>
                   </td>
 
-                  {/* Duration & GPS */}
+                  {/* Durasi Kerja & Jarak GPS (Dibuat sangat jelas & tidak ambigu) */}
                   <td className="py-3 px-2 whitespace-nowrap">
-                    <div className="font-mono text-slate-200 font-bold text-xs">
-                      {formatDuration(shift.duration_minutes)}
+                    <div className="font-mono text-slate-200 font-bold text-xs flex items-center space-x-1">
+                      <span className="text-[11px]">⏱️</span>
+                      <span>
+                        {isActive && (!shift.duration_minutes || shift.duration_minutes === 0)
+                          ? 'Sedang Berjalan'
+                          : formatDuration(shift.duration_minutes)}
+                      </span>
                     </div>
-                    <div className="text-[10px] font-mono mt-0.5">
-                      <span className={shift.checkin_distance > 150 ? 'text-rose-400 font-black' : 'text-slate-400'}>
-                        📍 {shift.checkin_distance != null ? `${shift.checkin_distance}m` : '-'}
+                    <div className="text-[10.5px] font-mono mt-1 flex items-center space-x-1">
+                      <span>📍</span>
+                      <span className={shift.checkin_distance > 150 ? 'text-rose-400 font-black' : 'text-slate-300 font-semibold'}>
+                        {shift.checkin_distance != null ? `${shift.checkin_distance} meter` : '-'}
                       </span>
                     </div>
                   </td>
