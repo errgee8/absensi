@@ -1497,5 +1497,54 @@ export const cloudDb = {
       console.warn('Monthly stats Supabase fetch note:', e.message);
       return null;
     }
+  },
+
+  // 17. Sync Staff Roster to Toilet Inspection Database
+  async syncStaffToToiletDb() {
+    if (!supabase) return false;
+    try {
+      const TOILET_SUPABASE_URL = 'https://nrrhkylpgitezjocgune.supabase.co';
+      const TOILET_SUPABASE_ANON_KEY = 'sb_publishable_GRzOFx-NzqaaBPCl3Oqr2A_1f8xpUNj';
+      const toiletClient = createClient(TOILET_SUPABASE_URL, TOILET_SUPABASE_ANON_KEY, {
+        auth: { persistSession: false }
+      });
+
+      const { data: mainStaff, error: mainErr } = await supabase
+        .from('staff')
+        .select('*')
+        .order('name', { ascending: true });
+
+      if (mainErr || !mainStaff || mainStaff.length === 0) return false;
+
+      const { data: toiletStaff } = await toiletClient
+        .from('staff_members')
+        .select('*');
+
+      const existingByName = new Map();
+      for (const ts of (toiletStaff || [])) {
+        existingByName.set(ts.name.trim().toLowerCase(), ts);
+      }
+
+      const upserts = [];
+      for (const ms of mainStaff) {
+        const key = ms.name.trim().toLowerCase();
+        const existing = existingByName.get(key);
+        const id = existing ? existing.id : `staff-${ms.legacy_code || ms.id}`;
+        const roleStr = `${ms.venue || ''} - ${ms.role || ms.division || 'Server'}`.trim();
+        upserts.push({
+          id,
+          name: ms.name.trim(),
+          pin: ms.pin || '1234',
+          role: roleStr,
+          is_active: ms.is_active !== false
+        });
+      }
+
+      await toiletClient.from('staff_members').upsert(upserts);
+      return true;
+    } catch (err) {
+      console.warn('Auto toilet staff sync error:', err.message);
+      return false;
+    }
   }
 };

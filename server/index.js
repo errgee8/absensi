@@ -6,6 +6,7 @@ import { fileURLToPath } from 'url';
 import routes from './routes.js';
 import { auditOpenShifts } from './flags.js';
 import { uploadsDir } from './db.js';
+import cloudDb from './supabase.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -52,4 +53,9 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`JP Check-in Server running on http://localhost:${PORT}`);
   console.log(`API endpoints active at http://localhost:${PORT}/api/`);
   console.log(`===============================================`);
+
+  // Sync staff roster to toilet inspection database in background
+  cloudDb.syncStaffToToiletDb().catch((err) => {
+    console.warn('Initial toilet staff sync note:', err.message);
+  });
 });

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Lock, Delete, AlertCircle, Loader2, Trophy, Clock } from 'lucide-react';
+import { Lock, Delete, AlertCircle, Loader2, Trophy, Clock, QrCode } from 'lucide-react';
 
 export default function KioskLoginScreen({
   pin,
@@ -8,7 +8,8 @@ export default function KioskLoginScreen({
   onOpenAdminAuth,
   onOpenLeaderboard,
   loading,
-  error
+  error,
+  directToiletLocation
 }) {
   const [liveTime, setLiveTime] = useState(() => new Date());
 
@@ -140,6 +141,21 @@ export default function KioskLoginScreen({
       )}
 
       <div className="bg-[#161b24] border border-slate-800/90 rounded-3xl p-6 sm:p-7 shadow-2xl shadow-black/40 space-y-6">
+        {/* Direct Toilet Scan Notice */}
+        {directToiletLocation && (
+          <div className="p-3.5 bg-teal-950/50 border border-teal-500/40 rounded-2xl flex items-center space-x-3 text-xs animate-fade-in">
+            <div className="w-8 h-8 rounded-xl bg-teal-500/20 text-teal-300 flex items-center justify-center shrink-0">
+              <QrCode className="w-4 h-4" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-teal-300 font-bold">Checklist {directToiletLocation.name}</div>
+              <div className="text-slate-400 text-[11px] truncate">
+                Ketik PIN Anda untuk otomatis mengisi checklist atas nama Anda
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* PIN Prompt & Visual Indicator Dots */}
         <div className="text-center space-y-3">
           <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider block">

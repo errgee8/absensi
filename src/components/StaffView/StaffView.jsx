@@ -329,6 +329,7 @@ export default function StaffView({
           onOpenLeaderboard={onOpenLeaderboard}
           loading={loading}
           error={error}
+          directToiletLocation={directToiletLocation}
         />
       )}
 
