@@ -4204,12 +4204,12 @@ router.get('/points', async (req, res) => {
     }
 
     const normalized = (allPoints || []).map((p) => {
-      const cInfo = p.cycle_key ? getPointCycleFromKey(p.cycle_key) : getPointCycleInfo(p.created_at);
+      const cInfo = p.created_at ? getPointCycleInfo(p.created_at) : (p.cycle_key ? getPointCycleFromKey(p.cycle_key) : currentCycle);
       return {
         ...p,
         points: Number(p.points || 0),
         cycle_key: cInfo.cycleKey,
-        cycle_label: p.cycle_label || cInfo.label,
+        cycle_label: cInfo.label,
         status: p.acknowledged_at || p.status === 'ACKNOWLEDGED' ? 'ACKNOWLEDGED' : 'PENDING'
       };
     });

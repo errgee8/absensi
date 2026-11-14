@@ -105,7 +105,7 @@ export default function StaffPointHistoryModal({
                   Siklus Cut-Off Bulanan
                 </span>
                 <p className="text-xs text-slate-300 font-semibold mt-1">
-                  Reset otomatis setiap <strong>tanggal 17</strong> (hitung s/d tanggal 13 bulan berikutnya).
+                  Reset otomatis kembali ke 0 setiap <strong>tanggal 13</strong> per bulannya.
                 </p>
               </div>
               {pendingCount > 0 && onOpenNoticeModal && (

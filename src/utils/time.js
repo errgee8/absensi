@@ -185,9 +185,9 @@ export function buildPointCycle(startYear, startMonth) {
     endMonth = 1;
     endYear += 1;
   }
-  const startDate = `${startYear}-${String(startMonth).padStart(2, '0')}-17`;
-  const cutoffDate = `${endYear}-${String(endMonth).padStart(2, '0')}-13`;
-  const label = `17 ${MONTH_SHORT_ID[startMonth - 1]} ${startYear} – 13 ${MONTH_SHORT_ID[endMonth - 1]} ${endYear}`;
+  const startDate = `${startYear}-${String(startMonth).padStart(2, '0')}-13`;
+  const cutoffDate = `${endYear}-${String(endMonth).padStart(2, '0')}-12`;
+  const label = `13 ${MONTH_SHORT_ID[startMonth - 1]} ${startYear} – 12 ${MONTH_SHORT_ID[endMonth - 1]} ${endYear}`;
   return {
     cycleKey: startDate,
     startDate,
@@ -212,7 +212,7 @@ export function getPointCycleInfo(date = getAppNow()) {
 
   let startYear = year;
   let startMonth = month;
-  if (day < 17) {
+  if (day < 13) {
     startMonth -= 1;
     if (startMonth < 1) {
       startMonth = 12;

@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
+import { getPointCycleInfo } from './shifts.js';
 dotenv.config();
 
 const supabaseUrl = process.env.SUPABASE_URL;
@@ -708,19 +709,24 @@ export const cloudDb = {
       }
     }
 
+    const currentPointCycle = getPointCycleInfo(new Date());
     const pointsMap = {};
     for (const pt of (pointsList || [])) {
       if (pt.status !== 'REVOKED') {
-        const pts = Math.abs(Number(pt.points) || 0);
-        const isPlus = pt.point_type === 'PLUS' || pt.type === 'PLUS';
-        const delta = isPlus ? pts : -pts;
-        const sId = String(pt.staff_id || pt.staffId || pt.staff_uuid || '');
-        if (sId) {
-          pointsMap[sId] = (pointsMap[sId] || 0) + delta;
-        }
-        if (pt.staff_uuid && String(pt.staff_uuid) !== sId) {
-          const uId = String(pt.staff_uuid);
-          pointsMap[uId] = (pointsMap[uId] || 0) + delta;
+        const ptCycle = pt.created_at ? getPointCycleInfo(pt.created_at) : currentPointCycle;
+        // Only count running points in the current active cycle (resets on the 13th of each month)
+        if (ptCycle.cycleKey === currentPointCycle.cycleKey) {
+          const pts = Math.abs(Number(pt.points) || 0);
+          const isPlus = pt.point_type === 'PLUS' || pt.type === 'PLUS';
+          const delta = isPlus ? pts : -pts;
+          const sId = String(pt.staff_id || pt.staffId || pt.staff_uuid || '');
+          if (sId) {
+            pointsMap[sId] = (pointsMap[sId] || 0) + delta;
+          }
+          if (pt.staff_uuid && String(pt.staff_uuid) !== sId) {
+            const uId = String(pt.staff_uuid);
+            pointsMap[uId] = (pointsMap[uId] || 0) + delta;
+          }
         }
       }
     }

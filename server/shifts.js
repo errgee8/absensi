@@ -223,7 +223,8 @@ export function detectShiftSchedule(schedules, checkinTime = new Date()) {
 const MONTH_SHORT_ID = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
 
 /**
- * Builds monthly point cycle info from a start year/month (cutoff cycle: 17th to 13th next month).
+ * Builds monthly point cycle info from a start year/month (cutoff cycle: 13th to 12th next month).
+ * Points reset automatically on the 13th of each month.
  */
 export function buildPointCycle(startYear, startMonth) {
   let endYear = startYear;
@@ -232,9 +233,9 @@ export function buildPointCycle(startYear, startMonth) {
     endMonth = 1;
     endYear += 1;
   }
-  const startDate = `${startYear}-${String(startMonth).padStart(2, '0')}-17`;
-  const cutoffDate = `${endYear}-${String(endMonth).padStart(2, '0')}-13`;
-  const label = `17 ${MONTH_SHORT_ID[startMonth - 1]} ${startYear} – 13 ${MONTH_SHORT_ID[endMonth - 1]} ${endYear}`;
+  const startDate = `${startYear}-${String(startMonth).padStart(2, '0')}-13`;
+  const cutoffDate = `${endYear}-${String(endMonth).padStart(2, '0')}-12`;
+  const label = `13 ${MONTH_SHORT_ID[startMonth - 1]} ${startYear} – 12 ${MONTH_SHORT_ID[endMonth - 1]} ${endYear}`;
   return {
     cycleKey: startDate,
     startDate,
@@ -254,7 +255,7 @@ export function getPointCycleFromKey(cycleKey) {
 
 /**
  * Returns the active monthly point accumulation cycle in WITA:
- * Resets on the 17th of each month and runs through the 13th of next month.
+ * Resets on the 13th of each month and runs through the 12th of next month.
  */
 export function getPointCycleInfo(date = new Date()) {
   const d = typeof date === 'string' ? new Date(date) : (date || new Date());
@@ -272,7 +273,7 @@ export function getPointCycleInfo(date = new Date()) {
 
   let startYear = year;
   let startMonth = month;
-  if (day < 17) {
+  if (day < 13) {
     startMonth -= 1;
     if (startMonth < 1) {
       startMonth = 12;

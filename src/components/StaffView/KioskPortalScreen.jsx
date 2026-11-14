@@ -490,11 +490,13 @@ export default function KioskPortalScreen({
               <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
                 Total Poin
               </div>
-              <div className="text-xl font-black text-white mt-0.5 leading-none">
-                {pointTotal}
+              <div className={`text-xl font-black mt-0.5 leading-none ${
+                pointTotal > 0 ? 'text-emerald-400' : pointTotal < 0 ? 'text-rose-400' : 'text-slate-300'
+              }`}>
+                {pointTotal > 0 ? `+${pointTotal}` : pointTotal}
               </div>
               <div className="text-[10px] text-slate-500 mt-1 truncate">
-                Terpisah dr rank
+                Periode berjalan
               </div>
             </button>
 
@@ -880,7 +882,9 @@ export default function KioskPortalScreen({
               </span>
             </div>
             <div className="mt-3">
-              <div className="text-sm font-extrabold text-white">Poin ({pointTotal})</div>
+              <div className="text-sm font-extrabold text-white">
+                Poin ({pointTotal > 0 ? `+${pointTotal}` : pointTotal})
+              </div>
               <div className="text-[11px] text-slate-400 mt-0.5">
                 Riwayat & pelanggaran
               </div>
