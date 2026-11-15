@@ -1067,6 +1067,61 @@ export const cloudDb = {
     return updated;
   },
 
+  async deleteShift(shiftId) {
+    if (!supabase) return null;
+    const { error } = await supabase
+      .from('attendance_logs')
+      .delete()
+      .eq('id', shiftId);
+    if (error) throw error;
+    return true;
+  },
+
+  async clearShiftLateness({ shiftId, reviewerName, reason }) {
+    if (!supabase) return null;
+    const { data: log, error: fetchErr } = await supabase
+      .from('attendance_logs')
+      .select('id, flags, notes')
+      .eq('id', shiftId)
+      .maybeSingle();
+
+    if (fetchErr) throw fetchErr;
+    if (!log) throw new Error('Shift record not found: ' + shiftId);
+
+    let parsedNotes = {};
+    try {
+      if (typeof log.notes === 'string') parsedNotes = JSON.parse(log.notes);
+      else if (log.notes) parsedNotes = log.notes;
+    } catch {}
+
+    let parsedFlags = Array.isArray(log.flags)
+      ? [...log.flags]
+      : (typeof log.flags === 'string' ? JSON.parse(log.flags || '[]') : []);
+
+    // Filter out all late-related flags
+    parsedFlags = parsedFlags.filter(f => !String(f).toLowerCase().includes('late'));
+    const now = new Date().toISOString();
+    parsedNotes.late_status = 'CLEARED_BY_MANAGER';
+    parsedNotes.late_reason = null;
+    parsedNotes.late_manager_note = reason || 'Keterlambatan dihapus/dibatalkan oleh Manajer';
+    parsedNotes.late_reviewed_by = reviewerName || 'Management';
+    parsedNotes.late_reviewed_at = now;
+
+    const { data: updated, error: updateErr } = await supabase
+      .from('attendance_logs')
+      .update({
+        notes: JSON.stringify(parsedNotes),
+        flags: parsedFlags,
+        updated_at: now
+      })
+      .eq('id', shiftId)
+      .select()
+      .maybeSingle();
+
+    if (updateErr) throw updateErr;
+    return updated;
+  },
+
   async getLeaveRequests({ staffId, status, type, year } = {}) {
     if (!supabase) return [];
     try {

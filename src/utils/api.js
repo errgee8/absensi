@@ -603,3 +603,33 @@ export async function getStaffAuditTrail(staffId) {
   if (!res.ok) throw new Error(data.error || 'Gagal memuat riwayat audit staf');
   return data;
 }
+
+// 9j. Clear Shift Lateness (Manager Only)
+export async function clearShiftLateness(shiftId, pin, reason) {
+  const res = await fetch(`${API_BASE}/shifts/${encodeURIComponent(shiftId)}/clear-late`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-manager-pin': String(pin || '').trim()
+    },
+    body: JSON.stringify({ pin: String(pin || '').trim(), reason })
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Gagal menghapus status keterlambatan');
+  return data;
+}
+
+// 9k. Delete Shift Record (Manager Only)
+export async function deleteShift(shiftId, pin, reason) {
+  const res = await fetch(`${API_BASE}/shifts/${encodeURIComponent(shiftId)}`, {
+    method: 'DELETE',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-manager-pin': String(pin || '').trim()
+    },
+    body: JSON.stringify({ pin: String(pin || '').trim(), reason })
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Gagal menghapus riwayat shift');
+  return data;
+}

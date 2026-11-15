@@ -1840,20 +1840,24 @@ router.get('/staff/:id/attendance-history', async (req, res) => {
   const manualDaysSum = dayAdjustments.reduce((sum, a) => sum + (Number(a.adjustment_days) || 0), 0);
   const totalWorkDaysFinal = Math.max(0, workedDates.size + manualDaysSum);
 
+  const statsObj = {
+    actualWorkDays: workedDates.size,
+    manualDaysSum,
+    workDays: totalWorkDaysFinal,
+    totalLate: lateRecords.length,
+    approvedLate: lateRecords.filter(r => r.late_status === 'APPROVED').length,
+    pendingLate: lateRecords.filter(r => r.late_status === 'PENDING_REVIEW').length,
+    rejectedLate: lateRecords.filter(r => r.late_status === 'REJECTED').length,
+    totalLeave: leaveRecords.length,
+    totalUnexcused: unexcusedAbsences.length
+  };
+
   res.json({
     success: true,
     monthKey: targetMonthKey,
-    stats: {
-      actualWorkDays: workedDates.size,
-      manualDaysSum,
-      workDays: totalWorkDaysFinal,
-      totalLate: lateRecords.length,
-      approvedLate: lateRecords.filter(r => r.late_status === 'APPROVED').length,
-      pendingLate: lateRecords.filter(r => r.late_status === 'PENDING_REVIEW').length,
-      rejectedLate: lateRecords.filter(r => r.late_status === 'REJECTED').length,
-      totalLeave: leaveRecords.length,
-      totalUnexcused: unexcusedAbsences.length
-    },
+    stats: statsObj,
+    summary: statsObj,
+    shifts: staffShifts,
     lateRecords,
     absenceRecords: allAbsences,
     auditLogs,
@@ -3383,6 +3387,137 @@ router.post('/shifts/:id/review-late', async (req, res) => {
   } catch (err) {
     console.error('Error reviewing late shift:', err);
     return res.status(500).json({ error: 'Gagal me-review keterlambatan: ' + err.message });
+  }
+});
+
+// 1b. Clear Shift Lateness (Hapus status telat shift - Manager Only)
+router.post('/shifts/:id/clear-late', async (req, res) => {
+  const { id } = req.params;
+  const pin = req.headers['x-manager-pin'] || req.body?.pin;
+  const { reason } = req.body || {};
+
+  const auth = await verifyManagementAuth(pin);
+  if (!auth.authorized) {
+    return res.status(403).json({ error: 'Akses ditolak: PIN Manajer salah atau tidak memiliki otorisasi.' });
+  }
+
+  try {
+    let targetStaffId = null;
+    let shiftDate = '-';
+
+    if (isSupabaseConfigured) {
+      const updated = await cloudDb.clearShiftLateness({
+        shiftId: id,
+        reviewerName: auth.reviewerName,
+        reason: reason || 'Dihapus oleh Manajer'
+      });
+      if (updated) {
+        targetStaffId = updated.staff_id || updated.staff_code;
+        shiftDate = updated.date || '-';
+      }
+    }
+
+    try {
+      const shiftRow = db.prepare('SELECT * FROM shifts WHERE id = ? OR supabase_id = ?').get(id, id);
+      if (shiftRow) {
+        if (!targetStaffId) targetStaffId = shiftRow.staff_id;
+        if (shiftDate === '-') shiftDate = shiftRow.date || '-';
+
+        let parsedNotes = {};
+        try { parsedNotes = JSON.parse(shiftRow.notes || '{}'); } catch {}
+        parsedNotes.late_status = 'CLEARED_BY_MANAGER';
+        parsedNotes.late_reason = null;
+        parsedNotes.late_manager_note = reason || 'Keterlambatan dibatalkan oleh Manajer';
+        parsedNotes.late_reviewed_by = auth.reviewerName;
+        parsedNotes.late_reviewed_at = new Date().toISOString();
+
+        let parsedFlags = JSON.parse(shiftRow.flags || '[]');
+        parsedFlags = parsedFlags.filter(f => !String(f).toLowerCase().includes('late'));
+
+        db.prepare('UPDATE shifts SET notes = ?, flags = ?, updated_at = datetime("now") WHERE id = ?').run(
+          JSON.stringify(parsedNotes),
+          JSON.stringify(parsedFlags),
+          shiftRow.id
+        );
+      }
+    } catch (e) {
+      console.warn('SQLite clear late warning:', e.message);
+    }
+
+    if (isSupabaseConfigured && targetStaffId) {
+      await cloudDb.recordStaffAuditLog({
+        staff_id: targetStaffId,
+        action: 'LATE_CLEARED',
+        actor: auth.reviewerName || 'Manajer',
+        description: `Status keterlambatan shift tanggal ${shiftDate} dihapus/dibatalkan oleh Manajer.`,
+        reason: reason || 'Dibatalkan oleh Manajer'
+      });
+    }
+
+    broadcastEvent('SHIFT_UPDATE');
+    broadcastEvent('LEADERBOARD_UPDATE');
+
+    return res.json({ success: true, message: 'Status keterlambatan shift berhasil dihapus.' });
+  } catch (err) {
+    console.error('Error clearing shift lateness:', err);
+    return res.status(500).json({ error: 'Gagal menghapus status telat: ' + err.message });
+  }
+});
+
+// 1c. Delete Shift Record (Hapus riwayat shift - Manager Only)
+router.delete('/shifts/:id', async (req, res) => {
+  const { id } = req.params;
+  const pin = req.headers['x-manager-pin'] || req.body?.pin;
+  const { reason } = req.body || {};
+
+  const auth = await verifyManagementAuth(pin);
+  if (!auth.authorized) {
+    return res.status(403).json({ error: 'Akses ditolak: PIN Manajer salah atau tidak memiliki otorisasi.' });
+  }
+
+  try {
+    let targetStaffId = null;
+    let shiftDate = '-';
+
+    try {
+      const shiftRow = db.prepare('SELECT * FROM shifts WHERE id = ? OR supabase_id = ?').get(id, id);
+      if (shiftRow) {
+        targetStaffId = shiftRow.staff_id;
+        shiftDate = shiftRow.date || '-';
+        db.prepare('DELETE FROM shifts WHERE id = ?').run(shiftRow.id);
+      }
+    } catch {}
+
+    if (isSupabaseConfigured) {
+      try {
+        const { data: sData } = await supabase.from('attendance_logs').select('staff_id, date').eq('id', id).maybeSingle();
+        if (sData) {
+          if (!targetStaffId) targetStaffId = sData.staff_id;
+          if (shiftDate === '-') shiftDate = sData.date || '-';
+        }
+        await cloudDb.deleteShift(id);
+      } catch (e) {
+        console.warn('Supabase delete shift warning:', e.message);
+      }
+    }
+
+    if (isSupabaseConfigured && targetStaffId) {
+      await cloudDb.recordStaffAuditLog({
+        staff_id: targetStaffId,
+        action: 'SHIFT_REMOVED',
+        actor: auth.reviewerName || 'Manajer',
+        description: `Riwayat shift tanggal ${shiftDate} dihapus oleh Manajer.`,
+        reason: reason || 'Dihapus oleh Manajer'
+      });
+    }
+
+    broadcastEvent('SHIFT_UPDATE');
+    broadcastEvent('LEADERBOARD_UPDATE');
+
+    return res.json({ success: true, message: 'Riwayat shift berhasil dihapus.' });
+  } catch (err) {
+    console.error('Error deleting shift:', err);
+    return res.status(500).json({ error: 'Gagal menghapus shift: ' + err.message });
   }
 });
 
