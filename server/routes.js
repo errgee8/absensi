@@ -1817,11 +1817,36 @@ router.get('/staff/:id/attendance-history', async (req, res) => {
     return dateB.localeCompare(dateA);
   });
 
+  // 5. Fetch Manager Audit Logs and Day Adjustments for this staff
+  let auditLogs = [];
+  let dayAdjustments = [];
+  if (isSupabaseConfigured) {
+    try {
+      const logs = await cloudDb.getStaffAuditLogs(staffCode);
+      const logsByUuid = staffUuid !== staffCode ? await cloudDb.getStaffAuditLogs(staffUuid) : [];
+      auditLogs = [...logs, ...logsByUuid];
+      
+      const allAdj = await cloudDb.getStaffDayAdjustments(targetMonthKey);
+      dayAdjustments = (allAdj || []).filter(a =>
+        String(a.staff_id) === String(staffCode) ||
+        String(a.staff_id) === String(staffUuid) ||
+        String(a.staff_name) === String(staff.name)
+      );
+    } catch (e) {
+      console.warn('Failed to fetch audit logs for staff history:', e.message);
+    }
+  }
+
+  const manualDaysSum = dayAdjustments.reduce((sum, a) => sum + (Number(a.adjustment_days) || 0), 0);
+  const totalWorkDaysFinal = Math.max(0, workedDates.size + manualDaysSum);
+
   res.json({
     success: true,
     monthKey: targetMonthKey,
     stats: {
-      workDays: workedDates.size,
+      actualWorkDays: workedDates.size,
+      manualDaysSum,
+      workDays: totalWorkDaysFinal,
       totalLate: lateRecords.length,
       approvedLate: lateRecords.filter(r => r.late_status === 'APPROVED').length,
       pendingLate: lateRecords.filter(r => r.late_status === 'PENDING_REVIEW').length,
@@ -1830,7 +1855,9 @@ router.get('/staff/:id/attendance-history', async (req, res) => {
       totalUnexcused: unexcusedAbsences.length
     },
     lateRecords,
-    absenceRecords: allAbsences
+    absenceRecords: allAbsences,
+    auditLogs,
+    dayAdjustments
   });
 });
 
@@ -4634,11 +4661,174 @@ router.delete('/points/:id', async (req, res) => {
       return res.status(404).json({ error: 'Catatan poin tidak ditemukan.' });
     }
 
+    if (isSupabaseConfigured && deleted && typeof deleted === 'object') {
+      try {
+        await cloudDb.recordStaffAuditLog({
+          staffId: deleted.staff_id,
+          staffName: deleted.staff_name,
+          actionType: 'POINT_REMOVED',
+          description: `Poin ${Number(deleted.points) > 0 ? '+' + deleted.points : deleted.points} (${deleted.reason || 'Sanksi/Apresiasi'}) dihapus oleh Manajer.`,
+          authorName: auth.reviewerName
+        });
+      } catch (logErr) {
+        console.warn('Audit log note:', logErr.message);
+      }
+    }
+
     broadcastEvent('POINT_UPDATE', { action: 'DELETED', id });
+    broadcastEvent('LEADERBOARD_UPDATE');
     return res.json({ success: true, message: 'Catatan poin berhasil dihapus.' });
   } catch (err) {
     console.error('Error deleting staff point:', err);
     return res.status(500).json({ error: 'Gagal menghapus catatan poin: ' + err.message });
+  }
+});
+
+// Delete Leave Request from History (Manager Only)
+router.delete('/leave-requests/:id', async (req, res) => {
+  const { id } = req.params;
+  const pin = req.body?.pin || req.query?.pin || req.headers['x-admin-pin'] || req.headers['x-manager-pin'];
+  const reason = req.body?.reason || 'Dibatalkan oleh Manajer';
+
+  const auth = await verifyManagementAuth(pin);
+  if (!auth.authorized || (auth.role !== 'MANAGER' && auth.role !== 'FULL_ADMIN')) {
+    return res.status(403).json({
+      error: 'Akses ditolak: Hanya Operational Manager yang berwenang menghapus riwayat pengajuan izin/cuti.'
+    });
+  }
+
+  try {
+    let deletedItem = null;
+    if (isSupabaseConfigured) {
+      deletedItem = await cloudDb.deleteLeaveRequest(id);
+    }
+
+    try {
+      if (db) {
+        const row = db.prepare('SELECT * FROM leave_requests WHERE id = ?').get(id);
+        if (row && !deletedItem) deletedItem = row;
+        db.prepare('DELETE FROM leave_requests WHERE id = ?').run(id);
+      }
+    } catch (e) {
+      console.warn('SQLite leave delete note:', e.message);
+    }
+
+    if (!deletedItem) {
+      return res.status(404).json({ error: 'Riwayat izin/cuti tidak ditemukan.' });
+    }
+
+    // Record audit log for staff transparency
+    if (isSupabaseConfigured) {
+      try {
+        await cloudDb.recordStaffAuditLog({
+          staffId: deletedItem.staff_id,
+          staffName: deletedItem.staff_name,
+          actionType: 'LEAVE_REMOVED',
+          description: `Pengajuan ${deletedItem.type} (${deletedItem.start_date || ''} s/d ${deletedItem.end_date || ''}) dihapus dari riwayat oleh Manajer. Alasan: ${reason}`,
+          authorName: auth.reviewerName
+        });
+      } catch (logErr) {
+        console.warn('Audit log note:', logErr.message);
+      }
+    }
+
+    broadcastEvent('LEAVE_UPDATE', { action: 'DELETED', id });
+    broadcastEvent('LEADERBOARD_UPDATE');
+    return res.json({
+      success: true,
+      message: 'Riwayat pengajuan izin/cuti berhasil dihapus oleh Manajer.',
+      deletedItem
+    });
+  } catch (err) {
+    console.error('Error deleting leave request:', err);
+    return res.status(500).json({ error: 'Gagal menghapus riwayat izin: ' + err.message });
+  }
+});
+
+// Get Staff Working Day Adjustments
+router.get('/admin/staff-day-adjustments', async (req, res) => {
+  const { month } = req.query;
+  try {
+    let list = [];
+    if (isSupabaseConfigured) {
+      list = await cloudDb.getStaffDayAdjustments(month);
+    } else {
+      const setting = getSetting('staff_day_adjustments');
+      list = Array.isArray(setting) ? setting : [];
+    }
+    return res.json(list);
+  } catch (err) {
+    console.error('Error fetching day adjustments:', err);
+    return res.status(500).json({ error: 'Gagal memuat data penyesuaian hari kerja: ' + err.message });
+  }
+});
+
+// Save Staff Working Day Adjustment (Add / Deduct Days by Manager)
+router.post('/admin/staff-day-adjustments', async (req, res) => {
+  const { pin, staffId, staffName, adjustmentDays, reason } = req.body || {};
+
+  const auth = await verifyManagementAuth(pin);
+  if (!auth.authorized || (auth.role !== 'MANAGER' && auth.role !== 'FULL_ADMIN')) {
+    return res.status(403).json({
+      error: 'Akses ditolak: Hanya Operational Manager yang berwenang menyesuaikan total hari kerja staf.'
+    });
+  }
+
+  if (!staffId || !staffName) {
+    return res.status(400).json({ error: 'Data staf tidak lengkap.' });
+  }
+
+  const adjNum = Number(adjustmentDays);
+  if (isNaN(adjNum) || adjNum === 0) {
+    return res.status(400).json({ error: 'Jumlah penyesuaian hari kerja harus berupa angka valid (misal: +1 atau -1).' });
+  }
+
+  try {
+    let saved = null;
+    if (isSupabaseConfigured) {
+      saved = await cloudDb.saveStaffDayAdjustment({
+        staffId,
+        staffName,
+        adjustmentDays: adjNum,
+        reason: reason || 'Penyesuaian Hari Kerja oleh Manajer',
+        authorName: auth.reviewerName
+      });
+
+      // Record audit log for staff transparency
+      await cloudDb.recordStaffAuditLog({
+        staffId,
+        staffName,
+        actionType: 'DAY_ADJUSTED',
+        description: `Total hari kerja disesuaikan ${adjNum > 0 ? '+' + adjNum : adjNum} hari oleh Manajer. Alasan: ${reason || 'Penyesuaian resmi'}`,
+        authorName: auth.reviewerName
+      });
+    }
+
+    broadcastEvent('SHIFT_UPDATE');
+    broadcastEvent('LEADERBOARD_UPDATE');
+    return res.json({
+      success: true,
+      message: `Hari kerja staf ${staffName} berhasil disesuaikan ${adjNum > 0 ? '+' + adjNum : adjNum} hari.`,
+      data: saved
+    });
+  } catch (err) {
+    console.error('Error saving day adjustment:', err);
+    return res.status(500).json({ error: 'Gagal menyimpan penyesuaian hari kerja: ' + err.message });
+  }
+});
+
+// Get Staff Audit Trail (Logs for Staff Dashboard & Manager Audit)
+router.get('/staff/:id/audit-trail', async (req, res) => {
+  const { id } = req.params;
+  try {
+    let logs = [];
+    if (isSupabaseConfigured) {
+      logs = await cloudDb.getStaffAuditLogs(id);
+    }
+    return res.json(logs);
+  } catch (err) {
+    console.error('Error fetching staff audit trail:', err);
+    return res.status(500).json({ error: 'Gagal memuat log audit staf: ' + err.message });
   }
 });
 

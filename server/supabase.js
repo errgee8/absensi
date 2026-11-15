@@ -1174,6 +1174,31 @@ export const cloudDb = {
     return item;
   },
 
+  async deleteLeaveRequest(id) {
+    if (!supabase) return null;
+    const { data } = await supabase
+      .from('app_settings')
+      .select('value')
+      .eq('key', 'leave_requests')
+      .maybeSingle();
+
+    const list = Array.isArray(data?.value) ? data.value : [];
+    const deletedItem = list.find(r => String(r.id) === String(id));
+    const filtered = list.filter(r => String(r.id) !== String(id));
+
+    const { error } = await supabase
+      .from('app_settings')
+      .upsert({
+        key: 'leave_requests',
+        value: filtered,
+        description: 'Staff Leave and Permission Requests',
+        updated_at: new Date().toISOString()
+      });
+
+    if (error) throw error;
+    return deletedItem;
+  },
+
   async getStaffLeaveBalance(staffId, year = new Date().getFullYear()) {
     const list = await this.getLeaveRequests({ staffId, type: 'CUTI', year });
     const approvedRequests = list.filter(r => r.status === 'APPROVED' || r.status === 'ADJUSTED');
@@ -1595,5 +1620,94 @@ export const cloudDb = {
       console.warn('Auto toilet staff sync error:', err.message);
       return false;
     }
+  },
+
+  // 18. Manual Working Day Adjustments (Manager Override)
+  async getStaffDayAdjustments(targetMonthStr = null) {
+    if (!supabase) return [];
+    try {
+      const { data } = await supabase
+        .from('app_settings')
+        .select('value')
+        .eq('key', 'staff_day_adjustments')
+        .maybeSingle();
+
+      const list = Array.isArray(data?.value) ? data.value : [];
+      if (!targetMonthStr) return list;
+      return list.filter(item => {
+        if (!item.created_at) return true;
+        return item.created_at.startsWith(targetMonthStr);
+      });
+    } catch (e) {
+      console.warn('Failed to fetch staff_day_adjustments:', e.message);
+      return [];
+    }
+  },
+
+  async saveStaffDayAdjustment(adjustment) {
+    if (!supabase) return null;
+    const now = new Date().toISOString();
+    const newAdj = {
+      id: `adj-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+      staff_id: adjustment.staffId,
+      staff_name: adjustment.staffName,
+      adjustment_days: Number(adjustment.adjustmentDays) || 0,
+      reason: adjustment.reason || 'Koreksi Hari Kerja oleh Manajer',
+      author_name: adjustment.authorName || 'Operational Manager',
+      created_at: now
+    };
+
+    const currentList = await this.getStaffDayAdjustments();
+    const updatedList = [newAdj, ...currentList];
+
+    await this.saveSetting('staff_day_adjustments', updatedList, 'Manual Staff Working Day Adjustments');
+    return newAdj;
+  },
+
+  async deleteStaffDayAdjustment(id) {
+    if (!supabase) return null;
+    const currentList = await this.getStaffDayAdjustments();
+    const itemToDelete = currentList.find(a => String(a.id) === String(id));
+    const updatedList = currentList.filter(a => String(a.id) !== String(id));
+    await this.saveSetting('staff_day_adjustments', updatedList, 'Manual Staff Working Day Adjustments');
+    return itemToDelete;
+  },
+
+  // 19. Staff Audit Trail (Transparent Log for Staff Dashboard)
+  async getStaffAuditLogs(staffId = null) {
+    if (!supabase) return [];
+    try {
+      const { data } = await supabase
+        .from('app_settings')
+        .select('value')
+        .eq('key', 'staff_audit_logs')
+        .maybeSingle();
+
+      const list = Array.isArray(data?.value) ? data.value : [];
+      if (!staffId) return list;
+      return list.filter(l => String(l.staff_id) === String(staffId));
+    } catch (e) {
+      console.warn('Failed to fetch staff_audit_logs:', e.message);
+      return [];
+    }
+  },
+
+  async recordStaffAuditLog({ staffId, staffName, actionType, description, authorName }) {
+    if (!supabase) return null;
+    const now = new Date().toISOString();
+    const logItem = {
+      id: `audit-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+      staff_id: staffId,
+      staff_name: staffName,
+      action_type: actionType, // 'POINT_REMOVED' | 'LEAVE_REMOVED' | 'DAY_ADJUSTED' | 'MANUAL_CORRECTION'
+      description: description || '',
+      author_name: authorName || 'Operational Manager',
+      created_at: now
+    };
+
+    const currentLogs = await this.getStaffAuditLogs();
+    const updatedLogs = [logItem, ...currentLogs.slice(0, 499)]; // Keep latest 500 logs
+    await this.saveSetting('staff_audit_logs', updatedLogs, 'Staff Action Audit Logs by Management');
+    return logItem;
   }
 };

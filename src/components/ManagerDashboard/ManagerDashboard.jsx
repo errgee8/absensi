@@ -16,7 +16,7 @@ import SystemRecoveryModal from './SystemRecoveryModal';
 import MonitoringAuditTab from './MonitoringAuditTab';
 import PointManagementTab from './PointManagementTab';
 import { exportMonthlyPayrollReport, exportTimesheetToExcel } from '../../utils/excelExport';
-import { getShifts, getStats, getShiftSchedules, getStaffList, getLeaveRequests, getAnnouncements, getAnnouncementReaders, getPoints, subscribeRealtimeEvents, sendPresenceHeartbeat } from '../../utils/api';
+import { getShifts, getStats, getShiftSchedules, getStaffList, getLeaveRequests, getAnnouncements, getAnnouncementReaders, getPoints, getStaffDayAdjustments, subscribeRealtimeEvents, sendPresenceHeartbeat } from '../../utils/api';
 import { getOperationalDateYMD, getOperationalYesterdayYMD, getWitaDateYMD, getAppNow, formatWitaDateTime } from '../../utils/time';
 import { resolveShift } from '../../utils/shiftResolver';
 import { showToast } from '../Common/Toast';
@@ -270,11 +270,12 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
       const startOfMonth = `${curYear}-${curMonth}-01`;
       const exportTimestamp = formatWitaDateTime(nowApp.toISOString());
 
-      // Fetch month-to-date data in parallel: shifts, staff roster, and approved leave
-      const [monthShifts, allStaffList, allLeaveRequests] = await Promise.all([
+      // Fetch month-to-date data in parallel: shifts, staff roster, approved leave, and manager day adjustments
+      const [monthShifts, allStaffList, allLeaveRequests, dayAdjustmentsData] = await Promise.all([
         getShifts({ startDate: startOfMonth, endDate: todayYmd }),
         getStaffList('ALL'),
-        getLeaveRequests({ year: curYear }).catch(() => [])
+        getLeaveRequests({ year: curYear }).catch(() => []),
+        getStaffDayAdjustments(curYear + '-' + curMonth).catch(() => ({ adjustments: [] }))
       ]);
 
       // Strictly filter completed shifts only (strictly exclude ON_DUTY / IN_PROGRESS)
@@ -288,6 +289,7 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
         shifts: completedShifts,
         allStaff: allStaffList || [],
         leaveRequests: allLeaveRequests || [],
+        dayAdjustments: dayAdjustmentsData?.adjustments || [],
         periodStart: startOfMonth,
         periodEnd: todayYmd,
         exportTimestamp
@@ -650,6 +652,7 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
 
         {!isReadOnly && activeTab === 'STAFF' && (
           <StaffManagementTab
+            adminAuth={adminAuth}
             onStaffUpdated={() => {
               loadData();
               refreshSettings();

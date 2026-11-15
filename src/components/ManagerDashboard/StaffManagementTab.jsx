@@ -1,9 +1,44 @@
 import React, { useState, useEffect } from 'react';
-import { UserPlus, Key, ShieldAlert, CheckCircle2, XCircle, Search, Eye, EyeOff, RefreshCw, Sparkles, UserCheck, Building2, Trash2 } from 'lucide-react';
-import { getAdminStaffList, createStaff, resetStaffPin, toggleStaffStatus, deleteStaff } from '../../utils/api';
+import {
+  UserPlus,
+  Key,
+  ShieldAlert,
+  CheckCircle2,
+  XCircle,
+  Search,
+  Eye,
+  EyeOff,
+  RefreshCw,
+  Sparkles,
+  UserCheck,
+  Building2,
+  Trash2,
+  Calendar,
+  Award,
+  Clock,
+  AlertCircle,
+  FileText,
+  Plus,
+  Minus,
+  History,
+  Info
+} from 'lucide-react';
+import {
+  getAdminStaffList,
+  createStaff,
+  resetStaffPin,
+  toggleStaffStatus,
+  deleteStaff,
+  getStaffAuditTrail,
+  saveStaffDayAdjustment,
+  getStaffAttendanceHistory,
+  deleteStaffPoint,
+  getPoints
+} from '../../utils/api';
 import { showToast } from '../Common/Toast';
+import { formatWitaDateTime } from '../../utils/time';
 
-export default function StaffManagementTab({ onStaffUpdated }) {
+export default function StaffManagementTab({ onStaffUpdated, adminAuth }) {
   const [staffRoster, setStaffRoster] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -24,6 +59,19 @@ export default function StaffManagementTab({ onStaffUpdated }) {
   const [pinSubmitting, setPinSubmitting] = useState(false);
 
   const [showPins, setShowPins] = useState({});
+
+  // Staff Detail & Adjustment Modal State
+  const [detailModalStaff, setDetailModalStaff] = useState(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailAttendance, setDetailAttendance] = useState(null);
+  const [detailAuditLogs, setDetailAuditLogs] = useState([]);
+  const [detailPoints, setDetailPoints] = useState([]);
+  const [adjDays, setAdjDays] = useState(1);
+  const [adjReason, setAdjReason] = useState('');
+  const [adjPin, setAdjPin] = useState(adminAuth?.pin || '');
+  const [adjSubmitting, setAdjSubmitting] = useState(false);
+  const [adjError, setAdjError] = useState(null);
+  const [adjSuccess, setAdjSuccess] = useState(null);
 
   // Division & Role templates mapping
   const templatesByVenue = {
@@ -242,6 +290,93 @@ export default function StaffManagementTab({ onStaffUpdated }) {
     }
   };
 
+  const openStaffDetailModal = async (staff) => {
+    setDetailModalStaff(staff);
+    setDetailLoading(true);
+    setAdjDays(1);
+    setAdjReason('');
+    setAdjPin(adminAuth?.pin || '');
+    setAdjError(null);
+    setAdjSuccess(null);
+    try {
+      const [histData, auditData, pointsData] = await Promise.all([
+        getStaffAttendanceHistory(staff.id, 'CURRENT_MONTH').catch(() => null),
+        getStaffAuditTrail(staff.id).catch(() => []),
+        getPoints({ staffId: staff.id }).catch(() => ({ points: [] }))
+      ]);
+      setDetailAttendance(histData);
+      setDetailAuditLogs(Array.isArray(auditData) ? auditData : []);
+      setDetailPoints(pointsData?.points || []);
+    } catch (err) {
+      console.error('Failed to load staff details:', err);
+    } finally {
+      setDetailLoading(false);
+    }
+  };
+
+  const handleSaveDayAdjustment = async (e) => {
+    e.preventDefault();
+    if (!detailModalStaff || adjSubmitting) return;
+    const effectivePin = (adjPin || adminAuth?.pin || '').trim();
+    if (!effectivePin) {
+      setAdjError('PIN Otorisasi Manajer wajib diisi.');
+      return;
+    }
+    if (!adjReason.trim()) {
+      setAdjError('Alasan penyesuaian hari kerja wajib diisi.');
+      return;
+    }
+    setAdjSubmitting(true);
+    setAdjError(null);
+    setAdjSuccess(null);
+    try {
+      await saveStaffDayAdjustment({
+        pin: effectivePin,
+        staffId: detailModalStaff.id,
+        staffName: detailModalStaff.name,
+        adjustmentDays: Number(adjDays),
+        reason: adjReason.trim()
+      });
+      setAdjSuccess(`Berhasil menyimpan penyesuaian hari kerja (${Number(adjDays) > 0 ? '+' : ''}${adjDays} hari).`);
+      setAdjReason('');
+      const [histData, auditData] = await Promise.all([
+        getStaffAttendanceHistory(detailModalStaff.id, 'CURRENT_MONTH').catch(() => null),
+        getStaffAuditTrail(detailModalStaff.id).catch(() => [])
+      ]);
+      setDetailAttendance(histData);
+      setDetailAuditLogs(Array.isArray(auditData) ? auditData : []);
+      if (onStaffUpdated) onStaffUpdated();
+    } catch (err) {
+      setAdjError(err.message || 'Gagal menyimpan penyesuaian.');
+    } finally {
+      setAdjSubmitting(false);
+    }
+  };
+
+  const handleDeleteStaffPointItem = async (pointId) => {
+    const effectivePin = (adjPin || adminAuth?.pin || '').trim();
+    if (!effectivePin) {
+      showToast('Silakan masukkan PIN Otorisasi pada form di atas untuk konfirmasi.', 'error');
+      return;
+    }
+    if (!window.confirm('Hapus catatan poin ini? Tindakan ini akan dicatat dalam audit trail staf.')) return;
+    try {
+      await deleteStaffPoint(pointId, effectivePin);
+      showToast('Catatan poin berhasil dihapus.', 'success');
+      const [histData, auditData, pointsData] = await Promise.all([
+        getStaffAttendanceHistory(detailModalStaff.id, 'CURRENT_MONTH').catch(() => null),
+        getStaffAuditTrail(detailModalStaff.id).catch(() => []),
+        getPoints({ staffId: detailModalStaff.id }).catch(() => ({ points: [] }))
+      ]);
+      setDetailAttendance(histData);
+      setDetailAuditLogs(Array.isArray(auditData) ? auditData : []);
+      setDetailPoints(pointsData?.points || []);
+      if (onStaffUpdated) onStaffUpdated();
+    } catch (err) {
+      showToast(err.message || 'Gagal menghapus poin.', 'error');
+    }
+  };
+
   const handleSaveResetPin = async (e) => {
     e.preventDefault();
     if (!pinModalStaff || resetPinValue.length < 4) return;
@@ -435,6 +570,15 @@ export default function StaffManagementTab({ onStaffUpdated }) {
 
                     {/* Actions */}
                     <td className="py-3 px-3 text-right space-x-1.5 whitespace-nowrap">
+                      <button
+                        onClick={() => openStaffDetailModal(staff)}
+                        className="px-2.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-[11px] font-black shadow-md shadow-blue-600/30 transition inline-flex items-center space-x-1"
+                        title="Lihat Detail, Riwayat & Sesuaikan Hari Kerja"
+                      >
+                        <History className="w-3 h-3" />
+                        <span>Detail & Koreksi</span>
+                      </button>
+
                       <button
                         onClick={() => {
                           setPinModalStaff(staff);
@@ -672,6 +816,290 @@ export default function StaffManagementTab({ onStaffUpdated }) {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Staff Detail & Manager Correction */}
+      {detailModalStaff && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md animate-fade-in text-slate-200">
+          <div className="bg-[#161b24] border border-slate-700 rounded-3xl max-w-2xl w-full max-h-[92vh] flex flex-col overflow-hidden shadow-2xl">
+            {/* Modal Header */}
+            <div className="p-4 sm:p-5 border-b border-slate-800 bg-[#12161f] flex items-center justify-between shrink-0">
+              <div className="flex items-center space-x-3">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center font-black text-white text-base shadow-md overflow-hidden">
+                  {detailModalStaff.photo_url ? (
+                    <img src={detailModalStaff.photo_url} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    detailModalStaff.name?.charAt(0)
+                  )}
+                </div>
+                <div>
+                  <div className="flex items-center space-x-2">
+                    <h3 className="text-base font-black text-white">{detailModalStaff.name}</h3>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full font-black bg-blue-500/20 text-blue-400 border border-blue-500/30 font-mono">
+                      PIN: {detailModalStaff.pin}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-400 font-bold">
+                    {detailModalStaff.venue} • {detailModalStaff.role} ({detailModalStaff.division})
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDetailModalStaff(null)}
+                className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Modal Body - Scrollable */}
+            <div className="p-4 sm:p-6 overflow-y-auto space-y-5 text-xs">
+              {detailLoading ? (
+                <div className="py-12 flex flex-col items-center justify-center text-slate-400">
+                  <RefreshCw className="w-6 h-6 animate-spin mb-2 text-blue-500" />
+                  <span className="font-bold">Memuat data detail staf...</span>
+                </div>
+              ) : (
+                <>
+                  {/* Attendance & Performance Summary Cards */}
+                  <div>
+                    <h4 className="text-[11px] font-black uppercase tracking-wider text-slate-400 mb-2 flex items-center space-x-1.5">
+                      <Calendar className="w-3.5 h-3.5 text-blue-400" />
+                      <span>Rekap Kehadiran Bulan Berjalan (Target 26 Hari)</span>
+                    </h4>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                      <div className="p-3 bg-[#12161f] border border-slate-800 rounded-2xl">
+                        <span className="text-[10px] text-slate-400 block font-bold">Hari Kerja Aktual</span>
+                        <span className="text-lg font-black text-blue-400">
+                          {detailAttendance?.summary?.actualWorkDays ?? detailAttendance?.summary?.workDays ?? 0} Hari
+                        </span>
+                      </div>
+                      <div className="p-3 bg-[#12161f] border border-slate-800 rounded-2xl">
+                        <span className="text-[10px] text-slate-400 block font-bold">Penyesuaian Manajer</span>
+                        <span className={`text-lg font-black ${
+                          (detailAttendance?.summary?.manualDaysSum || 0) > 0
+                            ? 'text-emerald-400'
+                            : (detailAttendance?.summary?.manualDaysSum || 0) < 0
+                            ? 'text-rose-400'
+                            : 'text-slate-400'
+                        }`}>
+                          {(detailAttendance?.summary?.manualDaysSum || 0) > 0 ? '+' : ''}
+                          {detailAttendance?.summary?.manualDaysSum || 0} Hari
+                        </span>
+                      </div>
+                      <div className="p-3 bg-[#12161f] border border-slate-800 rounded-2xl">
+                        <span className="text-[10px] text-slate-400 block font-bold">Total Hari Final</span>
+                        <span className="text-lg font-black text-emerald-400">
+                          {detailAttendance?.summary?.workDays || 0} / 26
+                        </span>
+                      </div>
+                      <div className="p-3 bg-[#12161f] border border-slate-800 rounded-2xl">
+                        <span className="text-[10px] text-slate-400 block font-bold">Total Telat</span>
+                        <span className="text-lg font-black text-amber-400">
+                          {detailAttendance?.summary?.totalLateCount || 0}x
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Form: Add or Deduct Working Days */}
+                  <div className="p-4 bg-gradient-to-br from-[#1a202c] to-[#12161f] border border-slate-700/80 rounded-2xl space-y-3">
+                    <div className="flex items-center space-x-2 text-white">
+                      <Sparkles className="w-4 h-4 text-amber-400" />
+                      <h4 className="text-xs font-black">⚡ Koreksi / Penyesuaian Hari Kerja (Otorisasi Manajer)</h4>
+                    </div>
+                    <p className="text-[11px] text-slate-400 leading-relaxed font-bold">
+                      Gunakan fitur ini untuk menambah bonus hari kerja (misal: lembur/bantuan shift) atau memotong hari kerja. Nilai ini akan dihitung pada akumulasi hari kerja (maks 26) dan dicatat transparan di dashboard staf.
+                    </p>
+
+                    {adjError && (
+                      <div className="p-2.5 bg-rose-950/50 border border-rose-500/50 rounded-xl text-xs text-rose-300 font-bold flex items-center space-x-2">
+                        <AlertCircle className="w-4 h-4 shrink-0" />
+                        <span>{adjError}</span>
+                      </div>
+                    )}
+
+                    {adjSuccess && (
+                      <div className="p-2.5 bg-emerald-950/50 border border-emerald-500/50 rounded-xl text-xs text-emerald-300 font-bold flex items-center space-x-2">
+                        <CheckCircle2 className="w-4 h-4 shrink-0" />
+                        <span>{adjSuccess}</span>
+                      </div>
+                    )}
+
+                    <form onSubmit={handleSaveDayAdjustment} className="space-y-3 pt-1">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-[11px] font-black text-slate-300 mb-1">
+                            Nilai Penyesuaian Hari (+ / -):
+                          </label>
+                          <div className="flex items-center space-x-2">
+                            <input
+                              type="number"
+                              step="1"
+                              value={adjDays}
+                              onChange={(e) => setAdjDays(e.target.value)}
+                              required
+                              className="w-full bg-[#12161f] border border-slate-700 rounded-xl px-3 py-2 text-slate-100 font-black text-sm focus:outline-none focus:border-blue-500"
+                            />
+                            <div className="flex items-center space-x-1">
+                              <button
+                                type="button"
+                                onClick={() => setAdjDays(1)}
+                                className={`px-2 py-1.5 rounded-lg text-xs font-black border ${Number(adjDays) === 1 ? 'bg-emerald-600 text-white border-emerald-500' : 'bg-slate-800 text-slate-300 border-slate-700'}`}
+                              >
+                                +1
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setAdjDays(-1)}
+                                className={`px-2 py-1.5 rounded-lg text-xs font-black border ${Number(adjDays) === -1 ? 'bg-rose-600 text-white border-rose-500' : 'bg-slate-800 text-slate-300 border-slate-700'}`}
+                              >
+                                -1
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="block text-[11px] font-black text-slate-300 mb-1">
+                            PIN Otorisasi Manajer:
+                          </label>
+                          <input
+                            type="password"
+                            inputMode="numeric"
+                            maxLength={8}
+                            value={adjPin}
+                            onChange={(e) => setAdjPin(e.target.value)}
+                            placeholder="Masukkan PIN Manager..."
+                            required
+                            className="w-full bg-[#12161f] border border-slate-700 rounded-xl px-3 py-2 text-slate-100 font-mono tracking-widest text-sm focus:outline-none focus:border-blue-500"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-black text-slate-300 mb-1">
+                          Alasan Penyesuaian (Wajib Diisi):
+                        </label>
+                        <input
+                          type="text"
+                          value={adjReason}
+                          onChange={(e) => setAdjReason(e.target.value)}
+                          placeholder="Contoh: Bantuan operasional event / Koreksi lupa absensi"
+                          required
+                          className="w-full bg-[#12161f] border border-slate-700 rounded-xl px-3 py-2 text-slate-100 text-xs focus:outline-none focus:border-blue-500"
+                        />
+                      </div>
+
+                      <div className="flex justify-end">
+                        <button
+                          type="submit"
+                          disabled={adjSubmitting || !adjPin.trim() || !adjReason.trim()}
+                          className="px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-black text-xs rounded-xl shadow-lg shadow-blue-600/30 transition disabled:opacity-50 flex items-center space-x-1.5 cursor-pointer"
+                        >
+                          {adjSubmitting ? (
+                            <>
+                              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                              <span>Menyimpan...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Sparkles className="w-3.5 h-3.5" />
+                              <span>Terapkan Penyesuaian Hari</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+
+                  {/* Violation / Disciplinary Points Management */}
+                  {detailPoints && detailPoints.length > 0 && (
+                    <div className="p-4 bg-[#12161f] border border-slate-800 rounded-2xl space-y-3">
+                      <h4 className="text-[11px] font-black uppercase tracking-wider text-slate-400 flex items-center justify-between">
+                        <span className="flex items-center space-x-1.5">
+                          <Award className="w-3.5 h-3.5 text-amber-400" />
+                          <span>Daftar Catatan Poin ({detailPoints.length})</span>
+                        </span>
+                        <span className="text-[10px] text-slate-500 lowercase">bisa dihapus langsung oleh manajer</span>
+                      </h4>
+                      <div className="space-y-2">
+                        {detailPoints.map((pt) => (
+                          <div key={pt.id} className="p-2.5 bg-[#161b24] border border-slate-800 rounded-xl flex items-center justify-between">
+                            <div className="space-y-0.5">
+                              <div className="flex items-center space-x-2">
+                                <span className={`px-2 py-0.5 rounded-md font-mono text-[10px] font-black ${
+                                  Number(pt.points) > 0 ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                                }`}>
+                                  {Number(pt.points) > 0 ? `+${pt.points}` : pt.points} Poin
+                                </span>
+                                <span className="font-black text-white text-xs">{pt.reason || pt.type}</span>
+                              </div>
+                              <p className="text-[10px] text-slate-400">
+                                {formatWitaDateTime(pt.created_at)}
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteStaffPointItem(pt.id)}
+                              className="px-2.5 py-1.5 bg-rose-950/60 hover:bg-rose-900 border border-rose-700 text-rose-300 hover:text-white rounded-lg text-[10px] font-black transition flex items-center space-x-1 cursor-pointer"
+                              title="Hapus Catatan Poin"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                              <span>Hapus Poin</span>
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Audit Trail List (Logged changes for transparency) */}
+                  <div className="p-4 bg-[#12161f] border border-slate-800 rounded-2xl space-y-3">
+                    <h4 className="text-[11px] font-black uppercase tracking-wider text-slate-400 flex items-center space-x-1.5">
+                      <History className="w-3.5 h-3.5 text-indigo-400" />
+                      <span>Log Transparansi Audit Manajer ({detailAuditLogs.length})</span>
+                    </h4>
+                    {detailAuditLogs.length === 0 ? (
+                      <p className="text-[11px] text-slate-500 italic py-2">
+                        Belum ada riwayat penyesuaian/penghapusan dari manajer untuk staf ini.
+                      </p>
+                    ) : (
+                      <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                        {detailAuditLogs.map((log) => (
+                          <div key={log.id} className="p-2.5 bg-[#161b24] border border-slate-800 rounded-xl text-[11px] space-y-1">
+                            <div className="flex items-center justify-between text-slate-400 text-[10px]">
+                              <span className="font-mono">{formatWitaDateTime(log.created_at)}</span>
+                              <span className="font-black text-slate-300">{log.actor || 'Manajer'}</span>
+                            </div>
+                            <p className="text-white font-bold">{log.description}</p>
+                            {log.reason && (
+                              <p className="text-slate-400 italic text-[10px]">
+                                Alasan: "{log.reason}"
+                              </p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 border-t border-slate-800 bg-[#12161f] flex justify-end shrink-0">
+              <button
+                type="button"
+                onClick={() => setDetailModalStaff(null)}
+                className="px-5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-black transition cursor-pointer"
+              >
+                Tutup
+              </button>
+            </div>
           </div>
         </div>
       )}

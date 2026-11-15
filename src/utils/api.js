@@ -560,3 +560,46 @@ export async function getStaffAttendanceHistory(staffId, monthKey) {
   if (!res.ok) throw new Error(data.error || 'Gagal memuat riwayat kehadiran');
   return data;
 }
+
+// 9g. Delete Leave Request from History (Manager Only)
+export async function deleteLeaveRequest(id, pin, reason) {
+  const res = await fetch(`${API_BASE}/leave-requests/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-manager-pin': String(pin || '').trim()
+    },
+    body: JSON.stringify({ pin: String(pin || '').trim(), reason })
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Gagal menghapus riwayat izin/cuti');
+  return data;
+}
+
+// 9h. Staff Working Day Adjustments (Manager Override)
+export async function getStaffDayAdjustments(month) {
+  const query = month ? `?month=${encodeURIComponent(month)}` : '';
+  const res = await fetch(`${API_BASE}/admin/staff-day-adjustments${query}`);
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Gagal memuat data penyesuaian hari kerja');
+  return data;
+}
+
+export async function saveStaffDayAdjustment({ pin, staffId, staffName, adjustmentDays, reason }) {
+  const res = await fetch(`${API_BASE}/admin/staff-day-adjustments`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ pin, staffId, staffName, adjustmentDays, reason })
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Gagal menyimpan penyesuaian hari kerja');
+  return data;
+}
+
+// 9i. Staff Audit Trail
+export async function getStaffAuditTrail(staffId) {
+  const res = await fetch(`${API_BASE}/staff/${encodeURIComponent(staffId)}/audit-trail`);
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Gagal memuat riwayat audit staf');
+  return data;
+}

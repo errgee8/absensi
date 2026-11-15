@@ -93,6 +93,7 @@ function buildVenuePayrollSheet({
   staffList = [],
   shifts = [],
   leaveRequests = [],
+  dayAdjustments = [],
   periodStart = '',
   periodEnd = '',
   exportTimestamp = ''
@@ -112,7 +113,11 @@ function buildVenuePayrollSheet({
       return (matchId || matchName) && isCompleted && s.checkin_time;
     });
 
-    const totalHariKerja = staffShifts.length;
+    const actualWorkDays = staffShifts.length;
+    const manualAdjSum = (dayAdjustments || [])
+      .filter((a) => String(a.staff_id) === String(staff.id) || (staff.uuid && String(a.staff_id) === String(staff.uuid)))
+      .reduce((acc, a) => acc + Number(a.adjustment_days || 0), 0);
+    const totalHariKerja = Math.min(26, Math.max(0, actualWorkDays + manualAdjSum));
     const isMgmt = (staff.division || '').toLowerCase().includes('management');
 
     // 2. Late check-in occurrences
@@ -260,6 +265,8 @@ function buildVenuePayrollSheet({
     return {
       staff,
       division: staff.division || 'Umum',
+      actualWorkDays,
+      manualAdjSum,
       totalHariKerja,
       lateCount: lateOccurrences.length,
       lateOccurrences,
@@ -341,7 +348,7 @@ function buildVenuePayrollSheet({
     { key: 'no', header: 'No.', width: 6 },
     { key: 'name', header: 'Nama Karyawan', width: 28 },
     { key: 'division', header: 'Divisi / Bagian', width: 22 },
-    { key: 'work_days', header: 'Total Hari Kerja', width: 17 },
+    { key: 'work_days', header: 'Total Hari Kerja (Target 26)', width: 22 },
     { key: 'late_count', header: 'Frekuensi Telat', width: 17 },
     { key: 'late_detail', header: 'Rincian Keterlambatan (Hari & Jam)', width: 44 },
     { key: 'early_count', header: 'Frekuensi Pulang Cepat', width: 20 },
@@ -429,17 +436,27 @@ function buildVenuePayrollSheet({
           : '✓ Normal';
 
       // Notes text
-      const notesText = metric.leaveNotes.length > 0 ? metric.leaveNotes.join('; ') : '-';
+      const allNotes = [...metric.leaveNotes];
+      if (metric.manualAdjSum !== 0) {
+        allNotes.push(`Koreksi Manajer: ${metric.manualAdjSum > 0 ? '+' : ''}${metric.manualAdjSum} Hari`);
+      }
+      const notesText = allNotes.length > 0 ? allNotes.join('; ') : '-';
 
       // Dynamic row height based on line count in late/early details
       const lineCount = Math.max(metric.lateOccurrences.length, metric.earlyOccurrences.length, 1);
       row.height = Math.max(26, lineCount * 17 + 8);
 
+      const workDaysText = metric.totalHariKerja > 0
+        ? (metric.manualAdjSum !== 0
+          ? `${metric.totalHariKerja} Hari (${metric.actualWorkDays}${metric.manualAdjSum > 0 ? '+' : ''}${metric.manualAdjSum})`
+          : `${metric.totalHariKerja} Hari`)
+        : '0';
+
       row.values = [
         globalStaffNumber++,
         metric.staff.name || '-',
         metric.division,
-        metric.totalHariKerja > 0 ? `${metric.totalHariKerja} Hari` : '0',
+        workDaysText,
         metric.lateCount > 0 ? `${metric.lateCount}x` : '0',
         lateText,
         metric.earlyCount > 0 ? `${metric.earlyCount}x` : '0',
@@ -784,15 +801,375 @@ function buildCompletedShiftsDetailSheet({ workbook, shifts = [], exportTimestam
 }
 
 /**
+ * Builds the Detail Lateness sheet with dates, times, minutes late, reason, and manager review status.
+ */
+function buildLatenessDetailSheet({ workbook, shifts = [], allStaff = [], exportTimestamp = '' }) {
+  const worksheet = workbook.addWorksheet('Rincian Log Keterlambatan', {
+    views: [{ showGridLines: true }],
+    pageSetup: { orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0 }
+  });
+
+  // Filter shifts that were late
+  const lateShifts = [];
+  shifts.forEach((s) => {
+    if (!s.checkin_time) return;
+    const inWita = getWitaComponents(s.checkin_time);
+    if (!inWita) return;
+
+    const matchedStaff = (allStaff || []).find(
+      (st) =>
+        String(st.id) === String(s.staff_id) ||
+        (st.uuid && String(st.uuid) === String(s.staff_id)) ||
+        (st.name || '').trim().toLowerCase() === (s.staff_name || '').trim().toLowerCase()
+    );
+
+    const isMgmt = (matchedStaff?.division || s.staff_division || s.division || '').toLowerCase().includes('management');
+    const schedStart = s.scheduled_start || matchedStaff?.shift_start || '13:00';
+    let isLate = false;
+    let lateMinutes = 0;
+
+    if (!isMgmt && schedStart && schedStart.includes(':') && schedStart !== '00:00' && schedStart !== 'FLEXIBLE') {
+      const [sh, sm] = schedStart.split(':').map(Number);
+      const schedM = sh * 60 + sm;
+      let diff = inWita.totalMinutes - schedM;
+      if (diff < -720) diff += 1440;
+      if (diff > 720) diff -= 1440;
+      if (diff > 10) {
+        isLate = true;
+        lateMinutes = diff;
+      }
+    }
+
+    let flagsArr = [];
+    try {
+      flagsArr = Array.isArray(s.flags) ? s.flags : JSON.parse(s.flags || '[]');
+    } catch {
+      flagsArr = [];
+    }
+
+    const hasLateFlag = flagsArr.some((f) => String(f).toLowerCase().includes('late') && !String(f).includes('EXCUSED'));
+    if (hasLateFlag) {
+      isLate = true;
+      if (lateMinutes === 0) lateMinutes = 15;
+    }
+
+    if (isLate) {
+      const isAcc = flagsArr.some((f) => String(f).includes('LATE_APPROVED')) || s.late_excused === 1;
+      const isRejected = flagsArr.some((f) => String(f).includes('LATE_REJECTED'));
+      const statusText = isAcc ? 'Di-ACC Manajer' : isRejected ? 'Ditolak' : 'Menunggu Review';
+
+      lateShifts.push({
+        shift: s,
+        inWita,
+        schedStart,
+        lateMinutes,
+        statusText,
+        isAcc,
+        isRejected,
+        staffName: s.staff_name || matchedStaff?.name || '-',
+        venue: s.staff_venue || s.venue || matchedStaff?.venue || '-',
+        division: s.staff_division || s.division || matchedStaff?.division || '-',
+        reason: s.late_reason || s.notes || 'Tidak ada alasan tertulis',
+        reviewer: s.late_reviewed_by || s.reviewed_by || '-'
+      });
+    }
+  });
+
+  // Sort by checkin time descending
+  lateShifts.sort((a, b) => new Date(b.shift.checkin_time).getTime() - new Date(a.shift.checkin_time).getTime());
+
+  // 1. Title Banner
+  worksheet.mergeCells('A1:K1');
+  const titleCell = worksheet.getCell('A1');
+  titleCell.value = 'RINCIAN LOG KETERLAMBATAN STAFF (DETAIL TANGGAL, JAM & ALASAN)';
+  titleCell.font = { name: 'Segoe UI', size: 13, bold: true, color: { argb: 'FFFFFFFF' } };
+  titleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF991B1B' } }; // Red 800
+  titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
+  worksheet.getRow(1).height = 34;
+
+  // 2. Subtitle
+  worksheet.mergeCells('A2:K2');
+  const subCell = worksheet.getCell('A2');
+  const cleanExportTime = String(exportTimestamp || '').replace(/\s*WITA\s*$/i, '') + ' WITA';
+  subCell.value = `Exported: ${cleanExportTime}  |  Total Kejadian Telat (>10 Menit Grace Period): ${lateShifts.length} Kejadian  |  Acuan Evaluasi Gaji & Disiplin`;
+  subCell.font = { name: 'Segoe UI', size: 9.5, italic: true, color: { argb: 'FFFEE2E2' } };
+  subCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF7F1D1D' } };
+  subCell.alignment = { horizontal: 'center', vertical: 'middle' };
+  worksheet.getRow(2).height = 20;
+
+  worksheet.getRow(3).height = 10;
+
+  // 3. Headers
+  const columns = [
+    { key: 'no', header: 'No.', width: 6 },
+    { key: 'date', header: 'Hari & Tanggal', width: 20 },
+    { key: 'staff_name', header: 'Nama Karyawan', width: 26 },
+    { key: 'venue', header: 'Outlet / Venue', width: 16 },
+    { key: 'division', header: 'Divisi / Bagian', width: 22 },
+    { key: 'sched_start', header: 'Jadwal Masuk', width: 15 },
+    { key: 'actual_in', header: 'Jam Masuk', width: 17 },
+    { key: 'late_minutes', header: 'Keterlambatan', width: 16 },
+    { key: 'reason', header: 'Alasan Tertulis Karyawan', width: 42 },
+    { key: 'status', header: 'Status Review', width: 18 },
+    { key: 'reviewer', header: 'Reviewer / Manajer', width: 20 }
+  ];
+
+  const headerRow = worksheet.getRow(4);
+  headerRow.height = 28;
+  columns.forEach((col, idx) => {
+    const cell = headerRow.getCell(idx + 1);
+    cell.value = col.header;
+    cell.font = { name: 'Segoe UI', size: 9.5, bold: true, color: { argb: 'FFFFFFFF' } };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF7F1D1D' } };
+    cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+    cell.border = {
+      top: { style: 'medium', color: { argb: 'FFCBD5E1' } },
+      left: { style: 'thin', color: { argb: 'FFCBD5E1' } },
+      bottom: { style: 'medium', color: { argb: 'FFCBD5E1' } },
+      right: { style: 'thin', color: { argb: 'FFCBD5E1' } }
+    };
+  });
+
+  // 4. Data Rows
+  lateShifts.forEach((item, index) => {
+    const rowIdx = index + 5;
+    const row = worksheet.getRow(rowIdx);
+    row.height = 24;
+
+    const isEven = index % 2 === 0;
+    const baseBg = isEven ? 'FFFFFFFF' : 'FFFDF2F2';
+
+    row.values = [
+      index + 1,
+      `${item.inWita.dayName}, ${item.inWita.fullDateStr}`,
+      item.staffName,
+      item.venue,
+      item.division,
+      item.schedStart ? `${item.schedStart} WITA` : '-',
+      item.shift.checkin_time ? `${item.inWita.timeStr} WITA` : '-',
+      `+${item.lateMinutes} Menit`,
+      `"${item.reason}"`,
+      item.statusText,
+      item.reviewer
+    ];
+
+    for (let c = 1; c <= 11; c++) {
+      const cell = row.getCell(c);
+      cell.font = { name: 'Segoe UI', size: 9, color: { argb: 'FF1E293B' } };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: baseBg } };
+      cell.border = {
+        top: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+        bottom: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+        left: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+        right: { style: 'thin', color: { argb: 'FFE2E8F0' } }
+      };
+      cell.alignment = { vertical: 'middle', horizontal: 'center' };
+
+      if (c === 3) {
+        cell.alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
+        cell.font = { name: 'Segoe UI', size: 9, bold: true, color: { argb: 'FF0F172A' } };
+      }
+      if (c === 8) {
+        cell.font = { name: 'Segoe UI', size: 9, bold: true, color: { argb: 'FF991B1B' } };
+      }
+      if (c === 9) {
+        cell.alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
+        cell.font = { name: 'Segoe UI', size: 8.5, italic: true, color: { argb: 'FF334155' } };
+      }
+      if (c === 10) {
+        cell.font = {
+          name: 'Segoe UI',
+          size: 9,
+          bold: true,
+          color: { argb: item.isAcc ? 'FF166534' : item.isRejected ? 'FF991B1B' : 'FFB45309' }
+        };
+        cell.fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: item.isAcc ? 'FFDCFCE7' : item.isRejected ? 'FFFEE2E2' : 'FFFEF3C7' }
+        };
+      }
+    }
+  });
+
+  columns.forEach((col, idx) => {
+    worksheet.getColumn(idx + 1).width = col.width;
+  });
+}
+
+/**
+ * Builds the Detail Leave & Cuti Requests sheet with category, date range, requested days, reason, and manager approval notes.
+ */
+function buildLeaveRequestsDetailSheet({ workbook, leaveRequests = [], exportTimestamp = '' }) {
+  const worksheet = workbook.addWorksheet('Rincian Izin & Cuti', {
+    views: [{ showGridLines: true }],
+    pageSetup: { orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0 }
+  });
+
+  const list = [...(leaveRequests || [])].sort(
+    (a, b) => new Date(b.created_at || b.start_date || 0).getTime() - new Date(a.created_at || a.start_date || 0).getTime()
+  );
+
+  // 1. Title Banner
+  worksheet.mergeCells('A1:L1');
+  const titleCell = worksheet.getCell('A1');
+  titleCell.value = 'RINCIAN SELURUH PENGAJUAN IZIN & CUTI KARYAWAN (AUDIT HRD & GAJI)';
+  titleCell.font = { name: 'Segoe UI', size: 13, bold: true, color: { argb: 'FFFFFFFF' } };
+  titleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF581C87' } }; // Purple 900
+  titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
+  worksheet.getRow(1).height = 34;
+
+  // 2. Subtitle
+  worksheet.mergeCells('A2:L2');
+  const subCell = worksheet.getCell('A2');
+  const cleanExportTime = String(exportTimestamp || '').replace(/\s*WITA\s*$/i, '') + ' WITA';
+  subCell.value = `Exported: ${cleanExportTime}  |  Total Pengajuan: ${list.length} Data  |  Termasuk Cuti, Sakit, Izin Biasa & Izin Pulang Awal`;
+  subCell.font = { name: 'Segoe UI', size: 9.5, italic: true, color: { argb: 'FFF3E8FF' } };
+  subCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF6B21A8' } };
+  subCell.alignment = { horizontal: 'center', vertical: 'middle' };
+  worksheet.getRow(2).height = 20;
+
+  worksheet.getRow(3).height = 10;
+
+  // 3. Headers
+  const columns = [
+    { key: 'no', header: 'No.', width: 6 },
+    { key: 'staff_name', header: 'Nama Karyawan', width: 26 },
+    { key: 'venue', header: 'Outlet / Venue', width: 16 },
+    { key: 'division', header: 'Divisi / Bagian', width: 22 },
+    { key: 'category', header: 'Jenis / Kategori', width: 20 },
+    { key: 'period', header: 'Periode Tanggal', width: 28 },
+    { key: 'days', header: 'Jumlah Hari', width: 14 },
+    { key: 'reason', header: 'Alasan Pengajuan', width: 40 },
+    { key: 'status', header: 'Status Review', width: 18 },
+    { key: 'approved_days', header: 'Hari Di-ACC', width: 14 },
+    { key: 'reviewer', header: 'Di-Review Oleh', width: 20 },
+    { key: 'notes', header: 'Catatan Manajer', width: 34 }
+  ];
+
+  const headerRow = worksheet.getRow(4);
+  headerRow.height = 28;
+  columns.forEach((col, idx) => {
+    const cell = headerRow.getCell(idx + 1);
+    cell.value = col.header;
+    cell.font = { name: 'Segoe UI', size: 9.5, bold: true, color: { argb: 'FFFFFFFF' } };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF6B21A8' } };
+    cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+    cell.border = {
+      top: { style: 'medium', color: { argb: 'FFCBD5E1' } },
+      left: { style: 'thin', color: { argb: 'FFCBD5E1' } },
+      bottom: { style: 'medium', color: { argb: 'FFCBD5E1' } },
+      right: { style: 'thin', color: { argb: 'FFCBD5E1' } }
+    };
+  });
+
+  list.forEach((req, index) => {
+    const rowIdx = index + 5;
+    const row = worksheet.getRow(rowIdx);
+    row.height = 24;
+
+    const isEven = index % 2 === 0;
+    const baseBg = isEven ? 'FFFFFFFF' : 'FFFAF5FF';
+
+    const isApproved = req.status === 'APPROVED';
+    const isAdjusted = req.status === 'ADJUSTED';
+    const isRejected = req.status === 'REJECTED';
+
+    const statusLabel = isApproved
+      ? 'Disetujui Penuh'
+      : isAdjusted
+      ? 'ACC Parsial'
+      : isRejected
+      ? 'Ditolak'
+      : 'Menunggu Review';
+
+    const categoryLabel =
+      req.category === 'SAKIT'
+        ? 'Sakit (Surat Dokter)'
+        : req.type === 'CUTI'
+        ? 'Cuti Tahunan'
+        : req.category === 'IZIN_PULANG_AWAL'
+        ? `Izin Pulang Awal (${req.departure_time || '-'})`
+        : 'Izin Tidak Masuk';
+
+    const periodStr =
+      req.category === 'IZIN_PULANG_AWAL'
+        ? formatWitaDateOnly(req.start_date)
+        : `${formatWitaDateOnly(req.start_date)} s/d ${formatWitaDateOnly(req.end_date)}`;
+
+    row.values = [
+      index + 1,
+      req.staff_name || '-',
+      req.staff_venue || '-',
+      req.staff_division || '-',
+      categoryLabel,
+      periodStr,
+      `${req.requested_days || 1} Hari`,
+      `"${req.reason || '-'}"`,
+      statusLabel,
+      isApproved ? `${req.requested_days || 1} Hari` : isAdjusted ? `${req.approved_days || 1} Hari` : '0 Hari',
+      req.reviewed_by || '-',
+      req.manager_notes || '-'
+    ];
+
+    for (let c = 1; c <= 12; c++) {
+      const cell = row.getCell(c);
+      cell.font = { name: 'Segoe UI', size: 9, color: { argb: 'FF1E293B' } };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: baseBg } };
+      cell.border = {
+        top: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+        bottom: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+        left: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+        right: { style: 'thin', color: { argb: 'FFE2E8F0' } }
+      };
+      cell.alignment = { vertical: 'middle', horizontal: 'center' };
+
+      if (c === 2) {
+        cell.alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
+        cell.font = { name: 'Segoe UI', size: 9, bold: true, color: { argb: 'FF0F172A' } };
+      }
+      if (c === 8) {
+        cell.alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
+        cell.font = { name: 'Segoe UI', size: 8.5, italic: true, color: { argb: 'FF334155' } };
+      }
+      if (c === 9) {
+        cell.font = {
+          name: 'Segoe UI',
+          size: 9,
+          bold: true,
+          color: {
+            argb: isApproved ? 'FF166534' : isAdjusted ? 'FF1E40AF' : isRejected ? 'FF991B1B' : 'FFB45309'
+          }
+        };
+        cell.fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: {
+            argb: isApproved ? 'FFDCFCE7' : isAdjusted ? 'FFDBEAFE' : isRejected ? 'FFFEE2E2' : 'FFFEF3C7'
+          }
+        };
+      }
+    }
+  });
+
+  columns.forEach((col, idx) => {
+    worksheet.getColumn(idx + 1).width = col.width;
+  });
+}
+
+/**
  * Main export function: Generates the Executive Month-to-Date Payroll & Attendance Report
  * - Sheet 1: Rekap Gaji JP Karaoke (All JP Staff grouped by Division, month-to-date)
  * - Sheet 2: Rekap Gaji LuckyCat (All LuckyCat Staff grouped by Division, month-to-date)
- * - Sheet 3: Rincian Shift Selesai (Completed shifts log month-to-date, strictly no in-progress)
+ * - Sheet 3: Rincian Log Keterlambatan (Detailed dates, times, minutes late, reason, manager review status)
+ * - Sheet 4: Rincian Izin & Cuti (Detailed leave requests, category, dates, days, written reason, review status)
+ * - Sheet 5: Rincian Shift Selesai (Completed shifts log month-to-date, strictly no in-progress)
  */
 export async function exportMonthlyPayrollReport({
   shifts = [],
   allStaff = [],
   leaveRequests = [],
+  dayAdjustments = [],
   periodStart = '',
   periodEnd = '',
   exportTimestamp = ''
@@ -846,6 +1223,7 @@ export async function exportMonthlyPayrollReport({
     staffList: sortedJpStaff,
     shifts: completedShifts,
     leaveRequests,
+    dayAdjustments,
     periodStart,
     periodEnd,
     exportTimestamp
@@ -865,12 +1243,28 @@ export async function exportMonthlyPayrollReport({
     staffList: sortedLcStaff,
     shifts: completedShifts,
     leaveRequests,
+    dayAdjustments,
     periodStart,
     periodEnd,
     exportTimestamp
   });
 
-  // Sheet 3: Rincian Shift Selesai
+  // Sheet 3: Rincian Log Keterlambatan
+  buildLatenessDetailSheet({
+    workbook,
+    shifts: completedShifts,
+    allStaff,
+    exportTimestamp
+  });
+
+  // Sheet 4: Rincian Izin & Cuti
+  buildLeaveRequestsDetailSheet({
+    workbook,
+    leaveRequests,
+    exportTimestamp
+  });
+
+  // Sheet 5: Rincian Shift Selesai
   buildCompletedShiftsDetailSheet({
     workbook,
     shifts: completedShifts,

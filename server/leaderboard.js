@@ -32,6 +32,7 @@ export async function computeLeaderboard(targetMonthStr) {
   const lastDay = new Date(year, month, 0).getDate();
   const endDate = `${year}-${monthPadded}-${String(lastDay).padStart(2, '0')}`;
   const monthName = `${MONTH_NAMES_ID[month - 1]} ${year}`;
+  const monthKey = `${year}-${monthPadded}`;
 
   // 1. Attendance Data
   const { data: staffList, error: staffErr } = await supabase
@@ -51,6 +52,9 @@ export async function computeLeaderboard(targetMonthStr) {
 
   // Check if a leaderboard reset cutoff timestamp is active (Reset Leaderboard Saja)
   let leaderboardResetAt = null;
+  let staffPointsList = [];
+  let staffDayAdjustmentsList = [];
+
   try {
     const { data: resetSetting } = await supabase
       .from('app_settings')
@@ -63,8 +67,22 @@ export async function computeLeaderboard(targetMonthStr) {
         leaderboardResetAt = parsedD;
       }
     }
+
+    const { data: pointsSetting } = await supabase
+      .from('app_settings')
+      .select('value')
+      .eq('key', 'staff_points')
+      .maybeSingle();
+    if (Array.isArray(pointsSetting?.value)) staffPointsList = pointsSetting.value;
+
+    const { data: dayAdjSetting } = await supabase
+      .from('app_settings')
+      .select('value')
+      .eq('key', 'staff_day_adjustments')
+      .maybeSingle();
+    if (Array.isArray(dayAdjSetting?.value)) staffDayAdjustmentsList = dayAdjSetting.value;
   } catch (e) {
-    console.warn('Leaderboard reset check note:', e.message);
+    console.warn('Leaderboard settings fetch note:', e.message);
   }
 
   // Build photo map of latest staff check-in selfies
@@ -95,6 +113,27 @@ export async function computeLeaderboard(targetMonthStr) {
     console.warn('Recent photos query note:', e.message);
   }
 
+  // Build maps for manager points and manual day adjustments
+  const staffPointsMap = {};
+  for (const pt of staffPointsList) {
+    if (!pt.staff_id) continue;
+    if (pt.created_at) {
+      const ptDate = pt.created_at.slice(0, 7);
+      if (ptDate !== monthKey) continue;
+    }
+    staffPointsMap[pt.staff_id] = (staffPointsMap[pt.staff_id] || 0) + (Number(pt.points) || 0);
+  }
+
+  const staffDayAdjMap = {};
+  for (const adj of staffDayAdjustmentsList) {
+    if (!adj.staff_id) continue;
+    if (adj.created_at) {
+      const adjDate = adj.created_at.slice(0, 7);
+      if (adjDate !== monthKey) continue;
+    }
+    staffDayAdjMap[adj.staff_id] = (staffDayAdjMap[adj.staff_id] || 0) + (Number(adj.adjustment_days) || 0);
+  }
+
   const staffStats = {};
   for (const s of staffList || []) {
     // Exclude management division
@@ -110,9 +149,13 @@ export async function computeLeaderboard(targetMonthStr) {
       division: s.division || s.department || 'Operasional',
       workDays: new Set(),
       totalLateSeconds: 0,
-      earlyBird15mCount: 0,
-      earlyBird30mCount: 0,
-      onTimeCount: 0,
+      earlyBird15mCount: 0,       // >= 15m early (+2.0 pts)
+      earlyBirdCount: 0,          // 1-14m early (+1.5 pts)
+      onTimeExactCount: 0,        // exact on-time (+1.0 pt)
+      gracePeriodCount: 0,        // 1-10m grace period (+0.5 pt, NOT late)
+      lateCount: 0,               // >10m late (penalized!)
+      onTimeCheckoutCount: 0,     // on-time checkout 0-15m (+1.0 pt)
+      deliberateLateCheckoutCount: 0, // >15m after shift (0 bonus pts, anti-cheat)
       earlyCheckoutCount: 0,
       totalEarlyCheckoutSeconds: 0,
       perfectDays: 0
@@ -141,6 +184,7 @@ export async function computeLeaderboard(targetMonthStr) {
       ? log.flags
       : (typeof log.flags === 'string' ? JSON.parse(log.flags || '[]') : []);
 
+    // 1. Punctuality Check-In
     if (log.check_in_time) {
       let schedStart = '13:00';
       if (parsedLogNotes?.scheduled_start) {
@@ -163,19 +207,28 @@ export async function computeLeaderboard(targetMonthStr) {
       // Check if late checkin was officially EXCUSED / WAIVED by management
       const isLateExcused = flagsArr.includes('FLAG_LATE_EXCUSED') || parsedLogNotes?.late_status === 'APPROVED';
 
-      if (diffSecs > 0) {
-        if (!isLateExcused) {
-          staffStats[sId].totalLateSeconds += diffSecs;
-        }
+      if (diffSecs <= -900) {
+        // Rank 1: Early Bird >= 15 mins early (+2.0 pts)
+        staffStats[sId].earlyBird15mCount++;
+      } else if (diffSecs < 0) {
+        // Rank 2: Early Bird 1-14 mins early (+1.5 pts)
+        staffStats[sId].earlyBirdCount++;
+      } else if (diffSecs === 0) {
+        // Rank 3: Exactly on-time at shift start (+1.0 pt)
+        staffStats[sId].onTimeExactCount++;
+      } else if (diffSecs <= 600) {
+        // Rank 4: Within 10 mins grace period (+0.5 pt, NOT counted as late)
+        staffStats[sId].gracePeriodCount++;
       } else {
-        staffStats[sId].onTimeCount++;
-        const early = Math.abs(diffSecs);
-        if (early >= 900) staffStats[sId].earlyBird15mCount++;
-        if (early >= 1800) staffStats[sId].earlyBird30mCount++;
+        // Rank 5: > 10 mins late (past grace period) -> PENALTY
+        if (!isLateExcused) {
+          staffStats[sId].lateCount++;
+          staffStats[sId].totalLateSeconds += (diffSecs - 600);
+        }
       }
     }
 
-    // Evaluate early checkout / pulang lebih awal
+    // 2. Punctuality Check-Out (Anti-Cheat: no extra reward for deliberate late checkout)
     if (log.check_out_time) {
       let schedEnd = '22:00';
       if (parsedLogNotes?.scheduled_end) {
@@ -183,9 +236,6 @@ export async function computeLeaderboard(targetMonthStr) {
       } else if (log.staff?.shift_end) {
         schedEnd = log.staff.shift_end;
       }
-
-      const hasEarlyFlag = flagsArr.some(f => String(f).includes('EARLY_CHECKOUT'));
-      const isEarlyCheckoutApproved = flagsArr.includes('FLAG_EARLY_CHECKOUT_APPROVED') || parsedLogNotes?.early_checkout_status === 'APPROVED';
 
       const dOut = new Date(log.check_out_time);
       const witaOutStr = dOut.toLocaleTimeString('en-GB', { timeZone: 'Asia/Makassar', hour12: false });
@@ -201,29 +251,59 @@ export async function computeLeaderboard(targetMonthStr) {
         earlySecs = (schedEndSecs + 24 * 3600) - checkOutSecs;
       }
 
-      // Early checkout is only counted if they actually clocked out MORE than 10 minutes (600s) before scheduled end
-      // If earlySecs <= 0 (e.g. clocked out at 22:36 when shift ends at 22:00), they did NOT checkout early!
+      const isEarlyCheckoutApproved = flagsArr.includes('FLAG_EARLY_CHECKOUT_APPROVED') || parsedLogNotes?.early_checkout_status === 'APPROVED';
+
       if (earlySecs > 600 && earlySecs < 12 * 3600) {
+        // Pulang lebih awal > 10 menit tanpa izin resmi
         if (!isEarlyCheckoutApproved) {
           staffStats[sId].earlyCheckoutCount++;
           staffStats[sId].totalEarlyCheckoutSeconds += Math.max(0, earlySecs);
+        }
+      } else {
+        // Pulang tepat waktu saat jam shift selesai (0 s/d 15 menit pasca shift)
+        const checkOutDelaySecs = -earlySecs;
+        if (checkOutDelaySecs >= 0 && checkOutDelaySecs <= 900) {
+          // Punctual checkout bonus (+1.0 pt)
+          staffStats[sId].onTimeCheckoutCount++;
+        } else if (checkOutDelaySecs > 900) {
+          // Deliberate late checkout (>15m, misal nongkrong di parkiran) -> TIDAK ADA BONUS TAMBAHAN!
+          staffStats[sId].deliberateLateCheckoutCount++;
         }
       }
     }
   }
 
   const attendanceRanked = Object.values(staffStats).map(st => {
-    const totalDays = st.workDays.size;
+    const manualDays = staffDayAdjMap[st.staff_id] || 0;
+    const actualDays = st.workDays.size;
+    const totalDays = Math.max(0, actualDays + manualDays);
     const cappedDays = Math.min(totalDays, 26);
     const workDaysScore = Math.round((cappedDays / 26) * 100 * 10) / 10;
     
     const lateMinutes = Math.floor(st.totalLateSeconds / 60);
     const lateSeconds = st.totalLateSeconds % 60;
-    const latePenalty = Math.round((st.totalLateSeconds / 60) * 0.5 * 10) / 10;
+    
+    // Punctuality check-in reward
+    const checkinBonus = Math.round((
+      (st.earlyBird15mCount * 2.0) +
+      (st.earlyBirdCount * 1.5) +
+      (st.onTimeExactCount * 1.0) +
+      (st.gracePeriodCount * 0.5)
+    ) * 10) / 10;
 
-    const earlyBonus = Math.round(((st.earlyBird15mCount * 1.0) + (st.earlyBird30mCount * 1.5)) * 10) / 10;
+    // Checkout punctuality reward (only for on-time checkouts within 0-15m)
+    const checkoutBonus = Math.round((st.onTimeCheckoutCount * 1.0) * 10) / 10;
 
-    const finalScore = Math.max(0, Math.round((workDaysScore - latePenalty + earlyBonus) * 10) / 10);
+    // Penalties
+    const latePenalty = Math.round((st.lateCount * 1.0 + (lateMinutes * 0.1)) * 10) / 10;
+    const earlyCheckoutPenalty = Math.round((st.earlyCheckoutCount * 1.5) * 10) / 10;
+
+    // Manager manual points (disciplinary minus & plus points)
+    const managerPoints = staffPointsMap[st.staff_id] || 0;
+
+    const finalScore = Math.max(0, Math.round((
+      workDaysScore + checkinBonus + checkoutBonus - latePenalty - earlyCheckoutPenalty + managerPoints
+    ) * 10) / 10);
 
     return {
       staff_id: st.staff_id,
@@ -232,38 +312,48 @@ export async function computeLeaderboard(targetMonthStr) {
       venue: st.venue,
       division: st.division,
       photo_url: staffPhotoMap[st.staff_id] || null,
+      actual_days: actualDays,
+      manual_days: manualDays,
       total_days: totalDays,
       max_days: 26,
       total_late_seconds: st.totalLateSeconds,
       total_late_minutes: lateMinutes,
       late_seconds_remainder: lateSeconds,
-      early_bird_count: st.earlyBird15mCount,
-      early_bird_30m_count: st.earlyBird30mCount,
-      on_time_count: st.onTimeCount,
+      late_count: st.lateCount,
+      early_bird_15m_count: st.earlyBird15mCount,
+      early_bird_count: st.earlyBirdCount,
+      on_time_exact_count: st.onTimeExactCount,
+      grace_period_count: st.gracePeriodCount,
+      on_time_checkout_count: st.onTimeCheckoutCount,
+      deliberate_late_checkout_count: st.deliberateLateCheckoutCount,
       early_checkout_count: st.earlyCheckoutCount,
       early_checkout_minutes: Math.round(st.totalEarlyCheckoutSeconds / 60),
+      manager_points: managerPoints,
       score: finalScore,
       breakdown: {
         workDaysScore,
+        checkinBonus,
+        checkoutBonus,
         latePenalty,
-        earlyBonus
+        earlyCheckoutPenalty,
+        managerPoints
       }
     };
   });
 
-  // Sort attendance: Score DESC, total_days DESC, total_late_seconds ASC, early_bird_30m DESC
+  // Sort attendance: Score DESC, total_days DESC, total_late_seconds ASC, early_bird_15m DESC
   attendanceRanked.sort((a, b) => {
     if (b.score !== a.score) return b.score - a.score;
     if (b.total_days !== a.total_days) return b.total_days - a.total_days;
     if (a.total_late_seconds !== b.total_late_seconds) return a.total_late_seconds - b.total_late_seconds;
-    return b.early_bird_30m_count - a.early_bird_30m_count;
+    return b.early_bird_15m_count - a.early_bird_15m_count;
   });
 
   attendanceRanked.forEach((item, idx) => {
     item.rank = idx + 1;
   });
 
-  // 2. Toilet Inspection Data (Optimized select to prevent statement timeout)
+  // 2. Toilet Inspection Data (Fair 2-hour interval check)
   const { data: inspections, error: toiletErr } = await toiletClient
     .from('inspections')
     .select('id, staff_name, created_at, overall_status, photo_url, location_id')
@@ -293,7 +383,7 @@ export async function computeLeaderboard(targetMonthStr) {
     const witaHours = (insTime.getUTCHours() + 8) % 24;
     const isOutOfHours = (witaHours >= 5 && witaHours < 8);
 
-    // Timeliness / Interval check per restroom location (Standard: 60m + 15m grace = 75m)
+    // Timeliness / Interval check per restroom location (Standard: 2 Hours = 120m + 15m grace = 135m)
     const locId = ins.location_id || 'unknown';
     const prevTime = lastInspectedByLoc[locId];
     let isOntime = false;
@@ -305,11 +395,11 @@ export async function computeLeaderboard(targetMonthStr) {
     } else {
       const diffMinutes = (insTime.getTime() - prevTime.getTime()) / (1000 * 60);
       if (diffMinutes < 15) {
-        isSpam = true; // Duplicate/rapid scan within 15 minutes
-      } else if (diffMinutes > 75) {
-        isLate = true; // Overdue inspection
+        isSpam = true; // Duplicate/rapid scan within 15 minutes (ignored, anti-spam)
+      } else if (diffMinutes > 135) {
+        isLate = true; // Overdue inspection > 2 hours -> point deduct!
       } else {
-        isOntime = true; // Exactly on schedule
+        isOntime = true; // On-time inspection (early or exact 2hr mark gets standard points, no extra bonus for early)
       }
     }
 
@@ -365,7 +455,7 @@ export async function computeLeaderboard(targetMonthStr) {
     const venue = matchedStaff ? matchedStaff.venue : (ts.name.startsWith('LC') ? 'LuckyCat' : 'JP Karaoke');
     const role = matchedStaff ? (matchedStaff.role || matchedStaff.division) : 'Staff Kebersihan / Service';
 
-    // Strict on-time weighting:
+    // Strict 2-hour interval weighting:
     // +15 pts per on-time inspection, +5 pts pass, +2 pts photo, -10 pts late penalty, -5 pts fail
     const ontimeScore = ts.ontime_count * 15;
     const latePenalty = ts.late_count * 10;
@@ -423,7 +513,6 @@ export async function computeLeaderboard(targetMonthStr) {
   });
 
   // Single Candidate Spotlight: Staf Paling Butuh Semangat / Improvement (Hall of Wake-Up Call)
-  // Hanya aktif jika sudah ada data shift yang berjalan di bulan ini
   const attendeesPool = attendanceRanked.filter(a => a.total_days > 0);
   let needsImprovement = null;
 
