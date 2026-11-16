@@ -229,8 +229,26 @@ export function computeCheckoutLockState({ activeShift, staff, now = getAppNow()
   if (!activeShift) {
     return { locked: true, unlockLabel: '🔒 Off', reason: 'Belum absen masuk.' };
   }
-  if (isManagement || hasApprovedEarlyLeave) {
-    return { locked: false, unlockLabel: 'Foto →', reason: null };
+
+  let parsedNotes = {};
+  if (typeof activeShift.notes === 'string' && activeShift.notes.startsWith('{')) {
+    try { parsedNotes = JSON.parse(activeShift.notes); } catch {}
+  } else if (typeof activeShift.notes === 'object' && activeShift.notes !== null) {
+    parsedNotes = activeShift.notes;
+  }
+
+  const flags = Array.isArray(activeShift.flags)
+    ? activeShift.flags
+    : (typeof activeShift.flags === 'string' ? (() => { try { return JSON.parse(activeShift.flags); } catch { return []; } })() : []);
+
+  const isEarlyAuthorized = Boolean(
+    activeShift.early_checkout_authorized ||
+    parsedNotes.early_checkout_authorized ||
+    flags.includes('FLAG_EARLY_CHECKOUT_AUTHORIZED')
+  );
+
+  if (isManagement || hasApprovedEarlyLeave || isEarlyAuthorized) {
+    return { locked: false, unlockLabel: 'Foto →', reason: null, isEarlyAuthorized };
   }
 
   const shiftStartStr = activeShift.scheduled_start || staff?.shift_start || '13:00';

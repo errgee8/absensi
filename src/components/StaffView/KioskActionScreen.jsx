@@ -207,6 +207,12 @@ export default function KioskActionScreen({
                   </button>
 
                   {/* Button 2: Check Out */}
+                  {checkoutLock.isEarlyAuthorized && (
+                    <div className="p-2.5 bg-emerald-950/60 border border-emerald-500/50 rounded-xl flex items-center justify-center space-x-2 text-emerald-300 font-black text-xs animate-fade-in shadow-md">
+                      <Check className="w-4 h-4 text-emerald-400 stroke-[3]" />
+                      <span>Otorisasi Manajer: Absen Pulang Terbuka</span>
+                    </div>
+                  )}
                   <button
                     type="button"
                     disabled={checkoutLock.locked}
@@ -249,6 +255,12 @@ export default function KioskActionScreen({
               ) : (
                 /* ONLY 1 BUTTON: CHECKOUT (Either break already taken or not allowed) */
                 <div className="space-y-3">
+                  {checkoutLock.isEarlyAuthorized && (
+                    <div className="p-2.5 bg-emerald-950/60 border border-emerald-500/50 rounded-xl flex items-center justify-center space-x-2 text-emerald-300 font-black text-xs animate-fade-in shadow-md">
+                      <Check className="w-4 h-4 text-emerald-400 stroke-[3]" />
+                      <span>Otorisasi Manajer: Absen Pulang Terbuka</span>
+                    </div>
+                  )}
                   <button
                     type="button"
                     disabled={checkoutLock.locked}

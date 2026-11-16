@@ -17,11 +17,11 @@ import MonitoringAuditTab from './MonitoringAuditTab';
 import PointManagementTab from './PointManagementTab';
 import StaffDetailManagementModal from './StaffDetailManagementModal';
 import { exportMonthlyPayrollReport, exportTimesheetToExcel } from '../../utils/excelExport';
-import { getShifts, getStats, getShiftSchedules, getStaffList, getLeaveRequests, getAnnouncements, getAnnouncementReaders, getPoints, getStaffDayAdjustments, subscribeRealtimeEvents, sendPresenceHeartbeat } from '../../utils/api';
+import { getShifts, getStats, getShiftSchedules, getStaffList, getLeaveRequests, getAnnouncements, getAnnouncementReaders, getPoints, getStaffDayAdjustments, subscribeRealtimeEvents, sendPresenceHeartbeat, authorizeEarlyCheckout } from '../../utils/api';
 import { getOperationalDateYMD, getOperationalYesterdayYMD, getWitaDateYMD, getAppNow, formatWitaDateTime } from '../../utils/time';
 import { resolveShift } from '../../utils/shiftResolver';
 import { showToast } from '../Common/Toast';
-import { LayoutDashboard, Users, Clock, Radio, Building2, Sparkles, Eye, ShieldAlert, Trophy, FileText, Megaphone, Activity, Award } from 'lucide-react';
+import { LayoutDashboard, Users, Clock, Radio, Building2, Sparkles, Eye, ShieldAlert, Trophy, FileText, Megaphone, Activity, Award, Unlock, AlertCircle } from 'lucide-react';
 
 export default function ManagerDashboard({ venueSettings, refreshSettings, adminAuth, isReadOnly = false, onOpenLeaderboard }) {
   // Tabs: 'AUDIT' | 'SCHEDULES' | 'STAFF' | 'TOILET'
@@ -56,6 +56,46 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
   const [lateReviewShift, setLateReviewShift] = useState(null);
   const [selectedStaffHistory, setSelectedStaffHistory] = useState(null);
   const [staffModalInitialTab, setStaffModalInitialTab] = useState('POINTS');
+
+  // Early checkout authorization modal state
+  const [earlyCheckoutShift, setEarlyCheckoutShift] = useState(null);
+  const [earlyPin, setEarlyPin] = useState(adminAuth?.pin || '');
+  const [earlyReason, setEarlyReason] = useState('Diizinkan pulang lebih awal oleh Manajer');
+  const [earlySubmitting, setEarlySubmitting] = useState(false);
+  const [earlyError, setEarlyError] = useState(null);
+
+  useEffect(() => {
+    if (adminAuth?.pin) setEarlyPin(adminAuth.pin);
+  }, [adminAuth]);
+
+  const handleOpenEarlyCheckoutModal = (shift) => {
+    setEarlyCheckoutShift(shift);
+    setEarlyReason('Diizinkan pulang lebih awal oleh Manajer');
+    setEarlyPin(adminAuth?.pin || '');
+    setEarlyError(null);
+  };
+
+  const handleConfirmEarlyCheckout = async (e) => {
+    e.preventDefault();
+    if (!earlyCheckoutShift || earlySubmitting) return;
+    const effectivePin = (earlyPin || adminAuth?.pin || '').trim();
+    if (!effectivePin) {
+      setEarlyError('PIN Otorisasi Manajer wajib diisi.');
+      return;
+    }
+    setEarlySubmitting(true);
+    setEarlyError(null);
+    try {
+      await authorizeEarlyCheckout(earlyCheckoutShift.id, effectivePin, earlyReason.trim());
+      showToast(`Tombol check-out berhasil dibuka untuk ${earlyCheckoutShift.staff_name}!`, 'success');
+      setEarlyCheckoutShift(null);
+      await loadData();
+    } catch (err) {
+      setEarlyError(err.message || 'Gagal memberikan otorisasi check-out.');
+    } finally {
+      setEarlySubmitting(false);
+    }
+  };
 
   const [density, setDensity] = useState(() => {
     try { return localStorage.getItem('dashboard_density') || 'compact'; } catch { return 'compact'; }
@@ -627,6 +667,7 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
               density={density}
               onInspectPhoto={(shift, type) => setInspectData({ shift, type })}
               onReviewLate={(shift) => setLateReviewShift(shift)}
+              onAuthorizeEarlyCheckout={handleOpenEarlyCheckoutModal}
               onInspectStaff={(shift, initialTab = 'POINTS') => {
                 setSelectedStaffHistory({
                   id: shift.staff_id,
@@ -770,6 +811,97 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
               loadData();
             }}
           />
+        )}
+
+        {/* Modal: Quick Early Check-Out Authorization */}
+        {earlyCheckoutShift && (
+          <div className="fixed inset-0 z-60 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md animate-fade-in text-slate-200">
+            <div className="bg-[#161b24] border border-emerald-500/40 rounded-3xl max-w-md w-full overflow-hidden shadow-2xl p-5 space-y-4">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 rounded-2xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center shrink-0">
+                  <Unlock className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-white">Buka Kunci Absen Pulang</h3>
+                  <p className="text-xs text-emerald-400 font-bold">Otorisasi Pulang Lebih Awal (Manajer)</p>
+                </div>
+              </div>
+
+              <div className="p-3 bg-[#12161f] border border-slate-800 rounded-2xl space-y-1">
+                <span className="text-[10px] text-slate-400 font-bold uppercase block">KARYAWAN:</span>
+                <p className="text-sm font-black text-white">{earlyCheckoutShift.staff_name} ({earlyCheckoutShift.staff_id})</p>
+                <p className="text-xs text-slate-400 font-bold">{earlyCheckoutShift.staff_venue} &bull; Jadwal Pulang: {earlyCheckoutShift.scheduled_end || '22:00'} WITA</p>
+              </div>
+
+              <p className="text-xs text-slate-300 font-bold leading-relaxed">
+                Tombol Absen Pulang di portal staf akan langsung terbuka tanpa harus menunggu jam shift berakhir. Staf dapat langsung mengambil foto selfie pulang.
+              </p>
+
+              {earlyError && (
+                <div className="p-2.5 bg-rose-950/60 border border-rose-500/50 rounded-xl text-xs text-rose-300 font-bold flex items-center space-x-2">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{earlyError}</span>
+                </div>
+              )}
+
+              <form onSubmit={handleConfirmEarlyCheckout} className="space-y-3 pt-1">
+                <div>
+                  <label className="block text-[11px] font-black text-slate-300 mb-1">
+                    Alasan Pulang Lebih Awal:
+                  </label>
+                  <input
+                    type="text"
+                    value={earlyReason}
+                    onChange={(e) => setEarlyReason(e.target.value)}
+                    placeholder="Contoh: Izin mendesak / Sakit / Diberikan pulang awal"
+                    className="w-full bg-[#12161f] border border-slate-700 rounded-xl px-3 py-2 text-slate-100 text-xs focus:outline-none focus:border-emerald-500 font-medium"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-black text-slate-300 mb-1">
+                    PIN Otorisasi Manajer:
+                  </label>
+                  <input
+                    type="password"
+                    inputMode="numeric"
+                    maxLength={8}
+                    value={earlyPin}
+                    onChange={(e) => setEarlyPin(e.target.value)}
+                    placeholder="Masukkan PIN Manager..."
+                    required
+                    className="w-full bg-[#12161f] border border-slate-700 rounded-xl px-3 py-2 text-slate-100 font-mono tracking-widest text-sm focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+
+                <div className="flex justify-end space-x-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setEarlyCheckoutShift(null)}
+                    disabled={earlySubmitting}
+                    className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-bold transition"
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={earlySubmitting || !earlyPin.trim()}
+                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black shadow-lg shadow-emerald-600/30 transition disabled:opacity-50 flex items-center space-x-1.5 cursor-pointer"
+                  >
+                    {earlySubmitting ? (
+                      <>
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        <span>Memproses...</span>
+                      </>
+                    ) : (
+                      <span>Buka Kunci Sekarang</span>
+                    )}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
         )}
       </div>
 

@@ -15,7 +15,9 @@ import {
   Award,
   Calendar,
   CalendarX,
-  AlertCircle
+  AlertCircle,
+  Unlock,
+  Check
 } from 'lucide-react';
 import { formatWitaTimeOnly, formatWitaDateOnly, formatDuration } from '../../utils/time';
 import { resolveShift } from '../../utils/shiftResolver';
@@ -26,6 +28,7 @@ export default function ShiftTable({
   onInspectPhoto,
   onReviewLate,
   onInspectStaff,
+  onAuthorizeEarlyCheckout,
   readersSet,
   hasActiveAnnouncement,
   density = 'compact'
@@ -526,6 +529,10 @@ export default function ShiftTable({
                             <span className="text-indigo-300 font-mono font-black text-[11px]">
                               {formatWitaTimeOnly(shift.checkout_time)}
                             </span>
+                          ) : shift.early_checkout_authorized ? (
+                            <span className="inline-block px-1.5 py-0.5 rounded text-[8px] font-black bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 whitespace-nowrap" title="Buka kunci checkout diizinkan oleh Manajer">
+                              Diizinkan Pulang
+                            </span>
                           ) : (
                             <span className="inline-block px-1.5 py-0.5 rounded text-[8px] font-black bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 whitespace-nowrap">
                               Aktif
@@ -759,6 +766,29 @@ export default function ShiftTable({
                                   <Eye className="w-2.5 h-2.5" />
                                   <span>Audit ➔</span>
                                 </button>
+
+                                {/* Otorisasi Checkout Awal jika shift masih berjalan */}
+                                {!shift.checkout_time && (
+                                  shift.early_checkout_authorized ? (
+                                    <span
+                                      className="px-2 py-1 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-black text-[9px] uppercase tracking-wider flex items-center space-x-1"
+                                      title="Manajer telah mengotorisasi checkout awal untuk shift ini"
+                                    >
+                                      <Check className="w-2.5 h-2.5 text-emerald-400" />
+                                      <span>Checkout Diizinkan</span>
+                                    </span>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      onClick={() => onAuthorizeEarlyCheckout?.(shift)}
+                                      className="px-2 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-black text-[9px] uppercase tracking-wider transition cursor-pointer flex items-center space-x-1 shadow-xs"
+                                      title="Buka kunci agar staf dapat langsung absen pulang di portal staf meski belum jam pulang"
+                                    >
+                                      <Unlock className="w-2.5 h-2.5" />
+                                      <span>Buka Kunci Checkout</span>
+                                    </button>
+                                  )
+                                )}
 
                                 <button
                                   type="button"

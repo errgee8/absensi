@@ -1123,6 +1123,12 @@ router.post('/staff/verify-pin', async (req, res) => {
 
   if (activeShift) {
     activeShift.flags = JSON.parse(activeShift.flags || '[]');
+    let parsedNotes = {};
+    try { parsedNotes = JSON.parse(activeShift.notes || '{}'); } catch {}
+    activeShift.early_checkout_authorized = Boolean(
+      parsedNotes.early_checkout_authorized ||
+      activeShift.flags.includes('FLAG_EARLY_CHECKOUT_AUTHORIZED')
+    );
   } else if (isSupabaseConfigured) {
     try {
       const { data: supaShift } = await supabase
@@ -1152,12 +1158,17 @@ router.post('/staff/verify-pin', async (req, res) => {
 
         const isOnBreak = supaShift.status === 'ON_BREAK' || supaBreak?.status === 'ON_BREAK';
         const hasCompletedBreak = supaBreak?.status === 'COMPLETED' || Boolean(supaBreak?.break_end);
+        const supaFlags = supaShift.flags || [];
 
         activeShift = {
           ...supaShift,
           checkin_time: supaShift.check_in_time,
           checkin_photo: supaShift.check_in_photo_url,
-          flags: supaShift.flags || [],
+          flags: supaFlags,
+          early_checkout_authorized: Boolean(
+            parsedNotes.early_checkout_authorized ||
+            supaFlags.includes('FLAG_EARLY_CHECKOUT_AUTHORIZED')
+          ),
           break_status: isOnBreak ? 'ON_BREAK' : (hasCompletedBreak ? 'COMPLETED' : 'NONE'),
           break_count: hasCompletedBreak ? 1 : 0,
           break_start_time: supaBreak?.break_start || supaShift.break_start_time || null,
@@ -3486,6 +3497,87 @@ router.post('/shifts/:id/clear-late', async (req, res) => {
   } catch (err) {
     console.error('Error clearing shift lateness:', err);
     return res.status(500).json({ error: 'Gagal menghapus status telat: ' + err.message });
+  }
+});
+
+// 1ba. Authorize Early Check-Out (Buka kunci checkout pulang lebih awal - Manager Only)
+router.post('/shifts/:id/authorize-early-checkout', async (req, res) => {
+  const { id } = req.params;
+  const pin = req.headers['x-manager-pin'] || req.body?.pin;
+  const { reason } = req.body || {};
+
+  const auth = await verifyManagementAuth(pin);
+  if (!auth.authorized) {
+    return res.status(403).json({ error: 'Akses ditolak: PIN Manajer salah atau tidak memiliki otorisasi.' });
+  }
+
+  try {
+    let updatedShift = null;
+    let targetStaffId = null;
+
+    if (isSupabaseConfigured) {
+      updatedShift = await cloudDb.authorizeEarlyCheckout({
+        shiftId: id,
+        reviewerName: auth.reviewerName,
+        reason: reason || 'Diizinkan pulang lebih awal oleh Manajer'
+      });
+      if (updatedShift) {
+        targetStaffId = updatedShift.staff_id;
+      }
+    }
+
+    try {
+      const shiftRow = db.prepare('SELECT * FROM shifts WHERE id = ? OR supabase_id = ?').get(id, id);
+      if (shiftRow) {
+        if (!targetStaffId) targetStaffId = shiftRow.staff_id;
+        let parsedNotes = {};
+        try { parsedNotes = JSON.parse(shiftRow.notes || '{}'); } catch {}
+        let parsedFlags = [];
+        try { parsedFlags = JSON.parse(shiftRow.flags || '[]'); } catch {}
+
+        if (!parsedFlags.includes('FLAG_EARLY_CHECKOUT_AUTHORIZED')) {
+          parsedFlags.push('FLAG_EARLY_CHECKOUT_AUTHORIZED');
+        }
+
+        parsedNotes.early_checkout_authorized = true;
+        parsedNotes.early_checkout_authorized_by = auth.reviewerName;
+        parsedNotes.early_checkout_authorized_at = new Date().toISOString();
+        parsedNotes.early_checkout_reason = reason || 'Diizinkan pulang lebih awal oleh Manajer';
+
+        db.prepare('UPDATE shifts SET notes = ?, flags = ?, updated_at = datetime("now") WHERE id = ?').run(
+          JSON.stringify(parsedNotes),
+          JSON.stringify(parsedFlags),
+          shiftRow.id
+        );
+      }
+    } catch (e) {
+      console.warn('SQLite authorize early checkout warning:', e.message);
+    }
+
+    if (targetStaffId) {
+      try {
+        await logStaffAudit({
+          staffId: targetStaffId,
+          action: 'EARLY_CHECKOUT_AUTHORIZED',
+          description: `Otorisasi buka kunci check-out (pulang lebih awal) disetujui oleh Manajer.`,
+          reason: reason || 'Diizinkan pulang lebih awal oleh Manajer',
+          actor: auth.reviewerName
+        });
+      } catch (auditErr) {
+        console.warn('Audit trail logging note:', auditErr.message);
+      }
+    }
+
+    broadcastEvent('SHIFT_UPDATE');
+
+    return res.json({
+      success: true,
+      message: 'Otorisasi buka kunci check-out berhasil diberikan.',
+      shift: updatedShift
+    });
+  } catch (err) {
+    console.error('Error authorizing early checkout:', err);
+    return res.status(500).json({ error: 'Gagal memberikan otorisasi pulang awal: ' + err.message });
   }
 });
 

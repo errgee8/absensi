@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { X, MapPin, ShieldAlert, CheckCircle, Calendar, Clock, User, Coffee, LogIn, LogOut, Camera, ShieldCheck, Check, AlertTriangle, MessageSquare, Lock, RefreshCw, Eye } from 'lucide-react';
+import { X, MapPin, ShieldAlert, CheckCircle, Calendar, Clock, User, Coffee, LogIn, LogOut, Camera, ShieldCheck, Check, AlertTriangle, MessageSquare, Lock, RefreshCw, Eye, Unlock } from 'lucide-react';
 import { formatWitaDateTime, formatDuration } from '../../utils/time';
-import { reviewLateCheckin } from '../../utils/api';
+import { reviewLateCheckin, authorizeEarlyCheckout } from '../../utils/api';
 import ZoomableImage from '../Common/ZoomableImage';
 
 export default function PhotoDetailModal({ shift, type = 'in', onClose, onShiftUpdated, adminAuth }) {
@@ -17,6 +17,40 @@ export default function PhotoDetailModal({ shift, type = 'in', onClose, onShiftU
   const [lateReviewError, setLateReviewError] = useState(null);
   const [lateReviewSuccess, setLateReviewSuccess] = useState(null);
   const [viewProofPhoto, setViewProofPhoto] = useState(false);
+
+  // Early checkout authorization states
+  const [earlyPin, setEarlyPin] = useState(adminAuth?.pin || '');
+  const [earlyReason, setEarlyReason] = useState('Diizinkan pulang lebih awal oleh Manajer');
+  const [authorizingEarly, setAuthorizingEarly] = useState(false);
+  const [earlyAuthError, setEarlyAuthError] = useState(null);
+  const [earlyAuthSuccess, setEarlyAuthSuccess] = useState(null);
+  const [isEarlyAuthorized, setIsEarlyAuthorized] = useState(Boolean(shift.early_checkout_authorized));
+
+  useEffect(() => {
+    setIsEarlyAuthorized(Boolean(shift.early_checkout_authorized));
+    if (adminAuth?.pin) setEarlyPin(adminAuth.pin);
+  }, [shift, adminAuth]);
+
+  const handleAuthorizeEarlyCheckout = async () => {
+    const effectivePin = (earlyPin || adminAuth?.pin || '').trim();
+    if (!effectivePin) {
+      setEarlyAuthError('Masukkan PIN Otorisasi Manajer.');
+      return;
+    }
+    setAuthorizingEarly(true);
+    setEarlyAuthError(null);
+    setEarlyAuthSuccess(null);
+    try {
+      await authorizeEarlyCheckout(shift.id, effectivePin, earlyReason.trim());
+      setIsEarlyAuthorized(true);
+      setEarlyAuthSuccess('Otorisasi berhasil! Tombol check-out telah terbuka di portal staf.');
+      if (onShiftUpdated) onShiftUpdated();
+    } catch (err) {
+      setEarlyAuthError(err.message || 'Gagal memberikan otorisasi pulang awal.');
+    } finally {
+      setAuthorizingEarly(false);
+    }
+  };
 
   useEffect(() => {
     setImgError(false);
@@ -555,6 +589,95 @@ export default function PhotoDetailModal({ shift, type = 'in', onClose, onShiftU
                   </div>
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* Manager Early Check-Out Override Card */}
+          {!shift.checkout_time && (
+            <div className={`rounded-2xl p-4 border transition ${
+              isEarlyAuthorized
+                ? 'bg-emerald-950/30 border-emerald-500/40'
+                : 'bg-[#12161f] border-amber-500/40'
+            }`}>
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center space-x-2">
+                  <Unlock className={`w-4 h-4 ${isEarlyAuthorized ? 'text-emerald-400' : 'text-amber-400'}`} />
+                  <span className={`font-black text-xs uppercase tracking-wide ${
+                    isEarlyAuthorized ? 'text-emerald-300' : 'text-amber-300'
+                  }`}>
+                    Otorisasi Buka Kunci Check-Out Pulang
+                  </span>
+                </div>
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-black border ${
+                  isEarlyAuthorized
+                    ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                    : 'bg-amber-500/20 text-amber-300 border-amber-500/40 animate-pulse'
+                }`}>
+                  {isEarlyAuthorized ? '✓ CHECKOUT DIBUKA' : 'TERKUNCI S/D H-30M'}
+                </span>
+              </div>
+
+              {isEarlyAuthorized ? (
+                <div className="p-3 bg-emerald-950/40 border border-emerald-500/30 rounded-xl space-y-1">
+                  <p className="text-xs font-black text-emerald-300 flex items-center space-x-1.5">
+                    <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <span>Otorisasi Manajer Aktif — Staf Dapat Langsung Absen Pulang</span>
+                  </p>
+                  <p className="text-[11px] text-slate-300 font-medium">
+                    Kunci tombol Absen Pulang telah dibuka untuk staf ini. Saat staf membuka aplikasi atau login PIN, tombol check-out akan otomatis aktif tanpa menunggu jam shift selesai.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2.5">
+                  <p className="text-[11px] text-slate-300 font-medium leading-relaxed">
+                    Staf tidak bisa check-out sebelum jam shift selesai. Berikan otorisasi manajer di bawah ini jika staf harus pulang lebih cepat (sakit mendadak / emergency) agar tombol check-out langsung terbuka di aplikasi staf.
+                  </p>
+
+                  {earlyAuthError && (
+                    <div className="p-2.5 bg-rose-950/60 border border-rose-500/50 rounded-xl text-xs text-rose-300 font-bold flex items-center space-x-1.5">
+                      <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                      <span>{earlyAuthError}</span>
+                    </div>
+                  )}
+
+                  {earlyAuthSuccess && (
+                    <div className="p-2.5 bg-emerald-950/60 border border-emerald-500/50 rounded-xl text-xs text-emerald-300 font-bold flex items-center space-x-1.5">
+                      <CheckCircle className="w-3.5 h-3.5 shrink-0" />
+                      <span>{earlyAuthSuccess}</span>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
+                    <input
+                      type="text"
+                      placeholder="Alasan izin pulang awal..."
+                      value={earlyReason}
+                      onChange={(e) => setEarlyReason(e.target.value)}
+                      className="sm:col-span-2 bg-[#161b24] border border-slate-700 rounded-xl px-3 py-2 text-slate-100 text-xs focus:outline-none focus:border-amber-500 font-medium"
+                    />
+                    <input
+                      type="password"
+                      maxLength={8}
+                      placeholder="PIN Manajer..."
+                      value={earlyPin}
+                      onChange={(e) => setEarlyPin(e.target.value)}
+                      className="bg-[#161b24] border border-slate-700 rounded-xl px-3 py-2 text-slate-100 font-mono tracking-widest text-xs focus:outline-none focus:border-amber-500"
+                    />
+                  </div>
+
+                  <div className="flex justify-end pt-1">
+                    <button
+                      type="button"
+                      disabled={authorizingEarly}
+                      onClick={handleAuthorizeEarlyCheckout}
+                      className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs rounded-xl shadow-md transition disabled:opacity-50 flex items-center space-x-1.5 cursor-pointer"
+                    >
+                      <Unlock className="w-3.5 h-3.5" />
+                      <span>{authorizingEarly ? 'Memproses...' : 'Buka Kunci Check-Out Sekarang'}</span>
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>

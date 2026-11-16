@@ -633,3 +633,18 @@ export async function deleteShift(shiftId, pin, reason) {
   if (!res.ok) throw new Error(data.error || 'Gagal menghapus riwayat shift');
   return data;
 }
+
+// 9l. Authorize Early Check-Out (Manager Override to Unlock Staff Checkout)
+export async function authorizeEarlyCheckout(shiftId, pin, reason) {
+  const res = await fetch(`${API_BASE}/shifts/${encodeURIComponent(shiftId)}/authorize-early-checkout`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-manager-pin': String(pin || '').trim()
+    },
+    body: JSON.stringify({ pin: String(pin || '').trim(), reason })
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Gagal memberikan otorisasi check-out awal');
+  return data;
+}

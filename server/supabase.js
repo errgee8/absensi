@@ -831,6 +831,10 @@ export const cloudDb = {
         monthly_leave_days: monthlyLeaveDays,
         monthly_leave_count: monthlyLeaveCount,
         active_points_total: activePts,
+        early_checkout_authorized: Boolean(
+          parsedNotes.early_checkout_authorized ||
+          parsedFlags.includes('FLAG_EARLY_CHECKOUT_AUTHORIZED')
+        ),
         staff_venue: st.venue || 'JP Karaoke',
         staff_division: st.division || st.role || 'Server and Cashier',
         staff_role: st.role || 'Staff',
@@ -1174,6 +1178,66 @@ export const cloudDb = {
       .maybeSingle();
 
     if (updateErr) throw updateErr;
+    return updated;
+  },
+
+  async authorizeEarlyCheckout({ shiftId, reviewerName, reason }) {
+    if (!supabase) return null;
+    const { data: log, error: fetchErr } = await supabase
+      .from('attendance_logs')
+      .select('id, staff_id, flags, notes')
+      .eq('id', shiftId)
+      .maybeSingle();
+
+    if (fetchErr) throw fetchErr;
+    if (!log) throw new Error('Shift record not found: ' + shiftId);
+
+    let parsedNotes = {};
+    try {
+      if (typeof log.notes === 'string') parsedNotes = JSON.parse(log.notes);
+      else if (log.notes) parsedNotes = log.notes;
+    } catch {}
+
+    let parsedFlags = Array.isArray(log.flags)
+      ? [...log.flags]
+      : (typeof log.flags === 'string' ? JSON.parse(log.flags || '[]') : []);
+
+    if (!parsedFlags.includes('FLAG_EARLY_CHECKOUT_AUTHORIZED')) {
+      parsedFlags.push('FLAG_EARLY_CHECKOUT_AUTHORIZED');
+    }
+
+    const now = new Date().toISOString();
+    parsedNotes.early_checkout_authorized = true;
+    parsedNotes.early_checkout_authorized_by = reviewerName || 'Manajer';
+    parsedNotes.early_checkout_authorized_at = now;
+    parsedNotes.early_checkout_reason = reason || 'Diizinkan pulang lebih awal oleh Manajer';
+
+    const { data: updated, error: updateErr } = await supabase
+      .from('attendance_logs')
+      .update({
+        notes: JSON.stringify(parsedNotes),
+        flags: parsedFlags,
+        updated_at: now
+      })
+      .eq('id', shiftId)
+      .select()
+      .maybeSingle();
+
+    if (updateErr) throw updateErr;
+
+    // Log to staff audit trail
+    try {
+      await this.logStaffAudit({
+        staffId: log.staff_id,
+        action: 'EARLY_CHECKOUT_AUTHORIZED',
+        description: 'Manajer memberikan otorisasi buka kunci pulang (checkout) lebih awal untuk shift ini.',
+        reason: reason || 'Diizinkan pulang lebih awal oleh Manajer',
+        actor: reviewerName || 'Manajer'
+      });
+    } catch (e) {
+      console.warn('Audit log for early checkout note:', e.message);
+    }
+
     return updated;
   },
 
