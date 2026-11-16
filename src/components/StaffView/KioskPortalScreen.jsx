@@ -348,215 +348,225 @@ export default function KioskPortalScreen({
     announcements?.[0]?.title || 'Lihat info operasional & jadwal terbaru';
 
   return (
-    <div className="min-h-screen bg-[#111318] text-slate-100 pb-8 px-3.5 pt-4 sm:px-6">
-      <div className="max-w-lg mx-auto space-y-3">
+    <div className="min-h-screen bg-[#111318] text-slate-100 pb-10 px-3 pt-3 sm:px-6">
+      <div className="max-w-md mx-auto space-y-3">
         {/* Toast feedback banner */}
         {toastMessage && (
-          <div className="bg-[#1f2634] border border-amber-500/40 text-amber-100 text-xs font-medium px-3.5 py-2.5 rounded-2xl shadow-lg flex items-center justify-between gap-2">
-            <span>{toastMessage}</span>
+          <div className="bg-[#1f2634] border border-amber-500/40 text-amber-100 text-xs font-medium px-3.5 py-2.5 rounded-2xl shadow-lg flex items-center justify-between gap-2 animate-fade-in">
+            <span className="leading-snug">{toastMessage}</span>
             <button
               type="button"
               onClick={() => setToastMessage(null)}
-              className="text-slate-400 hover:text-white shrink-0"
+              className="text-slate-400 hover:text-white shrink-0 p-1 cursor-pointer"
             >
               <X className="w-4 h-4" />
             </button>
           </div>
         )}
 
-        {/* 1. UNIFIED PROFILE CARD */}
-        <section className="bg-[#191d26] border border-white/[0.08] rounded-3xl p-4 shadow-xl">
-          {/* Top row: Avatar + Identity + Status/Logout */}
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex items-center gap-3 min-w-0">
-              {/* Real Profile Photo Avatar */}
-              <button
-                type="button"
-                onClick={handleOpenPhotoModal}
-                className="relative group shrink-0 focus:outline-none cursor-pointer"
-                title="Ganti Foto Profil"
-              >
-                <div className="w-16 h-16 rounded-2xl bg-[#232938] border border-white/15 overflow-hidden flex items-center justify-center shadow-inner">
-                  {staff?.profile_photo_url ? (
-                    <img
-                      src={staff.profile_photo_url}
-                      alt={staff?.name || 'Foto Profil'}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <span className="text-lg font-extrabold tracking-tight text-slate-200">
-                      {getInitials(staff?.name)}
-                    </span>
-                  )}
-                </div>
-                <span className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-indigo-500 text-white flex items-center justify-center border-2 border-[#191d26] shadow">
-                  <Pencil className="w-3 h-3" />
-                </span>
-              </button>
-
-              <div className="min-w-0">
-                <h1 className="text-base sm:text-lg font-extrabold text-white truncate leading-tight">
-                  {staff?.name || 'Staff'}
-                </h1>
-                <p className="text-xs text-slate-400 font-medium truncate mt-0.5">
-                  {staff?.role || 'Staff'} • {shiftStartLabel} - {shiftEndLabel}
-                </p>
-
-                {/* Ganti Foto + Update Biometrik Wajah + My Mood Today row */}
-                <div className="flex flex-wrap items-center gap-1.5 mt-2">
-                  <button
-                    type="button"
-                    onClick={handleOpenPhotoModal}
-                    className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-300 bg-[#232938] hover:bg-[#2c3345] border border-white/10 rounded-full px-2.5 py-1 transition cursor-pointer"
-                  >
-                    <Camera className="w-3 h-3 text-indigo-400" />
-                    <span>Ganti Foto</span>
-                  </button>
-
-                  {hasRegisteredBiometrics && (
-                    <button
-                      type="button"
-                      onClick={onOpenFaceRegistration}
-                      className="inline-flex items-center gap-1.5 text-[11px] font-bold text-emerald-300 bg-emerald-950/70 hover:bg-emerald-900/80 border border-emerald-500/40 rounded-full px-2.5 py-1 transition cursor-pointer shadow-sm active:scale-95"
-                      title="Perbarui / Overwrite data master biometrik wajah Anda"
-                    >
-                      <Smile className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                      <span>Update Wajah</span>
-                    </button>
-                  )}
-
-                  {/* my mood today : [emoji] */}
-                  <div className="relative" ref={moodContainerRef}>
-                    <button
-                      type="button"
-                      onClick={() => setMoodDropdownOpen((prev) => !prev)}
-                      disabled={savingMood}
-                      className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-200 bg-[#232938] hover:bg-[#2c3345] border border-white/10 rounded-full px-2.5 py-1 transition cursor-pointer"
-                    >
-                      <span className="text-slate-400">my mood today :</span>
-                      {currentMood ? (
-                        <span className="text-sm leading-none">{currentMood}</span>
-                      ) : (
-                        <span className="text-[10px] text-slate-400 font-normal italic px-1">pilih</span>
-                      )}
-                      <ChevronDown className="w-3 h-3 text-slate-400" />
-                    </button>
-
-                    {moodDropdownOpen && (
-                      <div className="absolute left-0 top-full mt-1.5 z-40 bg-[#1e2431] border border-white/15 rounded-2xl p-2 shadow-2xl grid grid-cols-4 gap-1.5 w-44">
-                        {MOOD_EMOJIS.map((emoji) => (
-                          <button
-                            key={emoji}
-                            type="button"
-                            onClick={() => handleSelectMood(emoji)}
-                            className={`h-9 rounded-xl text-lg flex items-center justify-center transition cursor-pointer ${
-                              currentMood === emoji
-                                ? 'bg-indigo-500/30 border border-indigo-400/60 scale-105'
-                                : 'bg-[#262d3d] hover:bg-[#313a4e] border border-transparent'
-                            }`}
-                          >
-                            {emoji}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Right top controls: Status pill + Clock + Keluar */}
-            <div className="flex flex-col items-end gap-1.5 shrink-0">
-              <div className="flex items-center gap-1.5">
-                <span
-                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold border ${
-                    isOnBreak
-                      ? 'bg-amber-500/15 text-amber-300 border-amber-500/35'
-                      : isOnDuty
-                      ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/35'
-                      : 'bg-slate-700/40 text-slate-300 border-white/10'
-                  }`}
-                >
-                  <span
-                    className={`w-1.5 h-1.5 rounded-full ${
-                      isOnBreak
-                        ? 'bg-amber-400 animate-pulse'
-                        : isOnDuty
-                        ? 'bg-emerald-400 animate-pulse'
-                        : 'bg-slate-400'
-                    }`}
-                  />
-                  {isOnBreak ? 'Istirahat' : isOnDuty ? 'On Duty' : 'Off Duty'}
-                </span>
-
-                <button
-                  type="button"
-                  onClick={onLogout}
-                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#242a38] hover:bg-rose-500/20 text-slate-300 hover:text-rose-200 border border-white/10 text-[11px] font-semibold transition cursor-pointer"
-                >
-                  <LogOut className="w-3 h-3" />
-                  <span>Keluar</span>
-                </button>
-              </div>
-
-              <div className="flex items-center gap-1 text-[11px] text-slate-400 font-mono">
+        {/* =========================================================
+            1. UNIFIED PROFILE & IDENTITY CARD (Mobile Optimized)
+           ========================================================= */}
+        <section className="bg-[#181d26] border border-white/[0.08] rounded-3xl p-3.5 sm:p-4 shadow-xl space-y-3">
+          {/* Top Bar: Venue & Clock on Left | Duty Status & Logout on Right */}
+          <div className="flex items-center justify-between gap-2 border-b border-white/[0.06] pb-2.5">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="px-2.5 py-0.5 rounded-full bg-indigo-500/20 border border-indigo-400/30 text-indigo-300 font-extrabold text-[10px] tracking-wide shrink-0">
+                {staff?.venue || 'LuckyCat'}
+              </span>
+              <span className="text-[11px] text-slate-400 font-mono flex items-center gap-1 shrink-0">
                 <Clock className="w-3 h-3 text-slate-500" />
                 <span>{formatWitaTimeOnly(now)} WITA</span>
+              </span>
+            </div>
+
+            <div className="flex items-center gap-1.5 shrink-0">
+              <span
+                className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10.5px] font-bold border ${
+                  isOnBreak
+                    ? 'bg-amber-500/15 text-amber-300 border-amber-500/35'
+                    : isOnDuty
+                    ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/35'
+                    : 'bg-slate-700/40 text-slate-300 border-white/10'
+                }`}
+              >
+                <span
+                  className={`w-1.5 h-1.5 rounded-full ${
+                    isOnBreak
+                      ? 'bg-amber-400 animate-pulse'
+                      : isOnDuty
+                      ? 'bg-emerald-400 animate-pulse'
+                      : 'bg-slate-400'
+                  }`}
+                />
+                <span>{isOnBreak ? 'Istirahat' : isOnDuty ? 'On Duty' : 'Off Duty'}</span>
+              </span>
+
+              <button
+                type="button"
+                onClick={onLogout}
+                className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#232938] hover:bg-rose-500/20 text-slate-300 hover:text-rose-200 border border-white/10 text-[10.5px] font-semibold transition cursor-pointer"
+                title="Keluar dari akun staff"
+              >
+                <LogOut className="w-3 h-3" />
+                <span>Keluar</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Profile Details: Avatar + Name + Role + Actions */}
+          <div className="flex items-center gap-3">
+            {/* Real Profile Photo Avatar */}
+            <button
+              type="button"
+              onClick={handleOpenPhotoModal}
+              className="relative group shrink-0 focus:outline-none cursor-pointer"
+              title="Ganti Foto Profil"
+            >
+              <div className="w-14 h-14 rounded-2xl bg-[#232938] border border-white/15 overflow-hidden flex items-center justify-center shadow-inner">
+                {staff?.profile_photo_url ? (
+                  <img
+                    src={staff.profile_photo_url}
+                    alt={staff?.name || 'Foto Profil'}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <span className="text-base font-black tracking-tight text-slate-200">
+                    {getInitials(staff?.name)}
+                  </span>
+                )}
+              </div>
+              <span className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-indigo-500 text-white flex items-center justify-center border-2 border-[#181d26] shadow">
+                <Pencil className="w-2.5 h-2.5" />
+              </span>
+            </button>
+
+            <div className="min-w-0 flex-1">
+              <h1 className="text-base sm:text-lg font-black text-white truncate leading-tight">
+                {staff?.name || 'Staff'}
+              </h1>
+              <div className="text-xs text-slate-400 font-medium flex items-center gap-1.5 mt-0.5 truncate">
+                <span>{staff?.role || 'Staff'}</span>
+                <span className="text-slate-600">•</span>
+                <span className="text-slate-300 font-mono text-[11px]">
+                  {shiftStartLabel} - {shiftEndLabel}
+                </span>
+              </div>
+
+              {/* Action Pills Row: Ganti Foto, Update Wajah, Mood */}
+              <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                <button
+                  type="button"
+                  onClick={handleOpenPhotoModal}
+                  className="inline-flex items-center gap-1 text-[10.5px] font-semibold text-slate-300 bg-[#232938] hover:bg-[#2c3345] border border-white/10 rounded-full px-2 py-0.5 transition cursor-pointer"
+                >
+                  <Camera className="w-3 h-3 text-indigo-400" />
+                  <span>Foto</span>
+                </button>
+
+                {hasRegisteredBiometrics && (
+                  <button
+                    type="button"
+                    onClick={onOpenFaceRegistration}
+                    className="inline-flex items-center gap-1 text-[10.5px] font-bold text-emerald-300 bg-emerald-950/70 hover:bg-emerald-900/80 border border-emerald-500/40 rounded-full px-2 py-0.5 transition cursor-pointer shadow-sm active:scale-95"
+                    title="Perbarui master biometrik wajah Anda"
+                  >
+                    <Smile className="w-3 h-3 text-emerald-400 shrink-0" />
+                    <span>Wajah</span>
+                  </button>
+                )}
+
+                {/* Mood Dropdown */}
+                <div className="relative" ref={moodContainerRef}>
+                  <button
+                    type="button"
+                    onClick={() => setMoodDropdownOpen((prev) => !prev)}
+                    disabled={savingMood}
+                    className="inline-flex items-center gap-1 text-[10.5px] font-semibold text-slate-200 bg-[#232938] hover:bg-[#2c3345] border border-white/10 rounded-full px-2 py-0.5 transition cursor-pointer"
+                  >
+                    <span className="text-slate-400">Mood:</span>
+                    {currentMood ? (
+                      <span className="text-xs leading-none">{currentMood}</span>
+                    ) : (
+                      <span className="text-[9.5px] text-slate-400 italic">pilih</span>
+                    )}
+                    <ChevronDown className="w-2.5 h-2.5 text-slate-400" />
+                  </button>
+
+                  {moodDropdownOpen && (
+                    <div className="absolute right-0 sm:left-0 top-full mt-1.5 z-40 bg-[#1e2431] border border-white/15 rounded-2xl p-2 shadow-2xl grid grid-cols-4 gap-1.5 w-44">
+                      {MOOD_EMOJIS.map((emoji) => (
+                        <button
+                          key={emoji}
+                          type="button"
+                          onClick={() => handleSelectMood(emoji)}
+                          className={`h-9 rounded-xl text-lg flex items-center justify-center transition cursor-pointer ${
+                            currentMood === emoji
+                              ? 'bg-indigo-500/30 border border-indigo-400/60 scale-105'
+                              : 'bg-[#262d3d] hover:bg-[#313a4e] border border-transparent'
+                          }`}
+                        >
+                          {emoji}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
 
-          {/* 3 Direct Read Metrics */}
-          <div className="grid grid-cols-3 gap-2 mt-4">
+          {/* 3 Metric Pills */}
+          <div className="grid grid-cols-3 gap-2 pt-1">
             <button
               type="button"
               onClick={handleClickPointsCard}
-              className="bg-[#131720] hover:bg-[#161b26] border border-white/[0.07] rounded-2xl p-2.5 text-left transition cursor-pointer"
+              className="bg-[#12151d] hover:bg-[#161a24] border border-white/[0.07] rounded-2xl p-2 text-left transition cursor-pointer active:scale-95"
             >
-              <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+              <div className="text-[9.5px] font-bold uppercase tracking-wider text-slate-400 truncate">
                 Total Poin
               </div>
-              <div className={`text-xl font-black mt-0.5 leading-none ${
+              <div className={`text-lg font-black mt-0.5 leading-none ${
                 pointTotal > 0 ? 'text-emerald-400' : pointTotal < 0 ? 'text-rose-400' : 'text-slate-300'
               }`}>
                 {pointTotal > 0 ? `+${pointTotal}` : pointTotal}
               </div>
-              <div className="text-[10px] text-slate-500 mt-1 truncate">
-                Periode berjalan
+              <div className="text-[9.5px] text-slate-500 mt-1 truncate">
+                Lihat riwayat →
               </div>
             </button>
 
             <button
               type="button"
               onClick={() => onOpenAttendanceHistory?.('LATE')}
-              className="bg-[#131720] hover:bg-[#161b26] border border-white/[0.07] rounded-2xl p-2.5 text-left transition cursor-pointer group"
-              title="Ketuk untuk melihat riwayat telat (tanggal, jam, alasan & status ACC)"
+              className="bg-[#12151d] hover:bg-[#161a24] border border-white/[0.07] rounded-2xl p-2 text-left transition cursor-pointer active:scale-95 group"
+              title="Ketuk untuk melihat riwayat keterlambatan"
             >
-              <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 group-hover:text-amber-300 transition">
+              <div className="text-[9.5px] font-bold uppercase tracking-wider text-slate-400 group-hover:text-amber-300 transition truncate">
                 Telat Bln Ini
               </div>
-              <div className="text-xl font-black text-white mt-0.5 leading-none">
+              <div className="text-lg font-black text-white mt-0.5 leading-none">
                 {lateCount}x
               </div>
-              <div className="text-[10px] text-amber-400/80 mt-1 truncate font-medium">
-                Cek Riwayat →
+              <div className="text-[9.5px] text-amber-400/90 mt-1 truncate font-medium">
+                Cek telat →
               </div>
             </button>
 
             <button
               type="button"
               onClick={() => onOpenAttendanceHistory?.('ABSENT')}
-              className="bg-[#131720] hover:bg-[#161b26] border border-white/[0.07] rounded-2xl p-2.5 text-left transition cursor-pointer group"
-              title="Ketuk untuk melihat riwayat hari kerja & tidak masuk (alpa/izin)"
+              className="bg-[#12151d] hover:bg-[#161a24] border border-white/[0.07] rounded-2xl p-2 text-left transition cursor-pointer active:scale-95 group"
+              title="Ketuk untuk melihat riwayat hari kerja & izin/alpa"
             >
-              <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 group-hover:text-blue-300 transition">
+              <div className="text-[9.5px] font-bold uppercase tracking-wider text-slate-400 group-hover:text-blue-300 transition truncate">
                 Hari Kerja
               </div>
-              <div className="text-xl font-black text-white mt-0.5 leading-none">
+              <div className="text-lg font-black text-white mt-0.5 leading-none">
                 {workDays}
               </div>
-              <div className="text-[10px] text-blue-400/80 mt-1 truncate font-medium">
-                Cek Riwayat →
+              <div className="text-[9.5px] text-blue-400/90 mt-1 truncate font-medium">
+                Cek hari →
               </div>
             </button>
           </div>
@@ -566,452 +576,394 @@ export default function KioskPortalScreen({
             <button
               type="button"
               onClick={onOpenPendingPoints}
-              className="w-full mt-3 bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/45 rounded-2xl px-3.5 py-2.5 flex items-center justify-between gap-2 text-left transition cursor-pointer"
+              className="w-full mt-2 bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/45 rounded-2xl px-3 py-2 flex items-center justify-between gap-2 text-left transition cursor-pointer"
             >
-              <div className="flex items-center gap-2.5 min-w-0">
-                <span className="w-7 h-7 rounded-xl bg-rose-500 text-white flex items-center justify-center shrink-0">
-                  <AlertTriangle className="w-4 h-4" />
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="w-6 h-6 rounded-lg bg-rose-500 text-white flex items-center justify-center shrink-0">
+                  <AlertTriangle className="w-3.5 h-3.5" />
                 </span>
                 <div className="min-w-0">
-                  <div className="text-xs font-extrabold text-rose-200 truncate">
-                    {pendingPointsCount} Pemberitahuan Poin Baru
+                  <div className="text-[11.5px] font-black text-rose-200 truncate">
+                    {pendingPointsCount} Poin Baru Perlu Dikonfirmasi
                   </div>
-                  <div className="text-[11px] text-rose-300/80 truncate">
-                    Ketuk untuk baca detail & konfirmasi
+                  <div className="text-[10px] text-rose-300/80 truncate">
+                    Ketuk untuk membaca detail sanksi/apresiasi
                   </div>
                 </div>
               </div>
-              <span className="px-2.5 py-1 rounded-full bg-rose-500 text-white text-[11px] font-bold shrink-0">
-                Cek →
+              <span className="px-2 py-0.5 rounded-full bg-rose-500 text-white text-[10px] font-bold shrink-0">
+                Konfirmasi →
               </span>
             </button>
           )}
         </section>
 
-        {/* Mandatory Face Biometrics Registration Alert (Hanya jika belum daftar sama sekali) */}
-        {!hasRegisteredBiometrics && (
-          <div className="bg-gradient-to-r from-indigo-950/80 via-[#1e2238] to-purple-950/80 border border-indigo-400/40 rounded-3xl p-4 shadow-xl flex items-center justify-between gap-3 animate-fade-in">
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="w-10 h-10 rounded-2xl bg-indigo-500 text-white flex items-center justify-center shrink-0 shadow-lg shadow-indigo-500/30">
-                <ShieldCheck className="w-5 h-5" />
-              </div>
-              <div className="min-w-0">
-                <h3 className="text-xs sm:text-sm font-black text-white">Daftarkan Wajah Biometrik Anda</h3>
-                <p className="text-[11px] text-indigo-200 truncate mt-0.5">Wajib 1x sebelum melakukan absensi masuk</p>
-              </div>
-            </div>
+        {/* =========================================================
+            2. HERO ABSENSI SHIFT (Top Priority - Immediately Accessible)
+           ========================================================= */}
+        <section className="bg-[#181d26] border border-white/[0.08] rounded-3xl p-3.5 sm:p-4 shadow-xl space-y-2.5">
+          <div className="flex items-center justify-between border-b border-white/[0.06] pb-2">
+            <span className="text-xs font-black uppercase tracking-wider text-slate-200 flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+              <span>Absensi Shift Hari Ini</span>
+            </span>
+            <span className="text-[11px] font-bold text-slate-400 font-mono">
+              {activeShift ? 'Shift Aktif Berjalan' : 'Siap Bertugas'}
+            </span>
+          </div>
+
+          <div className="space-y-2">
+            {/* Absen Masuk */}
             <button
               type="button"
-              onClick={onOpenFaceRegistration}
-              className="px-3.5 py-2 rounded-xl bg-indigo-500 hover:bg-indigo-400 text-white text-xs font-black shadow-lg shadow-indigo-500/25 shrink-0 transition cursor-pointer active:scale-95"
+              onClick={handleClickCheckIn}
+              disabled={Boolean(activeShift)}
+              className={`w-full px-4 py-3 rounded-2xl flex items-center justify-between text-xs font-black transition ${
+                activeShift
+                  ? 'bg-[#12151d] text-slate-500 border border-white/5 cursor-not-allowed'
+                  : 'bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-lg shadow-emerald-500/25 active:scale-[0.98] cursor-pointer'
+              }`}
             >
-              Daftar →
+              <span className="flex items-center gap-2.5">
+                <LogIn className="w-4 h-4 shrink-0" />
+                <span className="text-sm">
+                  {activeShift ? '✓ Sudah Absen Masuk' : 'Absen Masuk Sekarang'}
+                </span>
+              </span>
+              {!activeShift && (
+                <span className="px-2.5 py-1 rounded-xl bg-slate-950/20 text-slate-950 text-[11px] font-extrabold shrink-0">
+                  Foto Selfie →
+                </span>
+              )}
+            </button>
+
+            {/* Ambil Istirahat / Selesai Break */}
+            <button
+              type="button"
+              onClick={handleClickBreak}
+              disabled={!canClickBreak}
+              className={`w-full px-4 py-3 rounded-2xl flex items-center justify-between text-xs font-black transition border ${
+                !canClickBreak
+                  ? 'bg-[#12151d] text-slate-600 border-white/5 cursor-not-allowed'
+                  : isOnBreak
+                  ? 'bg-amber-400 hover:bg-amber-300 text-slate-950 border-amber-300 shadow-lg shadow-amber-400/25 cursor-pointer animate-pulse'
+                  : 'bg-[#222836] hover:bg-[#2b3345] text-slate-100 border-white/10 cursor-pointer active:scale-[0.98]'
+              }`}
+            >
+              <span className="flex items-center gap-2.5">
+                <Coffee className="w-4 h-4 shrink-0" />
+                <span className="text-sm">
+                  {isOnBreak
+                    ? 'Selesai Istirahat (Break)'
+                    : hasTakenBreak
+                    ? 'Istirahat Selesai (1x/shift)'
+                    : 'Ambil Istirahat'}
+                </span>
+              </span>
+              <span className="font-mono text-xs font-extrabold shrink-0">
+                {isOnBreak
+                  ? `${formatTimerSeconds(breakElapsedSec)} →`
+                  : canClickBreak
+                  ? 'Kuis & Foto →'
+                  : '—'}
+              </span>
+            </button>
+
+            {/* Absen Pulang (Smart Lock H-30m) */}
+            <button
+              type="button"
+              onClick={handleClickCheckOut}
+              className={`w-full px-4 py-3 rounded-2xl flex items-center justify-between text-xs font-black transition border ${
+                !activeShift
+                  ? 'bg-[#12151d] text-slate-600 border-white/5 cursor-not-allowed'
+                  : checkoutLock.locked
+                  ? 'bg-[#151821] text-slate-400 border-white/10 cursor-not-allowed'
+                  : 'bg-rose-500 hover:bg-rose-400 text-white border-rose-400/50 shadow-lg shadow-rose-500/25 active:scale-[0.98] cursor-pointer'
+              }`}
+            >
+              <span className="flex items-center gap-2.5 min-w-0">
+                {checkoutLock.locked || !activeShift ? (
+                  <Lock className="w-4 h-4 shrink-0 text-slate-500" />
+                ) : (
+                  <LogOut className="w-4 h-4 shrink-0" />
+                )}
+                <span className="text-sm truncate">Absen Pulang (Check-Out)</span>
+              </span>
+              <span className="text-xs shrink-0 font-bold">
+                {!activeShift
+                  ? '—'
+                  : checkoutLock.locked
+                  ? checkoutLock.unlockTimeStr
+                    ? `Buka ${checkoutLock.unlockTimeStr}`
+                    : 'Terkunci'
+                  : 'Foto Selfie →'}
+              </span>
             </button>
           </div>
-        )}
+        </section>
 
-        {/* Notice jika absensi aktif terkena peringatan wajah kurang sesuai */}
+        {/* Notice Peringatan Wajah Kurang Sesuai */}
         {activeShift && ((activeShift.flags || []).includes('FLAG_FACE_MISMATCH') || activeShift.face_recog_status === 'MISMATCH') && (
-          <div className="bg-amber-950/70 border border-amber-500/40 rounded-2xl p-3.5 flex items-center justify-between gap-3 animate-fade-in shadow-md">
-            <div className="flex items-center gap-2.5 min-w-0">
-              <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/40 flex items-center justify-center shrink-0">
-                <AlertTriangle className="w-4 h-4" />
+          <div className="bg-amber-950/70 border border-amber-500/40 rounded-2xl p-3 flex items-center justify-between gap-2.5 animate-fade-in shadow-md">
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="w-7 h-7 rounded-lg bg-amber-500/20 text-amber-400 border border-amber-500/40 flex items-center justify-center shrink-0">
+                <AlertTriangle className="w-3.5 h-3.5" />
               </div>
               <div className="min-w-0 text-left">
-                <h4 className="text-xs font-bold text-amber-300">Wajah Selfie Absensi Kurang Sesuai</h4>
-                <p className="text-[10.5px] text-amber-200/90 leading-tight">
-                  Kemiripan rendah karena pencahayaan/aksesoris. Anda dapat mendaftarkan ulang master wajah di tempat terang.
+                <h4 className="text-[11.5px] font-bold text-amber-300 leading-tight">Wajah Selfie Kurang Sesuai</h4>
+                <p className="text-[10px] text-amber-200/80 leading-tight mt-0.5">
+                  Kemiripan rendah. Perbarui foto master di tempat terang.
                 </p>
               </div>
             </div>
             <button
               type="button"
               onClick={onOpenFaceRegistration}
-              className="px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-[11px] font-bold shrink-0 transition cursor-pointer shadow"
+              className="px-2.5 py-1 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-[10.5px] font-bold shrink-0 transition cursor-pointer"
             >
-              Update Wajah
+              Update
             </button>
           </div>
         )}
 
-        {/* Tombol Cek & Munculkan Izin Lokasi/Kamera HP (Solusi untuk Anto dkk) */}
-        <button
-          type="button"
-          onClick={() => setPermModalOpen(true)}
-          className="w-full bg-[#181d26] hover:bg-[#1e2430] border border-blue-500/30 rounded-2xl p-3.5 flex items-center justify-between gap-3 text-left transition shadow-md cursor-pointer group"
-        >
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="w-9 h-9 rounded-xl bg-blue-500/20 text-blue-400 border border-blue-500/30 flex items-center justify-center shrink-0 group-hover:scale-105 transition">
-              <Smartphone className="w-4 h-4" />
-            </div>
-            <div className="min-w-0">
-              <div className="text-xs font-black text-white flex items-center gap-1.5">
-                <span>Izin Lokasi &amp; Kamera HP</span>
-                <span className="text-[9px] px-1.5 py-0.2 rounded-md bg-blue-500/20 text-blue-300 font-bold border border-blue-400/30">
-                  Klik Di Sini
-                </span>
-              </div>
-              <div className="text-[11px] text-slate-400 truncate mt-0.5">
-                Munculkan notifikasi izin di HP Anda jika lokasi/kamera belum aktif
-              </div>
-            </div>
-          </div>
-          <span className="text-xs font-bold text-blue-400 shrink-0">
-            Cek Izin →
-          </span>
-        </button>
-
-        {/* TOMBOL LAPOR (HIGH VISIBILITY FOR WHISTLEBLOWER INTEGRITY) */}
-        <button
-          type="button"
-          onClick={onOpenStaffReportModal}
-          className="w-full bg-gradient-to-r from-rose-950 via-rose-900/90 to-red-950 hover:from-rose-900 hover:to-red-900 border-2 border-rose-500/70 rounded-2xl p-4 flex items-center justify-between gap-3 text-left transition shadow-xl shadow-rose-950/60 active:scale-[0.99] cursor-pointer group animate-fade-in"
-        >
-          <div className="flex items-center gap-3.5 min-w-0">
-            <div className="w-10 h-10 rounded-xl bg-rose-500 text-white flex items-center justify-center shrink-0 shadow-lg shadow-rose-900/50 group-hover:scale-105 transition">
-              <ShieldAlert className="w-5 h-5 stroke-[2.5]" />
-            </div>
-            <div className="min-w-0">
-              <div className="text-sm font-black text-white flex items-center gap-2">
-                <span>🚨 LAPOR (Pusat Aduan &amp; Integritas)</span>
-                <span className="text-[9px] px-2 py-0.5 rounded-full bg-rose-500/30 text-rose-200 font-bold border border-rose-400/40">
-                  Reward +Point
-                </span>
-              </div>
-              <div className="text-[11px] text-rose-200/90 truncate mt-0.5">
-                Laporkan kecurangan kasir, SOP, atau kelakuan buruk leader • Opsi Anonim
-              </div>
-            </div>
-          </div>
-          <span className="px-3 py-1.5 rounded-xl bg-rose-500 hover:bg-rose-400 text-white text-xs font-black shrink-0 shadow-md transition">
-            Lapor →
-          </span>
-        </button>
-
-        {/* KUIS PENGETAHUAN PRODUK (MINGGUAN) - HANYA UNTUK STAF LUCKYCAT */}
-        {String(staff?.venue || '').toLowerCase().includes('lucky') && (
-          <button
-            type="button"
-            onClick={onOpenStaffQuizModal}
-            className="w-full bg-gradient-to-r from-amber-950/70 via-[#1f1b15] to-[#161a22] hover:bg-[#25221b] active:scale-[0.99] border border-amber-500/40 rounded-2xl px-4 py-3.5 flex items-center justify-between gap-3 text-left shadow-lg transition cursor-pointer"
-          >
+        {/* Mandatory Face Biometrics Registration Alert (Hanya jika belum daftar sama sekali) */}
+        {!hasRegisteredBiometrics && (
+          <div className="bg-gradient-to-r from-indigo-950/80 via-[#1e2238] to-purple-950/80 border border-indigo-400/40 rounded-3xl p-3.5 shadow-xl flex items-center justify-between gap-3 animate-fade-in">
             <div className="flex items-center gap-3 min-w-0">
-              <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-400/30 text-amber-300 flex items-center justify-center shrink-0">
-                <BookOpen className="w-5 h-5" />
+              <div className="w-9 h-9 rounded-2xl bg-indigo-500 text-white flex items-center justify-center shrink-0 shadow-lg shadow-indigo-500/30">
+                <ShieldCheck className="w-4 h-4" />
               </div>
               <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-extrabold text-white">Kuis Pengetahuan Produk</span>
-                  <span className="text-[9.5px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-bold border border-amber-400/30">
-                    Wajib 1x / Minggu
-                  </span>
-                </div>
-                <div className="text-xs text-slate-400 truncate mt-0.5">
-                  Menu, paket meja, promo &amp; SOP (10 Soal • 8 Menit • Wajib saat Break)
-                </div>
+                <h3 className="text-xs sm:text-sm font-black text-white">Daftarkan Wajah Biometrik Anda</h3>
+                <p className="text-[10.5px] text-indigo-200 truncate mt-0.5">Wajib 1x sebelum melakukan absensi masuk</p>
               </div>
             </div>
-            <span className="px-3 py-1.5 rounded-xl bg-amber-500/20 text-amber-200 border border-amber-400/30 text-xs font-bold shrink-0">
-              Buka →
-            </span>
-          </button>
+            <button
+              type="button"
+              onClick={onOpenFaceRegistration}
+              className="px-3 py-1.5 rounded-xl bg-indigo-500 hover:bg-indigo-400 text-white text-xs font-black shadow-lg shadow-indigo-500/25 shrink-0 transition cursor-pointer active:scale-95"
+            >
+              Daftar →
+            </button>
+          </div>
         )}
 
-        {/* 2. LEADERBOARD (Full-width) */}
-        <button
-          type="button"
-          onClick={onOpenLeaderboard}
-          className="w-full bg-[#1b202b] hover:bg-[#222836] active:scale-[0.99] border border-indigo-400/25 rounded-2xl px-4 py-3.5 flex items-center justify-between gap-3 text-left shadow-lg transition cursor-pointer"
-        >
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="w-10 h-10 rounded-xl bg-indigo-500/20 border border-indigo-400/30 text-indigo-300 flex items-center justify-center shrink-0">
-              <Trophy className="w-5 h-5" />
-            </div>
-            <div className="min-w-0">
-              <div className="text-sm font-extrabold text-white">Leaderboard</div>
-              <div className="text-xs text-slate-400 truncate">
-                Klasemen disiplin & performa tim
-              </div>
-            </div>
-          </div>
-          <span className="px-3 py-1.5 rounded-xl bg-indigo-500/20 text-indigo-200 border border-indigo-400/30 text-xs font-bold shrink-0">
-            Lihat →
-          </span>
-        </button>
-
-        {/* 3. PENGUMUMAN (Full-width, highlighted amber when unread) */}
-        <button
-          type="button"
-          onClick={onOpenAnnouncements}
-          className={`w-full rounded-2xl px-4 py-3.5 flex items-center justify-between gap-3 text-left shadow-lg active:scale-[0.99] transition cursor-pointer border ${
-            unreadAnnouncementsCount > 0
-              ? 'bg-amber-500/15 hover:bg-amber-500/20 border-amber-400/50'
-              : 'bg-[#1b202b] hover:bg-[#222836] border-white/10'
-          }`}
-        >
-          <div className="flex items-center gap-3 min-w-0">
-            <div
-              className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border ${
-                unreadAnnouncementsCount > 0
-                  ? 'bg-amber-500 text-slate-950 border-amber-300'
-                  : 'bg-[#252c3b] text-amber-300 border-white/10'
-              }`}
-            >
-              <Megaphone className="w-5 h-5" />
-            </div>
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-extrabold text-white">Pengumuman</span>
-                {unreadAnnouncementsCount > 0 && (
-                  <span className="px-2 py-0.5 rounded-full bg-amber-400 text-slate-950 text-[10px] font-black">
-                    {unreadAnnouncementsCount} Baru
-                  </span>
-                )}
-              </div>
-              <div className="text-xs text-slate-400 truncate mt-0.5">
-                {latestAnnouncementTitle}
-              </div>
-            </div>
-          </div>
-          <span
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold shrink-0 border ${
-              unreadAnnouncementsCount > 0
-                ? 'bg-amber-400 text-slate-950 border-amber-300'
-                : 'bg-[#252c3b] text-slate-200 border-white/10'
-            }`}
+        {/* =========================================================
+            3. LAYANAN & FITUR UTAMA (2x2 Balanced Bento Grid)
+           ========================================================= */}
+        <div className="grid grid-cols-2 gap-2.5">
+          {/* A. LAPOR INTEGRITAS */}
+          <button
+            type="button"
+            onClick={onOpenStaffReportModal}
+            className="bg-gradient-to-br from-rose-950/80 via-[#21161a] to-[#171318] hover:bg-rose-900/30 border border-rose-500/40 rounded-2xl p-3 flex flex-col justify-between text-left shadow-lg transition active:scale-[0.98] cursor-pointer min-h-[110px]"
           >
-            Buka →
-          </span>
-        </button>
-
-        {/* 3b. RIWAYAT TELAT & TIDAK MASUK (Full-width) */}
-        <button
-          type="button"
-          onClick={() => onOpenAttendanceHistory?.('LATE')}
-          className="w-full bg-[#1b202b] hover:bg-[#222836] active:scale-[0.99] border border-blue-400/25 rounded-2xl px-4 py-3.5 flex items-center justify-between gap-3 text-left shadow-lg transition cursor-pointer"
-        >
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="w-10 h-10 rounded-xl bg-blue-500/20 border border-blue-400/30 text-blue-300 flex items-center justify-center shrink-0">
-              <Clock className="w-5 h-5" />
+            <div className="flex items-center justify-between w-full">
+              <div className="w-8 h-8 rounded-xl bg-rose-500 text-white flex items-center justify-center shadow-md shadow-rose-900/50">
+                <ShieldAlert className="w-4 h-4 stroke-[2.5]" />
+              </div>
+              <span className="px-2 py-0.5 rounded-full bg-rose-500/25 text-rose-300 font-extrabold text-[9.5px] border border-rose-400/30">
+                +Point
+              </span>
             </div>
-            <div className="min-w-0">
-              <div className="text-sm font-extrabold text-white">Riwayat Telat &amp; Tidak Masuk</div>
-              <div className="text-xs text-slate-400 truncate mt-0.5">
-                Cek tanggal, jam masuk vs jadwal, &amp; status izin/alpa
+            <div className="mt-2.5">
+              <div className="text-xs font-black text-white">🚨 LAPOR Aduan</div>
+              <div className="text-[10.5px] text-rose-200/80 mt-0.5 line-clamp-1">
+                Kecurangan &amp; SOP (Anonim)
               </div>
             </div>
-          </div>
-          <span className="px-3 py-1.5 rounded-xl bg-blue-500/20 text-blue-200 border border-blue-400/30 text-xs font-bold shrink-0">
-            Lihat →
-          </span>
-        </button>
+          </button>
 
-        {/* 4. ABSENSI (Left) & PENGAJUAN (Right) 2-Column Bento Row */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {/* Left: Absensi (3 separate buttons) */}
-          <div className="bg-[#191d26] border border-white/[0.08] rounded-3xl p-3.5 shadow-lg flex flex-col justify-between gap-2.5">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-extrabold uppercase tracking-wider text-slate-300">
-                Absensi Shift
-              </span>
-              <span className="text-[11px] font-semibold text-slate-400">
-                {activeShift ? 'Aktif' : 'Siap'}
-              </span>
-            </div>
+          {/* B. KUIS MINGGUAN (LuckyCat Only) / ALTERNATIVE FOR JP */}
+          {String(staff?.venue || '').toLowerCase().includes('lucky') ? (
+            <button
+              type="button"
+              onClick={onOpenStaffQuizModal}
+              className="bg-gradient-to-br from-amber-950/70 via-[#221c15] to-[#171615] hover:bg-amber-900/30 border border-amber-500/40 rounded-2xl p-3 flex flex-col justify-between text-left shadow-lg transition active:scale-[0.98] cursor-pointer min-h-[110px]"
+            >
+              <div className="flex items-center justify-between w-full">
+                <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-300 border border-amber-400/30 flex items-center justify-center">
+                  <BookOpen className="w-4 h-4" />
+                </div>
+                <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-extrabold text-[9.5px] border border-amber-400/30">
+                  Wajib 1x
+                </span>
+              </div>
+              <div className="mt-2.5">
+                <div className="text-xs font-black text-white">📝 Kuis Mingguan</div>
+                <div className="text-[10.5px] text-amber-200/80 mt-0.5 line-clamp-1">
+                  10 Soal • Syarat Break
+                </div>
+              </div>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={onOpenLeaderboard}
+              className="bg-[#181d26] hover:bg-[#202734] border border-indigo-400/30 rounded-2xl p-3 flex flex-col justify-between text-left shadow-lg transition active:scale-[0.98] cursor-pointer min-h-[110px]"
+            >
+              <div className="flex items-center justify-between w-full">
+                <div className="w-8 h-8 rounded-xl bg-indigo-500/20 text-indigo-300 border border-indigo-400/30 flex items-center justify-center">
+                  <Trophy className="w-4 h-4" />
+                </div>
+                <span className="px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 font-bold text-[9.5px]">
+                  Peringkat
+                </span>
+              </div>
+              <div className="mt-2.5">
+                <div className="text-xs font-black text-white">Leaderboard</div>
+                <div className="text-[10.5px] text-slate-400 mt-0.5 line-clamp-1">
+                  Klasemen disiplin tim
+                </div>
+              </div>
+            </button>
+          )}
 
-            <div className="space-y-2">
-              {/* Absen Masuk */}
-              <button
-                type="button"
-                onClick={handleClickCheckIn}
-                disabled={Boolean(activeShift)}
-                className={`w-full px-3 py-2.5 rounded-2xl flex items-center justify-between text-xs font-extrabold transition ${
-                  activeShift
-                    ? 'bg-[#141820] text-slate-500 border border-white/5 cursor-not-allowed'
-                    : 'bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-md shadow-emerald-500/20 active:scale-[0.98] cursor-pointer'
-                }`}
-              >
-                <span className="flex items-center gap-2">
-                  <LogIn className="w-4 h-4" />
-                  <span>{activeShift ? 'Sudah Absen Masuk' : 'Absen Masuk'}</span>
-                </span>
-                {!activeShift && <span>Foto →</span>}
-              </button>
-
-              {/* Ambil Istirahat / Selesai Break */}
-              <button
-                type="button"
-                onClick={handleClickBreak}
-                disabled={!canClickBreak}
-                className={`w-full px-3 py-2.5 rounded-2xl flex items-center justify-between text-xs font-extrabold transition border ${
-                  !canClickBreak
-                    ? 'bg-[#141820] text-slate-500 border-white/5 cursor-not-allowed'
-                    : isOnBreak
-                    ? 'bg-amber-400 hover:bg-amber-300 text-slate-950 border-amber-300 shadow-md cursor-pointer'
-                    : 'bg-[#222836] hover:bg-[#2a3142] text-slate-100 border-white/10 cursor-pointer'
-                }`}
-              >
-                <span className="flex items-center gap-2">
-                  <Coffee className="w-4 h-4" />
-                  <span>
-                    {isOnBreak
-                      ? 'Selesai Break'
-                      : hasTakenBreak
-                      ? 'Break Selesai'
-                      : 'Ambil Istirahat'}
-                  </span>
-                </span>
-                <span className="font-mono text-[11px]">
-                  {isOnBreak
-                    ? formatTimerSeconds(breakElapsedSec)
-                    : canClickBreak
-                    ? 'Foto →'
-                    : '—'}
-                </span>
-              </button>
-
-              {/* Absen Pulang (Smart Lock H-30m) */}
-              <button
-                type="button"
-                onClick={handleClickCheckOut}
-                className={`w-full px-3 py-2.5 rounded-2xl flex items-center justify-between text-xs font-extrabold transition border ${
-                  !activeShift
-                    ? 'bg-[#141820] text-slate-600 border-white/5 cursor-not-allowed'
-                    : checkoutLock.locked
-                    ? 'bg-[#171b24] text-slate-400 border-white/10 cursor-not-allowed'
-                    : 'bg-rose-500 hover:bg-rose-400 text-white border-rose-400/50 shadow-md shadow-rose-500/20 active:scale-[0.98] cursor-pointer'
-                }`}
-              >
-                <span className="flex items-center gap-2 min-w-0">
-                  {checkoutLock.locked || !activeShift ? (
-                    <Lock className="w-4 h-4 shrink-0 text-slate-400" />
-                  ) : (
-                    <LogOut className="w-4 h-4 shrink-0" />
-                  )}
-                  <span className="truncate">Absen Pulang</span>
-                </span>
-                <span className="text-[11px] shrink-0">
-                  {!activeShift
-                    ? '—'
-                    : checkoutLock.locked
-                    ? checkoutLock.unlockTimeStr
-                      ? `Buka ${checkoutLock.unlockTimeStr}`
-                      : 'Terkunci'
-                    : 'Foto →'}
-                </span>
-              </button>
-            </div>
-          </div>
-
-          {/* Right: Pengajuan (Izin, Cuti, Sakit, dll) */}
+          {/* C. PENGAJUAN (Izin, Cuti, Sakit, Pulang Awal) */}
           <button
             type="button"
             onClick={onOpenStaffLeaveModal}
-            className="bg-[#1b202b] hover:bg-[#222836] active:scale-[0.99] border border-white/10 rounded-3xl p-4 flex flex-col justify-between text-left shadow-lg transition cursor-pointer min-h-[156px]"
+            className="bg-[#181d26] hover:bg-[#202734] border border-sky-400/30 rounded-2xl p-3 flex flex-col justify-between text-left shadow-lg transition active:scale-[0.98] cursor-pointer min-h-[110px]"
           >
-            <div className="flex items-start justify-between gap-2 w-full">
-              <div className="w-10 h-10 rounded-xl bg-sky-500/20 border border-sky-400/30 text-sky-300 flex items-center justify-center">
-                <FileText className="w-5 h-5" />
+            <div className="flex items-center justify-between w-full">
+              <div className="w-8 h-8 rounded-xl bg-sky-500/20 text-sky-300 border border-sky-400/30 flex items-center justify-center">
+                <FileText className="w-4 h-4" />
               </div>
-              {leaveUpdateCount > 0 && (
-                <span className="px-2 py-0.5 rounded-full bg-sky-400 text-slate-950 text-[10px] font-black">
+              {leaveUpdateCount > 0 ? (
+                <span className="px-2 py-0.5 rounded-full bg-sky-400 text-slate-950 font-black text-[9.5px]">
                   {leaveUpdateCount} Update
                 </span>
+              ) : (
+                <span className="text-[10.5px] font-bold text-sky-400">Buat →</span>
               )}
             </div>
-
-            <div className="mt-4">
-              <div className="text-sm font-extrabold text-white">Pengajuan</div>
-              <div className="text-xs text-slate-400 mt-0.5">
-                Izin, Cuti, Sakit, Pulang Awal
+            <div className="mt-2.5">
+              <div className="text-xs font-black text-white">Pengajuan</div>
+              <div className="text-[10.5px] text-slate-400 mt-0.5 line-clamp-1">
+                Izin, Sakit, Cuti, Pulang Awal
               </div>
             </div>
-
-            <div className="mt-3 flex items-center justify-end w-full">
-              <span className="px-3 py-1 rounded-xl bg-[#252c3b] text-slate-200 border border-white/10 text-xs font-bold">
-                Buat / Cek →
-              </span>
-            </div>
           </button>
-        </div>
 
-        {/* 5. SCAN QR TOILET & POIN (Bottom 2 Columns) */}
-        <div className="grid grid-cols-2 gap-3">
+          {/* D. SCAN QR TOILET */}
           <button
             type="button"
             onClick={onSelectToilet}
-            className="bg-[#1b202b] hover:bg-[#222836] active:scale-[0.98] border border-white/10 rounded-2xl p-3.5 flex flex-col justify-between text-left shadow-lg transition cursor-pointer min-h-[118px]"
+            className="bg-[#181d26] hover:bg-[#202734] border border-teal-400/30 rounded-2xl p-3 flex flex-col justify-between text-left shadow-lg transition active:scale-[0.98] cursor-pointer min-h-[110px]"
           >
             <div className="flex items-center justify-between w-full">
-              <div className="w-9 h-9 rounded-xl bg-teal-500/20 border border-teal-400/30 text-teal-300 flex items-center justify-center">
+              <div className="w-8 h-8 rounded-xl bg-teal-500/20 text-teal-300 border border-teal-400/30 flex items-center justify-center">
                 <QrCode className="w-4 h-4" />
               </div>
-              <span className="px-2.5 py-1 rounded-lg bg-[#252c3b] text-slate-200 text-[11px] font-bold">
-                Scan →
-              </span>
+              <span className="text-[10.5px] font-bold text-teal-400">Scan →</span>
             </div>
-            <div className="mt-3">
-              <div className="text-sm font-extrabold text-white">Scan QR Toilet</div>
-              <div className="text-[11px] text-slate-400 mt-0.5">
-                Verifikasi cek kebersihan
-              </div>
-            </div>
-          </button>
-
-          <button
-            type="button"
-            onClick={handleClickPointsCard}
-            className={`active:scale-[0.98] rounded-2xl p-3.5 flex flex-col justify-between text-left shadow-lg transition cursor-pointer min-h-[118px] border ${
-              pendingPointsCount > 0
-                ? 'bg-rose-500/15 hover:bg-rose-500/20 border-rose-400/50'
-                : 'bg-[#1b202b] hover:bg-[#222836] border-white/10'
-            }`}
-          >
-            <div className="flex items-center justify-between w-full">
-              <div
-                className={`w-9 h-9 rounded-xl flex items-center justify-center border ${
-                  pendingPointsCount > 0
-                    ? 'bg-rose-500 text-white border-rose-300'
-                    : 'bg-rose-500/15 text-rose-300 border-rose-400/30'
-                }`}
-              >
-                <AlertTriangle className="w-4 h-4" />
-              </div>
-              <span
-                className={`px-2.5 py-1 rounded-lg text-[11px] font-bold ${
-                  pendingPointsCount > 0
-                    ? 'bg-rose-500 text-white'
-                    : 'bg-[#252c3b] text-slate-200'
-                }`}
-              >
-                {pendingPointsCount > 0 ? `${pendingPointsCount} Baru` : 'Cek →'}
-              </span>
-            </div>
-            <div className="mt-3">
-              <div className="text-sm font-extrabold text-white">
-                Poin ({pointTotal > 0 ? `+${pointTotal}` : pointTotal})
-              </div>
-              <div className="text-[11px] text-slate-400 mt-0.5">
-                Riwayat & pelanggaran
+            <div className="mt-2.5">
+              <div className="text-xs font-black text-white">Cek Restroom</div>
+              <div className="text-[10.5px] text-slate-400 mt-0.5 line-clamp-1">
+                Scan checklist kebersihan
               </div>
             </div>
           </button>
         </div>
 
-        {/* 6. MANAGEMENT QUICK MONITORING BUTTON (Only if OM/AM) */}
-        {isManagementRole && onOpenMonitoring && (
+        {/* =========================================================
+            4. PENGUMUMAN & LEADERBOARD (Full Width Compact Cards)
+           ========================================================= */}
+        <div className="space-y-2 pt-1">
+          {/* Pengumuman Operasional */}
           <button
             type="button"
-            onClick={onOpenMonitoring}
-            className="w-full bg-[#191d26] hover:bg-[#222836] border border-white/10 rounded-2xl px-4 py-3 flex items-center justify-between text-xs font-bold text-slate-200 transition cursor-pointer"
+            onClick={onOpenAnnouncements}
+            className={`w-full rounded-2xl p-3 flex items-center justify-between gap-2.5 text-left shadow-lg active:scale-[0.99] transition cursor-pointer border ${
+              unreadAnnouncementsCount > 0
+                ? 'bg-amber-500/15 hover:bg-amber-500/20 border-amber-400/50'
+                : 'bg-[#181d26] hover:bg-[#202734] border-white/10'
+            }`}
           >
-            <span className="flex items-center gap-2">
-              <Eye className="w-4 h-4 text-indigo-400" />
-              <span>Pantau Laporan & Live Dashboard</span>
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div
+                className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 border ${
+                  unreadAnnouncementsCount > 0
+                    ? 'bg-amber-500 text-slate-950 border-amber-300'
+                    : 'bg-[#222836] text-amber-300 border-white/10'
+                }`}
+              >
+                <Megaphone className="w-4 h-4" />
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs font-black text-white">Pengumuman</span>
+                  {unreadAnnouncementsCount > 0 && (
+                    <span className="px-1.5 py-0.2 rounded-full bg-amber-400 text-slate-950 text-[9px] font-black">
+                      {unreadAnnouncementsCount} Baru
+                    </span>
+                  )}
+                </div>
+                <div className="text-[11px] text-slate-400 truncate mt-0.5">
+                  {latestAnnouncementTitle}
+                </div>
+              </div>
+            </div>
+            <span
+              className={`px-2.5 py-1 rounded-xl text-[10.5px] font-bold shrink-0 border ${
+                unreadAnnouncementsCount > 0
+                  ? 'bg-amber-400 text-slate-950 border-amber-300'
+                  : 'bg-[#222836] text-slate-200 border-white/10'
+              }`}
+            >
+              Baca →
             </span>
-            <span className="text-slate-400">Buka →</span>
           </button>
-        )}
+
+          {/* Leaderboard Tim (Tampil jika staf LuckyCat, karena kuis di bento) */}
+          {String(staff?.venue || '').toLowerCase().includes('lucky') && (
+            <button
+              type="button"
+              onClick={onOpenLeaderboard}
+              className="w-full bg-[#181d26] hover:bg-[#202734] active:scale-[0.99] border border-indigo-400/25 rounded-2xl p-3 flex items-center justify-between gap-2.5 text-left shadow-lg transition cursor-pointer"
+            >
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-8 h-8 rounded-xl bg-indigo-500/20 border border-indigo-400/30 text-indigo-300 flex items-center justify-center shrink-0">
+                  <Trophy className="w-4 h-4" />
+                </div>
+                <div className="min-w-0">
+                  <div className="text-xs font-black text-white">Leaderboard &amp; Peringkat</div>
+                  <div className="text-[11px] text-slate-400 truncate mt-0.5">
+                    Klasemen kedisiplinan &amp; perolehan poin tim
+                  </div>
+                </div>
+              </div>
+              <span className="px-2.5 py-1 rounded-xl bg-indigo-500/20 text-indigo-200 border border-indigo-400/30 text-[10.5px] font-bold shrink-0">
+                Lihat →
+              </span>
+            </button>
+          )}
+
+          {/* Live Monitoring Dashboard (Only if OM/AM Management Role) */}
+          {isManagementRole && onOpenMonitoring && (
+            <button
+              type="button"
+              onClick={onOpenMonitoring}
+              className="w-full bg-[#181d26] hover:bg-[#202734] border border-emerald-500/30 rounded-2xl p-3 flex items-center justify-between text-xs font-bold text-slate-200 transition cursor-pointer shadow-md"
+            >
+              <span className="flex items-center gap-2">
+                <Eye className="w-4 h-4 text-emerald-400" />
+                <span>Pantau Laporan &amp; Live Dashboard Manajer</span>
+              </span>
+              <span className="text-emerald-400 font-bold text-xs">Buka →</span>
+            </button>
+          )}
+
+          {/* Bantuan Akses Izin HP (Discreet Troubleshooting Helper) */}
+          <button
+            type="button"
+            onClick={() => setPermModalOpen(true)}
+            className="w-full py-2 px-3 rounded-xl bg-[#141821] hover:bg-[#1a202c] border border-white/5 text-slate-400 hover:text-slate-200 text-[10.5px] font-medium flex items-center justify-center gap-1.5 transition cursor-pointer"
+          >
+            <Smartphone className="w-3.5 h-3.5 text-blue-400" />
+            <span>Kamera atau GPS bermasalah? <strong>Cek Izin Perangkat HP</strong></span>
+          </button>
+        </div>
       </div>
 
       {/* SHIFT CONFIRMATION MODAL (for Check-In) */}

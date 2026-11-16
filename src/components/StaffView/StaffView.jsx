@@ -364,18 +364,18 @@ export default function StaffView({
   };
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-4">
+    <div className={step === 'PORTAL' ? "w-full" : "max-w-xl mx-auto px-3.5 py-4"}>
       {/* Toast Notification for Biometric Registration Success */}
       {faceSuccessAlert && (
-        <div className="mb-4 bg-emerald-950/90 border border-emerald-500/50 text-emerald-200 p-4 rounded-2xl flex items-center justify-between shadow-lg animate-fade-in">
-          <div className="flex items-center space-x-2.5">
+        <div className="mb-3 max-w-md mx-auto bg-emerald-950/90 border border-emerald-500/50 text-emerald-200 p-3.5 rounded-2xl flex items-center justify-between shadow-lg animate-fade-in">
+          <div className="flex items-center space-x-2.5 min-w-0">
             <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
-            <span className="text-xs sm:text-sm font-bold">{faceSuccessAlert}</span>
+            <span className="text-xs sm:text-sm font-bold leading-snug">{faceSuccessAlert}</span>
           </div>
           <button
             type="button"
             onClick={() => setFaceSuccessAlert(null)}
-            className="text-xs font-bold text-emerald-400 hover:text-white ml-3 cursor-pointer"
+            className="text-xs font-bold text-emerald-400 hover:text-white ml-3 shrink-0 cursor-pointer p-1"
           >
             ✕
           </button>
@@ -384,16 +384,16 @@ export default function StaffView({
 
       {/* Toast Notification for Toilet Submission Success */}
       {toiletSuccessAlert && (
-        <div className="mb-4 bg-emerald-50 border border-emerald-300 text-emerald-800 p-4 rounded-2xl flex items-center justify-between shadow-md animate-fade-in">
-          <div className="flex items-center space-x-2.5">
-            <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
-            <span className="text-xs sm:text-sm font-bold">{toiletSuccessAlert}</span>
+        <div className="mb-3 max-w-md mx-auto bg-emerald-950/90 border border-emerald-500/50 text-emerald-200 p-3.5 rounded-2xl flex items-center justify-between shadow-md animate-fade-in">
+          <div className="flex items-center space-x-2.5 min-w-0">
+            <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+            <span className="text-xs sm:text-sm font-bold leading-snug">{toiletSuccessAlert}</span>
           </div>
           <button
             onClick={() => setToiletSuccessAlert(null)}
-            className="text-xs font-bold text-emerald-700 hover:text-emerald-900 ml-3"
+            className="text-xs font-bold text-emerald-400 hover:text-white ml-3 shrink-0 cursor-pointer p-1"
           >
-            Tutup
+            ✕
           </button>
         </div>
       )}
