@@ -39,6 +39,7 @@ export default function StaffView({
   // Attendance Camera & Face Registration modal state
   const [cameraModalOpen, setCameraModalOpen] = useState(false);
   const [faceRegistrationModalOpen, setFaceRegistrationModalOpen] = useState(false);
+  const [faceSuccessAlert, setFaceSuccessAlert] = useState(null);
   const [cameraActionType, setCameraActionType] = useState('checkin');
   const [confirmedShift, setConfirmedShift] = useState(null);
   const [leaveModalOpen, setLeaveModalOpen] = useState(false);
@@ -268,10 +269,12 @@ export default function StaffView({
     } : prev));
     setFaceRegistrationModalOpen(false);
 
-    // Langsung lanjut absen menggunakan face recog yang telah didaftarkan!
-    setCameraActionType('checkin');
-    setConfirmedShift(null);
-    setCameraModalOpen(true);
+    // Pendaftaran biometrik selesai: TIDAK langsung absensi!
+    // Staf tetap di menu portal dan baru absen saat menekan tombol absen.
+    setFaceSuccessAlert('✓ Pendaftaran Biometrik Wajah Berhasil! Wajah Anda telah terdaftar. Silakan tekan tombol Absen Masuk saat waktu shift Anda tiba.');
+    setTimeout(() => {
+      setFaceSuccessAlert(null);
+    }, 8000);
   };
 
   // Reset to initial login screen for next staff
@@ -300,6 +303,23 @@ export default function StaffView({
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-4">
+      {/* Toast Notification for Biometric Registration Success */}
+      {faceSuccessAlert && (
+        <div className="mb-4 bg-emerald-950/90 border border-emerald-500/50 text-emerald-200 p-4 rounded-2xl flex items-center justify-between shadow-lg animate-fade-in">
+          <div className="flex items-center space-x-2.5">
+            <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+            <span className="text-xs sm:text-sm font-bold">{faceSuccessAlert}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setFaceSuccessAlert(null)}
+            className="text-xs font-bold text-emerald-400 hover:text-white ml-3 cursor-pointer"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       {/* Toast Notification for Toilet Submission Success */}
       {toiletSuccessAlert && (
         <div className="mb-4 bg-emerald-50 border border-emerald-300 text-emerald-800 p-4 rounded-2xl flex items-center justify-between shadow-md animate-fade-in">
@@ -473,7 +493,7 @@ export default function StaffView({
               setToiletChecklistOpen(true);
             }
             setStep('PORTAL');
-            if (!loggedInStaff?.profile_photo_url) {
+            if (!loggedInStaff?.face_biometrics_registered) {
               setFaceRegistrationModalOpen(true);
             }
           }}

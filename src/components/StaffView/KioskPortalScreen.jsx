@@ -563,7 +563,7 @@ export default function KioskPortalScreen({
         </section>
 
         {/* Mandatory Face Biometrics Registration Alert (If staff hasn't registered yet) */}
-        {!staff?.profile_photo_url && (
+        {!staff?.face_biometrics_registered && (
           <div className="bg-gradient-to-r from-indigo-950/80 via-[#1e2238] to-purple-950/80 border border-indigo-400/40 rounded-3xl p-4 shadow-xl flex items-center justify-between gap-3 animate-fade-in">
             <div className="flex items-center gap-3 min-w-0">
               <div className="w-10 h-10 rounded-2xl bg-indigo-500 text-white flex items-center justify-center shrink-0 shadow-lg shadow-indigo-500/30">

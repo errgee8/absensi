@@ -21,6 +21,7 @@ export default function FaceRegistrationModal({
   const [cameraError, setCameraError] = useState(null);
   const [saving, setSaving] = useState(false);
   const [registeredSuccess, setRegisteredSuccess] = useState(false);
+  const [savedBiometricUrl, setSavedBiometricUrl] = useState(null);
   const [previewPhoto, setPreviewPhoto] = useState(null);
   const [errorMsg, setErrorMsg] = useState(null);
   const [permModalOpen, setPermModalOpen] = useState(false);
@@ -159,6 +160,7 @@ export default function FaceRegistrationModal({
         livenessVerified: true
       });
       const newUrl = res?.biometrics?.photo_url || photoBase64;
+      setSavedBiometricUrl(newUrl);
       setRegisteredSuccess(true);
 
       confetti({
@@ -173,12 +175,12 @@ export default function FaceRegistrationModal({
         streamRef.current = null;
       }
 
-      // Automatically proceed to attendance check-in after 1.8s
+      // Finish enrollment and return to portal after 2s or on button click
       setTimeout(() => {
         if (onFaceRegistered) {
           onFaceRegistered(newUrl);
         }
-      }, 1800);
+      }, 2200);
     } catch (err) {
       setErrorMsg(err.message || 'Gagal menyimpan biometrik wajah. Coba lagi.');
       setSaving(false);
@@ -221,15 +223,29 @@ export default function FaceRegistrationModal({
               </div>
 
               <div>
-                <h4 className="text-lg font-black text-white">Wajah Berhasil Didaftarkan!</h4>
+                <h4 className="text-lg font-black text-white">Pendaftaran Wajah Berhasil!</h4>
                 <p className="text-xs text-slate-300 mt-1">
                   Sistem Face Recognition Anda telah aktif &amp; terverifikasi liveness.
                 </p>
               </div>
 
-              <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-2xl text-[11px] text-emerald-300 font-bold">
-                Melanjutkan langsung ke absensi masuk...
+              <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-2xl text-[11px] text-emerald-300 font-bold leading-relaxed">
+                ✓ Pendaftaran biometrik selesai. Silakan tekan tombol <strong>Absen Masuk</strong> di menu utama saat jam kerja dimulai.
               </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (onFaceRegistered) {
+                    onFaceRegistered(savedBiometricUrl || previewPhoto);
+                  } else {
+                    onClose();
+                  }
+                }}
+                className="w-full py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg shadow-emerald-900/30 transition cursor-pointer"
+              >
+                Selesai &amp; Kembali ke Menu
+              </button>
             </div>
           ) : (
             <>
