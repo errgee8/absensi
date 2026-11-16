@@ -174,6 +174,14 @@ export default function KioskPortalScreen({
     staff?.division === 'Management' ||
     (shiftStartLabel === '00:00' && shiftEndLabel === '23:59');
 
+  const hasRegisteredBiometrics = Boolean(
+    staff?.face_biometrics_registered ||
+    staff?.biometric_photo_url ||
+    staff?.profile_photo_url ||
+    (staff?.id && typeof window !== 'undefined' && window.localStorage?.getItem(`staff_face_registered_${staff.id}`) === 'true') ||
+    (staff?.uuid && typeof window !== 'undefined' && window.localStorage?.getItem(`staff_face_registered_${staff.uuid}`) === 'true')
+  );
+
   const breakStatus = activeShift?.break_status || 'NONE';
   const isOnBreak = Boolean(
     activeShift && (breakStatus === 'ON_BREAK' || (activeShift.break_start_at && !activeShift.break_end_at))
@@ -263,12 +271,7 @@ export default function KioskPortalScreen({
       return;
     }
     // Jika belum pernah mendaftarkan wajah biometrik sama sekali, wajibkan registrasi 1x
-    const hasBiometricData = Boolean(
-      staff?.face_biometrics_registered ||
-      staff?.biometric_photo_url ||
-      staff?.profile_photo_url
-    );
-    if (!hasBiometricData) {
+    if (!hasRegisteredBiometrics) {
       if (onOpenFaceRegistration) {
         onOpenFaceRegistration();
         return;
@@ -409,7 +412,7 @@ export default function KioskPortalScreen({
                     <span>Ganti Foto</span>
                   </button>
 
-                  {staff?.face_biometrics_registered && (
+                  {hasRegisteredBiometrics && (
                     <button
                       type="button"
                       onClick={onOpenFaceRegistration}
@@ -585,7 +588,7 @@ export default function KioskPortalScreen({
         </section>
 
         {/* Mandatory Face Biometrics Registration Alert (Hanya jika belum daftar sama sekali) */}
-        {!staff?.face_biometrics_registered && (
+        {!hasRegisteredBiometrics && (
           <div className="bg-gradient-to-r from-indigo-950/80 via-[#1e2238] to-purple-950/80 border border-indigo-400/40 rounded-3xl p-4 shadow-xl flex items-center justify-between gap-3 animate-fade-in">
             <div className="flex items-center gap-3 min-w-0">
               <div className="w-10 h-10 rounded-2xl bg-indigo-500 text-white flex items-center justify-center shrink-0 shadow-lg shadow-indigo-500/30">

@@ -177,6 +177,12 @@ export default function FaceRegistrationModal({
     setSaving(true);
     setErrorMsg(null);
 
+    // Optimistic local persistence flag to prevent any reload/loop
+    try {
+      if (staff?.id) localStorage.setItem(`staff_face_registered_${staff.id}`, 'true');
+      if (staff?.uuid) localStorage.setItem(`staff_face_registered_${staff.uuid}`, 'true');
+    } catch {}
+
     try {
       const res = await registerStaffBiometrics(staff.id, {
         photoBase64,
@@ -185,6 +191,11 @@ export default function FaceRegistrationModal({
       const newUrl = res?.biometric_photo_url || res?.biometrics?.photo_url || res?.photo_url || photoBase64;
       setSavedBiometricUrl(newUrl);
       setRegisteredSuccess(true);
+
+      // Call onFaceRegistered IMMEDIATELY so parent loggedInStaff state updates without delay
+      if (onFaceRegistered) {
+        onFaceRegistered(newUrl);
+      }
 
       confetti({
         particleCount: 60,
@@ -198,12 +209,10 @@ export default function FaceRegistrationModal({
         streamRef.current = null;
       }
 
-      // Finish enrollment and return to portal after 2s or on button click
+      // Auto close and return to portal after 1.8s
       setTimeout(() => {
-        if (onFaceRegistered) {
-          onFaceRegistered(newUrl);
-        }
-      }, 2200);
+        onClose();
+      }, 1800);
     } catch (err) {
       setErrorMsg(err.message || 'Gagal menyimpan biometrik wajah. Coba lagi.');
       setSaving(false);
@@ -267,13 +276,12 @@ export default function FaceRegistrationModal({
                 onClick={() => {
                   if (onFaceRegistered) {
                     onFaceRegistered(savedBiometricUrl || previewPhoto);
-                  } else {
-                    onClose();
                   }
+                  onClose();
                 }}
                 className="w-full py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg shadow-emerald-900/30 transition cursor-pointer"
               >
-                Selesai &amp; Kembali ke Menu
+                Selesai &amp; Kembali ke Menu Absen
               </button>
             </div>
           ) : (

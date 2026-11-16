@@ -1510,7 +1510,7 @@ export const cloudDb = {
           value,
           description: description || `Setting for ${key}`,
           updated_at: new Date().toISOString()
-        });
+        }, { onConflict: 'key' });
       if (error) throw error;
       return value;
     } catch (e) {

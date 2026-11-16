@@ -249,7 +249,9 @@ export default function StaffView({
       const hasAnyFaceRef = Boolean(
         data.staff?.face_biometrics_registered ||
         data.staff?.biometric_photo_url ||
-        data.staff?.profile_photo_url
+        data.staff?.profile_photo_url ||
+        (data.staff?.id && typeof window !== 'undefined' && window.localStorage?.getItem(`staff_face_registered_${data.staff.id}`) === 'true') ||
+        (data.staff?.uuid && typeof window !== 'undefined' && window.localStorage?.getItem(`staff_face_registered_${data.staff.uuid}`) === 'true')
       );
       if (!hasAnyFaceRef) {
         setFaceRegistrationModalOpen(true);
@@ -267,7 +269,9 @@ export default function StaffView({
     const hasBiometric = Boolean(
       loggedInStaff?.face_biometrics_registered ||
       loggedInStaff?.biometric_photo_url ||
-      loggedInStaff?.profile_photo_url
+      loggedInStaff?.profile_photo_url ||
+      (loggedInStaff?.id && typeof window !== 'undefined' && window.localStorage?.getItem(`staff_face_registered_${loggedInStaff.id}`) === 'true') ||
+      (loggedInStaff?.uuid && typeof window !== 'undefined' && window.localStorage?.getItem(`staff_face_registered_${loggedInStaff.uuid}`) === 'true')
     );
     if (type === 'checkin' && !hasBiometric) {
       setFaceRegistrationModalOpen(true);
@@ -305,6 +309,11 @@ export default function StaffView({
   };
 
   const handleFaceRegistered = (newBiometricUrl) => {
+    try {
+      if (loggedInStaff?.id) window.localStorage?.setItem(`staff_face_registered_${loggedInStaff.id}`, 'true');
+      if (loggedInStaff?.uuid) window.localStorage?.setItem(`staff_face_registered_${loggedInStaff.uuid}`, 'true');
+    } catch {}
+
     setLoggedInStaff((prev) => (prev ? {
       ...prev,
       face_biometrics_registered: true,
@@ -542,7 +551,13 @@ export default function StaffView({
               setToiletChecklistOpen(true);
             }
             setStep('PORTAL');
-            if (!loggedInStaff?.face_biometrics_registered) {
+            const hasAnyFaceRef = Boolean(
+              loggedInStaff?.face_biometrics_registered ||
+              loggedInStaff?.biometric_photo_url ||
+              loggedInStaff?.profile_photo_url ||
+              (loggedInStaff?.id && typeof window !== 'undefined' && window.localStorage?.getItem(`staff_face_registered_${loggedInStaff.id}`) === 'true')
+            );
+            if (!hasAnyFaceRef) {
               setFaceRegistrationModalOpen(true);
             }
           }}

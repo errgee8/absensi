@@ -1434,9 +1434,9 @@ router.post('/staff/verify-pin', async (req, res) => {
     isWithin2HoursOfEnd: false,
     detectedShift: detectedShift || null,
     availableSchedules: schedules,
-    profile_photo_url: profileEntry?.photo_url || biometricEntry?.photo_url || null,
-    face_biometrics_registered: Boolean(biometricEntry?.photo_url || profileEntry?.photo_url),
-    biometric_photo_url: biometricEntry?.photo_url || profileEntry?.photo_url || null,
+    profile_photo_url: profileEntry?.photo_url || biometricEntry?.photo_url || staff.avatar || null,
+    face_biometrics_registered: Boolean(biometricEntry?.photo_url || profileEntry?.photo_url || staff.avatar),
+    biometric_photo_url: biometricEntry?.photo_url || profileEntry?.photo_url || staff.avatar || null,
     mood_emoji: moodEntry && moodEntry.date_ymd === currentOpDate ? moodEntry.emoji : null,
     monthlyStats
   };
@@ -1729,13 +1729,27 @@ router.post('/staff/:id/biometrics', async (req, res) => {
       setSetting('staff_profiles', nextProfiles);
     }
 
+    try {
+      db.prepare('UPDATE staff SET avatar = ? WHERE id = ? OR uuid = ?').run(photoUrl, staff.id, staff.id);
+    } catch {}
+
     if (isSupabaseConfigured) {
-      await cloudDb.saveStaffBiometricPhoto({
-        staffId: staff.id,
-        staffUuid: staff.uuid,
-        photoUrl,
-        livenessVerified: Boolean(livenessVerified)
-      });
+      try {
+        await cloudDb.saveStaffBiometricPhoto({
+          staffId: staff.id,
+          staffUuid: staff.uuid,
+          photoUrl,
+          livenessVerified: Boolean(livenessVerified)
+        });
+      } catch (e) {
+        console.warn('saveStaffBiometricPhoto note:', e.message);
+      }
+      try {
+        await supabase.from('staff').update({
+          avatar: photoUrl,
+          updated_at: new Date().toISOString()
+        }).eq('id', staff.uuid || staff.id);
+      } catch {}
     }
 
     const resolvedObj = { biometric_photo_url: photoUrl };
