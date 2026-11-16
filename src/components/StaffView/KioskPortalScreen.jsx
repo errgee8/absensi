@@ -688,32 +688,34 @@ export default function KioskPortalScreen({
           </span>
         </button>
 
-        {/* KUIS PENGETAHUAN PRODUK (MINGGUAN) */}
-        <button
-          type="button"
-          onClick={onOpenStaffQuizModal}
-          className="w-full bg-gradient-to-r from-amber-950/70 via-[#1f1b15] to-[#161a22] hover:bg-[#25221b] active:scale-[0.99] border border-amber-500/40 rounded-2xl px-4 py-3.5 flex items-center justify-between gap-3 text-left shadow-lg transition cursor-pointer"
-        >
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-400/30 text-amber-300 flex items-center justify-center shrink-0">
-              <BookOpen className="w-5 h-5" />
-            </div>
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-extrabold text-white">Kuis Pengetahuan Produk</span>
-                <span className="text-[9.5px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-bold border border-amber-400/30">
-                  Wajib 1x / Minggu
-                </span>
+        {/* KUIS PENGETAHUAN PRODUK (MINGGUAN) - HANYA UNTUK STAF LUCKYCAT */}
+        {String(staff?.venue || '').toLowerCase().includes('lucky') && (
+          <button
+            type="button"
+            onClick={onOpenStaffQuizModal}
+            className="w-full bg-gradient-to-r from-amber-950/70 via-[#1f1b15] to-[#161a22] hover:bg-[#25221b] active:scale-[0.99] border border-amber-500/40 rounded-2xl px-4 py-3.5 flex items-center justify-between gap-3 text-left shadow-lg transition cursor-pointer"
+          >
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-400/30 text-amber-300 flex items-center justify-center shrink-0">
+                <BookOpen className="w-5 h-5" />
               </div>
-              <div className="text-xs text-slate-400 truncate mt-0.5">
-                Menu, paket meja, promo &amp; SOP (10 Soal • 8 Menit • Wajib saat Break)
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-extrabold text-white">Kuis Pengetahuan Produk</span>
+                  <span className="text-[9.5px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-bold border border-amber-400/30">
+                    Wajib 1x / Minggu
+                  </span>
+                </div>
+                <div className="text-xs text-slate-400 truncate mt-0.5">
+                  Menu, paket meja, promo &amp; SOP (10 Soal • 8 Menit • Wajib saat Break)
+                </div>
               </div>
             </div>
-          </div>
-          <span className="px-3 py-1.5 rounded-xl bg-amber-500/20 text-amber-200 border border-amber-400/30 text-xs font-bold shrink-0">
-            Buka →
-          </span>
-        </button>
+            <span className="px-3 py-1.5 rounded-xl bg-amber-500/20 text-amber-200 border border-amber-400/30 text-xs font-bold shrink-0">
+              Buka →
+            </span>
+          </button>
+        )}
 
         {/* 2. LEADERBOARD (Full-width) */}
         <button

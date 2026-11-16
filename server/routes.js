@@ -5662,7 +5662,7 @@ router.get('/reports/my-reports', async (req, res) => {
 
 // 16a. Get Weekly Quiz
 router.get('/quiz/weekly', async (req, res) => {
-  const { staffId, venue = 'LuckyCat' } = req.query;
+  const { staffId } = req.query;
   const weekKey = getWitaWeekKey();
 
   if (!staffId) {
@@ -5670,6 +5670,29 @@ router.get('/quiz/weekly', async (req, res) => {
   }
 
   try {
+    let staff = null;
+    if (isSupabaseConfigured) {
+      staff = await findStaffInSupabase(staffId);
+    }
+    if (!staff) {
+      staff = db.prepare('SELECT * FROM staff WHERE id = ? OR legacy_code = ? OR uuid = ?').get(staffId, staffId, staffId);
+    }
+
+    const staffVenue = staff?.venue || req.query.venue || 'LuckyCat';
+    const isLuckyCat = String(staffVenue).toLowerCase().includes('lucky');
+
+    // RESTRIKSI KETAT: Soal kuis ini khusus untuk staf LuckyCat. Staf JP Karaoke tidak dapat mengakses kuis ini.
+    if (!isLuckyCat) {
+      return res.json({
+        available: false,
+        notApplicable: true,
+        alreadyCompleted: true, // Tidak memblokir staf JP saat ingin istirahat
+        weekKey,
+        venue: staffVenue,
+        message: 'Kuis mingguan saat ini hanya dikhususkan untuk tim LuckyCat. Tim JP Karaoke tidak perlu mengisi kuis ini.'
+      });
+    }
+
     // Check if staff has already completed this week's quiz
     let completions = [];
     if (isSupabaseConfigured) {
@@ -5689,7 +5712,7 @@ router.get('/quiz/weekly', async (req, res) => {
     }
 
     // Generate 10 randomized questions with shuffled options
-    const questions = generateRandomWeeklyQuiz(10, venue);
+    const questions = generateRandomWeeklyQuiz(10, 'LuckyCat');
     return res.json({
       alreadyCompleted: false,
       weekKey,
@@ -5716,6 +5739,15 @@ router.post('/quiz/submit', async (req, res) => {
   }
   if (!staff) {
     staff = db.prepare('SELECT * FROM staff WHERE id = ? OR legacy_code = ?').get(staffId, staffId);
+  }
+
+  const staffVenue = staff?.venue || venue;
+  const isLuckyCat = String(staffVenue).toLowerCase().includes('lucky');
+  if (!isLuckyCat) {
+    return res.status(403).json({
+      error: 'Akses ditolak: Kuis ini hanya untuk tim LuckyCat.',
+      notApplicable: true
+    });
   }
 
   try {

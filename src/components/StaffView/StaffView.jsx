@@ -281,16 +281,21 @@ export default function StaffView({
     }
 
     // Weekly quiz gating: must complete product quiz once a week before starting break!
+    // Kuis produk mingguan HANYA diwajibkan untuk staf LuckyCat (staf JP Karaoke tidak dikenakan)
     if (type === 'break_start') {
-      try {
-        const quizStatus = await getWeeklyQuiz(loggedInStaff.id, loggedInStaff.venue || 'LuckyCat');
-        if (!quizStatus?.alreadyCompleted) {
-          setPendingBreakShift(shift || null);
-          setStaffQuizModalOpen(true);
-          return;
+      const staffVenue = loggedInStaff.venue || 'LuckyCat';
+      const isLucky = String(staffVenue).toLowerCase().includes('lucky');
+      if (isLucky) {
+        try {
+          const quizStatus = await getWeeklyQuiz(loggedInStaff.id, staffVenue);
+          if (!quizStatus?.alreadyCompleted && !quizStatus?.notApplicable) {
+            setPendingBreakShift(shift || null);
+            setStaffQuizModalOpen(true);
+            return;
+          }
+        } catch (err) {
+          console.warn('Failed to verify weekly quiz status before break:', err);
         }
-      } catch (err) {
-        console.warn('Failed to verify weekly quiz status before break:', err);
       }
     }
 

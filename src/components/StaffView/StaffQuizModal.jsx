@@ -21,6 +21,7 @@ export default function StaffQuizModal({
   const [timerActive, setTimerActive] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [quizResults, setQuizResults] = useState(null); // Review state
+  const [notApplicableMsg, setNotApplicableMsg] = useState(null);
 
   const timerRef = useRef(null);
 
@@ -33,6 +34,13 @@ export default function StaffQuizModal({
       try {
         const data = await getWeeklyQuiz(staff.id, staff.venue || 'LuckyCat');
         if (!mounted) return;
+
+        // Restriction: Jika kuis tidak berlaku untuk staf ini (misal staf JP)
+        if (data.notApplicable || data.available === false) {
+          setNotApplicableMsg(data.message || 'Kuis mingguan saat ini hanya dikhususkan untuk staf LuckyCat.');
+          setLoading(false);
+          return;
+        }
 
         setWeekKey(data.weekKey || '');
         if (data.alreadyCompleted && data.completion) {
@@ -161,7 +169,7 @@ export default function StaffQuizModal({
             </div>
           </div>
 
-          {!quizResults && !loading && (
+          {!quizResults && !notApplicableMsg && !loading && (
             <div className={`px-3 py-1 rounded-full font-mono text-xs font-black flex items-center gap-1.5 border shadow ${
               secondsRemaining < 60
                 ? 'bg-rose-500/20 border-rose-400 text-rose-300 animate-pulse'
@@ -186,6 +194,35 @@ export default function StaffQuizModal({
             <div className="p-3 rounded-xl bg-rose-500/20 border border-rose-500/40 text-rose-300 text-xs font-bold flex items-center gap-2">
               <AlertTriangle className="w-4 h-4 shrink-0" />
               <span>{errorMsg}</span>
+            </div>
+          )}
+
+          {/* =========================================
+              NOT APPLICABLE (JP STAFF)
+             ========================================= */}
+          {notApplicableMsg && (
+            <div className="py-8 px-4 text-center space-y-4 animate-fade-in">
+              <div className="w-14 h-14 rounded-2xl bg-amber-500/20 text-amber-400 border border-amber-400/30 flex items-center justify-center mx-auto shadow-lg">
+                <BookOpen className="w-7 h-7" />
+              </div>
+              <div className="space-y-1.5">
+                <h4 className="text-base font-black text-white">Khusus Staf LuckyCat</h4>
+                <p className="text-xs text-slate-300 leading-relaxed max-w-sm mx-auto">
+                  {notApplicableMsg}
+                </p>
+              </div>
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    if (onQuizCompleted) onQuizCompleted({ notApplicable: true });
+                  }}
+                  className="px-6 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 active:scale-95 text-slate-950 text-xs font-black transition shadow-lg cursor-pointer"
+                >
+                  Tutup &amp; Lanjutkan
+                </button>
+              </div>
             </div>
           )}
 
