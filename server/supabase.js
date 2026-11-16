@@ -692,7 +692,8 @@ export const cloudDb = {
       moodsMap,
       pointsList,
       monthLogsRes,
-      allDayAdjustments
+      allDayAdjustments,
+      leavesList
     ] = await Promise.all([
       query,
       this.getStaffProfilesMap().catch(() => ({})),
@@ -702,7 +703,8 @@ export const cloudDb = {
         .from('attendance_logs')
         .select('staff_id, shift_date, flags, notes, status')
         .gte('shift_date', `${currentMonthKey}-01`),
-      this.getStaffDayAdjustments(currentMonthKey).catch(() => ([]))
+      this.getStaffDayAdjustments(currentMonthKey).catch(() => ([])),
+      this.getLeaveRequests().catch(() => ([]))
     ]);
     if (error) throw error;
 
@@ -759,6 +761,25 @@ export const cloudDb = {
       }
     }
 
+    const leaveDaysMap = {};
+    const leaveCountMap = {};
+    for (const lv of (leavesList || [])) {
+      const sDate = lv.start_date || '';
+      const eDate = lv.end_date || sDate;
+      if (sDate.startsWith(currentMonthKey) || eDate.startsWith(currentMonthKey)) {
+        const days = Number(lv.approved_days || lv.requested_days || 1) || 1;
+        const sId = String(lv.staff_id || lv.staff_uuid || '');
+        if (sId) {
+          leaveDaysMap[sId] = (leaveDaysMap[sId] || 0) + days;
+          leaveCountMap[sId] = (leaveCountMap[sId] || 0) + 1;
+        }
+        if (lv.staff_name) {
+          leaveDaysMap[lv.staff_name] = (leaveDaysMap[lv.staff_name] || 0) + days;
+          leaveCountMap[lv.staff_name] = (leaveCountMap[lv.staff_name] || 0) + 1;
+        }
+      }
+    }
+
     let formatted = (data || []).map(row => {
       const st = row.staff || {};
       const brk = (row.break_logs && row.break_logs.length > 0) ? row.break_logs[row.break_logs.length - 1] : null;
@@ -794,6 +815,8 @@ export const cloudDb = {
       const monthlyDays = Math.max(0, actualDays + manualDays);
       const monthlyLate = monthlyStatsMap[staffUuid]?.lateCount || monthlyStatsMap[staffCode]?.lateCount || 0;
       const activePts = pointsMap[staffUuid] ?? pointsMap[staffCode] ?? 0;
+      const monthlyLeaveDays = leaveDaysMap[staffUuid] || leaveDaysMap[staffCode] || leaveDaysMap[st.name] || 0;
+      const monthlyLeaveCount = leaveCountMap[staffUuid] || leaveCountMap[staffCode] || leaveCountMap[st.name] || 0;
 
       return {
         id: row.id,
@@ -805,6 +828,8 @@ export const cloudDb = {
         mood_emoji: resolvedMoodEmoji,
         monthly_work_days: monthlyDays,
         monthly_late_count: monthlyLate,
+        monthly_leave_days: monthlyLeaveDays,
+        monthly_leave_count: monthlyLeaveCount,
         active_points_total: activePts,
         staff_venue: st.venue || 'JP Karaoke',
         staff_division: st.division || st.role || 'Server and Cashier',

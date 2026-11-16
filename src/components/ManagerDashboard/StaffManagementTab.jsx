@@ -46,6 +46,7 @@ import {
 } from '../../utils/api';
 import { showToast } from '../Common/Toast';
 import { formatWitaDateTime, formatWitaDateOnly, formatWitaTimeOnly, formatDuration } from '../../utils/time';
+import StaffDetailManagementModal from './StaffDetailManagementModal';
 
 export default function StaffManagementTab({ onStaffUpdated, adminAuth }) {
   const [staffRoster, setStaffRoster] = useState([]);
@@ -338,14 +339,6 @@ export default function StaffManagementTab({ onStaffUpdated, adminAuth }) {
 
   const openStaffDetailModal = (staff) => {
     setDetailModalStaff(staff);
-    setDetailMonthChoice('CURRENT');
-    setDetailActiveTab('LATE');
-    setAdjDays(1);
-    setAdjReason('');
-    setAdjPin(adminAuth?.pin || '');
-    setAdjError(null);
-    setAdjSuccess(null);
-    fetchStaffDetail(staff, 'CURRENT');
   };
 
   const handleMonthChoiceChange = (newChoice) => {
@@ -818,6 +811,82 @@ export default function StaffManagementTab({ onStaffUpdated, adminAuth }) {
             </form>
           </div>
         </div>
+      )}
+
+      {/* Modal: Reset Staff PIN */}
+      {pinModalStaff && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in text-slate-200">
+          <div className="bg-[#161b24] border border-slate-800 rounded-3xl max-w-sm w-full overflow-hidden shadow-2xl">
+            <form onSubmit={handleSaveResetPin}>
+              <div className="p-4 border-b border-slate-800 bg-[#12161f] flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <div className="w-8 h-8 rounded-xl bg-blue-500/15 border border-blue-500/30 text-blue-400 flex items-center justify-center">
+                    <Key className="w-4 h-4 stroke-[2.5]" />
+                  </div>
+                  <h3 className="text-sm font-black text-slate-100">Reset PIN Staff</h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setPinModalStaff(null)}
+                  className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition cursor-pointer"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="p-5 space-y-3 text-xs">
+                <p className="text-slate-300 font-bold">
+                  Masukkan 4 digit PIN baru untuk <strong className="text-white">{pinModalStaff.name}</strong> ({pinModalStaff.id}):
+                </p>
+
+                <div>
+                  <input
+                    type="password"
+                    maxLength={6}
+                    required
+                    value={resetPinValue}
+                    onChange={(e) => setResetPinValue(e.target.value)}
+                    placeholder="••••"
+                    className="w-full bg-[#12161f] border border-slate-700 rounded-xl px-3 py-2 text-slate-100 font-mono text-xl font-black text-center tracking-widest focus:outline-none focus:border-blue-500"
+                    autoFocus
+                  />
+                </div>
+              </div>
+
+              <div className="p-4 border-t border-slate-800 bg-[#12161f] flex justify-end space-x-2">
+                <button
+                  type="button"
+                  onClick={() => setPinModalStaff(null)}
+                  className="px-4 py-2 bg-[#1c2230] hover:bg-[#252d3d] text-slate-300 rounded-xl text-xs font-black transition cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={pinSubmitting || resetPinValue.length < 4}
+                  className="px-5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-black shadow-lg shadow-blue-600/30 transition disabled:opacity-50 cursor-pointer"
+                >
+                  {pinSubmitting ? 'Menyimpan...' : 'Perbarui PIN'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Full Staff Detail, History & Management Actions */}
+      {detailModalStaff && (
+        <StaffDetailManagementModal
+          isOpen={Boolean(detailModalStaff)}
+          onClose={() => setDetailModalStaff(null)}
+          staff={detailModalStaff}
+          initialTab="POINTS"
+          adminAuth={adminAuth}
+          onUpdate={() => {
+            loadRoster();
+            if (onStaffUpdated) onStaffUpdated();
+          }}
+        />
       )}
 
       {/* Modal: Reset Staff PIN */}

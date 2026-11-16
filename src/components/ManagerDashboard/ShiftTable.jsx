@@ -14,6 +14,7 @@ import {
   ChevronUp,
   Award,
   Calendar,
+  CalendarX,
   AlertCircle
 } from 'lucide-react';
 import { formatWitaTimeOnly, formatWitaDateOnly, formatDuration } from '../../utils/time';
@@ -590,17 +591,21 @@ export default function ShiftTable({
                             </span>
                           </div>
 
-                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 text-xs">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2 text-xs">
                             {/* Card 1: Jumlah Point */}
-                            <div className="bg-[#181e2b] p-3 rounded-xl border border-slate-700/80 shadow-md">
+                            <div
+                              onClick={() => onInspectStaff?.(shift, 'POINTS')}
+                              className="bg-[#181e2b] hover:bg-[#202738] p-3 rounded-xl border border-amber-500/30 hover:border-amber-400/70 shadow-md transition cursor-pointer group"
+                              title="Klik untuk melihat riwayat lengkap & edit/hapus poin staf ini"
+                            >
                               <div className="flex items-center justify-between text-slate-400 mb-0.5">
-                                <span className="text-[9px] font-black uppercase tracking-wider">Jumlah Poin</span>
+                                <span className="text-[9px] font-black uppercase tracking-wider group-hover:text-amber-300 transition">Jumlah Poin</span>
                                 <Award className={`w-3.5 h-3.5 ${
                                   (shift.active_points_total || 0) > 0
                                     ? 'text-emerald-400'
                                     : (shift.active_points_total || 0) < 0
                                     ? 'text-rose-400'
-                                    : 'text-slate-400'
+                                    : 'text-amber-400'
                                 }`} />
                               </div>
                               <div className="flex items-baseline space-x-1">
@@ -617,20 +622,16 @@ export default function ShiftTable({
                                 </span>
                                 <span className="text-[9px] text-slate-400 font-bold">Poin</span>
                               </div>
-                              <p className="text-[9px] text-slate-400 mt-0.5 font-medium leading-tight">
-                                {(shift.active_points_total || 0) > 0
-                                  ? 'Apresiasi & poin plus aktif staff.'
-                                  : (shift.active_points_total || 0) < 0
-                                  ? 'Akumulasi sanksi berjalan.'
-                                  : 'Staff tertib tanpa catatan poin.'}
+                              <p className="text-[9px] text-slate-400 mt-0.5 font-medium leading-tight group-hover:text-amber-200 transition">
+                                Klik utk riwayat &amp; edit poin ➔
                               </p>
                             </div>
 
                             {/* Card 2: Hari Kerja */}
                             <div
-                              onClick={() => onInspectStaff?.(shift)}
-                              className="bg-[#181e2b] hover:bg-[#1f2737] p-3 rounded-xl border border-slate-700/80 shadow-md transition cursor-pointer group"
-                              title="Klik untuk melihat seluruh riwayat kehadiran staf"
+                              onClick={() => onInspectStaff?.(shift, 'WORK_DAYS')}
+                              className="bg-[#181e2b] hover:bg-[#202738] p-3 rounded-xl border border-blue-500/30 hover:border-blue-400/70 shadow-md transition cursor-pointer group"
+                              title="Klik untuk melihat riwayat kehadiran & koreksi hari kerja staf"
                             >
                               <div className="flex items-center justify-between text-slate-400 mb-0.5">
                                 <span className="text-[9px] font-black uppercase tracking-wider group-hover:text-blue-300 transition">Hari Kerja</span>
@@ -642,16 +643,16 @@ export default function ShiftTable({
                                 </span>
                                 <span className="text-[9px] text-slate-400 font-bold">Hari Kehadiran</span>
                               </div>
-                              <p className="text-[9px] text-slate-400 mt-0.5 font-medium leading-tight">
-                                Shift kerja terdata bulan ini (Klik utk detail).
+                              <p className="text-[9px] text-slate-400 mt-0.5 font-medium leading-tight group-hover:text-blue-200 transition">
+                                Klik utk rincian &amp; koreksi hari ➔
                               </p>
                             </div>
 
                             {/* Card 3: Total Keterlambatan */}
                             <div
-                              onClick={() => onInspectStaff?.(shift)}
-                              className="bg-[#181e2b] hover:bg-[#1f2737] p-3 rounded-xl border border-slate-700/80 shadow-md transition cursor-pointer group"
-                              title="Klik untuk melihat riwayat keterlambatan staf"
+                              onClick={() => onInspectStaff?.(shift, 'LATE')}
+                              className="bg-[#181e2b] hover:bg-[#202738] p-3 rounded-xl border border-rose-500/30 hover:border-rose-400/70 shadow-md transition cursor-pointer group"
+                              title="Klik untuk melihat riwayat keterlambatan & hapus status telat"
                             >
                               <div className="flex items-center justify-between text-slate-400 mb-0.5">
                                 <span className="text-[9px] font-black uppercase tracking-wider group-hover:text-rose-300 transition">Total Telat</span>
@@ -665,12 +666,35 @@ export default function ShiftTable({
                                 </span>
                                 <span className="text-[9px] text-slate-400 font-bold">Kali Telat</span>
                               </div>
-                              <p className="text-[9px] text-slate-400 mt-0.5 font-medium leading-tight">
-                                Akumulasi keterlambatan bulan ini.
+                              <p className="text-[9px] text-slate-400 mt-0.5 font-medium leading-tight group-hover:text-rose-200 transition">
+                                Klik utk riwayat &amp; hapus telat ➔
                               </p>
                             </div>
 
-                            {/* Card 4: Aksi yang Harus Diambil */}
+                            {/* Card 4: Izin & Cuti */}
+                            <div
+                              onClick={() => onInspectStaff?.(shift, 'LEAVE')}
+                              className="bg-[#181e2b] hover:bg-[#202738] p-3 rounded-xl border border-purple-500/30 hover:border-purple-400/70 shadow-md transition cursor-pointer group"
+                              title="Klik untuk melihat riwayat izin / cuti & kelola pengajuan staf"
+                            >
+                              <div className="flex items-center justify-between text-slate-400 mb-0.5">
+                                <span className="text-[9px] font-black uppercase tracking-wider group-hover:text-purple-300 transition">Izin &amp; Cuti</span>
+                                <CalendarX className="w-3.5 h-3.5 text-purple-400" />
+                              </div>
+                              <div className="flex items-baseline space-x-1">
+                                <span className={`text-xl font-black font-mono ${
+                                  (shift.monthly_leave_days || 0) > 0 ? 'text-purple-300' : 'text-slate-300'
+                                }`}>
+                                  {shift.monthly_leave_days || 0}
+                                </span>
+                                <span className="text-[9px] text-slate-400 font-bold">Hari ({shift.monthly_leave_count || 0} Izin)</span>
+                              </div>
+                              <p className="text-[9px] text-slate-400 mt-0.5 font-medium leading-tight group-hover:text-purple-200 transition">
+                                Klik utk riwayat &amp; hapus izin ➔
+                              </p>
+                            </div>
+
+                            {/* Card 5: Aksi yang Harus Diambil */}
                             <div className={`p-3 rounded-xl border shadow-md flex flex-col justify-between ${
                               actionItems.length > 0
                                 ? 'bg-amber-950/30 border-amber-500/40'
@@ -738,9 +762,9 @@ export default function ShiftTable({
 
                                 <button
                                   type="button"
-                                  onClick={() => onInspectStaff?.(shift)}
+                                  onClick={() => onInspectStaff?.(shift, 'AUDIT')}
                                   className="px-2 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-black text-[9px] uppercase tracking-wider transition cursor-pointer shadow-xs flex items-center space-x-1"
-                                  title="Lihat seluruh log riwayat kehadiran staf bulan ini"
+                                  title="Lihat seluruh log riwayat dan audit trail staf"
                                 >
                                   <Calendar className="w-2.5 h-2.5" />
                                   <span>Riwayat ➔</span>

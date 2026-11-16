@@ -2949,6 +2949,8 @@ router.get('/shifts', async (req, res) => {
       ...r,
       monthly_work_days: sqliteMonthStats[r.staff_id]?.dates?.size || 0,
       monthly_late_count: sqliteMonthStats[r.staff_id]?.lateCount || 0,
+      monthly_leave_days: 0,
+      monthly_leave_count: 0,
       flags: JSON.parse(r.flags || '[]'),
       mood_emoji: resolvedMood,
       staff_profile_photo_url: profEntry?.photo_url || null,

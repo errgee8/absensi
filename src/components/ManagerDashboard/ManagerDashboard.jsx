@@ -15,7 +15,7 @@ import WipeLeaderboardModal from '../Leaderboard/WipeLeaderboardModal';
 import SystemRecoveryModal from './SystemRecoveryModal';
 import MonitoringAuditTab from './MonitoringAuditTab';
 import PointManagementTab from './PointManagementTab';
-import StaffAttendanceHistoryModal from '../StaffView/StaffAttendanceHistoryModal';
+import StaffDetailManagementModal from './StaffDetailManagementModal';
 import { exportMonthlyPayrollReport, exportTimesheetToExcel } from '../../utils/excelExport';
 import { getShifts, getStats, getShiftSchedules, getStaffList, getLeaveRequests, getAnnouncements, getAnnouncementReaders, getPoints, getStaffDayAdjustments, subscribeRealtimeEvents, sendPresenceHeartbeat } from '../../utils/api';
 import { getOperationalDateYMD, getOperationalYesterdayYMD, getWitaDateYMD, getAppNow, formatWitaDateTime } from '../../utils/time';
@@ -55,6 +55,7 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
   const [recoveryModalOpen, setRecoveryModalOpen] = useState(false);
   const [lateReviewShift, setLateReviewShift] = useState(null);
   const [selectedStaffHistory, setSelectedStaffHistory] = useState(null);
+  const [staffModalInitialTab, setStaffModalInitialTab] = useState('POINTS');
 
   const [density, setDensity] = useState(() => {
     try { return localStorage.getItem('dashboard_density') || 'compact'; } catch { return 'compact'; }
@@ -626,14 +627,18 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
               density={density}
               onInspectPhoto={(shift, type) => setInspectData({ shift, type })}
               onReviewLate={(shift) => setLateReviewShift(shift)}
-              onInspectStaff={(shift) => setSelectedStaffHistory({
-                id: shift.staff_id,
-                uuid: shift.staff_uuid,
-                name: shift.staff_name,
-                venue: shift.staff_venue,
-                role: shift.staff_role,
-                division: shift.staff_division
-              })}
+              onInspectStaff={(shift, initialTab = 'POINTS') => {
+                setSelectedStaffHistory({
+                  id: shift.staff_id,
+                  uuid: shift.staff_uuid,
+                  name: shift.staff_name,
+                  venue: shift.staff_venue,
+                  role: shift.staff_role,
+                  division: shift.staff_division,
+                  photo_url: shift.staff_profile_photo_url
+                });
+                setStaffModalInitialTab(initialTab);
+              }}
             />
           </>
         )}
@@ -753,12 +758,17 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
           />
         )}
 
-        {/* Modal: Full Staff Attendance & Discipline History */}
+        {/* Modal: Full Staff Detail, History & Management Actions */}
         {selectedStaffHistory && (
-          <StaffAttendanceHistoryModal
+          <StaffDetailManagementModal
             isOpen={Boolean(selectedStaffHistory)}
             onClose={() => setSelectedStaffHistory(null)}
             staff={selectedStaffHistory}
+            initialTab={staffModalInitialTab}
+            adminAuth={adminAuth}
+            onUpdate={() => {
+              loadData();
+            }}
           />
         )}
       </div>
