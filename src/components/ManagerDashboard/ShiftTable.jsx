@@ -24,6 +24,7 @@ export default function ShiftTable({
   schedules = [],
   onInspectPhoto,
   onReviewLate,
+  onInspectStaff,
   readersSet,
   hasActiveAnnouncement,
   density = 'compact'
@@ -626,26 +627,34 @@ export default function ShiftTable({
                             </div>
 
                             {/* Card 2: Hari Kerja */}
-                            <div className="bg-[#181e2b] p-3 rounded-xl border border-slate-700/80 shadow-md">
+                            <div
+                              onClick={() => onInspectStaff?.(shift)}
+                              className="bg-[#181e2b] hover:bg-[#1f2737] p-3 rounded-xl border border-slate-700/80 shadow-md transition cursor-pointer group"
+                              title="Klik untuk melihat seluruh riwayat kehadiran staf"
+                            >
                               <div className="flex items-center justify-between text-slate-400 mb-0.5">
-                                <span className="text-[9px] font-black uppercase tracking-wider">Hari Kerja</span>
+                                <span className="text-[9px] font-black uppercase tracking-wider group-hover:text-blue-300 transition">Hari Kerja</span>
                                 <Calendar className="w-3.5 h-3.5 text-blue-400" />
                               </div>
                               <div className="flex items-baseline space-x-1">
                                 <span className="text-xl font-black font-mono text-blue-300">
-                                  {shift.monthly_work_days || 1}
+                                  {shift.monthly_work_days ?? 0}
                                 </span>
                                 <span className="text-[9px] text-slate-400 font-bold">Hari Kehadiran</span>
                               </div>
                               <p className="text-[9px] text-slate-400 mt-0.5 font-medium leading-tight">
-                                Shift kerja terdata bulan ini.
+                                Shift kerja terdata bulan ini (Klik utk detail).
                               </p>
                             </div>
 
                             {/* Card 3: Total Keterlambatan */}
-                            <div className="bg-[#181e2b] p-3 rounded-xl border border-slate-700/80 shadow-md">
+                            <div
+                              onClick={() => onInspectStaff?.(shift)}
+                              className="bg-[#181e2b] hover:bg-[#1f2737] p-3 rounded-xl border border-slate-700/80 shadow-md transition cursor-pointer group"
+                              title="Klik untuk melihat riwayat keterlambatan staf"
+                            >
                               <div className="flex items-center justify-between text-slate-400 mb-0.5">
-                                <span className="text-[9px] font-black uppercase tracking-wider">Total Telat</span>
+                                <span className="text-[9px] font-black uppercase tracking-wider group-hover:text-rose-300 transition">Total Telat</span>
                                 <Clock className="w-3.5 h-3.5 text-rose-400" />
                               </div>
                               <div className="flex items-baseline space-x-1">
@@ -725,6 +734,16 @@ export default function ShiftTable({
                                 >
                                   <Eye className="w-2.5 h-2.5" />
                                   <span>Audit ➔</span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => onInspectStaff?.(shift)}
+                                  className="px-2 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-black text-[9px] uppercase tracking-wider transition cursor-pointer shadow-xs flex items-center space-x-1"
+                                  title="Lihat seluruh log riwayat kehadiran staf bulan ini"
+                                >
+                                  <Calendar className="w-2.5 h-2.5" />
+                                  <span>Riwayat ➔</span>
                                 </button>
                               </div>
                             </div>

@@ -15,6 +15,7 @@ import WipeLeaderboardModal from '../Leaderboard/WipeLeaderboardModal';
 import SystemRecoveryModal from './SystemRecoveryModal';
 import MonitoringAuditTab from './MonitoringAuditTab';
 import PointManagementTab from './PointManagementTab';
+import StaffAttendanceHistoryModal from '../StaffView/StaffAttendanceHistoryModal';
 import { exportMonthlyPayrollReport, exportTimesheetToExcel } from '../../utils/excelExport';
 import { getShifts, getStats, getShiftSchedules, getStaffList, getLeaveRequests, getAnnouncements, getAnnouncementReaders, getPoints, getStaffDayAdjustments, subscribeRealtimeEvents, sendPresenceHeartbeat } from '../../utils/api';
 import { getOperationalDateYMD, getOperationalYesterdayYMD, getWitaDateYMD, getAppNow, formatWitaDateTime } from '../../utils/time';
@@ -53,6 +54,7 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
   const [announcementCompliance, setAnnouncementCompliance] = useState(null);
   const [recoveryModalOpen, setRecoveryModalOpen] = useState(false);
   const [lateReviewShift, setLateReviewShift] = useState(null);
+  const [selectedStaffHistory, setSelectedStaffHistory] = useState(null);
 
   const [density, setDensity] = useState(() => {
     try { return localStorage.getItem('dashboard_density') || 'compact'; } catch { return 'compact'; }
@@ -624,6 +626,14 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
               density={density}
               onInspectPhoto={(shift, type) => setInspectData({ shift, type })}
               onReviewLate={(shift) => setLateReviewShift(shift)}
+              onInspectStaff={(shift) => setSelectedStaffHistory({
+                id: shift.staff_id,
+                uuid: shift.staff_uuid,
+                name: shift.staff_name,
+                venue: shift.staff_venue,
+                role: shift.staff_role,
+                division: shift.staff_division
+              })}
             />
           </>
         )}
@@ -740,6 +750,15 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
             onClose={() => setRecoveryModalOpen(false)}
             adminAuth={adminAuth}
             venueSettings={venueSettings}
+          />
+        )}
+
+        {/* Modal: Full Staff Attendance & Discipline History */}
+        {selectedStaffHistory && (
+          <StaffAttendanceHistoryModal
+            isOpen={Boolean(selectedStaffHistory)}
+            onClose={() => setSelectedStaffHistory(null)}
+            staff={selectedStaffHistory}
           />
         )}
       </div>

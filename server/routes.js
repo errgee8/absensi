@@ -2916,6 +2916,27 @@ router.get('/shifts', async (req, res) => {
   const localProfiles = getSetting('staff_profiles') || {};
   const localMoods = getSetting('staff_moods') || {};
 
+  const curMonthKey = new Date().toISOString().substring(0, 7);
+  let monthRows = [];
+  try {
+    monthRows = db.prepare(`SELECT staff_id, date, flags, notes FROM shifts WHERE date >= ?`).all(`${curMonthKey}-01`);
+  } catch {}
+
+  const sqliteMonthStats = {};
+  for (const mr of monthRows) {
+    const sId = mr.staff_id;
+    if (!sqliteMonthStats[sId]) sqliteMonthStats[sId] = { dates: new Set(), lateCount: 0 };
+    if (mr.date) sqliteMonthStats[sId].dates.add(mr.date);
+    let fl = [];
+    try { fl = JSON.parse(mr.flags || '[]'); } catch {}
+    let pn = {};
+    try { pn = JSON.parse(mr.notes || '{}'); } catch {}
+    const isExcused = pn.late_status === 'APPROVED' || pn.late_status === 'CLEARED_BY_MANAGER';
+    if (!isExcused && fl.some(f => String(f).toLowerCase().includes('late') && !String(f).includes('EXCUSED'))) {
+      sqliteMonthStats[sId].lateCount++;
+    }
+  }
+
   let processed = rows.map(r => {
     let parsedNotes = {};
     try {
@@ -2926,6 +2947,8 @@ router.get('/shifts', async (req, res) => {
     const profEntry = localProfiles?.[r.staff_id] || null;
     return {
       ...r,
+      monthly_work_days: sqliteMonthStats[r.staff_id]?.dates?.size || 0,
+      monthly_late_count: sqliteMonthStats[r.staff_id]?.lateCount || 0,
       flags: JSON.parse(r.flags || '[]'),
       mood_emoji: resolvedMood,
       staff_profile_photo_url: profEntry?.photo_url || null,

@@ -684,29 +684,57 @@ export const cloudDb = {
       query = query.lte('shift_date', endDate);
     }
 
-    const [{ data, error }, profilesMap, moodsMap, pointsList] = await Promise.all([
+    const currentMonthKey = new Date().toISOString().substring(0, 7);
+
+    const [
+      { data, error },
+      profilesMap,
+      moodsMap,
+      pointsList,
+      monthLogsRes,
+      allDayAdjustments
+    ] = await Promise.all([
       query,
       this.getStaffProfilesMap().catch(() => ({})),
       this.getStaffMoodsMap().catch(() => ({})),
-      this.getStaffPoints().catch(() => ([]))
+      this.getStaffPoints().catch(() => ([])),
+      supabase
+        .from('attendance_logs')
+        .select('staff_id, shift_date, flags, notes, status')
+        .gte('shift_date', `${currentMonthKey}-01`),
+      this.getStaffDayAdjustments(currentMonthKey).catch(() => ([]))
     ]);
     if (error) throw error;
 
-    const currentMonthKey = new Date().toISOString().substring(0, 7);
     const monthlyStatsMap = {};
-    for (const row of (data || [])) {
-      const sId = row.staff_id;
+    for (const row of (monthLogsRes?.data || [])) {
+      const sId = String(row.staff_id || '');
       const rDate = row.shift_date || '';
-      if (rDate.startsWith(currentMonthKey)) {
+      if (rDate && rDate.startsWith(currentMonthKey)) {
         if (!monthlyStatsMap[sId]) {
           monthlyStatsMap[sId] = { dates: new Set(), lateCount: 0 };
         }
         monthlyStatsMap[sId].dates.add(rDate);
+
+        let parsedNotes = {};
+        if (typeof row.notes === 'string' && row.notes.startsWith('{')) {
+          try { parsedNotes = JSON.parse(row.notes); } catch {}
+        }
+        const isLateExcused = parsedNotes.late_status === 'APPROVED' || parsedNotes.late_status === 'CLEARED_BY_MANAGER';
+
         const fl = Array.isArray(row.flags) ? row.flags : (typeof row.flags === 'string' ? JSON.parse(row.flags || '[]') : []);
-        if (fl.some(f => String(f).includes('Late') || String(f).includes('LATE'))) {
+        const hasUnexcusedLateFlag = fl.some(f => String(f).toLowerCase().includes('late') && !String(f).includes('EXCUSED'));
+
+        if (!isLateExcused && hasUnexcusedLateFlag) {
           monthlyStatsMap[sId].lateCount++;
         }
       }
+    }
+
+    const dayAdjMap = {};
+    for (const adj of (allDayAdjustments || [])) {
+      const sId = String(adj.staff_id || '');
+      dayAdjMap[sId] = (dayAdjMap[sId] || 0) + (Number(adj.adjustment_days) || 0);
     }
 
     const currentPointCycle = getPointCycleInfo(new Date());
@@ -761,7 +789,9 @@ export const cloudDb = {
         (moodEntry && moodEntry.date_ymd === shiftDateYmd ? moodEntry.emoji : null) ||
         null;
 
-      const monthlyDays = monthlyStatsMap[staffUuid]?.dates?.size || monthlyStatsMap[staffCode]?.dates?.size || 1;
+      const actualDays = monthlyStatsMap[staffUuid]?.dates?.size || monthlyStatsMap[staffCode]?.dates?.size || 0;
+      const manualDays = dayAdjMap[staffUuid] || dayAdjMap[staffCode] || 0;
+      const monthlyDays = Math.max(0, actualDays + manualDays);
       const monthlyLate = monthlyStatsMap[staffUuid]?.lateCount || monthlyStatsMap[staffCode]?.lateCount || 0;
       const activePts = pointsMap[staffUuid] ?? pointsMap[staffCode] ?? 0;
 
