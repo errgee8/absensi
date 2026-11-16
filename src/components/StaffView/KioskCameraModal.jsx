@@ -214,17 +214,32 @@ export default function KioskCameraModal({
 
     if (stream) {
       streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        try {
-          await videoRef.current.play();
-        } catch (e) {
-          console.warn('Video play interrupted:', e);
-        }
+      const v = videoRef.current;
+      if (v) {
+        v.srcObject = stream;
+        v.onloadedmetadata = () => {
+          v.play().catch((e) => console.warn('Video play interrupted:', e));
+          setCameraActive(true);
+          setCameraLoading(false);
+        };
+        v.play().catch((e) => console.warn('Immediate video play error:', e));
       }
       setCameraActive(true);
       setCameraLoading(false);
     }
+
+    // Safety guard: if camera is still loading after 4 seconds, force loading to stop
+    setTimeout(() => {
+      setCameraLoading((curr) => {
+        if (curr) {
+          if (streamRef.current) {
+            setCameraActive(true);
+          }
+          return false;
+        }
+        return curr;
+      });
+    }, 4000);
   };
 
   // Switch between front and back camera
@@ -727,15 +742,15 @@ export default function KioskCameraModal({
                   />
                 ) : (
                   <>
-                    {/* Always mounted video element for immediate srcObject binding */}
+                    {/* Always mounted video element for immediate srcObject binding (never display:none so video frames decode) */}
                     <video
                       ref={videoRef}
                       autoPlay
                       playsInline
                       muted
-                      className={`w-full h-full object-cover ${
+                      className={`w-full h-full object-cover transition-opacity duration-200 ${
                         facingMode === 'user' ? 'transform scale-x-[-1]' : ''
-                      } ${cameraActive ? 'block' : 'hidden'}`}
+                      } ${cameraActive ? 'opacity-100 block' : 'opacity-0 absolute inset-0'}`}
                     />
 
                     {/* Biometric Face Recognition Oval Guide Overlay */}
@@ -776,13 +791,21 @@ export default function KioskCameraModal({
                       </button>
                     )}
 
-                    {/* Loading State */}
+                    {/* Loading State with Instant Native Fallback */}
                     {cameraLoading && !cameraError && (
-                      <div className="text-center p-4 space-y-2">
+                      <div className="text-center p-4 space-y-3 z-20">
                         <Loader2 className="w-8 h-8 text-emerald-400 animate-spin mx-auto" />
-                        <span className="text-xs text-slate-400 block font-medium">
+                        <span className="text-xs text-slate-300 block font-medium">
                           {facingMode === 'user' ? 'Membuka kamera depan (selfie)...' : 'Membuka kamera belakang...'}
                         </span>
+                        <button
+                          type="button"
+                          onClick={() => fileInputRef.current?.click()}
+                          className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-[11px] font-bold border border-slate-700 transition flex items-center justify-center space-x-1.5 mx-auto cursor-pointer"
+                        >
+                          <Camera className="w-3.5 h-3.5 text-emerald-400" />
+                          <span>Buka Kamera HP Langsung</span>
+                        </button>
                       </div>
                     )}
 

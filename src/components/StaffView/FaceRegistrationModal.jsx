@@ -63,7 +63,21 @@ export default function FaceRegistrationModal({
           setCameraActive(true);
           setCameraLoading(false);
         };
+        videoRef.current?.play().catch(() => {});
       }
+      setCameraActive(true);
+      setCameraLoading(false);
+
+      // Safety guard: force loading state to dismiss within 3.5s
+      setTimeout(() => {
+        setCameraLoading((curr) => {
+          if (curr) {
+            if (streamRef.current) setCameraActive(true);
+            return false;
+          }
+          return curr;
+        });
+      }, 3500);
     } catch (err) {
       console.warn('Face registration camera start error:', err);
       let msg = 'Kamera tidak dapat diakses.';
@@ -375,11 +389,19 @@ export default function FaceRegistrationModal({
                   </>
                 )}
 
-                {/* Loading state */}
+                {/* Loading state with escape button */}
                 {cameraLoading && !previewPhoto && (
-                  <div className="absolute inset-0 bg-slate-950/80 flex flex-col items-center justify-center space-y-2">
-                    <RefreshCw className="w-7 h-7 text-indigo-400 animate-spin" />
+                  <div className="absolute inset-0 bg-slate-950/85 flex flex-col items-center justify-center space-y-2.5 z-20 p-4 text-center">
+                    <RefreshCw className="w-7 h-7 text-indigo-400 animate-spin mx-auto" />
                     <span className="text-xs text-slate-300 font-bold">Membuka Kamera HP...</span>
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-[11px] font-bold border border-slate-700 transition flex items-center justify-center space-x-1.5 mx-auto cursor-pointer shadow"
+                    >
+                      <Camera className="w-3.5 h-3.5 text-indigo-400" />
+                      <span>Buka Kamera HP Langsung</span>
+                    </button>
                   </div>
                 )}
 
