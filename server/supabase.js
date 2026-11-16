@@ -107,6 +107,10 @@ const SIGNED_URL_TTL_SECONDS = 3600;
 const SIGNED_URL_CACHE_BUFFER_MS = 10 * 60 * 1000;
 const signedPhotoCache = new Map();
 
+// High-performance In-Memory Settings Cache (reduces Vercel latency and DB roundtrips)
+const SETTING_CACHE_TTL_MS = 60 * 1000; // 60s TTL
+const settingCache = new Map();
+
 export function extractAttendancePhotoPath(url) {
   if (!url || typeof url !== 'string') return null;
   const match = url.match(/\/storage\/v1\/object\/(?:public|sign|authenticated)\/attendance-photos\/([^?]+)/);
@@ -1475,6 +1479,11 @@ export const cloudDb = {
 
   async getSetting(key) {
     if (!supabase) return null;
+    const now = Date.now();
+    const cached = settingCache.get(key);
+    if (cached && now < cached.expiresAt) {
+      return cached.value;
+    }
     try {
       const { data, error } = await supabase
         .from('app_settings')
@@ -1482,7 +1491,9 @@ export const cloudDb = {
         .eq('key', key)
         .maybeSingle();
       if (error) throw error;
-      return data?.value ?? null;
+      const val = data?.value ?? null;
+      settingCache.set(key, { value: val, expiresAt: now + SETTING_CACHE_TTL_MS });
+      return val;
     } catch (e) {
       return null;
     }
@@ -1490,6 +1501,7 @@ export const cloudDb = {
 
   async saveSetting(key, value, description = '') {
     if (!supabase) return null;
+    settingCache.set(key, { value, expiresAt: Date.now() + SETTING_CACHE_TTL_MS });
     try {
       const { error } = await supabase
         .from('app_settings')

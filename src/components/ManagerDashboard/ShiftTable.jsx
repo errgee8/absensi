@@ -283,7 +283,6 @@ export default function ShiftTable({
               <th className="py-2.5 px-1 whitespace-nowrap">Durasi/GPS</th>
               <th className="py-2.5 px-1.5 whitespace-nowrap">Review</th>
               <th className="py-2.5 px-1.5">Anomali</th>
-              <th className="py-2.5 px-1 text-right w-7"></th>
             </tr>
           </thead>
 
@@ -565,24 +564,12 @@ export default function ShiftTable({
                     <td className={`${cellPy} px-1.5`}>
                       {renderFlagBadges(shift.flags, shift)}
                     </td>
-
-                    {/* Detail Button */}
-                    <td className={`${cellPy} px-1 text-right`}>
-                      <button
-                        type="button"
-                        onClick={() => onInspectPhoto(shift, shift.checkout_photo ? 'out' : 'in')}
-                        className="p-1.5 rounded-xl bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/30 transition cursor-pointer"
-                        title="Buka audit lengkap shift"
-                      >
-                        <Eye className="w-3.5 h-3.5 stroke-[2.5]" />
-                      </button>
-                    </td>
                   </tr>
 
                   {/* EXPANDED ROW: Full Staff KPI Cards & Actions */}
                   {isExpanded && (
                     <tr className="bg-[#121620] border-y border-indigo-500/40 animate-fade-in">
-                      <td colSpan={12} className="p-3 sm:p-4">
+                      <td colSpan={11} className="p-3 sm:p-4">
                         <div className="space-y-2.5">
                           <div className="flex items-center justify-between pb-1.5 border-b border-slate-800">
                             <div className="flex items-center space-x-2">

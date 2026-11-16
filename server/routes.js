@@ -1434,9 +1434,9 @@ router.post('/staff/verify-pin', async (req, res) => {
     isWithin2HoursOfEnd: false,
     detectedShift: detectedShift || null,
     availableSchedules: schedules,
-    profile_photo_url: profileEntry?.photo_url || null,
-    face_biometrics_registered: Boolean(biometricEntry?.photo_url),
-    biometric_photo_url: biometricEntry?.photo_url || null,
+    profile_photo_url: profileEntry?.photo_url || biometricEntry?.photo_url || null,
+    face_biometrics_registered: Boolean(biometricEntry?.photo_url || profileEntry?.photo_url),
+    biometric_photo_url: biometricEntry?.photo_url || profileEntry?.photo_url || null,
     mood_emoji: moodEntry && moodEntry.date_ymd === currentOpDate ? moodEntry.emoji : null,
     monthlyStats
   };
@@ -1719,6 +1719,16 @@ router.post('/staff/:id/biometrics', async (req, res) => {
     if (staff.id) nextLocalMap[String(staff.id)] = record;
     setSetting('staff_biometrics', nextLocalMap);
 
+    // Also mirror to profile photo if not yet set
+    const localProfiles = getSetting('staff_profiles') || {};
+    if (!localProfiles[String(staff.uuid)] && !localProfiles[String(staff.id)]) {
+      const nextProfiles = { ...localProfiles };
+      const profRec = { photo_url: photoUrl, updated_at: new Date().toISOString() };
+      if (staff.uuid) nextProfiles[String(staff.uuid)] = profRec;
+      if (staff.id) nextProfiles[String(staff.id)] = profRec;
+      setSetting('staff_profiles', nextProfiles);
+    }
+
     if (isSupabaseConfigured) {
       await cloudDb.saveStaffBiometricPhoto({
         staffId: staff.id,
@@ -1735,7 +1745,9 @@ router.post('/staff/:id/biometrics', async (req, res) => {
     return res.json({
       success: true,
       message: 'Biometrik wajah berhasil didaftarkan.',
-      biometric_photo_url: resolvedObj.biometric_photo_url
+      biometric_photo_url: resolvedObj.biometric_photo_url,
+      photo_url: resolvedObj.biometric_photo_url,
+      biometrics: { photo_url: resolvedObj.biometric_photo_url }
     });
   } catch (err) {
     console.error('Error registering biometrics:', err);
@@ -5347,16 +5359,8 @@ router.post('/reports', async (req, res) => {
 // 15b. Get All Reports (Manager Only)
 router.get('/reports', async (req, res) => {
   const pin = (req.headers['x-manager-pin'] || req.query.pin || '').toString().trim();
-  let adminPin = (process.env.ADMIN_PIN || getSetting('admin_pin') || '8980').trim();
-
-  if (isSupabaseConfigured) {
-    try {
-      const { data: supaPin } = await supabase.from('app_settings').select('value').eq('key', 'admin_pin').maybeSingle();
-      if (supaPin?.value) adminPin = String(supaPin.value).trim();
-    } catch {}
-  }
-
-  if (pin !== adminPin) {
+  const auth = await verifyManagementAuth(pin);
+  if (!auth.authorized) {
     return res.status(403).json({ error: 'PIN Otorisasi Manajer tidak valid.' });
   }
 
@@ -5394,22 +5398,16 @@ router.get('/reports', async (req, res) => {
 // 15c. Reward Report (Award Bonus Points to Reporter)
 router.post('/reports/:id/reward', async (req, res) => {
   const { id } = req.params;
-  const { pin, points, reason, managerName = 'Manager' } = req.body || {};
+  const { pin, managerPin, points, reason, note, managerName = 'Manager' } = req.body || {};
+  const effectivePin = (pin || managerPin || req.headers['x-manager-pin'] || '').toString().trim();
 
-  let adminPin = (process.env.ADMIN_PIN || getSetting('admin_pin') || '8980').trim();
-  if (isSupabaseConfigured) {
-    try {
-      const { data: supaPin } = await supabase.from('app_settings').select('value').eq('key', 'admin_pin').maybeSingle();
-      if (supaPin?.value) adminPin = String(supaPin.value).trim();
-    } catch {}
-  }
-
-  if ((pin || '').trim() !== adminPin) {
+  const auth = await verifyManagementAuth(effectivePin);
+  if (!auth.authorized) {
     return res.status(403).json({ error: 'PIN Otorisasi Manajer tidak valid.' });
   }
 
   const bonusPoints = Math.abs(Number(points) || 5);
-  const rewardReason = (reason || 'Apresiasi Laporan Valid').trim();
+  const rewardReason = (reason || note || 'Apresiasi Laporan Valid').trim();
 
   try {
     let reports = [];
@@ -5485,20 +5483,14 @@ router.post('/reports/:id/reward', async (req, res) => {
   }
 });
 
-// 15d. Update Report Status (Investigating / Dismissed / Resolved)
+// 15d. Update Report Status (Investigating / Dismissed / Resolved / Need More Proof)
 router.post('/reports/:id/status', async (req, res) => {
   const { id } = req.params;
-  const { pin, status, managerNote } = req.body || {};
+  const { pin, managerPin, status, managerNote } = req.body || {};
+  const effectivePin = (pin || managerPin || req.headers['x-manager-pin'] || '').toString().trim();
 
-  let adminPin = (process.env.ADMIN_PIN || getSetting('admin_pin') || '8980').trim();
-  if (isSupabaseConfigured) {
-    try {
-      const { data: supaPin } = await supabase.from('app_settings').select('value').eq('key', 'admin_pin').maybeSingle();
-      if (supaPin?.value) adminPin = String(supaPin.value).trim();
-    } catch {}
-  }
-
-  if ((pin || '').trim() !== adminPin) {
+  const auth = await verifyManagementAuth(effectivePin);
+  if (!auth.authorized) {
     return res.status(403).json({ error: 'PIN Otorisasi Manajer tidak valid.' });
   }
 
@@ -5524,11 +5516,40 @@ router.post('/reports/:id/status', async (req, res) => {
         .run(target.status, target.manager_note, now, id);
     } catch {}
 
-    broadcastEvent('REPORT_UPDATED', { id, status: target.status });
+    broadcastEvent('REPORT_UPDATED', { id, status: target.status, manager_note: target.manager_note });
     return res.json({ success: true, message: 'Status laporan berhasil diperbarui.', report: target });
   } catch (err) {
     console.error('Error updating report status:', err);
     return res.status(500).json({ error: 'Gagal memperbarui status laporan: ' + err.message });
+  }
+});
+
+// 15e. Get My Reports (Staff Tracker & Notification)
+router.get('/reports/my-reports', async (req, res) => {
+  const { staffId } = req.query;
+  if (!staffId) return res.status(400).json({ error: 'staffId wajib disertakan.' });
+
+  try {
+    let reports = [];
+    if (isSupabaseConfigured) {
+      const supaReports = await cloudDb.getSetting('staff_whistleblower_reports');
+      if (Array.isArray(supaReports)) reports = supaReports;
+    }
+
+    if (reports.length === 0) {
+      try {
+        reports = db.prepare('SELECT * FROM staff_reports ORDER BY created_at DESC').all();
+      } catch {}
+    }
+
+    const myReports = (Array.isArray(reports) ? reports : []).filter(
+      r => String(r.staff_id) === String(staffId) || String(r.staff_uuid) === String(staffId)
+    );
+
+    return res.json(myReports);
+  } catch (err) {
+    console.error('Error fetching my reports:', err);
+    return res.status(500).json({ error: 'Gagal memuat status laporan staf: ' + err.message });
   }
 });
 

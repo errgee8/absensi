@@ -672,31 +672,75 @@ export async function getStaffReports(pin) {
   return data;
 }
 
-export async function rewardStaffReport(reportId, pin, points, reason, managerName) {
+export async function rewardStaffReport(reportId, pinOrOptions, pointsArg, reasonArg, managerNameArg) {
+  let pin, points, reason, managerName;
+  if (typeof pinOrOptions === 'object' && pinOrOptions !== null) {
+    pin = pinOrOptions.pin || pinOrOptions.managerPin || '8980';
+    points = pinOrOptions.points;
+    reason = pinOrOptions.reason || pinOrOptions.note;
+    managerName = pinOrOptions.managerName;
+  } else {
+    pin = pinOrOptions;
+    points = pointsArg;
+    reason = reasonArg;
+    managerName = managerNameArg;
+  }
+
+  const effectivePin = String(pin || '8980').trim();
   const res = await fetch(`${API_BASE}/reports/${encodeURIComponent(reportId)}/reward`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'x-manager-pin': String(pin || '').trim()
+      'x-manager-pin': effectivePin
     },
-    body: JSON.stringify({ pin: String(pin || '').trim(), points, reason, managerName })
+    body: JSON.stringify({
+      pin: effectivePin,
+      managerPin: effectivePin,
+      points,
+      reason,
+      managerName
+    })
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'Gagal memberikan poin apresiasi');
   return data;
 }
 
-export async function updateStaffReportStatus(reportId, pin, status, managerNote) {
+export async function updateStaffReportStatus(reportId, pinOrOptions, statusArg, managerNoteArg) {
+  let pin, status, managerNote;
+  if (typeof pinOrOptions === 'object' && pinOrOptions !== null) {
+    pin = pinOrOptions.pin || pinOrOptions.managerPin || '8980';
+    status = pinOrOptions.status;
+    managerNote = pinOrOptions.managerNote || pinOrOptions.note;
+  } else {
+    pin = pinOrOptions;
+    status = statusArg;
+    managerNote = managerNoteArg;
+  }
+
+  const effectivePin = String(pin || '8980').trim();
   const res = await fetch(`${API_BASE}/reports/${encodeURIComponent(reportId)}/status`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'x-manager-pin': String(pin || '').trim()
+      'x-manager-pin': effectivePin
     },
-    body: JSON.stringify({ pin: String(pin || '').trim(), status, managerNote })
+    body: JSON.stringify({
+      pin: effectivePin,
+      managerPin: effectivePin,
+      status,
+      managerNote
+    })
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'Gagal memperbarui status laporan');
+  return data;
+}
+
+export async function getMyStaffReports(staffId) {
+  const res = await fetch(`${API_BASE}/reports/my-reports?staffId=${encodeURIComponent(staffId)}`);
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Gagal memuat status laporan');
   return data;
 }
 

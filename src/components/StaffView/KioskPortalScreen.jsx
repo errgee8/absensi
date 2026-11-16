@@ -262,8 +262,13 @@ export default function KioskPortalScreen({
       setToastMessage('Kamu sudah absen masuk untuk shift ini.');
       return;
     }
-    // Jika belum pernah face recog, wajib lakukan face recog terlebih dahulu
-    if (!staff?.profile_photo_url) {
+    // Jika belum pernah mendaftarkan wajah biometrik sama sekali, wajibkan registrasi 1x
+    const hasBiometricData = Boolean(
+      staff?.face_biometrics_registered ||
+      staff?.biometric_photo_url ||
+      staff?.profile_photo_url
+    );
+    if (!hasBiometricData) {
       if (onOpenFaceRegistration) {
         onOpenFaceRegistration();
         return;

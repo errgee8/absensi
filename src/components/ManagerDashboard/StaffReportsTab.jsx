@@ -38,6 +38,7 @@ export default function StaffReportsTab({ adminAuth }) {
   const [targetReport, setTargetReport] = useState(null);
   const [rewardPoints, setRewardPoints] = useState(10);
   const [rewardNote, setRewardNote] = useState('Apresiasi laporan valid & integritas SOP manajemen');
+  const [rewardPin, setRewardPin] = useState(adminAuth?.pin || '8980');
   const [rewardSubmitting, setRewardSubmitting] = useState(false);
   const [rewardError, setRewardError] = useState(null);
 
@@ -46,6 +47,7 @@ export default function StaffReportsTab({ adminAuth }) {
   const [statusTargetReport, setStatusTargetReport] = useState(null);
   const [newStatus, setNewStatus] = useState('INVESTIGATING');
   const [statusNote, setStatusNote] = useState('');
+  const [statusPin, setStatusPin] = useState(adminAuth?.pin || '8980');
   const [statusSubmitting, setStatusSubmitting] = useState(false);
 
   const fetchReports = async () => {
@@ -69,6 +71,7 @@ export default function StaffReportsTab({ adminAuth }) {
     setTargetReport(report);
     setRewardPoints(10);
     setRewardNote(`Apresiasi validitas laporan: ${report.title}`);
+    setRewardPin(adminAuth?.pin || '8980');
     setRewardError(null);
     setRewardModalOpen(true);
   };
@@ -81,7 +84,8 @@ export default function StaffReportsTab({ adminAuth }) {
       await rewardStaffReport(targetReport.id, {
         points: Number(rewardPoints) || 10,
         note: rewardNote,
-        managerPin: '8980'
+        pin: (rewardPin || '8980').trim(),
+        managerPin: (rewardPin || '8980').trim()
       });
       setRewardModalOpen(false);
       setTargetReport(null);
@@ -96,7 +100,8 @@ export default function StaffReportsTab({ adminAuth }) {
   const handleOpenStatusModal = (report, defaultStatus) => {
     setStatusTargetReport(report);
     setNewStatus(defaultStatus || report.status || 'INVESTIGATING');
-    setStatusNote(report.management_note || '');
+    setStatusNote(report.management_note || report.manager_note || '');
+    setStatusPin(adminAuth?.pin || '8980');
     setStatusModalOpen(true);
   };
 
@@ -106,8 +111,9 @@ export default function StaffReportsTab({ adminAuth }) {
     try {
       await updateStaffReportStatus(statusTargetReport.id, {
         status: newStatus,
-        managementNote: statusNote,
-        managerPin: '8980'
+        managerNote: statusNote,
+        pin: (statusPin || '8980').trim(),
+        managerPin: (statusPin || '8980').trim()
       });
       setStatusModalOpen(false);
       setStatusTargetReport(null);
@@ -135,17 +141,25 @@ export default function StaffReportsTab({ adminAuth }) {
   const getStatusBadge = (status) => {
     switch (status) {
       case 'VALID_REWARDED':
+      case 'RESOLVED':
         return (
           <span className="px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[11px] font-black flex items-center gap-1">
             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-            Valid &amp; Diberi Reward
+            {status === 'VALID_REWARDED' ? 'Valid & Diberi Reward' : 'Sudah Terselesaikan'}
           </span>
         );
       case 'INVESTIGATING':
         return (
-          <span className="px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[11px] font-black flex items-center gap-1">
-            <Clock className="w-3.5 h-3.5 text-amber-400" />
+          <span className="px-2.5 py-1 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30 text-[11px] font-black flex items-center gap-1">
+            <Clock className="w-3.5 h-3.5 text-blue-400" />
             Sedang Diinvestigasi
+          </span>
+        );
+      case 'NEED_MORE_PROOF':
+        return (
+          <span className="px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[11px] font-black flex items-center gap-1 animate-pulse">
+            <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
+            Butuh Bukti Lebih Lanjut
           </span>
         );
       case 'DISMISSED':
@@ -158,8 +172,8 @@ export default function StaffReportsTab({ adminAuth }) {
       case 'PENDING':
       default:
         return (
-          <span className="px-2.5 py-1 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/40 text-[11px] font-black flex items-center gap-1 animate-pulse">
-            <AlertTriangle className="w-3.5 h-3.5 text-rose-400" />
+          <span className="px-2.5 py-1 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/40 text-[11px] font-black flex items-center gap-1">
+            <Clock className="w-3.5 h-3.5 text-rose-400" />
             Menunggu Tinjauan
           </span>
         );
@@ -305,14 +319,14 @@ export default function StaffReportsTab({ adminAuth }) {
                     <User className="w-4 h-4" />
                   </div>
                   <div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-xs font-black text-white">
-                        Pelapor: {report.reporter_name || 'Staf'}
+                        Pelapor: {report.reporter_name || report.staff_name || 'Staf'} {report.is_anonymous ? '(Anonim)' : ''}
                       </span>
                       {report.is_anonymous ? (
-                        <span className="px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/40 text-[10px] font-black flex items-center gap-1">
+                        <span className="px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/40 text-[10px] font-black flex items-center gap-1" title="Staf memilih opsi Anonim: nama dirahasiakan ke rekan kerja, tetapi tetap diketahui oleh Manager">
                           <Lock className="w-3 h-3" />
-                          Anonim ke Rekan (Khusus Manager)
+                          Anonim ke Rekan Floor (Khusus Manager Tahu)
                         </span>
                       ) : (
                         <span className="px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30 text-[10px] font-black flex items-center gap-1">
@@ -468,6 +482,20 @@ export default function StaffReportsTab({ adminAuth }) {
                 />
               </div>
 
+              <div>
+                <label className="text-xs font-bold text-slate-300 block mb-1">
+                  PIN Otorisasi Manajer:
+                </label>
+                <input
+                  type="password"
+                  maxLength={6}
+                  value={rewardPin}
+                  onChange={(e) => setRewardPin(e.target.value)}
+                  placeholder="PIN Manajer (default: 8980)"
+                  className="w-full bg-[#11141c] border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-400 font-mono tracking-widest"
+                />
+              </div>
+
               <div className="p-3 rounded-xl bg-emerald-950/40 border border-emerald-500/30 text-[11px] text-emerald-200">
                 💡 Poin ini akan langsung masuk ke total skor leaderboard staf <strong>{targetReport.reporter_name}</strong> dan status laporan otomatis diubah menjadi <strong>Valid &amp; Diberi Reward</strong>.
               </div>
@@ -519,9 +547,25 @@ export default function StaffReportsTab({ adminAuth }) {
                 >
                   <option value="PENDING">Menunggu Tinjauan</option>
                   <option value="INVESTIGATING">Sedang Diinvestigasi</option>
+                  <option value="NEED_MORE_PROOF">Butuh Bukti Lebih Lanjut</option>
+                  <option value="RESOLVED">Sudah Terselesaikan</option>
                   <option value="VALID_REWARDED">Valid &amp; Diberi Reward</option>
                   <option value="DISMISSED">Tidak Valid / Ditutup</option>
                 </select>
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-300 block mb-1">
+                  PIN Otorisasi Manajer:
+                </label>
+                <input
+                  type="password"
+                  maxLength={6}
+                  value={statusPin}
+                  onChange={(e) => setStatusPin(e.target.value)}
+                  placeholder="PIN Manajer (default: 8980)"
+                  className="w-full bg-[#11141c] border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-400 font-mono tracking-widest"
+                />
               </div>
 
               <div>

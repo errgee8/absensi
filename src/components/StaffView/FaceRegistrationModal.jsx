@@ -182,7 +182,7 @@ export default function FaceRegistrationModal({
         photoBase64,
         livenessVerified: true
       });
-      const newUrl = res?.biometrics?.photo_url || photoBase64;
+      const newUrl = res?.biometric_photo_url || res?.biometrics?.photo_url || res?.photo_url || photoBase64;
       setSavedBiometricUrl(newUrl);
       setRegisteredSuccess(true);
 

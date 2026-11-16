@@ -246,7 +246,12 @@ export default function StaffView({
       setStep('PORTAL');
 
       // Check if staff has NEVER registered official face biometrics (separated from profile photos)
-      if (!data.staff?.face_biometrics_registered) {
+      const hasAnyFaceRef = Boolean(
+        data.staff?.face_biometrics_registered ||
+        data.staff?.biometric_photo_url ||
+        data.staff?.profile_photo_url
+      );
+      if (!hasAnyFaceRef) {
         setFaceRegistrationModalOpen(true);
       }
     } catch (err) {
@@ -259,7 +264,12 @@ export default function StaffView({
 
   const handleTriggerCamera = async (type, shift) => {
     // If staff hasn't registered official face biometrics yet, require face registration first!
-    if (type === 'checkin' && !loggedInStaff?.face_biometrics_registered) {
+    const hasBiometric = Boolean(
+      loggedInStaff?.face_biometrics_registered ||
+      loggedInStaff?.biometric_photo_url ||
+      loggedInStaff?.profile_photo_url
+    );
+    if (type === 'checkin' && !hasBiometric) {
       setFaceRegistrationModalOpen(true);
       return;
     }
@@ -298,7 +308,8 @@ export default function StaffView({
     setLoggedInStaff((prev) => (prev ? {
       ...prev,
       face_biometrics_registered: true,
-      biometric_photo_url: newBiometricUrl
+      biometric_photo_url: newBiometricUrl,
+      profile_photo_url: prev.profile_photo_url || newBiometricUrl
     } : prev));
     setFaceRegistrationModalOpen(false);
 
