@@ -1645,26 +1645,117 @@ export const cloudDb = {
     }
   },
 
-  async getStaffBiometricsMap() {
+  async getStaffBiometricsMap(bypassCache = false) {
     if (!supabase) return {};
     try {
-      const val = await this.getSetting('staff_biometrics');
-      return val && typeof val === 'object' && !Array.isArray(val) ? val : {};
+      if (!bypassCache) {
+        const val = await this.getSetting('staff_biometrics');
+        if (val && typeof val === 'object' && !Array.isArray(val)) return val;
+      }
+      const { data } = await supabase
+        .from('app_settings')
+        .select('value')
+        .eq('key', 'staff_biometrics')
+        .maybeSingle();
+      const val = data?.value;
+      if (val && typeof val === 'object' && !Array.isArray(val)) {
+        settingCache.set('staff_biometrics', { value: val, expiresAt: Date.now() + 10000 });
+        return val;
+      }
+      return {};
     } catch {
       return {};
     }
   },
 
-  async saveStaffBiometricPhoto({ staffId, staffUuid, photoUrl, livenessVerified = true }) {
+  async saveStaffBiometricPhoto({ staffId, staffUuid, legacyCode, photoUrl, livenessVerified = true }) {
     if (!supabase || !photoUrl) return null;
-    const current = await this.getStaffBiometricsMap();
+    let current = {};
+    try {
+      const { data } = await supabase
+        .from('app_settings')
+        .select('value')
+        .eq('key', 'staff_biometrics')
+        .maybeSingle();
+      if (data?.value && typeof data.value === 'object' && !Array.isArray(data.value)) {
+        current = data.value;
+      }
+    } catch {}
+
     const now = new Date().toISOString();
     const record = { photo_url: photoUrl, liveness_verified: livenessVerified, updated_at: now };
     const next = { ...current };
-    if (staffUuid) next[String(staffUuid)] = record;
-    if (staffId) next[String(staffId)] = record;
+
+    const keysToBind = new Set([
+      staffUuid,
+      staffId,
+      legacyCode,
+      staffUuid ? String(staffUuid).toUpperCase() : null,
+      staffId ? String(staffId).toUpperCase() : null,
+      legacyCode ? String(legacyCode).toUpperCase() : null
+    ].filter(Boolean).map(String));
+
+    for (const k of keysToBind) {
+      next[k] = record;
+    }
+
     await this.saveSetting('staff_biometrics', next, 'Official Staff Biometric Face Reference');
+
+    // Also mirror to staff_profiles
+    try {
+      let curProf = {};
+      const { data: pData } = await supabase
+        .from('app_settings')
+        .select('value')
+        .eq('key', 'staff_profiles')
+        .maybeSingle();
+      if (pData?.value && typeof pData.value === 'object' && !Array.isArray(pData.value)) {
+        curProf = pData.value;
+      }
+      const nextProf = { ...curProf };
+      const profRec = { photo_url: photoUrl, updated_at: now };
+      for (const k of keysToBind) {
+        nextProf[k] = profRec;
+      }
+      await this.saveSetting('staff_profiles', nextProf, 'Custom Staff Profile Photos');
+    } catch {}
+
     return record;
+  },
+
+  async syncStaffToSqlite(localDb) {
+    if (!supabase || !localDb) return false;
+    try {
+      const { data: supaStaff, error } = await supabase
+        .from('staff')
+        .select('*');
+      if (error || !Array.isArray(supaStaff) || supaStaff.length === 0) return false;
+
+      const stmt = localDb.prepare(`
+        INSERT OR REPLACE INTO staff (id, name, venue, division, role, department, pin, shift_start, shift_end, standard_hours, is_active, uuid)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+      for (const s of supaStaff) {
+        stmt.run(
+          s.legacy_code || s.id,
+          s.name,
+          s.venue,
+          s.division,
+          s.role,
+          s.department || s.division,
+          s.pin,
+          s.shift_start || '13:00',
+          s.shift_end || '22:00',
+          s.standard_hours || 8.5,
+          s.is_active ? 1 : 0,
+          s.id
+        );
+      }
+      return true;
+    } catch (e) {
+      console.warn('syncStaffToSqlite note:', e.message);
+      return false;
+    }
   },
 
   async saveStaffProfilePhoto({ staffId, staffUuid, photoUrl }) {

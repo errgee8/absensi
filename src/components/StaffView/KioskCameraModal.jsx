@@ -183,7 +183,7 @@ export default function KioskCameraModal({
       return;
     }
 
-    const getUserMediaWithTimeout = (constraints, timeoutMs = 3500) => {
+    const getUserMediaWithTimeout = (constraints, timeoutMs = 6000) => {
       return Promise.race([
         navigator.mediaDevices.getUserMedia(constraints),
         new Promise((_, reject) =>
@@ -197,7 +197,7 @@ export default function KioskCameraModal({
       stream = await getUserMediaWithTimeout({
         video: { facingMode: { ideal: targetFacing } },
         audio: false
-      }, 3000);
+      }, 5000);
     } catch (err1) {
       console.warn(`FacingMode ${targetFacing} failed or timed out, trying fallback stream:`, err1);
       try {
@@ -205,7 +205,7 @@ export default function KioskCameraModal({
         stream = await getUserMediaWithTimeout({
           video: true,
           audio: false
-        }, 3000);
+        }, 5000);
       } catch (err2) {
         console.error('All camera attempts failed or timed out:', err2);
         let msg = 'Kamera tidak dapat diakses atau lambat merespons.';
@@ -812,9 +812,9 @@ export default function KioskCameraModal({
                         <button
                           type="button"
                           onClick={() => fileInputRef.current?.click()}
-                          className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-[11px] font-bold border border-slate-700 transition flex items-center justify-center space-x-1.5 mx-auto cursor-pointer"
+                          className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black border border-emerald-400 shadow-md transition flex items-center justify-center space-x-2 mx-auto cursor-pointer"
                         >
-                          <Camera className="w-3.5 h-3.5 text-emerald-400" />
+                          <Camera className="w-4 h-4" />
                           <span>Buka Kamera HP Langsung</span>
                         </button>
                       </div>

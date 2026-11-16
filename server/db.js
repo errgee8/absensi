@@ -20,6 +20,7 @@ if (!fs.existsSync(uploadsDir)) {
 const dbPath = path.join(dataDir, 'checkin.db');
 const db = new Database(dbPath);
 db.pragma('journal_mode = WAL');
+db.pragma('foreign_keys = OFF');
 
 // Initialize schema
 db.exec(`

@@ -251,7 +251,8 @@ export default function StaffView({
         data.staff?.biometric_photo_url ||
         data.staff?.profile_photo_url ||
         (data.staff?.id && typeof window !== 'undefined' && window.localStorage?.getItem(`staff_face_registered_${data.staff.id}`) === 'true') ||
-        (data.staff?.uuid && typeof window !== 'undefined' && window.localStorage?.getItem(`staff_face_registered_${data.staff.uuid}`) === 'true')
+        (data.staff?.uuid && typeof window !== 'undefined' && window.localStorage?.getItem(`staff_face_registered_${data.staff.uuid}`) === 'true') ||
+        (data.staff?.name && typeof window !== 'undefined' && window.localStorage?.getItem(`staff_face_registered_${data.staff.name.toLowerCase().trim()}`) === 'true')
       );
       if (!hasAnyFaceRef) {
         setFaceRegistrationModalOpen(true);
@@ -271,7 +272,8 @@ export default function StaffView({
       loggedInStaff?.biometric_photo_url ||
       loggedInStaff?.profile_photo_url ||
       (loggedInStaff?.id && typeof window !== 'undefined' && window.localStorage?.getItem(`staff_face_registered_${loggedInStaff.id}`) === 'true') ||
-      (loggedInStaff?.uuid && typeof window !== 'undefined' && window.localStorage?.getItem(`staff_face_registered_${loggedInStaff.uuid}`) === 'true')
+      (loggedInStaff?.uuid && typeof window !== 'undefined' && window.localStorage?.getItem(`staff_face_registered_${loggedInStaff.uuid}`) === 'true') ||
+      (loggedInStaff?.name && typeof window !== 'undefined' && window.localStorage?.getItem(`staff_face_registered_${loggedInStaff.name.toLowerCase().trim()}`) === 'true')
     );
     if (type === 'checkin' && !hasBiometric) {
       setFaceRegistrationModalOpen(true);
@@ -308,10 +310,12 @@ export default function StaffView({
     }
   };
 
-  const handleFaceRegistered = (newBiometricUrl) => {
+  const handleFaceRegistered = (newBiometricUrl, registeredStaff) => {
+    const targetStaff = registeredStaff || loggedInStaff;
     try {
-      if (loggedInStaff?.id) window.localStorage?.setItem(`staff_face_registered_${loggedInStaff.id}`, 'true');
-      if (loggedInStaff?.uuid) window.localStorage?.setItem(`staff_face_registered_${loggedInStaff.uuid}`, 'true');
+      if (targetStaff?.id) window.localStorage?.setItem(`staff_face_registered_${targetStaff.id}`, 'true');
+      if (targetStaff?.uuid) window.localStorage?.setItem(`staff_face_registered_${targetStaff.uuid}`, 'true');
+      if (targetStaff?.name) window.localStorage?.setItem(`staff_face_registered_${targetStaff.name.toLowerCase().trim()}`, 'true');
     } catch {}
 
     setLoggedInStaff((prev) => (prev ? {

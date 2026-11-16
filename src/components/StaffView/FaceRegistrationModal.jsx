@@ -46,7 +46,7 @@ export default function FaceRegistrationModal({
       return;
     }
 
-    const getUserMediaWithTimeout = (constraints, timeoutMs = 3500) => {
+    const getUserMediaWithTimeout = (constraints, timeoutMs = 6000) => {
       return Promise.race([
         navigator.mediaDevices.getUserMedia(constraints),
         new Promise((_, reject) =>
@@ -63,7 +63,7 @@ export default function FaceRegistrationModal({
           height: { ideal: 640 }
         },
         audio: false
-      }, 3500);
+      }, 6000);
       streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
@@ -181,6 +181,7 @@ export default function FaceRegistrationModal({
     try {
       if (staff?.id) localStorage.setItem(`staff_face_registered_${staff.id}`, 'true');
       if (staff?.uuid) localStorage.setItem(`staff_face_registered_${staff.uuid}`, 'true');
+      if (staff?.name) localStorage.setItem(`staff_face_registered_${staff.name.toLowerCase().trim()}`, 'true');
     } catch {}
 
     try {
@@ -194,7 +195,7 @@ export default function FaceRegistrationModal({
 
       // Call onFaceRegistered IMMEDIATELY so parent loggedInStaff state updates without delay
       if (onFaceRegistered) {
-        onFaceRegistered(newUrl);
+        onFaceRegistered(newUrl, staff);
       }
 
       confetti({

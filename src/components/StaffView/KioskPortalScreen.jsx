@@ -179,7 +179,8 @@ export default function KioskPortalScreen({
     staff?.biometric_photo_url ||
     staff?.profile_photo_url ||
     (staff?.id && typeof window !== 'undefined' && window.localStorage?.getItem(`staff_face_registered_${staff.id}`) === 'true') ||
-    (staff?.uuid && typeof window !== 'undefined' && window.localStorage?.getItem(`staff_face_registered_${staff.uuid}`) === 'true')
+    (staff?.uuid && typeof window !== 'undefined' && window.localStorage?.getItem(`staff_face_registered_${staff.uuid}`) === 'true') ||
+    (staff?.name && typeof window !== 'undefined' && window.localStorage?.getItem(`staff_face_registered_${staff.name.toLowerCase()}`) === 'true')
   );
 
   const breakStatus = activeShift?.break_status || 'NONE';
