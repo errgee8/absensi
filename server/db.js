@@ -209,6 +209,11 @@ const ensureColumn = (tableName, columnName, definition) => {
 ensureColumn('staff', 'venue', "TEXT DEFAULT 'JP Karaoke'");
 ensureColumn('staff', 'division', "TEXT DEFAULT 'Server and Cashier'");
 ensureColumn('staff_points', 'proof_photo_url', 'TEXT');
+ensureColumn('staff_points', 'point_type', "TEXT DEFAULT 'MINUS'");
+ensureColumn('staff_points', 'type', "TEXT DEFAULT 'MINUS'");
+try {
+  db.prepare("UPDATE staff_points SET point_type = 'PLUS', type = 'PLUS', points = ABS(points) WHERE reason LIKE '%[Apresiasi Whistleblower]%' OR cycle_label LIKE '%Apresiasi%'").run();
+} catch (e) {}
 ensureColumn('staff', 'shift_id', 'INTEGER');
 ensureColumn('staff', 'uuid', 'TEXT');
 

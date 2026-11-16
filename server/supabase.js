@@ -1530,7 +1530,30 @@ export const cloudDb = {
         .maybeSingle();
       if (error) throw error;
       const list = Array.isArray(data?.value) ? data.value : [];
-      return [...list].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+      let fixed = false;
+      const repaired = list.map(item => {
+        const isWhistleblower = (item.reason && item.reason.includes('[Apresiasi Whistleblower]')) ||
+                                (item.cycle_label && item.cycle_label.includes('Apresiasi'));
+        if (isWhistleblower && (item.point_type !== 'PLUS' || item.type !== 'PLUS')) {
+          fixed = true;
+          return {
+            ...item,
+            point_type: 'PLUS',
+            type: 'PLUS',
+            points: Math.abs(Number(item.points) || 0)
+          };
+        }
+        return item;
+      });
+      if (fixed) {
+        supabase.from('app_settings').upsert({
+          key: 'staff_points',
+          value: repaired,
+          description: 'Staff Violation Points Log & Acknowledgments',
+          updated_at: new Date().toISOString()
+        }).then(() => console.log('Successfully repaired whistleblower reward points to PLUS!')).catch(() => {});
+      }
+      return [...repaired].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
     } catch (e) {
       console.warn('Failed to fetch staff points from Supabase:', e.message);
       return [];

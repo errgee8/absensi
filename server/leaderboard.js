@@ -121,7 +121,10 @@ export async function computeLeaderboard(targetMonthStr) {
       const ptDate = pt.created_at.slice(0, 7);
       if (ptDate !== monthKey) continue;
     }
-    staffPointsMap[pt.staff_id] = (staffPointsMap[pt.staff_id] || 0) + (Number(pt.points) || 0);
+    const isPlus = pt.point_type === 'PLUS' || pt.type === 'PLUS' || (pt.reason && pt.reason.includes('[Apresiasi Whistleblower]'));
+    const pts = Math.abs(Number(pt.points) || 0);
+    const signedPts = isPlus ? pts : -pts;
+    staffPointsMap[pt.staff_id] = (staffPointsMap[pt.staff_id] || 0) + signedPts;
   }
 
   const staffDayAdjMap = {};

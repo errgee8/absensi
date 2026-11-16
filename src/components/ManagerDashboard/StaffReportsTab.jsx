@@ -78,11 +78,12 @@ export default function StaffReportsTab({ adminAuth }) {
 
   const handleConfirmReward = async () => {
     if (!targetReport) return;
+    const finalPoints = Math.max(1, Number(rewardPoints) || 1);
     setRewardSubmitting(true);
     setRewardError(null);
     try {
       await rewardStaffReport(targetReport.id, {
-        points: Number(rewardPoints) || 10,
+        points: finalPoints,
         note: rewardNote,
         pin: (rewardPin || '8980').trim(),
         managerPin: (rewardPin || '8980').trim()
@@ -449,24 +450,61 @@ export default function StaffReportsTab({ adminAuth }) {
 
             <div className="space-y-3">
               <div>
-                <label className="text-xs font-bold text-slate-300 block mb-1">
-                  Jumlah Poin Bonus Apresiasi (+):
-                </label>
-                <div className="flex items-center gap-2">
-                  {[5, 10, 15, 20].map((pts) => (
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-xs font-bold text-slate-300 block">
+                    Jumlah Poin Bonus Apresiasi (+):
+                  </label>
+                  <span className="text-xs font-black text-emerald-400 bg-emerald-950/70 border border-emerald-500/40 px-2 py-0.5 rounded-lg">
+                    +{rewardPoints || 0} Poin Plus
+                  </span>
+                </div>
+                
+                {/* Preset Chips */}
+                <div className="flex items-center gap-1.5 mb-2.5">
+                  {[5, 10, 15, 20, 25].map((pts) => (
                     <button
                       key={pts}
                       type="button"
                       onClick={() => setRewardPoints(pts)}
-                      className={`flex-1 py-2 rounded-xl text-xs font-black transition cursor-pointer border ${
-                        rewardPoints === pts
-                          ? 'bg-emerald-600 text-white border-emerald-400 shadow-md'
+                      className={`flex-1 py-1.5 rounded-xl text-xs font-black transition cursor-pointer border ${
+                        Number(rewardPoints) === pts
+                          ? 'bg-emerald-600 text-white border-emerald-400 shadow-md ring-2 ring-emerald-500/30'
                           : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
                       }`}
                     >
-                      +{pts} Poin
+                      +{pts}
                     </button>
                   ))}
+                </div>
+
+                {/* Custom Point Input */}
+                <div>
+                  <label className="text-[11px] font-semibold text-slate-400 block mb-1">
+                    Atau Ketik Manual Poin Custom (Bebas):
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-black text-emerald-400">
+                      +
+                    </span>
+                    <input
+                      type="number"
+                      min="1"
+                      max="1000"
+                      value={rewardPoints}
+                      onChange={(e) => {
+                        const val = e.target.value === '' ? '' : parseInt(e.target.value, 10);
+                        setRewardPoints(val);
+                      }}
+                      placeholder="Input jumlah poin (contoh: 30, 50, 100)"
+                      className="w-full bg-[#11141c] border border-slate-700 rounded-xl pl-8 pr-20 py-2.5 text-xs text-white font-bold focus:outline-none focus:border-emerald-400"
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] text-slate-400 font-medium">
+                      Poin Plus
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-slate-400 mt-1">
+                    *Pilih preset di atas atau ketik manual berapa pun poin yang ingin diberikan.
+                  </p>
                 </div>
               </div>
 

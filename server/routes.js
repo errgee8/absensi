@@ -4654,10 +4654,15 @@ router.get('/points', async (req, res) => {
     }
 
     const normalized = (allPoints || []).map((p) => {
+      const isWhistleblower = (p.reason && p.reason.includes('[Apresiasi Whistleblower]')) ||
+                              (p.cycle_label && p.cycle_label.includes('Apresiasi'));
+      const pointType = isWhistleblower ? 'PLUS' : (p.point_type || p.type || 'MINUS');
       const cInfo = p.created_at ? getPointCycleInfo(p.created_at) : (p.cycle_key ? getPointCycleFromKey(p.cycle_key) : currentCycle);
       return {
         ...p,
         points: Number(p.points || 0),
+        point_type: pointType,
+        type: pointType,
         cycle_key: cInfo.cycleKey,
         cycle_label: cInfo.label,
         status: p.acknowledged_at || p.status === 'ACKNOWLEDGED' ? 'ACKNOWLEDGED' : 'PENDING'
@@ -5449,6 +5454,7 @@ router.post('/reports/:id/reward', async (req, res) => {
     target.updated_at = now;
 
     // Award positive point to staff_points
+    const cycle = getPointCycleInfo(now);
     const pointRecord = {
       id: `pt_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
       staff_id: target.staff_id,
@@ -5456,11 +5462,13 @@ router.post('/reports/:id/reward', async (req, res) => {
       staff_name: target.staff_name,
       staff_role: target.staff_role,
       staff_venue: target.staff_venue,
-      staff_division: target.staff_role,
+      staff_division: target.staff_division || target.staff_role,
       points: bonusPoints,
+      point_type: 'PLUS',
+      type: 'PLUS',
       reason: `[Apresiasi Whistleblower] ${rewardReason} (Laporan: ${target.title})`,
-      cycle_key: 'CURRENT',
-      cycle_label: 'Apresiasi Laporan Valid',
+      cycle_key: cycle.cycleKey,
+      cycle_label: cycle.label,
       wita_date: getWitaDateYMD(),
       given_by: managerName,
       given_by_role: 'OPERATIONAL_MANAGER',
@@ -5473,6 +5481,32 @@ router.post('/reports/:id/reward', async (req, res) => {
       await cloudDb.createStaffPoints(pointRecord);
       await cloudDb.saveSetting('staff_whistleblower_reports', reports, 'Whistleblower & Integrity Staff Reports');
     }
+
+    try {
+      db.prepare(`
+        INSERT INTO staff_points (
+          id, staff_id, staff_uuid, staff_name, staff_role, staff_venue, staff_division,
+          points, point_type, reason, cycle_key, cycle_label, wita_date, given_by, given_by_role,
+          status, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'PLUS', ?, ?, ?, ?, ?, 'OPERATIONAL_MANAGER', 'APPROVED', ?, ?)
+      `).run(
+        pointRecord.id,
+        pointRecord.staff_id,
+        pointRecord.staff_uuid,
+        pointRecord.staff_name,
+        pointRecord.staff_role,
+        pointRecord.staff_venue,
+        pointRecord.staff_division,
+        pointRecord.points,
+        pointRecord.reason,
+        pointRecord.cycle_key,
+        pointRecord.cycle_label,
+        pointRecord.wita_date,
+        pointRecord.given_by,
+        now,
+        now
+      );
+    } catch {}
 
     try {
       db.prepare(`
