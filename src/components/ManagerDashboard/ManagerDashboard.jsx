@@ -16,6 +16,8 @@ import SystemRecoveryModal from './SystemRecoveryModal';
 import MonitoringAuditTab from './MonitoringAuditTab';
 import PointManagementTab from './PointManagementTab';
 import StaffDetailManagementModal from './StaffDetailManagementModal';
+import StaffReportsTab from './StaffReportsTab';
+import QuizLeaderboardTab from './QuizLeaderboardTab';
 import { exportMonthlyPayrollReport, exportTimesheetToExcel } from '../../utils/excelExport';
 import { getShifts, getStats, getShiftSchedules, getStaffList, getLeaveRequests, getAnnouncements, getAnnouncementReaders, getPoints, getStaffDayAdjustments, subscribeRealtimeEvents, sendPresenceHeartbeat, authorizeEarlyCheckout } from '../../utils/api';
 import { getOperationalDateYMD, getOperationalYesterdayYMD, getWitaDateYMD, getAppNow, formatWitaDateTime } from '../../utils/time';
@@ -447,6 +449,32 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
               )}
             </button>
 
+            <button
+              onClick={() => setActiveTab('REPORTS')}
+              className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-bold transition relative cursor-pointer ${
+                activeTab === 'REPORTS'
+                  ? 'bg-rose-600 text-white shadow-md shadow-rose-600/30'
+                  : 'text-rose-300 hover:text-white hover:bg-rose-950/40 border border-rose-500/20'
+              }`}
+              title="Pusat Aduan & Integritas Staf (Whistleblower)"
+            >
+              <ShieldAlert className="w-4 h-4 text-rose-400 stroke-[2.2]" />
+              <span>🚨 Laporan Aduan</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('QUIZ')}
+              className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-bold transition relative cursor-pointer ${
+                activeTab === 'QUIZ'
+                  ? 'bg-amber-600 text-slate-950 shadow-md shadow-amber-600/30 font-black'
+                  : 'text-amber-300 hover:text-white hover:bg-amber-950/40 border border-amber-500/20'
+              }`}
+              title="Hasil Kuis Pengetahuan Produk Mingguan"
+            >
+              <Trophy className="w-4 h-4 text-amber-400 stroke-[2.2]" />
+              <span>📝 Kuis Produk</span>
+            </button>
+
             {onOpenLeaderboard && (
               <button
                 type="button"
@@ -703,6 +731,10 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
             onPointsUpdated={loadPendingPointsCount}
           />
         )}
+
+        {activeTab === 'REPORTS' && <StaffReportsTab adminAuth={adminAuth} />}
+
+        {activeTab === 'QUIZ' && <QuizLeaderboardTab adminAuth={adminAuth} />}
 
         {!isReadOnly && activeTab === 'SCHEDULES' && <ShiftSchedulesTab />}
 

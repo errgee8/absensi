@@ -648,3 +648,82 @@ export async function authorizeEarlyCheckout(shiftId, pin, reason) {
   if (!res.ok) throw new Error(data.error || 'Gagal memberikan otorisasi check-out awal');
   return data;
 }
+
+// 10. Whistleblower & Staff Reports (LAPOR)
+export async function submitStaffReport({ staffId, venue, category, title, description, photoBase64, isAnonymous }) {
+  const res = await fetch(`${API_BASE}/reports`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ staffId, venue, category, title, description, photoBase64, isAnonymous })
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Gagal mengirim laporan');
+  return data;
+}
+
+export async function getStaffReports(pin) {
+  const res = await fetch(`${API_BASE}/reports?pin=${encodeURIComponent(String(pin || '').trim())}`, {
+    headers: {
+      'x-manager-pin': String(pin || '').trim()
+    }
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Gagal memuat laporan staf');
+  return data;
+}
+
+export async function rewardStaffReport(reportId, pin, points, reason, managerName) {
+  const res = await fetch(`${API_BASE}/reports/${encodeURIComponent(reportId)}/reward`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-manager-pin': String(pin || '').trim()
+    },
+    body: JSON.stringify({ pin: String(pin || '').trim(), points, reason, managerName })
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Gagal memberikan poin apresiasi');
+  return data;
+}
+
+export async function updateStaffReportStatus(reportId, pin, status, managerNote) {
+  const res = await fetch(`${API_BASE}/reports/${encodeURIComponent(reportId)}/status`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-manager-pin': String(pin || '').trim()
+    },
+    body: JSON.stringify({ pin: String(pin || '').trim(), status, managerNote })
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Gagal memperbarui status laporan');
+  return data;
+}
+
+// 11. Product Knowledge Weekly Quiz
+export async function getWeeklyQuiz(staffId, venue = 'LuckyCat') {
+  const res = await fetch(`${API_BASE}/quiz/weekly?staffId=${encodeURIComponent(staffId)}&venue=${encodeURIComponent(venue)}`);
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Gagal memuat kuis mingguan');
+  return data;
+}
+
+export async function submitWeeklyQuiz({ staffId, weekKey, answers, durationSeconds, venue }) {
+  const res = await fetch(`${API_BASE}/quiz/submit`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ staffId, weekKey, answers, durationSeconds, venue })
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Gagal mengirim jawaban kuis');
+  return data;
+}
+
+export async function getQuizLeaderboard(weekKey) {
+  const query = weekKey ? `?weekKey=${encodeURIComponent(weekKey)}` : '';
+  const res = await fetch(`${API_BASE}/quiz/leaderboard${query}`);
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Gagal memuat leaderboard kuis');
+  return data;
+}
+

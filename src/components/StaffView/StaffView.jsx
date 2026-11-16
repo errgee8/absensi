@@ -12,8 +12,10 @@ import StaffPointNoticeModal from './StaffPointNoticeModal';
 import StaffPointHistoryModal from './StaffPointHistoryModal';
 import StaffAttendanceHistoryModal from './StaffAttendanceHistoryModal';
 import FaceRegistrationModal from './FaceRegistrationModal';
+import StaffReportModal from './StaffReportModal';
+import StaffQuizModal from './StaffQuizModal';
 import { getNotificationPermission } from '../../utils/pushNotifications';
-import { verifyStaffPin, getAnnouncements, acknowledgeAnnouncement, getLeaveRequests, getPoints, acknowledgeStaffPoint, subscribeRealtimeEvents, sendPresenceHeartbeat } from '../../utils/api';
+import { verifyStaffPin, getAnnouncements, acknowledgeAnnouncement, getLeaveRequests, getPoints, acknowledgeStaffPoint, subscribeRealtimeEvents, sendPresenceHeartbeat, getWeeklyQuiz } from '../../utils/api';
 import { getOperationalDateYMD } from '../../utils/time';
 import { RESTROOM_LOCATIONS } from '../../utils/toiletService';
 import { CheckCircle2 } from 'lucide-react';
@@ -61,6 +63,12 @@ export default function StaffView({
   const [pointHistoryModalOpen, setPointHistoryModalOpen] = useState(false);
   const [attendanceHistoryModalOpen, setAttendanceHistoryModalOpen] = useState(false);
   const [attendanceHistoryInitialTab, setAttendanceHistoryInitialTab] = useState('LATE');
+
+  // Whistleblower (Lapor) & Product Knowledge Quiz State
+  const [staffReportModalOpen, setStaffReportModalOpen] = useState(false);
+  const [staffQuizModalOpen, setStaffQuizModalOpen] = useState(false);
+  const [pendingBreakShift, setPendingBreakShift] = useState(false);
+  const [reportSuccessAlert, setReportSuccessAlert] = useState(null);
 
   // Live Presence Heartbeat for active logged-in staff (direct WebSocket via Supabase Presence)
   useEffect(() => {
@@ -250,15 +258,41 @@ export default function StaffView({
     }
   };
 
-  const handleTriggerCamera = (type, shift) => {
+  const handleTriggerCamera = async (type, shift) => {
     // If staff hasn't registered official face biometrics yet, require face registration first!
     if (type === 'checkin' && !loggedInStaff?.face_biometrics_registered) {
       setFaceRegistrationModalOpen(true);
       return;
     }
+
+    // Weekly quiz gating: must complete product quiz once a week before starting break!
+    if (type === 'break_start') {
+      try {
+        const quizStatus = await getWeeklyQuiz(loggedInStaff.id, loggedInStaff.venue || 'LuckyCat');
+        if (!quizStatus?.alreadyCompleted) {
+          setPendingBreakShift(shift || null);
+          setStaffQuizModalOpen(true);
+          return;
+        }
+      } catch (err) {
+        console.warn('Failed to verify weekly quiz status before break:', err);
+      }
+    }
+
     setCameraActionType(type);
     setConfirmedShift(shift || null);
     setCameraModalOpen(true);
+  };
+
+  const handleQuizCompleted = () => {
+    if (pendingBreakShift !== false) {
+      const shiftToConfirm = pendingBreakShift;
+      setPendingBreakShift(false);
+      setStaffQuizModalOpen(false);
+      setCameraActionType('break_start');
+      setConfirmedShift(shiftToConfirm);
+      setCameraModalOpen(true);
+    }
   };
 
   const handleFaceRegistered = (newBiometricUrl) => {
@@ -396,6 +430,11 @@ export default function StaffView({
           onMoodUpdated={(emoji) =>
             setLoggedInStaff((prev) => (prev ? { ...prev, mood_emoji: emoji } : prev))
           }
+          onOpenStaffReportModal={() => setStaffReportModalOpen(true)}
+          onOpenStaffQuizModal={() => {
+            setPendingBreakShift(false);
+            setStaffQuizModalOpen(true);
+          }}
         />
       )}
 
@@ -541,6 +580,32 @@ export default function StaffView({
           onClose={() => setAttendanceHistoryModalOpen(false)}
           staff={loggedInStaff}
           initialTab={attendanceHistoryInitialTab}
+        />
+      )}
+
+      {/* Staff Whistleblower Report Modal (LAPOR) */}
+      {staffReportModalOpen && loggedInStaff && (
+        <StaffReportModal
+          staff={loggedInStaff}
+          isOpen={staffReportModalOpen}
+          onClose={() => setStaffReportModalOpen(false)}
+          onSuccess={() => {
+            setReportSuccessAlert('Laporan rahasia berhasil terkirim langsung ke manajer.');
+            setTimeout(() => setReportSuccessAlert(null), 6000);
+          }}
+        />
+      )}
+
+      {/* Mandatory Weekly Product Knowledge Quiz Modal */}
+      {staffQuizModalOpen && loggedInStaff && (
+        <StaffQuizModal
+          staff={loggedInStaff}
+          isOpen={staffQuizModalOpen}
+          onClose={() => {
+            setStaffQuizModalOpen(false);
+            setPendingBreakShift(false);
+          }}
+          onQuizCompleted={handleQuizCompleted}
         />
       )}
     </div>

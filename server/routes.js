@@ -11,6 +11,7 @@ import { computeLeaderboard } from './leaderboard.js';
 import { getVapidPublicKey, savePushSubscription, sendPushNotification } from './push.js';
 import { createSystemSnapshot, listSystemBackups, restoreSystemSnapshot } from './backup.js';
 import { verifyFaceMatch } from './faceBiometrics.js';
+import { LUCKYCAT_QUESTION_BANK, generateRandomWeeklyQuiz } from './quizBank.js';
 
 const router = express.Router();
 
@@ -5081,6 +5082,489 @@ router.get('/staff/:id/audit-trail', async (req, res) => {
   } catch (err) {
     console.error('Error fetching staff audit trail:', err);
     return res.status(500).json({ error: 'Gagal memuat log audit staf: ' + err.message });
+  }
+});
+
+// Helper: Calculate ISO Week Key in WITA
+function getWitaWeekKey(date = new Date()) {
+  const d = new Date(date);
+  const dayNum = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  const weekNo = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+  return `${d.getUTCFullYear()}-W${String(weekNo).padStart(2, '0')}`;
+}
+
+// ==========================================
+// 15. WHISTLEBLOWER & LAPORAN STAF
+// ==========================================
+
+// Helper: Ensure staff_reports table in SQLite
+try {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS staff_reports (
+      id TEXT PRIMARY KEY,
+      staff_id TEXT NOT NULL,
+      staff_uuid TEXT,
+      staff_name TEXT NOT NULL,
+      staff_role TEXT,
+      staff_venue TEXT,
+      category TEXT NOT NULL,
+      title TEXT NOT NULL,
+      description TEXT NOT NULL,
+      evidence_photo_url TEXT,
+      is_anonymous INTEGER DEFAULT 1,
+      status TEXT DEFAULT 'PENDING',
+      reward_points REAL DEFAULT 0,
+      reward_reason TEXT,
+      reward_at TEXT,
+      reward_by TEXT,
+      manager_note TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now'))
+    );
+  `);
+} catch (e) {
+  console.warn('SQLite staff_reports init note:', e.message);
+}
+
+// 15a. Submit Report (Staff)
+router.post('/reports', async (req, res) => {
+  const { staffId, venue, category, title, description, photoBase64, isAnonymous } = req.body || {};
+
+  if (!description || !description.trim()) {
+    return res.status(400).json({ error: 'Detail kronologi laporan wajib diisi.' });
+  }
+
+  let staff = null;
+  if (staffId) {
+    if (isSupabaseConfigured) {
+      staff = await findStaffInSupabase(staffId);
+    }
+    if (!staff) {
+      staff = db.prepare('SELECT * FROM staff WHERE id = ? OR legacy_code = ?').get(staffId, staffId);
+    }
+  }
+
+  let photoUrl = null;
+  if (photoBase64) {
+    try {
+      photoUrl = await savePhoto(photoBase64, `report_${Date.now()}`);
+    } catch (err) {
+      console.warn('Report photo upload warning:', err.message);
+    }
+  }
+
+  const reportId = `rep_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+  const now = new Date().toISOString();
+
+  const report = {
+    id: reportId,
+    staff_id: staff?.legacy_code || staff?.id || staffId || 'UNKNOWN',
+    staff_uuid: staff?.id || null,
+    staff_name: staff?.name || 'Staf',
+    staff_role: staff?.role || 'Staff',
+    staff_venue: staff?.venue || venue || 'LuckyCat',
+    category: category || 'Kecurangan / SOP',
+    title: (title || 'Laporan Pelanggaran').trim(),
+    description: description.trim(),
+    evidence_photo_url: photoUrl,
+    is_anonymous: isAnonymous !== false,
+    status: 'PENDING',
+    reward_points: 0,
+    reward_reason: null,
+    reward_at: null,
+    reward_by: null,
+    manager_note: null,
+    created_at: now,
+    updated_at: now
+  };
+
+  // 1. Save to Supabase Cloud
+  if (isSupabaseConfigured) {
+    try {
+      const existing = (await cloudDb.getSetting('staff_whistleblower_reports')) || [];
+      const updatedList = [report, ...(Array.isArray(existing) ? existing : [])];
+      await cloudDb.saveSetting('staff_whistleblower_reports', updatedList, 'Whistleblower & Integrity Staff Reports');
+    } catch (e) {
+      console.warn('Failed to save report to Supabase:', e.message);
+    }
+  }
+
+  // 2. Save to SQLite
+  try {
+    db.prepare(`
+      INSERT INTO staff_reports (
+        id, staff_id, staff_uuid, staff_name, staff_role, staff_venue,
+        category, title, description, evidence_photo_url, is_anonymous,
+        status, reward_points, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      report.id, report.staff_id, report.staff_uuid, report.staff_name, report.staff_role, report.staff_venue,
+      report.category, report.title, report.description, report.evidence_photo_url, report.is_anonymous ? 1 : 0,
+      report.status, 0, report.created_at, report.updated_at
+    );
+  } catch (e) {
+    console.warn('SQLite staff_reports insert note:', e.message);
+  }
+
+  broadcastEvent('REPORT_SUBMITTED', { id: report.id, title: report.title, venue: report.staff_venue });
+  return res.json({
+    success: true,
+    message: 'Laporan Anda telah berhasil terkirim langsung ke Manajer. Terima kasih atas kepedulian Anda menjaga integritas venue!',
+    reportId: report.id
+  });
+});
+
+// 15b. Get All Reports (Manager Only)
+router.get('/reports', async (req, res) => {
+  const pin = (req.headers['x-manager-pin'] || req.query.pin || '').toString().trim();
+  let adminPin = (process.env.ADMIN_PIN || getSetting('admin_pin') || '8980').trim();
+
+  if (isSupabaseConfigured) {
+    try {
+      const { data: supaPin } = await supabase.from('app_settings').select('value').eq('key', 'admin_pin').maybeSingle();
+      if (supaPin?.value) adminPin = String(supaPin.value).trim();
+    } catch {}
+  }
+
+  if (pin !== adminPin) {
+    return res.status(403).json({ error: 'PIN Otorisasi Manajer tidak valid.' });
+  }
+
+  try {
+    let reports = [];
+    if (isSupabaseConfigured) {
+      const supaReports = await cloudDb.getSetting('staff_whistleblower_reports');
+      if (Array.isArray(supaReports)) reports = supaReports;
+    }
+
+    if (reports.length === 0) {
+      try {
+        const rows = db.prepare('SELECT * FROM staff_reports ORDER BY created_at DESC').all();
+        reports = rows.map(r => ({ ...r, is_anonymous: Boolean(r.is_anonymous) }));
+      } catch {}
+    }
+
+    // Resolve signed photo urls
+    const photoTargets = reports.filter(r => r.evidence_photo_url).map(r => ({ evidence_photo_url: r.evidence_photo_url }));
+    if (photoTargets.length > 0 && isSupabaseConfigured) {
+      await resolveAttendancePhotoUrls(photoTargets, ['evidence_photo_url']);
+      photoTargets.forEach((t, i) => {
+        const rep = reports.find(r => r.evidence_photo_url === t.evidence_photo_url);
+        if (rep) rep.evidence_photo_url = t.evidence_photo_url;
+      });
+    }
+
+    return res.json(reports);
+  } catch (err) {
+    console.error('Error fetching reports:', err);
+    return res.status(500).json({ error: 'Gagal memuat laporan staf: ' + err.message });
+  }
+});
+
+// 15c. Reward Report (Award Bonus Points to Reporter)
+router.post('/reports/:id/reward', async (req, res) => {
+  const { id } = req.params;
+  const { pin, points, reason, managerName = 'Manager' } = req.body || {};
+
+  let adminPin = (process.env.ADMIN_PIN || getSetting('admin_pin') || '8980').trim();
+  if (isSupabaseConfigured) {
+    try {
+      const { data: supaPin } = await supabase.from('app_settings').select('value').eq('key', 'admin_pin').maybeSingle();
+      if (supaPin?.value) adminPin = String(supaPin.value).trim();
+    } catch {}
+  }
+
+  if ((pin || '').trim() !== adminPin) {
+    return res.status(403).json({ error: 'PIN Otorisasi Manajer tidak valid.' });
+  }
+
+  const bonusPoints = Math.abs(Number(points) || 5);
+  const rewardReason = (reason || 'Apresiasi Laporan Valid').trim();
+
+  try {
+    let reports = [];
+    if (isSupabaseConfigured) {
+      reports = (await cloudDb.getSetting('staff_whistleblower_reports')) || [];
+    }
+    let target = reports.find(r => r.id === id);
+
+    if (!target) {
+      try {
+        target = db.prepare('SELECT * FROM staff_reports WHERE id = ?').get(id);
+      } catch {}
+    }
+
+    if (!target) {
+      return res.status(404).json({ error: 'Data laporan tidak ditemukan.' });
+    }
+
+    const now = new Date().toISOString();
+    target.status = 'VALID_REWARDED';
+    target.reward_points = bonusPoints;
+    target.reward_reason = rewardReason;
+    target.reward_at = now;
+    target.reward_by = managerName;
+    target.updated_at = now;
+
+    // Award positive point to staff_points
+    const pointRecord = {
+      id: `pt_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      staff_id: target.staff_id,
+      staff_uuid: target.staff_uuid,
+      staff_name: target.staff_name,
+      staff_role: target.staff_role,
+      staff_venue: target.staff_venue,
+      staff_division: target.staff_role,
+      points: bonusPoints,
+      reason: `[Apresiasi Whistleblower] ${rewardReason} (Laporan: ${target.title})`,
+      cycle_key: 'CURRENT',
+      cycle_label: 'Apresiasi Laporan Valid',
+      wita_date: getWitaDateYMD(),
+      given_by: managerName,
+      given_by_role: 'OPERATIONAL_MANAGER',
+      status: 'APPROVED',
+      created_at: now,
+      updated_at: now
+    };
+
+    if (isSupabaseConfigured) {
+      await cloudDb.createStaffPoints(pointRecord);
+      await cloudDb.saveSetting('staff_whistleblower_reports', reports, 'Whistleblower & Integrity Staff Reports');
+    }
+
+    try {
+      db.prepare(`
+        UPDATE staff_reports
+        SET status = ?, reward_points = ?, reward_reason = ?, reward_at = ?, reward_by = ?, updated_at = ?
+        WHERE id = ?
+      `).run('VALID_REWARDED', bonusPoints, rewardReason, now, managerName, now, id);
+    } catch {}
+
+    broadcastEvent('REPORT_UPDATED', { id, status: 'VALID_REWARDED', reward_points: bonusPoints });
+    broadcastEvent('POINTS_UPDATE', { staffId: target.staff_id });
+    broadcastEvent('LEADERBOARD_UPDATE');
+
+    return res.json({
+      success: true,
+      message: `Poin apresiasi +${bonusPoints} berhasil diberikan kepada ${target.staff_name}!`,
+      report: target
+    });
+  } catch (err) {
+    console.error('Error rewarding report:', err);
+    return res.status(500).json({ error: 'Gagal memberikan poin apresiasi: ' + err.message });
+  }
+});
+
+// 15d. Update Report Status (Investigating / Dismissed / Resolved)
+router.post('/reports/:id/status', async (req, res) => {
+  const { id } = req.params;
+  const { pin, status, managerNote } = req.body || {};
+
+  let adminPin = (process.env.ADMIN_PIN || getSetting('admin_pin') || '8980').trim();
+  if (isSupabaseConfigured) {
+    try {
+      const { data: supaPin } = await supabase.from('app_settings').select('value').eq('key', 'admin_pin').maybeSingle();
+      if (supaPin?.value) adminPin = String(supaPin.value).trim();
+    } catch {}
+  }
+
+  if ((pin || '').trim() !== adminPin) {
+    return res.status(403).json({ error: 'PIN Otorisasi Manajer tidak valid.' });
+  }
+
+  try {
+    let reports = [];
+    if (isSupabaseConfigured) {
+      reports = (await cloudDb.getSetting('staff_whistleblower_reports')) || [];
+    }
+    const target = reports.find(r => r.id === id);
+    if (!target) return res.status(404).json({ error: 'Laporan tidak ditemukan.' });
+
+    const now = new Date().toISOString();
+    target.status = status || target.status;
+    if (managerNote != null) target.manager_note = managerNote;
+    target.updated_at = now;
+
+    if (isSupabaseConfigured) {
+      await cloudDb.saveSetting('staff_whistleblower_reports', reports, 'Whistleblower & Integrity Staff Reports');
+    }
+
+    try {
+      db.prepare('UPDATE staff_reports SET status = ?, manager_note = ?, updated_at = ? WHERE id = ?')
+        .run(target.status, target.manager_note, now, id);
+    } catch {}
+
+    broadcastEvent('REPORT_UPDATED', { id, status: target.status });
+    return res.json({ success: true, message: 'Status laporan berhasil diperbarui.', report: target });
+  } catch (err) {
+    console.error('Error updating report status:', err);
+    return res.status(500).json({ error: 'Gagal memperbarui status laporan: ' + err.message });
+  }
+});
+
+// ==========================================
+// 16. DYNAMIC RANDOMIZED WEEKLY QUIZ
+// ==========================================
+
+// 16a. Get Weekly Quiz
+router.get('/quiz/weekly', async (req, res) => {
+  const { staffId, venue = 'LuckyCat' } = req.query;
+  const weekKey = getWitaWeekKey();
+
+  if (!staffId) {
+    return res.status(400).json({ error: 'staffId wajib disertakan.' });
+  }
+
+  try {
+    // Check if staff has already completed this week's quiz
+    let completions = [];
+    if (isSupabaseConfigured) {
+      completions = (await cloudDb.getSetting('staff_quiz_completions')) || [];
+    }
+
+    const completion = (Array.isArray(completions) ? completions : []).find(
+      (c) => (c.staff_id === staffId || c.staff_uuid === staffId) && c.week_key === weekKey
+    );
+
+    if (completion) {
+      return res.json({
+        alreadyCompleted: true,
+        weekKey,
+        completion
+      });
+    }
+
+    // Generate 10 randomized questions with shuffled options
+    const questions = generateRandomWeeklyQuiz(10, venue);
+    return res.json({
+      alreadyCompleted: false,
+      weekKey,
+      durationMinutes: 8,
+      totalQuestions: questions.length,
+      questions
+    });
+  } catch (err) {
+    console.error('Error fetching weekly quiz:', err);
+    return res.status(500).json({ error: 'Gagal memuat kuis mingguan: ' + err.message });
+  }
+});
+
+// 16b. Submit Quiz
+router.post('/quiz/submit', async (req, res) => {
+  const { staffId, weekKey, answers = {}, durationSeconds = 0, venue = 'LuckyCat' } = req.body || {};
+  const currentWeek = weekKey || getWitaWeekKey();
+
+  if (!staffId) return res.status(400).json({ error: 'staffId wajib disertakan.' });
+
+  let staff = null;
+  if (isSupabaseConfigured) {
+    staff = await findStaffInSupabase(staffId);
+  }
+  if (!staff) {
+    staff = db.prepare('SELECT * FROM staff WHERE id = ? OR legacy_code = ?').get(staffId, staffId);
+  }
+
+  try {
+    let completions = [];
+    if (isSupabaseConfigured) {
+      completions = (await cloudDb.getSetting('staff_quiz_completions')) || [];
+    }
+
+    // Evaluate answers against question bank
+    const questionsPool = LUCKYCAT_QUESTION_BANK;
+    let correctCount = 0;
+    const reviewList = [];
+
+    const answeredIds = Object.keys(answers);
+    const totalQuestions = Math.max(10, answeredIds.length);
+
+    for (const qId of answeredIds) {
+      const qObj = questionsPool.find(q => q.id === qId);
+      if (!qObj) continue;
+      const staffAns = (answers[qId] || '').trim();
+      const isCorrect = staffAns === qObj.correctAnswer.trim();
+      if (isCorrect) correctCount++;
+      reviewList.push({
+        id: qObj.id,
+        category: qObj.category,
+        question: qObj.question,
+        staffAnswer: staffAns,
+        correctAnswer: qObj.correctAnswer,
+        isCorrect,
+        explanation: qObj.explanation
+      });
+    }
+
+    const score = Math.round((correctCount / totalQuestions) * 100);
+    const now = new Date().toISOString();
+
+    const record = {
+      id: `qz_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      staff_id: staff?.legacy_code || staff?.id || staffId,
+      staff_uuid: staff?.id || null,
+      staff_name: staff?.name || 'Staff',
+      staff_role: staff?.role || 'Staff',
+      staff_venue: staff?.venue || venue || 'LuckyCat',
+      week_key: currentWeek,
+      score,
+      correct_count: correctCount,
+      total_questions: totalQuestions,
+      duration_seconds: durationSeconds,
+      results: reviewList,
+      completed_at: now
+    };
+
+    const updatedCompletions = [record, ...(Array.isArray(completions) ? completions.filter(c => !(c.staff_id === record.staff_id && c.week_key === currentWeek)) : [])];
+
+    if (isSupabaseConfigured) {
+      await cloudDb.saveSetting('staff_quiz_completions', updatedCompletions, 'Staff Weekly Quiz Results');
+    }
+
+    broadcastEvent('QUIZ_COMPLETED', { staffId: record.staff_id, score, weekKey: currentWeek });
+
+    return res.json({
+      success: true,
+      score,
+      correctCount,
+      totalQuestions,
+      durationSeconds,
+      results: reviewList,
+      completion: record
+    });
+  } catch (err) {
+    console.error('Error submitting quiz:', err);
+    return res.status(500).json({ error: 'Gagal mengirim jawaban kuis: ' + err.message });
+  }
+});
+
+// 16c. Quiz Leaderboard
+router.get('/quiz/leaderboard', async (req, res) => {
+  const weekKey = req.query.weekKey || getWitaWeekKey();
+  try {
+    let completions = [];
+    if (isSupabaseConfigured) {
+      completions = (await cloudDb.getSetting('staff_quiz_completions')) || [];
+    }
+
+    const filtered = (Array.isArray(completions) ? completions : []).filter(
+      c => !weekKey || c.week_key === weekKey
+    );
+
+    // Sort by score DESC, then durationSeconds ASC
+    filtered.sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      return (a.duration_seconds || 0) - (b.duration_seconds || 0);
+    });
+
+    return res.json({
+      weekKey,
+      leaderboard: filtered
+    });
+  } catch (err) {
+    console.error('Error fetching quiz leaderboard:', err);
+    return res.status(500).json({ error: 'Gagal memuat leaderboard kuis: ' + err.message });
   }
 });
 

@@ -19,6 +19,8 @@ import {
   CheckCircle2,
   Smartphone,
   ShieldCheck,
+  ShieldAlert,
+  BookOpen,
   Sparkles,
   Smile
 } from 'lucide-react';
@@ -96,7 +98,9 @@ export default function KioskPortalScreen({
   onOpenAttendanceHistory,
   onProfilePhotoUpdated,
   onMoodUpdated,
-  onOpenFaceRegistration
+  onOpenFaceRegistration,
+  onOpenStaffReportModal,
+  onOpenStaffQuizModal
 }) {
   const [now, setNow] = useState(() => getAppNow());
   const [moodDropdownOpen, setMoodDropdownOpen] = useState(false);
@@ -645,6 +649,60 @@ export default function KioskPortalScreen({
           </div>
           <span className="text-xs font-bold text-blue-400 shrink-0">
             Cek Izin →
+          </span>
+        </button>
+
+        {/* TOMBOL LAPOR (HIGH VISIBILITY FOR WHISTLEBLOWER INTEGRITY) */}
+        <button
+          type="button"
+          onClick={onOpenStaffReportModal}
+          className="w-full bg-gradient-to-r from-rose-950 via-rose-900/90 to-red-950 hover:from-rose-900 hover:to-red-900 border-2 border-rose-500/70 rounded-2xl p-4 flex items-center justify-between gap-3 text-left transition shadow-xl shadow-rose-950/60 active:scale-[0.99] cursor-pointer group animate-fade-in"
+        >
+          <div className="flex items-center gap-3.5 min-w-0">
+            <div className="w-10 h-10 rounded-xl bg-rose-500 text-white flex items-center justify-center shrink-0 shadow-lg shadow-rose-900/50 group-hover:scale-105 transition">
+              <ShieldAlert className="w-5 h-5 stroke-[2.5]" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-sm font-black text-white flex items-center gap-2">
+                <span>🚨 LAPOR (Pusat Aduan &amp; Integritas)</span>
+                <span className="text-[9px] px-2 py-0.5 rounded-full bg-rose-500/30 text-rose-200 font-bold border border-rose-400/40">
+                  Reward +Point
+                </span>
+              </div>
+              <div className="text-[11px] text-rose-200/90 truncate mt-0.5">
+                Laporkan kecurangan kasir, SOP, atau kelakuan buruk leader • Opsi Anonim
+              </div>
+            </div>
+          </div>
+          <span className="px-3 py-1.5 rounded-xl bg-rose-500 hover:bg-rose-400 text-white text-xs font-black shrink-0 shadow-md transition">
+            Lapor →
+          </span>
+        </button>
+
+        {/* KUIS PENGETAHUAN PRODUK (MINGGUAN) */}
+        <button
+          type="button"
+          onClick={onOpenStaffQuizModal}
+          className="w-full bg-gradient-to-r from-amber-950/70 via-[#1f1b15] to-[#161a22] hover:bg-[#25221b] active:scale-[0.99] border border-amber-500/40 rounded-2xl px-4 py-3.5 flex items-center justify-between gap-3 text-left shadow-lg transition cursor-pointer"
+        >
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-400/30 text-amber-300 flex items-center justify-center shrink-0">
+              <BookOpen className="w-5 h-5" />
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-extrabold text-white">Kuis Pengetahuan Produk</span>
+                <span className="text-[9.5px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-bold border border-amber-400/30">
+                  Wajib 1x / Minggu
+                </span>
+              </div>
+              <div className="text-xs text-slate-400 truncate mt-0.5">
+                Menu, paket meja, promo &amp; SOP (10 Soal • 8 Menit • Wajib saat Break)
+              </div>
+            </div>
+          </div>
+          <span className="px-3 py-1.5 rounded-xl bg-amber-500/20 text-amber-200 border border-amber-400/30 text-xs font-bold shrink-0">
+            Buka →
           </span>
         </button>
 
