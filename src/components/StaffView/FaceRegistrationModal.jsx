@@ -198,8 +198,12 @@ export default function FaceRegistrationModal({
               <ShieldCheck className="w-4 h-4" />
             </div>
             <div>
-              <h3 className="text-sm font-black text-white">Daftar Face Biometrics</h3>
-              <p className="text-[10px] text-slate-400">Wajib untuk {staff.name}</p>
+              <h3 className="text-sm font-black text-white">
+                {staff?.face_biometrics_registered ? 'Perbarui Wajah Biometrik' : 'Daftar Face Biometrics'}
+              </h3>
+              <p className="text-[10px] text-slate-400">
+                {staff?.face_biometrics_registered ? `Overwrite data biometrik master ${staff.name}` : `Wajib 1x untuk ${staff.name}`}
+              </p>
             </div>
           </div>
           {!saving && !registeredSuccess && (
@@ -223,14 +227,16 @@ export default function FaceRegistrationModal({
               </div>
 
               <div>
-                <h4 className="text-lg font-black text-white">Pendaftaran Wajah Berhasil!</h4>
+                <h4 className="text-lg font-black text-white">
+                  {staff?.face_biometrics_registered ? 'Biometrik Wajah Diperbarui!' : 'Pendaftaran Wajah Berhasil!'}
+                </h4>
                 <p className="text-xs text-slate-300 mt-1">
-                  Sistem Face Recognition Anda telah aktif &amp; terverifikasi liveness.
+                  Data master wajah Anda telah diperbarui &amp; siap diverifikasi saat absensi masuk.
                 </p>
               </div>
 
               <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-2xl text-[11px] text-emerald-300 font-bold leading-relaxed">
-                ✓ Pendaftaran biometrik selesai. Silakan tekan tombol <strong>Absen Masuk</strong> di menu utama saat jam kerja dimulai.
+                ✓ Foto biometrik baru telah tersimpan. Silakan tekan tombol <strong>Absen Masuk</strong> di menu utama saat jam kerja dimulai.
               </div>
 
               <button
@@ -250,14 +256,25 @@ export default function FaceRegistrationModal({
           ) : (
             <>
               {/* Mandatory Lighting & Centering Guidance Banner */}
-              <div className="bg-indigo-500/15 border border-indigo-500/35 rounded-2xl p-3 space-y-1">
+              <div className="bg-gradient-to-r from-indigo-950/70 via-slate-900 to-indigo-950/70 border border-indigo-500/40 rounded-2xl p-3 space-y-2">
                 <div className="flex items-center space-x-1.5 text-indigo-300 font-black text-xs">
                   <Sparkles className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
-                  <span>Petunjuk Pendaftaran Biometrik</span>
+                  <span>Panduan Foto Master Biometrik:</span>
                 </div>
-                <p className="text-[11px] text-slate-200 leading-relaxed font-semibold">
-                  Pastikan berada di tempat yang memiliki cahaya cukup terang dan posisikan wajah di tengah bingkai.
-                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5 text-[10.5px]">
+                  <div className="bg-[#12161f] border border-slate-800/80 rounded-xl p-2 flex flex-col justify-start">
+                    <span className="font-bold text-amber-300">💡 Cahaya Terang</span>
+                    <span className="text-slate-300 text-[10px] leading-tight mt-0.5">Cahaya cukup di depan wajah, jangan membelakangi lampu.</span>
+                  </div>
+                  <div className="bg-[#12161f] border border-slate-800/80 rounded-xl p-2 flex flex-col justify-start">
+                    <span className="font-bold text-rose-300">🚫 Tanpa Aksesoris</span>
+                    <span className="text-slate-300 text-[10px] leading-tight mt-0.5">Lepas masker, kacamata hitam, atau topi.</span>
+                  </div>
+                  <div className="bg-[#12161f] border border-slate-800/80 rounded-xl p-2 flex flex-col justify-start">
+                    <span className="font-bold text-emerald-300">🎯 Pas di Bingkai</span>
+                    <span className="text-slate-300 text-[10px] leading-tight mt-0.5">Wajah tegak lurus tepat di dalam garis oval panduan.</span>
+                  </div>
+                </div>
               </div>
 
               {/* Liveness Step Indicator */}

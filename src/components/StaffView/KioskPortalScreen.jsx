@@ -19,7 +19,8 @@ import {
   CheckCircle2,
   Smartphone,
   ShieldCheck,
-  Sparkles
+  Sparkles,
+  Smile
 } from 'lucide-react';
 import {
   getAppNow,
@@ -388,7 +389,7 @@ export default function KioskPortalScreen({
                   {staff?.role || 'Staff'} • {shiftStartLabel} - {shiftEndLabel}
                 </p>
 
-                {/* Ganti Foto + My Mood Today row */}
+                {/* Ganti Foto + Update Biometrik Wajah + My Mood Today row */}
                 <div className="flex flex-wrap items-center gap-1.5 mt-2">
                   <button
                     type="button"
@@ -398,6 +399,18 @@ export default function KioskPortalScreen({
                     <Camera className="w-3 h-3 text-indigo-400" />
                     <span>Ganti Foto</span>
                   </button>
+
+                  {staff?.face_biometrics_registered && (
+                    <button
+                      type="button"
+                      onClick={onOpenFaceRegistration}
+                      className="inline-flex items-center gap-1.5 text-[11px] font-bold text-emerald-300 bg-emerald-950/70 hover:bg-emerald-900/80 border border-emerald-500/40 rounded-full px-2.5 py-1 transition cursor-pointer shadow-sm active:scale-95"
+                      title="Perbarui / Overwrite data master biometrik wajah Anda"
+                    >
+                      <Smile className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                      <span>Update Wajah</span>
+                    </button>
+                  )}
 
                   {/* my mood today : [emoji] */}
                   <div className="relative" ref={moodContainerRef}>
@@ -562,7 +575,7 @@ export default function KioskPortalScreen({
           )}
         </section>
 
-        {/* Mandatory Face Biometrics Registration Alert (If staff hasn't registered yet) */}
+        {/* Mandatory Face Biometrics Registration Alert (Hanya jika belum daftar sama sekali) */}
         {!staff?.face_biometrics_registered && (
           <div className="bg-gradient-to-r from-indigo-950/80 via-[#1e2238] to-purple-950/80 border border-indigo-400/40 rounded-3xl p-4 shadow-xl flex items-center justify-between gap-3 animate-fade-in">
             <div className="flex items-center gap-3 min-w-0">
@@ -580,6 +593,30 @@ export default function KioskPortalScreen({
               className="px-3.5 py-2 rounded-xl bg-indigo-500 hover:bg-indigo-400 text-white text-xs font-black shadow-lg shadow-indigo-500/25 shrink-0 transition cursor-pointer active:scale-95"
             >
               Daftar →
+            </button>
+          </div>
+        )}
+
+        {/* Notice jika absensi aktif terkena peringatan wajah kurang sesuai */}
+        {activeShift && ((activeShift.flags || []).includes('FLAG_FACE_MISMATCH') || activeShift.face_recog_status === 'MISMATCH') && (
+          <div className="bg-amber-950/70 border border-amber-500/40 rounded-2xl p-3.5 flex items-center justify-between gap-3 animate-fade-in shadow-md">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/40 flex items-center justify-center shrink-0">
+                <AlertTriangle className="w-4 h-4" />
+              </div>
+              <div className="min-w-0 text-left">
+                <h4 className="text-xs font-bold text-amber-300">Wajah Selfie Absensi Kurang Sesuai</h4>
+                <p className="text-[10.5px] text-amber-200/90 leading-tight">
+                  Kemiripan rendah karena pencahayaan/aksesoris. Anda dapat mendaftarkan ulang master wajah di tempat terang.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={onOpenFaceRegistration}
+              className="px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-[11px] font-bold shrink-0 transition cursor-pointer shadow"
+            >
+              Update Wajah
             </button>
           </div>
         )}

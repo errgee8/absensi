@@ -34,6 +34,7 @@ export default function KioskCameraModal({
   const [submitError, setSubmitError] = useState(null);
   const [countdown, setCountdown] = useState(3);
   const [faceMismatchAlert, setFaceMismatchAlert] = useState(false);
+  const [faceSimilarity, setFaceSimilarity] = useState(null);
   const [permModalOpen, setPermModalOpen] = useState(false);
 
   const [userLocation, setUserLocation] = useState(null);
@@ -324,6 +325,9 @@ export default function KioskCameraModal({
       const isMismatch = res?.faceRecog?.status === 'MISMATCH' || (res?.flags || []).includes('FLAG_FACE_MISMATCH');
       if (isMismatch) {
         setFaceMismatchAlert(true);
+        if (res?.faceRecog?.similarity != null) {
+          setFaceSimilarity(res.faceRecog.similarity);
+        }
       }
 
       setSuccessMessage(res.message || config.successMsg);
@@ -528,16 +532,28 @@ export default function KioskCameraModal({
                 <p className="text-xs text-slate-300 mt-1">{successMessage}</p>
               </div>
 
-              {/* Face Mismatch Staff Notice */}
+              {/* Face Mismatch Staff Notice with Actionable Guidance */}
               {faceMismatchAlert && (
-                <div className="bg-amber-950/70 border border-amber-500/40 rounded-2xl p-3 text-left space-y-1.5 shadow-md">
+                <div className="bg-amber-950/80 border border-amber-500/50 rounded-2xl p-3.5 text-left space-y-2 shadow-lg">
                   <div className="flex items-center space-x-1.5 text-amber-300 font-bold text-xs">
                     <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
-                    <span>Peringatan: Wajah Tidak Cocok</span>
+                    <span>Peringatan: Wajah Kurang Cocok {faceSimilarity != null ? `(${faceSimilarity}%)` : ''}</span>
                   </div>
                   <p className="text-[11px] text-amber-200/90 leading-relaxed font-medium">
-                    Sistem mendeteksi foto selfie ini tidak sesuai dengan wajah Anda yang terdaftar. Absensi tetap masuk ke sistem, namun <strong>status ketidakcocokan wajah telah dilaporkan ke Manajer</strong> untuk ditinjau.
+                    Absensi Anda tetap tercatat, namun terdapat perbedaan tingkat kemiripan dengan data biometrik master.
                   </p>
+                  <div className="bg-black/35 border border-amber-500/30 rounded-xl p-2.5 text-[10.5px] text-amber-100 space-y-1">
+                    <div className="font-bold text-amber-300 flex items-center gap-1">
+                      <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                      <span>Anjuran Perbaikan:</span>
+                    </div>
+                    <ul className="list-disc list-inside space-y-0.5 text-slate-200 pl-1">
+                      <li>Pastikan berfoto di area <strong>cahaya terang merata</strong> (hindari backlight).</li>
+                      <li>Lepas <strong>masker, kacamata hitam, atau topi</strong>.</li>
+                      <li>Posisikan wajah tepat di tengah <strong>garis oval bingkai</strong>.</li>
+                      <li>Perbarui master biometrik Anda via tombol <strong>"Update Wajah"</strong> di dashboard staf.</li>
+                    </ul>
+                  </div>
                 </div>
               )}
 

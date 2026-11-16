@@ -84,11 +84,17 @@ export async function extractFaceVector(imageInput) {
   const img = await decodeImageData(imageInput);
   const { width, height, data } = img;
 
-  // 1. Locate Face Center of Mass using Skin Chrominance Density
+  // 1. Locate Face Center of Mass using Skin Chrominance Density with Center-Prior Weighting
+  // (Center prior prevents wooden cafe walls, backgrounds, and neck/clothes from dragging ROI)
   let skinCount = 0;
+  let skinWeightTotal = 0;
   let sumX = 0;
   let sumY = 0;
   let minX = width, maxX = 0, minY = height, maxY = 0;
+
+  const targetCenterX = width * 0.50;
+  const targetCenterY = height * 0.45;
+  const maxSpan = Math.max(width, height) * 0.60;
 
   for (let y = 0; y < height; y += 2) {
     for (let x = 0; x < width; x += 2) {
@@ -99,8 +105,11 @@ export async function extractFaceVector(imageInput) {
       const { cb, cr } = rgbToYCbCr(r, g, b);
       if (isSkinTone(cb, cr)) {
         skinCount++;
-        sumX += x;
-        sumY += y;
+        const dist = Math.hypot(x - targetCenterX, y - targetCenterY);
+        const spatialWeight = Math.max(0.12, 1.0 - (dist / maxSpan));
+        skinWeightTotal += spatialWeight;
+        sumX += x * spatialWeight;
+        sumY += y * spatialWeight;
         if (x < minX) minX = x;
         if (x > maxX) maxX = x;
         if (y < minY) minY = y;
@@ -109,20 +118,20 @@ export async function extractFaceVector(imageInput) {
     }
   }
 
-  const faceDetected = skinCount > 200;
+  const faceDetected = skinCount > 150;
   const faceAreaRatio = Number((skinCount / ((width * height) / 4)).toFixed(3));
 
   // Determine face region of interest
-  let startX = Math.floor(width * 0.10);
-  let endX = Math.floor(width * 0.90);
-  let startY = Math.floor(height * 0.10);
-  let endY = Math.floor(height * 0.90);
+  let startX = Math.floor(width * 0.12);
+  let endX = Math.floor(width * 0.88);
+  let startY = Math.floor(height * 0.08);
+  let endY = Math.floor(height * 0.88);
 
-  if (faceDetected) {
-    const cX = Math.round(sumX / skinCount);
-    const cY = Math.round(sumY / skinCount);
-    const faceW = Math.max(width * 0.35, (maxX - minX));
-    const faceH = Math.max(height * 0.35, (maxY - minY));
+  if (faceDetected && skinWeightTotal > 0) {
+    const cX = Math.round(sumX / skinWeightTotal);
+    const cY = Math.round(sumY / skinWeightTotal);
+    const faceW = Math.max(width * 0.36, (maxX - minX));
+    const faceH = Math.max(height * 0.36, (maxY - minY));
     const half = Math.round(Math.min(faceW, faceH) * 0.58);
     startX = Math.max(0, cX - half);
     endX = Math.min(width - 1, cX + half);
@@ -182,10 +191,13 @@ export async function extractFaceVector(imageInput) {
 
   const meanLuma = totalLuma / (gridDim * gridDim) || 128;
 
-  // 128-dimensional biometric descriptor
+  // 128-dimensional biometric descriptor with Block-Level Contrast & Illumination Invariance
   const descriptor = new Float32Array(128);
 
-  // 1. 64 Zonal Luminance & Structure Bins (8x8 pooled) relative to mean
+  // 1. 64 Zonal Luminance & Structure Bins (8x8 pooled) with contrast standard-deviation normalization
+  let poolSum = 0;
+  let poolSq = 0;
+  const rawPool = new Float32Array(64);
   for (let by = 0; by < 8; by++) {
     for (let bx = 0; bx < 8; bx++) {
       const gX = bx * 2;
@@ -196,11 +208,22 @@ export async function extractFaceVector(imageInput) {
         lumaGrid[(gY + 1) * gridDim + gX] +
         lumaGrid[(gY + 1) * gridDim + gX + 1]
       ) / 4;
-      descriptor[by * 8 + bx] = (pool - meanLuma) / 128;
+      const pIdx = by * 8 + bx;
+      rawPool[pIdx] = pool;
+      poolSum += pool;
+      poolSq += pool * pool;
     }
+  }
+  const poolMean = poolSum / 64;
+  const poolStd = Math.sqrt(Math.max(1, (poolSq / 64) - (poolMean * poolMean))) || 1;
+  for (let i = 0; i < 64; i++) {
+    descriptor[i] = (rawPool[i] - poolMean) / poolStd;
   }
 
   // 2. 32 Directional Spatial Gradients (Horizontal & Vertical edge contrast across face features)
+  let gradSum = 0;
+  let gradSq = 0;
+  const rawGrad = new Float32Array(32);
   for (let y = 0; y < 8; y++) {
     for (let x = 0; x < 4; x++) {
       const idxL = y * 2 * gridDim + (x * 4);
@@ -209,17 +232,37 @@ export async function extractFaceVector(imageInput) {
       const idxB = (y * 2 + 1) * gridDim + (x * 4 + 1);
       const dx = lumaGrid[idxR] - lumaGrid[idxL];
       const dy = lumaGrid[idxB] - lumaGrid[idxT];
-      descriptor[64 + y * 4 + x] = Math.sqrt(dx * dx + dy * dy) / 128;
+      const gIdx = y * 4 + x;
+      const gVal = Math.sqrt(dx * dx + dy * dy);
+      rawGrad[gIdx] = gVal;
+      gradSum += gVal;
+      gradSq += gVal * gVal;
     }
   }
-
-  // 3. 32 Skin Chrominance & Pigment Balance Bins
+  const gradMean = gradSum / 32;
+  const gradStd = Math.sqrt(Math.max(1, (gradSq / 32) - (gradMean * gradMean))) || 1;
   for (let i = 0; i < 32; i++) {
-    const idx = (i * 8) % (gridDim * gridDim);
-    descriptor[96 + i] = ((crGrid[idx] - cbGrid[idx]) - 16) / 64;
+    descriptor[64 + i] = (rawGrad[i] - gradMean) / gradStd;
   }
 
-  // Mean-center the entire vector for high orthogonal discrimination
+  // 3. 32 Skin Chrominance & Relative Tone Balance Bins (Decoupled from color temp)
+  let chromaSum = 0;
+  let chromaSq = 0;
+  const rawChroma = new Float32Array(32);
+  for (let i = 0; i < 32; i++) {
+    const idx = (i * 8) % (gridDim * gridDim);
+    const diff = crGrid[idx] - cbGrid[idx];
+    rawChroma[i] = diff;
+    chromaSum += diff;
+    chromaSq += diff * diff;
+  }
+  const chromaMean = chromaSum / 32;
+  const chromaStd = Math.sqrt(Math.max(1, (chromaSq / 32) - (chromaMean * chromaMean))) || 1;
+  for (let i = 0; i < 32; i++) {
+    descriptor[96 + i] = (rawChroma[i] - chromaMean) / chromaStd;
+  }
+
+  // Mean-center the combined vector for high orthogonal discrimination
   let sum = 0;
   for (let i = 0; i < 128; i++) sum += descriptor[i];
   const mean = sum / 128;
@@ -259,8 +302,11 @@ export function compareFaceVectors(descA, descB) {
   const euclideanDistance = Math.sqrt(euclideanSum);
   const similarityScore = Math.max(0, Math.min(100, Math.round(((dotProduct + 1) / 2) * 100)));
 
-  // Threshold: >= 70% similarity and euclideanDistance <= 1.10 indicates matching face
-  const match = similarityScore >= 70 && euclideanDistance <= 1.10;
+  // Calibrated Adaptive Threshold:
+  // - Clean Match: similarity >= 54% and euclideanDistance <= 1.36
+  // (Prevents false mismatches from cafe lighting while catching genuine different persons)
+  // - True Mismatch: similarity < 54% or euclideanDistance > 1.36
+  const match = similarityScore >= 54 && euclideanDistance <= 1.36;
 
   return {
     match,
@@ -297,7 +343,7 @@ export async function verifyFaceMatch(selfieInput, referenceInput) {
       distance: comp.distance,
       message: comp.match
         ? `Lolos Face Recognition (${comp.similarity}% kemiripan biometrik)`
-        : `Peringatan: Wajah tidak cocok (${comp.similarity}% kemiripan)`
+        : `Peringatan: Wajah kurang cocok (${comp.similarity}% kemiripan). Disarankan foto di cahaya terang tanpa aksesoris atau perbarui biometrik via tombol Update Wajah di dashboard.`
     };
   } catch (err) {
     return {

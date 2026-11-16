@@ -364,7 +364,7 @@ export default function PhotoDetailModal({ shift, type = 'in', onClose, onShiftU
               )}
               {shift.face_recog_status === 'MISMATCH' && (
                 <p className="text-rose-300 font-medium">
-                  <strong>Peringatan Titip Absen:</strong> Tingkat kemiripan biometrik hanya <strong>{shift.face_recog_similarity}%</strong> (di bawah batas minimum 70%). Sistem mendeteksi kemungkinan wajah orang lain yang mengambil selfie untuk karyawan ini.
+                  <strong>Peringatan Verifikasi Wajah:</strong> Tingkat kemiripan biometrik <strong>{shift.face_recog_similarity}%</strong> (di bawah batas toleransi). Sistem mendeteksi kemungkinan wajah kurang sesuai atau pencahayaan selfie tidak mencukupi dibanding data biometrik master. Karyawan disarankan memperbarui master wajah di tempat terang.
                 </p>
               )}
               {shift.face_recog_status === 'NO_REFERENCE' && (
