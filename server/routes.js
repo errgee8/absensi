@@ -59,6 +59,10 @@ router.get('/events', (req, res) => {
   res.end();
 });
 
+// Lightweight In-Memory Caches for Serverless (30-60s TTL to preserve Vercel compute & Supabase quota)
+let schedulesCache = { data: null, ts: 0 };
+let announcementsCache = { data: null, ts: 0 };
+
 // ==========================================
 // PUSH NOTIFICATION ROUTES
 // ==========================================
@@ -162,7 +166,7 @@ router.post('/admin/backups/restore', async (req, res) => {
 
 // 5. Emergency Bypass / Fault Switch Check-in (Kamera / Hardware Rusak)
 router.post('/admin/emergency-bypass', async (req, res) => {
-  const { pin, staffId, actionType, reason, reviewerName } = req.body || {};
+  const { pin, staffId, actionType = 'checkin', reason, reviewerName } = req.body || {};
   const auth = await verifyManagementAuth(pin);
   if (!auth.authorized) {
     return res.status(403).json({ error: 'Akses ditolak: PIN Manager salah.' });
@@ -174,77 +178,188 @@ router.post('/admin/emergency-bypass', async (req, res) => {
       staff = await findStaffInSupabase(staffId);
     }
     if (!staff) {
-      staff = db.prepare('SELECT * FROM staff WHERE id = ? OR name LIKE ?').get(staffId, `%${staffId}%`);
+      staff = db.prepare('SELECT * FROM staff WHERE id = ? OR legacy_code = ? OR name LIKE ?').get(staffId, staffId, `%${staffId}%`);
     }
     if (!staff) return res.status(404).json({ error: 'Staf tidak ditemukan.' });
+
+    const localStaffId = String(staff.legacy_code || staff.id);
+    const staffUuid = staff.uuid || (typeof staff.id === 'string' && staff.id.includes('-') ? staff.id : null);
+
+    // 1. Ensure staff row is in SQLite staff table to eliminate FOREIGN KEY constraint error
+    try {
+      db.prepare(`
+        INSERT OR REPLACE INTO staff (id, name, venue, division, role, department, pin, shift_start, shift_end, standard_hours, is_active, uuid)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        localStaffId,
+        staff.name,
+        staff.venue || 'LuckyCat',
+        staff.division || 'Server and Cashier',
+        staff.role || 'Staff',
+        staff.department || staff.division || 'Floor',
+        staff.pin || '1234',
+        staff.shift_start || '13:00',
+        staff.shift_end || '22:00',
+        staff.standard_hours || 8.5,
+        staff.is_active ? 1 : 0,
+        staffUuid
+      );
+    } catch (e) {
+      console.warn('Mirror staff to SQLite error in bypass:', e.message);
+    }
 
     const now = new Date();
     const bypassFlags = ['FLAG_MANUAL_ADMIN_OVERRIDE'];
     const notes = {
       is_manual_override: true,
       override_reason: reason || 'Kamera/Hardware staf bermasalah',
-      authorized_by: reviewerName || auth.reviewerName,
+      authorized_by: reviewerName || auth.reviewerName || 'Operational Manager',
       authorized_at: now.toISOString()
     };
+    const dateStr = getOperationalDateYMD(now.toISOString());
 
     if (actionType === 'checkout') {
       db.prepare(`
         UPDATE shifts
         SET checkout_time = ?, status = 'COMPLETED', flags = ?, notes = ?, updated_at = ?
-        WHERE staff_id = ? AND status != 'COMPLETED'
-      `).run(now.toISOString(), JSON.stringify(bypassFlags), JSON.stringify(notes), now.toISOString(), staff.id);
+        WHERE (staff_id = ? OR staff_id = ?) AND status != 'COMPLETED'
+      `).run(now.toISOString(), JSON.stringify(bypassFlags), JSON.stringify(notes), now.toISOString(), localStaffId, String(staff.id));
 
       if (isSupabaseConfigured && supabase) {
-        await supabase
-          .from('attendance_logs')
-          .update({
-            checkout_time: now.toISOString(),
-            status: 'COMPLETED',
-            flags: bypassFlags,
-            notes: JSON.stringify(notes),
-            updated_at: now.toISOString()
-          })
-          .eq('staff_id', staff.uuid || staff.id)
-          .neq('status', 'COMPLETED');
+        try {
+          await supabase
+            .from('attendance_logs')
+            .update({
+              check_out_time: now.toISOString(),
+              status: 'COMPLETED',
+              flags: bypassFlags,
+              notes: JSON.stringify(notes),
+              updated_at: now.toISOString()
+            })
+            .eq('staff_id', staffUuid || staff.id)
+            .neq('status', 'COMPLETED');
+        } catch (e) {
+          console.warn('Supabase checkout bypass error:', e.message);
+        }
+      }
+    } else if (actionType === 'break_start') {
+      db.prepare(`
+        UPDATE shifts
+        SET break_status = 'ON_BREAK', break_start_time = ?, flags = ?, notes = ?, updated_at = ?
+        WHERE (staff_id = ? OR staff_id = ?) AND status != 'COMPLETED'
+      `).run(now.toISOString(), JSON.stringify(bypassFlags), JSON.stringify(notes), now.toISOString(), localStaffId, String(staff.id));
+
+      if (isSupabaseConfigured && supabase) {
+        try {
+          await supabase
+            .from('attendance_logs')
+            .update({
+              break_status: 'ON_BREAK',
+              break_start_time: now.toISOString(),
+              updated_at: now.toISOString()
+            })
+            .eq('staff_id', staffUuid || staff.id)
+            .neq('status', 'COMPLETED');
+        } catch {}
+      }
+    } else if (actionType === 'break_end') {
+      db.prepare(`
+        UPDATE shifts
+        SET break_status = 'FINISHED', break_end_time = ?, flags = ?, notes = ?, updated_at = ?
+        WHERE (staff_id = ? OR staff_id = ?) AND status != 'COMPLETED'
+      `).run(now.toISOString(), JSON.stringify(bypassFlags), JSON.stringify(notes), now.toISOString(), localStaffId, String(staff.id));
+
+      if (isSupabaseConfigured && supabase) {
+        try {
+          await supabase
+            .from('attendance_logs')
+            .update({
+              break_status: 'FINISHED',
+              break_end_time: now.toISOString(),
+              updated_at: now.toISOString()
+            })
+            .eq('staff_id', staffUuid || staff.id)
+            .neq('status', 'COMPLETED');
+        } catch {}
       }
     } else {
-      const dateStr = getOperationalDateYMD(now.toISOString());
-      db.prepare(`
-        INSERT INTO shifts (staff_id, date, checkin_time, checkin_lat, checkin_lng, status, flags, notes, created_at)
-        VALUES (?, ?, ?, ?, ?, 'IN_PROGRESS', ?, ?, ?)
-      `).run(
-        staff.id,
-        dateStr,
-        now.toISOString(),
-        getSetting('venue_lat') || -8.780981,
-        getSetting('venue_lng') || 115.176863,
-        JSON.stringify(bypassFlags),
-        JSON.stringify(notes),
-        now.toISOString()
-      );
+      // actionType === 'checkin'
+      const existing = db.prepare(`
+        SELECT id FROM shifts WHERE (staff_id = ? OR staff_id = ?) AND status != 'COMPLETED'
+      `).get(localStaffId, String(staff.id));
+
+      if (existing) {
+        db.prepare(`
+          UPDATE shifts
+          SET flags = ?, notes = ?, updated_at = ?
+          WHERE id = ?
+        `).run(JSON.stringify(bypassFlags), JSON.stringify(notes), now.toISOString(), existing.id);
+      } else {
+        db.prepare(`
+          INSERT INTO shifts (staff_id, date, scheduled_start, scheduled_end, checkin_time, checkin_lat, checkin_lng, status, flags, notes, created_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, 'IN_PROGRESS', ?, ?, ?)
+        `).run(
+          localStaffId,
+          dateStr,
+          staff.shift_start || '13:00',
+          staff.shift_end || '22:00',
+          now.toISOString(),
+          getSetting('venue_lat') || -8.780981,
+          getSetting('venue_lng') || 115.176863,
+          JSON.stringify(bypassFlags),
+          JSON.stringify(notes),
+          now.toISOString()
+        );
+      }
 
       if (isSupabaseConfigured && supabase) {
-        await supabase.from('attendance_logs').insert([{
-          staff_id: staff.uuid || staff.id,
-          date: dateStr,
-          checkin_time: now.toISOString(),
-          checkin_lat: getSetting('venue_lat') || -8.780981,
-          checkin_lng: getSetting('venue_lng') || 115.176863,
-          status: 'IN_PROGRESS',
-          flags: bypassFlags,
-          notes: JSON.stringify(notes)
-        }]);
+        try {
+          const { data: supaActive } = await supabase
+            .from('attendance_logs')
+            .select('id')
+            .eq('staff_id', staffUuid || staff.id)
+            .neq('status', 'COMPLETED')
+            .maybeSingle();
+
+          if (supaActive) {
+            await supabase
+              .from('attendance_logs')
+              .update({
+                flags: bypassFlags,
+                notes: JSON.stringify(notes),
+                status: 'ON_DUTY',
+                updated_at: now.toISOString()
+              })
+              .eq('id', supaActive.id);
+          } else {
+            await supabase
+              .from('attendance_logs')
+              .insert([{
+                staff_id: staffUuid || staff.id,
+                shift_date: dateStr,
+                check_in_time: now.toISOString(),
+                check_in_lat: getSetting('venue_lat') || -8.780981,
+                check_in_lng: getSetting('venue_lng') || 115.176863,
+                status: 'ON_DUTY',
+                flags: bypassFlags,
+                notes: JSON.stringify(notes)
+              }]);
+          }
+        } catch (e) {
+          console.warn('Supabase checkin bypass note:', e.message);
+        }
       }
     }
 
-    broadcastEvent('SHIFT_UPDATE', { action: 'BYPASS_PUNCH', staffId: staff.id });
+    broadcastEvent('SHIFT_UPDATE', { action: 'BYPASS_PUNCH', staffId: localStaffId });
 
     return res.json({
       success: true,
-      message: `Otorisasi darurat (${actionType}) untuk ${staff.name} berhasil dicatat.`,
+      message: `Otorisasi darurat (${actionType}) untuk ${staff.name} berhasil dicatat. Staf langsung aktif tanpa perlu selfie kamera.`,
       staff: staff.name
     });
   } catch (err) {
+    console.error('Error during emergency-bypass:', err);
     return res.status(500).json({ error: 'Gagal memproses bypass: ' + err.message });
   }
 });
@@ -657,6 +772,11 @@ router.get('/network-status', (req, res) => {
 
 // 3. Shift Schedules Management (Timing Editor)
 router.get('/schedules', async (req, res) => {
+  const nowMs = Date.now();
+  if (schedulesCache.data && nowMs - schedulesCache.ts < 60000) {
+    return res.json(schedulesCache.data);
+  }
+
   let schedules = db.prepare('SELECT * FROM shift_schedules ORDER BY venue ASC, division ASC, shift_number ASC').all();
   let breakWindows = {};
 
@@ -724,10 +844,12 @@ router.get('/schedules', async (req, res) => {
     venue: s.venue && s.venue.replace(/\s+/g, '').toLowerCase() === 'luckycat' ? 'LuckyCat' : s.venue
   }));
 
+  schedulesCache = { data: schedules, ts: Date.now() };
   res.json(schedules);
 });
 
 router.post('/schedules', async (req, res) => {
+  schedulesCache = { data: null, ts: 0 };
   const { venue, division, shift_number, name, start_time, end_time, is_flexible_checkout, allows_break, max_break_end, break_start_time } = req.body;
 
   if (!division || !start_time || !end_time) {
@@ -807,6 +929,7 @@ router.post('/schedules', async (req, res) => {
 });
 
 router.put('/schedules/:id', async (req, res) => {
+  schedulesCache = { data: null, ts: 0 };
   const { id } = req.params;
   const { venue, division, name, start_time, end_time, is_flexible_checkout, allows_break, max_break_end, break_start_time } = req.body;
 
@@ -865,6 +988,7 @@ router.put('/schedules/:id', async (req, res) => {
 });
 
 router.delete('/schedules/:id', async (req, res) => {
+  schedulesCache = { data: null, ts: 0 };
   const { id } = req.params;
   try {
     db.prepare('DELETE FROM shift_schedules WHERE id = ?').run(id);
@@ -1022,8 +1146,15 @@ router.post('/staff/verify-pin', async (req, res) => {
   const cleanPin = pin.trim();
   let staff = null;
 
-  // 1. Primary: Lookup in Supabase Cloud
-  if (isSupabaseConfigured) {
+  // 1. Ultra-fast path: Check local SQLite cache first (0.2ms latency)
+  if (staffId) {
+    staff = db.prepare('SELECT * FROM staff WHERE (id = ? OR legacy_code = ?) AND is_active = 1').get(staffId, staffId);
+  } else {
+    staff = db.prepare('SELECT * FROM staff WHERE pin = ? AND is_active = 1').get(cleanPin);
+  }
+
+  // 2. If not found in SQLite, query Supabase Cloud
+  if (!staff && isSupabaseConfigured) {
     try {
       if (staffId) {
         const supa = await findStaffInSupabase(staffId);
@@ -1048,7 +1179,7 @@ router.post('/staff/verify-pin', async (req, res) => {
       }
 
       if (staff) {
-        // Upsert to SQLite to ensure local cache consistency
+        // Upsert to SQLite to ensure future logins are instant
         try {
           db.prepare(`
             INSERT OR REPLACE INTO staff (id, name, venue, division, role, department, pin, shift_start, shift_end, standard_hours, is_active, uuid)
@@ -1070,16 +1201,7 @@ router.post('/staff/verify-pin', async (req, res) => {
         } catch {}
       }
     } catch (e) {
-      console.warn('Supabase pin query error:', e.message);
-    }
-  }
-
-  // 2. Fallback to SQLite
-  if (!staff) {
-    if (staffId) {
-      staff = db.prepare('SELECT * FROM staff WHERE id = ?').get(staffId);
-    } else {
-      staff = db.prepare('SELECT * FROM staff WHERE pin = ? AND is_active = 1').get(cleanPin);
+      console.warn('Supabase pin query note:', e.message);
     }
   }
 
@@ -1097,11 +1219,9 @@ router.post('/staff/verify-pin', async (req, res) => {
     return res.status(401).json({ error: 'PIN salah. Silakan coba lagi.' });
   }
 
-  // Auto-close any forgotten previous-day shifts that passed 07:00 WITA cutoff
+  // Auto-close forgotten shifts in background (non-blocking for instant login)
   if (isSupabaseConfigured) {
-    try {
-      await cloudDb.autoCloseCutoffShifts(staff.uuid || staff.id);
-    } catch {}
+    cloudDb.autoCloseCutoffShifts(staff.uuid || staff.id).catch(() => {});
   }
   try {
     const curOpDate = getOperationalDateYMD(new Date());
@@ -4104,10 +4224,15 @@ router.get('/announcements', async (req, res) => {
     let reads = [];
 
     if (isSupabaseConfigured) {
-      [announcements, reads] = await Promise.all([
-        cloudDb.getAnnouncements(),
-        cloudDb.getAnnouncementReads()
-      ]);
+      const now = Date.now();
+      if (!announcementsCache.data || now - announcementsCache.ts > 30000) {
+        const [aData, rData] = await Promise.all([
+          cloudDb.getAnnouncements(),
+          cloudDb.getAnnouncementReads()
+        ]);
+        announcementsCache = { data: [aData || [], rData || []], ts: now };
+      }
+      [announcements, reads] = announcementsCache.data;
     } else {
       announcements = db.prepare('SELECT * FROM announcements ORDER BY created_at DESC').all();
       reads = db.prepare('SELECT * FROM announcement_reads').all();
@@ -4235,6 +4360,7 @@ router.post('/announcements', async (req, res) => {
       console.warn('SQLite announcement insert note:', e.message);
     }
 
+    announcementsCache = { data: null, ts: 0 };
     broadcastEvent('ANNOUNCEMENT_UPDATE', { action: 'CREATED', announcement: newAnnouncement });
 
     // Send Web Push notification to all staff (if enabled in settings)
@@ -4339,6 +4465,7 @@ router.put('/announcements/:id', async (req, res) => {
       console.warn('SQLite announcement update note:', e.message);
     }
 
+    announcementsCache = { data: null, ts: 0 };
     broadcastEvent('ANNOUNCEMENT_UPDATE', { action: 'UPDATED', announcement: updated });
 
     return res.json({
@@ -4390,6 +4517,7 @@ router.post('/announcements/:id/acknowledge', async (req, res) => {
       console.warn('SQLite announcement_reads note:', e.message);
     }
 
+    announcementsCache = { data: null, ts: 0 };
     broadcastEvent('ANNOUNCEMENT_READ', { announcementId: id, staffId, staffName });
 
     return res.json({

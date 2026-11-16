@@ -747,24 +747,26 @@ export default function ShiftTable({
                                   </button>
                                 )}
 
-                                {shift.face_recog_status === 'MISMATCH' && (
-                                  <button
-                                    type="button"
-                                    onClick={() => onInspectPhoto?.(shift, 'in')}
-                                    className="px-2 py-1 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-200 border border-rose-500/40 font-black text-[9px] uppercase tracking-wider transition cursor-pointer flex items-center space-x-1"
-                                  >
-                                    <Eye className="w-2.5 h-2.5" />
-                                    <span>Cek Wajah</span>
-                                  </button>
-                                )}
-
                                 <button
                                   type="button"
                                   onClick={() => onInspectPhoto?.(shift, shift.checkout_photo ? 'out' : 'in')}
-                                  className="px-2 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-black text-[9px] uppercase tracking-wider transition cursor-pointer shadow-xs flex items-center space-x-1"
+                                  className={`px-2.5 py-1.5 rounded-lg font-black text-[9.5px] uppercase tracking-wider transition cursor-pointer shadow-xs flex items-center space-x-1.5 ${
+                                    shift.face_recog_status === 'MISMATCH'
+                                      ? 'bg-rose-600 hover:bg-rose-500 text-white'
+                                      : 'bg-indigo-600 hover:bg-indigo-500 text-white'
+                                  }`}
+                                  title="Buka audit lengkap shift, foto selfie, GPS, dan verifikasi biometrik"
                                 >
-                                  <Eye className="w-2.5 h-2.5" />
-                                  <span>Audit ➔</span>
+                                  {shift.face_recog_status === 'MISMATCH' ? (
+                                    <ShieldAlert className="w-3 h-3 text-white" />
+                                  ) : (
+                                    <FileText className="w-3 h-3 text-indigo-200" />
+                                  )}
+                                  <span>
+                                    {shift.face_recog_status === 'MISMATCH'
+                                      ? 'Audit & Cek Wajah ➔'
+                                      : 'Audit Shift ➔'}
+                                  </span>
                                 </button>
 
                                 {/* Otorisasi Checkout Awal jika shift masih berjalan */}

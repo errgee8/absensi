@@ -46,15 +46,24 @@ export default function FaceRegistrationModal({
       return;
     }
 
+    const getUserMediaWithTimeout = (constraints, timeoutMs = 3500) => {
+      return Promise.race([
+        navigator.mediaDevices.getUserMedia(constraints),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('CAMERA_TIMEOUT')), timeoutMs)
+        )
+      ]);
+    };
+
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
+      const stream = await getUserMediaWithTimeout({
         video: {
           facingMode: { ideal: 'user' },
           width: { ideal: 640 },
           height: { ideal: 640 }
         },
         audio: false
-      });
+      }, 3500);
       streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;

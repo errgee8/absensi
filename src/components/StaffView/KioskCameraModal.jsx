@@ -183,27 +183,38 @@ export default function KioskCameraModal({
       return;
     }
 
+    const getUserMediaWithTimeout = (constraints, timeoutMs = 3500) => {
+      return Promise.race([
+        navigator.mediaDevices.getUserMedia(constraints),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('CAMERA_TIMEOUT')), timeoutMs)
+        )
+      ]);
+    };
+
     try {
       // 1. Try requested facingMode ('user' for front selfie, 'environment' for rear/back camera)
-      stream = await navigator.mediaDevices.getUserMedia({
+      stream = await getUserMediaWithTimeout({
         video: { facingMode: { ideal: targetFacing } },
         audio: false
-      });
+      }, 3000);
     } catch (err1) {
-      console.warn(`FacingMode ${targetFacing} failed, trying fallback stream:`, err1);
+      console.warn(`FacingMode ${targetFacing} failed or timed out, trying fallback stream:`, err1);
       try {
         // 2. Fallback to basic video stream (any available camera)
-        stream = await navigator.mediaDevices.getUserMedia({
+        stream = await getUserMediaWithTimeout({
           video: true,
           audio: false
-        });
+        }, 3000);
       } catch (err2) {
-        console.error('All camera attempts failed:', err2);
-        let msg = 'Kamera tidak dapat diakses.';
+        console.error('All camera attempts failed or timed out:', err2);
+        let msg = 'Kamera tidak dapat diakses atau lambat merespons.';
         if (err2.name === 'NotAllowedError' || err1.name === 'NotAllowedError') {
           msg = 'Izin kamera ditolak. Berikan izin kamera di browser Anda atau gunakan tombol Buka Kamera HP.';
         } else if (err2.name === 'NotFoundError') {
           msg = 'Kamera tidak terdeteksi. Gunakan tombol Buka Kamera HP di bawah.';
+        } else if (err2.message === 'CAMERA_TIMEOUT' || err1.message === 'CAMERA_TIMEOUT') {
+          msg = 'Kamera HP lambat merespons. Klik tombol "Buka Kamera HP Langsung" di bawah.';
         }
         setCameraError(msg);
         setCameraLoading(false);

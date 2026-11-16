@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { formatWitaDateTime } from '../../utils/time';
+import { getStaffList } from '../../utils/api';
 
 export default function SystemRecoveryModal({ isOpen, onClose, adminAuth, venueSettings }) {
   if (!isOpen) return null;
@@ -37,8 +38,15 @@ export default function SystemRecoveryModal({ isOpen, onClose, adminAuth, venueS
   // Emergency Bypass Form State
   const [bypassStaffId, setStaffId] = useState('');
   const [bypassType, setBypassType] = useState('checkin');
-  const [bypassReason, setBypassReason] = useState('Kamera HP staf rusak fisik');
+  const [bypassReason, setBypassReason] = useState('Kamera HP staf rusak fisik / error');
   const [submittingBypass, setSubmittingBypass] = useState(false);
+  const [staffList, setStaffList] = useState([]);
+
+  useEffect(() => {
+    getStaffList('ALL')
+      .then((data) => setStaffList(Array.isArray(data) ? data : []))
+      .catch(() => {});
+  }, []);
 
   // Load backups on open
   const loadBackups = async () => {
@@ -383,14 +391,26 @@ export default function SystemRecoveryModal({ isOpen, onClose, adminAuth, venueS
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="text-[11px] font-black uppercase text-slate-600 block mb-1">
-                      Nama atau ID Staf:
+                      Pilih Staf yang Mengalami Masalah Kamera:
                     </label>
-                    <input
-                      type="text"
-                      placeholder="Contoh: Hendy atau JP-SER-8978737"
+                    <select
                       value={bypassStaffId}
                       onChange={(e) => setStaffId(e.target.value)}
-                      className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-bold focus:border-blue-500 focus:outline-none"
+                      className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-bold focus:border-blue-500 focus:outline-none bg-white mb-1.5"
+                    >
+                      <option value="">-- Pilih Staf dari Daftar --</option>
+                      {staffList.map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.name} ({s.role || s.division || s.venue}) - PIN: {s.pin}
+                        </option>
+                      ))}
+                    </select>
+                    <input
+                      type="text"
+                      placeholder="Atau ketik nama staf (contoh: Martin)"
+                      value={bypassStaffId}
+                      onChange={(e) => setStaffId(e.target.value)}
+                      className="w-full px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-medium focus:border-blue-500 focus:outline-none placeholder:text-slate-400"
                     />
                   </div>
 

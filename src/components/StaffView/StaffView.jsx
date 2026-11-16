@@ -229,7 +229,6 @@ export default function StaffView({
 
       setLoggedInStaff(data.staff);
       setActiveShift(data.activeShift);
-      loadStaffNotifications(data.staff);
 
       // Check Mandatory Notification Permission
       const perm = getNotificationPermission();
