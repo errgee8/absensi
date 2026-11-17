@@ -127,7 +127,7 @@ export default function KioskPortalScreen({
   const [kudosModalOpen, setKudosModalOpen] = useState(false);
   const [staffTheme, setStaffTheme] = useState(() => getStaffTheme(staff?.id, staff));
 
-  const currentStreak = staff?.streak || activeShift?.streak || 0;
+  const currentStreak = isVip ? 888 : (staff?.streak || activeShift?.streak || 0);
   const streakTier = getStreakTier(currentStreak, isVip);
 
   useEffect(() => {
@@ -501,8 +501,8 @@ export default function KioskPortalScreen({
                 <h1 className="text-base sm:text-lg font-black text-white truncate leading-tight">
                   {staff?.name || 'Staff'}
                 </h1>
-                {/* VIP Logo or Streak Badge */}
-                {isVip ? (
+                {/* VIP Logo Badge */}
+                {isVip && (
                   <span
                     className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-black bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 text-slate-950 shadow-[0_0_20px_rgba(234,179,8,0.85)] border-2 border-yellow-200 tracking-wider animate-pulse"
                     title="👑 Executive VIP Owner"
@@ -510,15 +510,15 @@ export default function KioskPortalScreen({
                     <Crown className="w-3.5 h-3.5 text-slate-950 fill-slate-950 stroke-[2.5]" />
                     <span>VIP</span>
                   </span>
-                ) : (
-                  <span
-                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black border shadow-sm ${streakTier.pillBg}`}
-                    title={`Streak On-Time: ${currentStreak} hari berturut-turut (${streakTier.name})`}
-                  >
-                    <span>🔥</span>
-                    <span>{currentStreak} Hari Streak</span>
-                  </span>
                 )}
+                {/* Streak Badge */}
+                <span
+                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black border shadow-sm ${streakTier.pillBg}`}
+                  title={isVip ? '👑 Infinite VIP Streak: 888 Hari' : `Streak On-Time: ${currentStreak} hari berturut-turut (${streakTier.name})`}
+                >
+                  <span>🔥</span>
+                  <span>{currentStreak} Hari Streak</span>
+                </span>
               </div>
               <div className="text-xs text-slate-400 font-medium flex items-center gap-1.5 mt-0.5 truncate">
                 {isVip ? (
