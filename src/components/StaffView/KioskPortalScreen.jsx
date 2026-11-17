@@ -35,7 +35,8 @@ import {
 } from '../../utils/time';
 import {
   updateStaffProfilePhoto,
-  updateStaffMood
+  updateStaffMood,
+  saveStaffThemeRemote
 } from '../../utils/api';
 import DevicePermissionModal from './DevicePermissionModal';
 import StaffThemeModal, { getStaffTheme, saveStaffTheme } from './StaffThemeModal';
@@ -143,8 +144,22 @@ export default function KioskPortalScreen({
 
   useEffect(() => {
     if (staff) {
-      setStaffTheme(getStaffTheme(staff?.id, staff));
+      const activeT = getStaffTheme(staff?.id, staff);
+      setStaffTheme(activeT);
       setStaffBio(staff?.bio || '');
+
+      // Auto-sync staff theme to remote server so all visitors immediately see this theme
+      try {
+        const localThemeId =
+          localStorage.getItem(`staff_theme_${staff.id}`) ||
+          (staff.uuid ? localStorage.getItem(`staff_theme_${staff.uuid}`) : null) ||
+          (activeT?.id && activeT.id !== 'midnight' ? activeT.id : null);
+
+        if (localThemeId) {
+          saveStaffThemeRemote(staff.id, localThemeId);
+          if (staff.uuid) saveStaffThemeRemote(staff.uuid, localThemeId);
+        }
+      } catch {}
     }
   }, [staff]);
 

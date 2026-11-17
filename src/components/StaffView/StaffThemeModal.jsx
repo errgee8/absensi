@@ -279,21 +279,43 @@ export function getStaffTheme(staffId, staff = null) {
     return VIP_THEME;
   }
 
-  if (!staffId) return STAFF_THEMES[0];
+  const defaultTheme = STAFF_THEMES.find(t => t.id === 'midnight') || STAFF_THEMES[0];
+
+  // 1. If staff record has theme_id from database/server
+  if (staff?.theme_id) {
+    const serverMatch = STAFF_THEMES.find(t => t.id === staff.theme_id);
+    if (serverMatch) return serverMatch;
+  }
+
+  if (!staffId && !staff?.uuid) return defaultTheme;
+
+  // 2. Check localStorage by staffId or staff.uuid
   try {
-    const savedId = localStorage.getItem(`staff_theme_${staffId}`) || localStorage.getItem('staff_theme_global');
-    const matched = STAFF_THEMES.find(t => t.id === savedId);
-    return matched || STAFF_THEMES[0];
+    const sUuid = staff?.uuid;
+    const savedId =
+      (staffId ? localStorage.getItem(`staff_theme_${staffId}`) : null) ||
+      (sUuid ? localStorage.getItem(`staff_theme_${sUuid}`) : null) ||
+      localStorage.getItem('staff_theme_global');
+
+    if (savedId) {
+      const matched = STAFF_THEMES.find(t => t.id === savedId);
+      if (matched) return matched;
+    }
+    return defaultTheme;
   } catch {
-    return STAFF_THEMES[0];
+    return defaultTheme;
   }
 }
 
-export function saveStaffTheme(staffId, themeId) {
+export function saveStaffTheme(staffId, themeId, staffUuid = null) {
   try {
     if (staffId) {
       localStorage.setItem(`staff_theme_${staffId}`, themeId);
       saveStaffThemeRemote(staffId, themeId);
+    }
+    if (staffUuid && staffUuid !== staffId) {
+      localStorage.setItem(`staff_theme_${staffUuid}`, themeId);
+      saveStaffThemeRemote(staffUuid, themeId);
     }
     localStorage.setItem('staff_theme_global', themeId);
   } catch (err) {
@@ -313,7 +335,7 @@ export default function StaffThemeModal({ isOpen, onClose, staff, currentThemeId
   });
 
   const handleChoose = (theme) => {
-    saveStaffTheme(staff?.id, theme.id);
+    saveStaffTheme(staff?.id, theme.id, staff?.uuid);
     if (onSelectTheme) onSelectTheme(theme);
     onClose();
   };

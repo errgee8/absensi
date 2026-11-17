@@ -18,6 +18,8 @@ import { getStaffPublicProfile } from '../../utils/api';
 import { getStreakTier, isVipStaff } from '../../utils/streakFrames';
 import { VIP_THEME, STAFF_THEMES } from './StaffThemeModal';
 
+const profileClientCache = new Map();
+
 export default function StaffPublicProfileModal({
   isOpen,
   staffId,
@@ -26,24 +28,36 @@ export default function StaffPublicProfileModal({
   onClose,
   onGiveStar = null
 }) {
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => !profileClientCache.has(staffId));
   const [error, setError] = useState(null);
-  const [profile, setProfile] = useState(null);
+  const [profile, setProfile] = useState(() => profileClientCache.get(staffId) || null);
 
   useEffect(() => {
     if (!isOpen || !staffId) return;
     let isMounted = true;
 
+    // Instant cache check
+    if (profileClientCache.has(staffId)) {
+      setProfile(profileClientCache.get(staffId));
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
+
     async function fetchProfile() {
       try {
-        setLoading(true);
         setError(null);
         const res = await getStaffPublicProfile(staffId, visitorStaff?.id || '');
         if (!isMounted) return;
-        setProfile(res?.profile || null);
+        if (res?.profile) {
+          setProfile(res.profile);
+          profileClientCache.set(staffId, res.profile);
+          if (res.profile.id) profileClientCache.set(res.profile.id, res.profile);
+          if (res.profile.uuid) profileClientCache.set(res.profile.uuid, res.profile);
+        }
       } catch (err) {
         if (!isMounted) return;
-        setError(err.message || 'Gagal memuat profil staf.');
+        if (!profile) setError(err.message || 'Gagal memuat profil staf.');
       } finally {
         if (isMounted) setLoading(false);
       }
@@ -62,11 +76,12 @@ export default function StaffPublicProfileModal({
   const streakTier = getStreakTier(currentStreak, isVip);
   const isSelf = visitorStaff && (String(visitorStaff.id) === String(profile?.id) || String(visitorStaff.uuid) === String(profile?.uuid));
 
-  // Ambil tema yang dipilih oleh staf yang sedang dikunjungi
+  // Ambil tema yang dipilih oleh staf yang sedang dikunjungi (Default: Stealth Titanium 'midnight')
+  const defaultTheme = STAFF_THEMES.find((t) => t.id === 'midnight') || STAFF_THEMES[0];
   const visitedTheme =
     (isVip ? VIP_THEME : null) ||
     [VIP_THEME, ...STAFF_THEMES].find((t) => t.id === profile?.theme_id) ||
-    STAFF_THEMES[0];
+    defaultTheme;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md animate-fade-in overflow-y-auto">

@@ -255,6 +255,10 @@ const ensureColumn = (tableName, columnName, definition) => {
 ensureColumn('staff', 'venue', "TEXT DEFAULT 'JP Karaoke'");
 ensureColumn('staff', 'division', "TEXT DEFAULT 'Server and Cashier'");
 ensureColumn('staff', 'bio', 'TEXT');
+ensureColumn('staff', 'theme_id', "TEXT DEFAULT 'midnight'");
+try {
+  db.prepare("UPDATE staff SET theme_id = 'royal_obsidian_vip' WHERE name LIKE '%Ryan Gerrit%' OR pin = '8894'").run();
+} catch (e) {}
 ensureColumn('staff_kudos', 'is_anonymous', 'INTEGER DEFAULT 0');
 ensureColumn('staff_points', 'proof_photo_url', 'TEXT');
 ensureColumn('staff_points', 'point_type', "TEXT DEFAULT 'MINUS'");
