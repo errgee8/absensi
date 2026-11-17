@@ -360,13 +360,19 @@ export default function KioskPortalScreen({
     announcements?.[0]?.title || 'Lihat info operasional & jadwal terbaru';
 
   return (
-    <div className={`min-h-screen ${staffTheme?.wrapperBg || 'bg-[#111318]'} text-slate-100 pb-10 px-3 pt-3 sm:px-6 transition-colors duration-300 relative overflow-hidden`}>
+    <div className={`min-h-screen ${staffTheme?.wrapperBg || 'bg-[#111318]'} text-slate-100 pb-10 px-3 pt-3 sm:px-6 transition-all duration-500 relative overflow-hidden`}>
       {/* Dynamic ambient background glow */}
       {staffTheme?.ambientGlow && (
-        <div
-          className="pointer-events-none absolute -top-40 left-1/2 -translate-x-1/2 w-[520px] h-[520px] rounded-full blur-[130px] transition-all duration-500"
-          style={{ backgroundColor: staffTheme.ambientGlow }}
-        />
+        <>
+          <div
+            className="pointer-events-none absolute -top-32 left-1/2 -translate-x-1/2 w-[580px] h-[480px] rounded-full blur-[140px] opacity-35 transition-all duration-700"
+            style={{ backgroundColor: staffTheme.ambientGlow }}
+          />
+          <div
+            className="pointer-events-none absolute top-1/3 -right-24 w-[320px] h-[320px] rounded-full blur-[120px] opacity-25 transition-all duration-700"
+            style={{ backgroundColor: staffTheme.ambientGlow }}
+          />
+        </>
       )}
 
       <div className="max-w-md mx-auto space-y-3 relative z-10">
@@ -443,7 +449,7 @@ export default function KioskPortalScreen({
               className="relative group shrink-0 focus:outline-none cursor-pointer"
               title="Ganti Foto Profil"
             >
-              <div className="w-14 h-14 rounded-2xl bg-[#232938] border border-white/15 overflow-hidden flex items-center justify-center shadow-inner">
+              <div className={`w-14 h-14 rounded-2xl bg-[#232938] border border-white/15 overflow-hidden flex items-center justify-center shadow-inner transition-all duration-300 ${staffTheme?.avatarRing || ''}`}>
                 {staff?.profile_photo_url ? (
                   <img
                     src={staff.profile_photo_url}
@@ -537,11 +543,14 @@ export default function KioskPortalScreen({
                 <button
                   type="button"
                   onClick={() => setThemeModalOpen(true)}
-                  className="inline-flex items-center gap-1 text-[10.5px] font-semibold text-slate-200 bg-[#232938] hover:bg-[#2c3345] border border-white/10 rounded-full px-2 py-0.5 transition cursor-pointer active:scale-95"
+                  className={`inline-flex items-center gap-1.5 text-[10.5px] font-bold rounded-full px-2.5 py-0.5 transition cursor-pointer active:scale-95 border shadow-sm ${
+                    staffTheme?.pillBorder || 'border-indigo-400/40 text-indigo-200 bg-indigo-950/60'
+                  }`}
                   title="Kustomisasi Tema & Nuansa Dashboard"
                 >
-                  <span className="text-xs">{staffTheme?.icon || '🎨'}</span>
-                  <span>{staffTheme?.name?.split(' ')[0] || 'Tema'}</span>
+                  <span className="text-[9.5px] opacity-75 font-bold">Theme :</span>
+                  <span>{staffTheme?.icon || '🎨'}</span>
+                  <span className="font-black">{staffTheme?.shortName || staffTheme?.name || 'Custom'}</span>
                 </button>
               </div>
             </div>
@@ -552,7 +561,7 @@ export default function KioskPortalScreen({
             <button
               type="button"
               onClick={handleClickPointsCard}
-              className="bg-[#12151d] hover:bg-[#161a24] border border-white/[0.07] rounded-2xl p-2 text-left transition cursor-pointer active:scale-95"
+              className={`${staffTheme?.metricBg || 'bg-[#12151d] hover:bg-[#161a24] border border-white/[0.07]'} rounded-2xl p-2 text-left transition cursor-pointer active:scale-95`}
             >
               <div className="text-[9.5px] font-bold uppercase tracking-wider text-slate-400 truncate">
                 Total Poin
@@ -570,7 +579,7 @@ export default function KioskPortalScreen({
             <button
               type="button"
               onClick={() => onOpenAttendanceHistory?.('LATE')}
-              className="bg-[#12151d] hover:bg-[#161a24] border border-white/[0.07] rounded-2xl p-2 text-left transition cursor-pointer active:scale-95 group"
+              className={`${staffTheme?.metricBg || 'bg-[#12151d] hover:bg-[#161a24] border border-white/[0.07]'} rounded-2xl p-2 text-left transition cursor-pointer active:scale-95 group`}
               title="Ketuk untuk melihat riwayat keterlambatan"
             >
               <div className="text-[9.5px] font-bold uppercase tracking-wider text-slate-400 group-hover:text-amber-300 transition truncate">
@@ -587,7 +596,7 @@ export default function KioskPortalScreen({
             <button
               type="button"
               onClick={() => onOpenAttendanceHistory?.('ABSENT')}
-              className="bg-[#12151d] hover:bg-[#161a24] border border-white/[0.07] rounded-2xl p-2 text-left transition cursor-pointer active:scale-95 group"
+              className={`${staffTheme?.metricBg || 'bg-[#12151d] hover:bg-[#161a24] border border-white/[0.07]'} rounded-2xl p-2 text-left transition cursor-pointer active:scale-95 group`}
               title="Ketuk untuk melihat riwayat hari kerja & izin/alpa"
             >
               <div className="text-[9.5px] font-bold uppercase tracking-wider text-slate-400 group-hover:text-blue-300 transition truncate">
