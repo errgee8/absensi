@@ -14,6 +14,7 @@ import StaffAttendanceHistoryModal from './StaffAttendanceHistoryModal';
 import FaceRegistrationModal from './FaceRegistrationModal';
 import StaffReportModal from './StaffReportModal';
 import StaffQuizModal from './StaffQuizModal';
+import ShiftClearedModal from './ShiftClearedModal';
 import { getNotificationPermission } from '../../utils/pushNotifications';
 import { verifyStaffPin, getAnnouncements, acknowledgeAnnouncement, getLeaveRequests, getPoints, acknowledgeStaffPoint, subscribeRealtimeEvents, sendPresenceHeartbeat, getWeeklyQuiz } from '../../utils/api';
 import { getOperationalDateYMD } from '../../utils/time';
@@ -44,6 +45,7 @@ export default function StaffView({
   const [faceSuccessAlert, setFaceSuccessAlert] = useState(null);
   const [cameraActionType, setCameraActionType] = useState('checkin');
   const [confirmedShift, setConfirmedShift] = useState(null);
+  const [shiftClearedData, setShiftClearedData] = useState(null);
   const [leaveModalOpen, setLeaveModalOpen] = useState(false);
   const [leaveModalInitialCategory, setLeaveModalInitialCategory] = useState(null);
 
@@ -501,7 +503,24 @@ export default function StaffView({
           confirmedShift={confirmedShift}
           venueSettings={venueSettings}
           onCompleteAndAutoLogout={handleResetToLogin}
+          onCheckoutCompleted={(completedShift) => {
+            setCameraModalOpen(false);
+            setShiftClearedData(completedShift);
+          }}
           onClose={() => setCameraModalOpen(false)}
+        />
+      )}
+
+      {/* Shift Cleared Confetti Celebration Modal */}
+      {shiftClearedData && (
+        <ShiftClearedModal
+          shift={shiftClearedData}
+          streak={shiftClearedData.streak || loggedInStaff?.streak || 0}
+          durationMinutes={shiftClearedData.duration_minutes || 0}
+          onClose={() => {
+            setShiftClearedData(null);
+            handleResetToLogin();
+          }}
         />
       )}
 

@@ -771,3 +771,29 @@ export async function getQuizLeaderboard(weekKey) {
   return data;
 }
 
+// 12. Peer Kudos (Bintang Apresiasi)
+export async function sendStaffKudos({ fromStaffId, toStaffId, reason }) {
+  const res = await fetch(`${API_BASE}/staff/kudos`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fromStaffId, toStaffId, reason })
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Gagal mengirim Bintang Apresiasi');
+  return data;
+}
+
+export async function getStaffKudosStatus(staffId) {
+  const res = await fetch(`${API_BASE}/staff/kudos/status?staffId=${encodeURIComponent(staffId)}`);
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Gagal memuat status Bintang Apresiasi');
+  return data;
+}
+
+export async function getAdminKudosLogs() {
+  const res = await fetch(`${API_BASE}/admin/kudos`);
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Gagal memuat riwayat Bintang Apresiasi');
+  return data;
+}
+

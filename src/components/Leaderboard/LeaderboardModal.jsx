@@ -21,13 +21,15 @@ import {
   Eye,
   Coffee
 } from 'lucide-react';
+import { getStreakTier } from '../../utils/streakFrames';
 
 // Reusable Elegant Framed Avatar Component with Fallback
-function StaffAvatarFrame({ photo, name, rank, size = 'md' }) {
+function StaffAvatarFrame({ photo, name, rank, streak = 0, size = 'md' }) {
   const [imgError, setImgError] = useState(false);
+  const streakTier = getStreakTier(streak);
 
-  // Frame styles based on rank
-  let ringClasses = 'ring-2 ring-slate-700 border border-slate-600';
+  // Frame styles based on rank & streak milestone
+  let ringClasses = streakTier.tier > 0 ? streakTier.ringClasses : 'ring-2 ring-slate-700 border border-slate-600';
   let badgeColor = 'bg-slate-700 text-slate-200';
   let crownColor = null;
 
@@ -57,6 +59,16 @@ function StaffAvatarFrame({ photo, name, rank, size = 'md' }) {
         <div className="absolute -top-4 left-1/2 -translate-x-1/2 z-20 animate-bounce pointer-events-none">
           <Crown className={`w-6 h-6 sm:w-7 sm:h-7 ${crownColor} drop-shadow-md`} />
         </div>
+      )}
+
+      {/* Streak Milestone Badge (🔥, ⚡, 👑) on Top-Left */}
+      {streakTier.badge && (
+        <span
+          className={`absolute -top-1.5 -left-1.5 px-1 py-0.2 rounded-full text-[9px] font-black shadow-lg z-20 flex items-center justify-center border border-white/40 ${streakTier.badgeClasses}`}
+          title={`${streakTier.name} (${streak} Hari Streak)`}
+        >
+          {streakTier.badge} {streak}
+        </span>
       )}
 
       {/* Elegant Portrait Frame */}
@@ -176,6 +188,7 @@ function LeaderboardColumn({
                       photo={top2.photo_url}
                       name={top2.name}
                       rank={2}
+                      streak={top2.streak || 0}
                       size="lg"
                     />
                     <h4 className="text-xs font-black text-white truncate max-w-full mt-2">
@@ -204,6 +217,7 @@ function LeaderboardColumn({
                       photo={top1.photo_url}
                       name={top1.name}
                       rank={1}
+                      streak={top1.streak || 0}
                       size="xl"
                     />
                     <h4 className="text-xs sm:text-sm font-black text-amber-200 truncate max-w-full mt-2">
@@ -226,6 +240,11 @@ function LeaderboardColumn({
                           ⚠️ {top1.late_count}x Telat
                         </span>
                       )}
+                      {isAttendance && top1.streak > 0 && (
+                        <span className="inline-block mt-0.5 px-1.5 py-0.2 rounded-full bg-amber-500/20 text-amber-300 text-[8px] font-black border border-amber-400/30">
+                          🔥 {top1.streak} Hari Streak
+                        </span>
+                      )}
                       {isAttendance && top1.early_bird_30m_count > 0 && (
                         <span className="inline-block mt-0.5 px-1.5 py-0.2 rounded-full bg-amber-400/20 text-amber-200 text-[8px] font-black">
                           ⚡ Awal: {top1.early_bird_30m_count}x
@@ -242,6 +261,7 @@ function LeaderboardColumn({
                       photo={top3.photo_url}
                       name={top3.name}
                       rank={3}
+                      streak={top3.streak || 0}
                       size="lg"
                     />
                     <h4 className="text-xs font-black text-white truncate max-w-full mt-2">
@@ -251,7 +271,7 @@ function LeaderboardColumn({
                       {top3.role}
                     </span>
                     <div className="mt-1.5 w-full py-1.5 px-1 bg-slate-950/80 rounded-xl border border-slate-800 text-[10px]">
-                      <span className="block font-mono font-black text-amber-400">
+                      <span className="block font-mono font-black text-slate-200">
                         {top3.score} Pts
                       </span>
                       <span className="text-slate-400 text-[8px] sm:text-[9px] block">
@@ -282,6 +302,7 @@ function LeaderboardColumn({
                       photo={item.photo_url}
                       name={item.name}
                       rank={item.rank}
+                      streak={item.streak || 0}
                       size="sm"
                     />
 
@@ -300,6 +321,11 @@ function LeaderboardColumn({
                           <span className="px-1.5 py-0.2 rounded bg-blue-950 text-blue-300 border border-blue-900/60 font-mono">
                             📅 {item.total_days}/26h
                           </span>
+                          {item.streak > 0 && (
+                            <span className="px-1.5 py-0.2 rounded bg-amber-950 text-amber-300 border border-amber-500/40 font-mono">
+                              🔥 {item.streak}d
+                            </span>
+                          )}
                           <span
                             className={`px-1.5 py-0.2 rounded border font-mono ${
                               item.total_late_seconds === 0

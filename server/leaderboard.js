@@ -54,6 +54,7 @@ export async function computeLeaderboard(targetMonthStr) {
   let leaderboardResetAt = null;
   let staffPointsList = [];
   let staffDayAdjustmentsList = [];
+  let staffStreaksMap = {};
 
   try {
     const { data: resetSetting } = await supabase
@@ -81,6 +82,13 @@ export async function computeLeaderboard(targetMonthStr) {
       .eq('key', 'staff_day_adjustments')
       .maybeSingle();
     if (Array.isArray(dayAdjSetting?.value)) staffDayAdjustmentsList = dayAdjSetting.value;
+
+    const { data: streakSetting } = await supabase
+      .from('app_settings')
+      .select('value')
+      .eq('key', 'staff_streaks')
+      .maybeSingle();
+    if (streakSetting?.value && typeof streakSetting.value === 'object') staffStreaksMap = streakSetting.value;
   } catch (e) {
     console.warn('Leaderboard settings fetch note:', e.message);
   }
@@ -315,6 +323,8 @@ export async function computeLeaderboard(targetMonthStr) {
       early_checkout_count: st.earlyCheckoutCount,
       early_checkout_minutes: Math.round(st.totalEarlyCheckoutSeconds / 60),
       manager_points: managerPoints,
+      streak: staffStreaksMap[st.staff_id]?.currentStreak || 0,
+      longest_streak: staffStreaksMap[st.staff_id]?.longestStreak || 0,
       score: finalScore,
       breakdown: {
         workDaysScore,

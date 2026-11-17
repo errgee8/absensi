@@ -204,6 +204,30 @@ db.exec(`
     created_at TEXT DEFAULT (datetime('now')),
     updated_at TEXT DEFAULT (datetime('now'))
   );
+
+  CREATE TABLE IF NOT EXISTS staff_kudos (
+    id TEXT PRIMARY KEY,
+    from_staff_id TEXT NOT NULL,
+    from_staff_name TEXT NOT NULL,
+    from_staff_venue TEXT,
+    to_staff_id TEXT NOT NULL,
+    to_staff_name TEXT NOT NULL,
+    to_staff_venue TEXT,
+    reason TEXT NOT NULL,
+    week_key TEXT NOT NULL,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+  CREATE INDEX IF NOT EXISTS idx_kudos_week_from ON staff_kudos(week_key, from_staff_id);
+  CREATE INDEX IF NOT EXISTS idx_kudos_to_staff ON staff_kudos(to_staff_id);
+
+  CREATE TABLE IF NOT EXISTS staff_streaks (
+    staff_id TEXT PRIMARY KEY,
+    current_streak INTEGER DEFAULT 0,
+    longest_streak INTEGER DEFAULT 0,
+    last_ontime_date TEXT,
+    last_checkin_date TEXT,
+    updated_at TEXT DEFAULT (datetime('now'))
+  );
 `);
 
 // Safe column migrations

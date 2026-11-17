@@ -16,11 +16,13 @@ export default function KioskCameraModal({
   confirmedShift = null,
   venueSettings,
   onCompleteAndAutoLogout,
+  onCheckoutCompleted = null,
   onClose
 }) {
   const videoRef = useRef(null);
   const streamRef = useRef(null);
   const fileInputRef = useRef(null);
+  const lastResponseRef = useRef(null);
 
   const [cameraActive, setCameraActive] = useState(false);
   const [cameraLoading, setCameraLoading] = useState(true);
@@ -356,6 +358,7 @@ export default function KioskCameraModal({
         }
       }
 
+      lastResponseRef.current = res;
       setSuccessMessage(res.message || config.successMsg);
 
       setTimeout(() => {
@@ -369,15 +372,19 @@ export default function KioskCameraModal({
           origin: { y: 0.6 }
         });
 
-        // 5-second auto logout timer for face mismatch notice, otherwise 3-second
-        let count = isMismatch ? 5 : 3;
+        // If checkout, pause briefly before triggering celebration modal
+        let count = isMismatch ? 5 : (actionType === 'checkout' ? 2 : 3);
         setCountdown(count);
         const timer = setInterval(() => {
           count -= 1;
           setCountdown(count);
           if (count <= 0) {
             clearInterval(timer);
-            onCompleteAndAutoLogout();
+            if (actionType === 'checkout' && onCheckoutCompleted) {
+              onCheckoutCompleted(res?.shift || res);
+            } else {
+              onCompleteAndAutoLogout();
+            }
           }
         }, 1000);
       }, 1200);
@@ -600,7 +607,14 @@ export default function KioskCameraModal({
               </div>
 
               <button
-                onClick={onCompleteAndAutoLogout}
+                type="button"
+                onClick={() => {
+                  if (actionType === 'checkout' && onCheckoutCompleted && lastResponseRef.current) {
+                    onCheckoutCompleted(lastResponseRef.current?.shift || lastResponseRef.current);
+                  } else {
+                    onCompleteAndAutoLogout();
+                  }
+                }}
                 className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold transition cursor-pointer"
               >
                 Selesai Sekarang

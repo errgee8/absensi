@@ -16,22 +16,33 @@ import {
   User,
   Image as ImageIcon,
   Check,
-  X
+  X,
+  Star,
+  Heart,
+  MessageSquare
 } from 'lucide-react';
 import {
   getStaffReports,
   rewardStaffReport,
-  updateStaffReportStatus
+  updateStaffReportStatus,
+  getAdminKudosLogs
 } from '../../utils/api';
 import { formatWitaDateTime } from '../../utils/time';
 
 export default function StaffReportsTab({ adminAuth }) {
+  const [activeSection, setActiveSection] = useState('REPORTS'); // 'REPORTS' | 'KUDOS'
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState(null);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [selectedPhoto, setSelectedPhoto] = useState(null);
+
+  // Kudos Audit Logs State
+  const [kudosLogs, setKudosLogs] = useState([]);
+  const [kudosLoading, setKudosLoading] = useState(false);
+  const [kudosSearch, setKudosSearch] = useState('');
+  const [kudosVenueFilter, setKudosVenueFilter] = useState('ALL');
 
   // Reward Modal State
   const [rewardModalOpen, setRewardModalOpen] = useState(false);
@@ -63,8 +74,21 @@ export default function StaffReportsTab({ adminAuth }) {
     }
   };
 
+  const fetchKudos = async () => {
+    setKudosLoading(true);
+    try {
+      const res = await getAdminKudosLogs();
+      setKudosLogs(Array.isArray(res?.logs) ? res.logs : []);
+    } catch (err) {
+      console.warn('Failed to load kudos logs:', err.message);
+    } finally {
+      setKudosLoading(false);
+    }
+  };
+
   useEffect(() => {
     fetchReports();
+    fetchKudos();
   }, []);
 
   const handleOpenReward = (report) => {
@@ -181,41 +205,98 @@ export default function StaffReportsTab({ adminAuth }) {
     }
   };
 
+  const filteredKudos = kudosLogs.filter((k) => {
+    if (kudosVenueFilter !== 'ALL') {
+      const matchVenue = (k.from_staff_venue || '').toLowerCase().includes(kudosVenueFilter.toLowerCase()) ||
+                         (k.to_staff_venue || '').toLowerCase().includes(kudosVenueFilter.toLowerCase());
+      if (!matchVenue) return false;
+    }
+    if (kudosSearch.trim()) {
+      const q = kudosSearch.toLowerCase();
+      const matchSender = (k.from_staff_name || '').toLowerCase().includes(q);
+      const matchReceiver = (k.to_staff_name || '').toLowerCase().includes(q);
+      const matchReason = (k.reason || '').toLowerCase().includes(q);
+      const matchWeek = (k.week_key || '').toLowerCase().includes(q);
+      if (!matchSender && !matchReceiver && !matchReason && !matchWeek) return false;
+    }
+    return true;
+  });
+
   return (
     <div className="space-y-6 animate-fade-in text-slate-100">
-      {/* Top Banner */}
-      <div className="bg-gradient-to-r from-rose-950/70 via-[#1e1520] to-[#141822] border-2 border-rose-500/40 rounded-3xl p-5 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex items-start space-x-3.5">
-          <div className="w-12 h-12 rounded-2xl bg-rose-500/20 border border-rose-500/40 text-rose-400 flex items-center justify-center shrink-0 shadow-lg shadow-rose-950/50">
-            <ShieldAlert className="w-6 h-6 stroke-[2.2]" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h2 className="text-base font-black text-white">
-                🚨 Pusat Laporan &amp; Aduan Staf (Whistleblower System)
-              </h2>
-              <span className="px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 text-[10px] font-black border border-rose-400/30">
-                Kerahasiaan Manager
-              </span>
-            </div>
-            <p className="text-xs text-slate-300 mt-1 leading-relaxed">
-              Kanal khusus penerimaan aduan pelanggaran peraturan perusahaan, kecurangan, perilaku tidak etis/bullying, atau tindakan yang merugikan integritas tim.
-              Staf yang memilih opsi <strong>Anonim</strong> tetap dirahasiakan identitasnya dari rekan kerja, namun
-              <strong> khusus Manager dapat melihat siapa pelapor</strong> untuk verifikasi dan pemberian reward poin.
-            </p>
-          </div>
-        </div>
+      {/* Subtab Navigation Switcher */}
+      <div className="flex flex-wrap items-center gap-2 border-b border-slate-800 pb-3">
+        <button
+          type="button"
+          onClick={() => setActiveSection('REPORTS')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-black transition cursor-pointer ${
+            activeSection === 'REPORTS'
+              ? 'bg-rose-600 text-white shadow-lg shadow-rose-900/40'
+              : 'bg-[#181d26] text-slate-400 hover:text-white border border-slate-800'
+          }`}
+        >
+          <ShieldAlert className="w-4 h-4" />
+          <span>Laporan Integritas ({reports.length})</span>
+        </button>
 
         <button
           type="button"
-          onClick={fetchReports}
-          disabled={loading}
-          className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs flex items-center justify-center gap-2 border border-slate-700 transition cursor-pointer self-start md:self-center"
+          onClick={() => {
+            setActiveSection('KUDOS');
+            fetchKudos();
+          }}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-black transition cursor-pointer ${
+            activeSection === 'KUDOS'
+              ? 'bg-gradient-to-r from-amber-400 to-yellow-500 text-slate-950 shadow-lg shadow-amber-500/30 font-black'
+              : 'bg-[#181d26] text-amber-300 hover:text-amber-200 border border-amber-500/20'
+          }`}
         >
-          <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-          <span>Segarkan Data</span>
+          <Star className="w-4 h-4 fill-amber-400" />
+          <span>Log Riwayat Bintang Apresiasi (Kudos)</span>
+          <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+            activeSection === 'KUDOS' ? 'bg-slate-950 text-amber-300' : 'bg-amber-500/20 text-amber-300'
+          }`}>
+            {kudosLogs.length}
+          </span>
         </button>
       </div>
+
+      {/* SECTION 1: WHISTLEBLOWER INTEGRITY REPORTS */}
+      {activeSection === 'REPORTS' && (
+        <>
+          {/* Top Banner */}
+          <div className="bg-gradient-to-r from-rose-950/70 via-[#1e1520] to-[#141822] border-2 border-rose-500/40 rounded-3xl p-5 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="flex items-start space-x-3.5">
+              <div className="w-12 h-12 rounded-2xl bg-rose-500/20 border border-rose-500/40 text-rose-400 flex items-center justify-center shrink-0 shadow-lg shadow-rose-950/50">
+                <ShieldAlert className="w-6 h-6 stroke-[2.2]" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-base font-black text-white">
+                    🚨 Pusat Laporan &amp; Aduan Staf (Whistleblower System)
+                  </h2>
+                  <span className="px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 text-[10px] font-black border border-rose-400/30">
+                    Kerahasiaan Manager
+                  </span>
+                </div>
+                <p className="text-xs text-slate-300 mt-1 leading-relaxed">
+                  Kanal khusus penerimaan aduan pelanggaran peraturan perusahaan, kecurangan, perilaku tidak etis/bullying, atau tindakan yang merugikan integritas tim.
+                  Staf yang memilih opsi <strong>Anonim</strong> tetap dirahasiakan identitasnya dari rekan kerja, namun
+                  <strong> khusus Manager dapat melihat siapa pelapor</strong> untuk verifikasi dan pemberian reward poin.
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={fetchReports}
+              disabled={loading}
+              className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs flex items-center justify-center gap-2 border border-slate-700 transition cursor-pointer self-start md:self-center"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+              <span>Segarkan Data</span>
+            </button>
+          </div>
 
       {/* Filter and Search Bar */}
       <div className="bg-[#181d26] border border-slate-800 rounded-2xl p-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 shadow-lg">
@@ -404,6 +485,190 @@ export default function StaffReportsTab({ adminAuth }) {
               </div>
             </div>
           ))}
+        </div>
+      )}
+        </>
+      )}
+
+      {/* SECTION 2: PEER KUDOS AUDIT LOGS */}
+      {activeSection === 'KUDOS' && (
+        <div className="space-y-5 animate-fade-in">
+          {/* Kudos Header Banner */}
+          <div className="bg-gradient-to-r from-amber-950/70 via-[#221c17] to-[#141822] border-2 border-amber-400/40 rounded-3xl p-5 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="flex items-start space-x-3.5">
+              <div className="w-12 h-12 rounded-2xl bg-amber-500/20 border border-amber-400/40 text-amber-300 flex items-center justify-center shrink-0 shadow-lg shadow-amber-950/50">
+                <Star className="w-6 h-6 fill-amber-400 stroke-[1.5]" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-base font-black text-white">
+                    ⭐ Log Audit Bintang Apresiasi Karyawan (Peer Kudos)
+                  </h2>
+                  <span className="px-2 py-0.5 rounded-full bg-amber-400/20 text-amber-300 text-[10px] font-black border border-amber-400/30">
+                    Apresiasi Mingguan
+                  </span>
+                </div>
+                <p className="text-xs text-slate-300 mt-1 leading-relaxed">
+                  Pantau budaya apresiasi dan kekompakan tim antar staf. Setiap karyawan memiliki kuota 1 Bintang Apresiasi per minggu untuk diberikan kepada rekan kerja yang berdedikasi tinggi.
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={fetchKudos}
+              disabled={kudosLoading}
+              className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs flex items-center justify-center gap-2 border border-slate-700 transition cursor-pointer self-start md:self-center shrink-0"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${kudosLoading ? 'animate-spin' : ''}`} />
+              <span>Segarkan Log</span>
+            </button>
+          </div>
+
+          {/* 3 Metric Summary Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="bg-[#181d26] border border-amber-400/20 rounded-2xl p-4 shadow-md">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
+                <span>Total Bintang Terkirim</span>
+              </div>
+              <div className="text-2xl font-black text-amber-300 mt-1 font-mono">
+                {kudosLogs.length} <span className="text-xs font-normal text-slate-400">bintang</span>
+              </div>
+              <div className="text-[10.5px] text-slate-400 mt-1">
+                Akumulasi seluruh outlet
+              </div>
+            </div>
+
+            <div className="bg-[#181d26] border border-purple-400/20 rounded-2xl p-4 shadow-md">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-purple-400" />
+                <span>Penerima Bintang Unik</span>
+              </div>
+              <div className="text-2xl font-black text-purple-300 mt-1 font-mono">
+                {new Set(kudosLogs.map(k => k.to_staff_id)).size} <span className="text-xs font-normal text-slate-400">staf</span>
+              </div>
+              <div className="text-[10.5px] text-slate-400 mt-1">
+                Mendapat apresiasi dari rekan
+              </div>
+            </div>
+
+            <div className="bg-[#181d26] border border-emerald-400/20 rounded-2xl p-4 shadow-md">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                <Heart className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Pengirim Apresiasi</span>
+              </div>
+              <div className="text-2xl font-black text-emerald-300 mt-1 font-mono">
+                {new Set(kudosLogs.map(k => k.from_staff_id)).size} <span className="text-xs font-normal text-slate-400">staf</span>
+              </div>
+              <div className="text-[10.5px] text-slate-400 mt-1">
+                Aktif berbagi semangat tim
+              </div>
+            </div>
+          </div>
+
+          {/* Search & Filter Bar */}
+          <div className="bg-[#181d26] border border-slate-800 rounded-2xl p-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 shadow-lg">
+            <div className="relative flex-1">
+              <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Cari berdasarkan nama pengirim, penerima, atau pesan apresiasi..."
+                value={kudosSearch}
+                onChange={(e) => setKudosSearch(e.target.value)}
+                className="w-full bg-[#11141c] border border-slate-700 rounded-xl pl-10 pr-4 py-2 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-amber-400"
+              />
+            </div>
+
+            <div className="flex items-center gap-2">
+              {['ALL', 'LuckyCat', 'JP Karaoke'].map((v) => (
+                <button
+                  key={v}
+                  type="button"
+                  onClick={() => setKudosVenueFilter(v)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer ${
+                    kudosVenueFilter === v
+                      ? 'bg-amber-500 text-slate-950 font-black shadow-md shadow-amber-500/30'
+                      : 'bg-slate-800 text-slate-400 hover:text-white'
+                  }`}
+                >
+                  {v === 'ALL' ? 'Semua Outlet' : v}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Kudos Logs Table */}
+          {kudosLoading && (
+            <div className="py-12 text-center text-xs text-slate-400 space-y-2">
+              <div className="w-6 h-6 border-2 border-amber-400 border-t-transparent rounded-full animate-spin mx-auto" />
+              <p>Memuat log riwayat bintang apresiasi...</p>
+            </div>
+          )}
+
+          {!kudosLoading && filteredKudos.length === 0 && (
+            <div className="bg-[#181d26] border border-slate-800 rounded-2xl p-8 text-center text-slate-400 space-y-2">
+              <Star className="w-8 h-8 text-slate-600 mx-auto stroke-1" />
+              <p className="text-xs font-bold text-slate-300">Belum ada riwayat Bintang Apresiasi yang cocok</p>
+              <p className="text-[11px] text-slate-500">
+                Staf dapat mengirimkan bintang apresiasi langsung dari Staff Portal Kiosk.
+              </p>
+            </div>
+          )}
+
+          {!kudosLoading && filteredKudos.length > 0 && (
+            <div className="bg-[#181d26] border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-[#12151d] text-slate-400 font-bold uppercase tracking-wider text-[10px] border-b border-slate-800">
+                    <tr>
+                      <th className="py-3 px-4">Waktu (WITA)</th>
+                      <th className="py-3 px-4">Pengirim (Dari)</th>
+                      <th className="py-3 px-4">Penerima (Kepada)</th>
+                      <th className="py-3 px-4 min-w-[240px]">Alasan Apresiasi</th>
+                      <th className="py-3 px-4">Minggu Ke-</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/60 font-medium">
+                    {filteredKudos.map((kudos) => (
+                      <tr key={kudos.id} className="hover:bg-slate-800/40 transition">
+                        <td className="py-3 px-4 whitespace-nowrap text-slate-300 font-mono text-[11px]">
+                          {formatWitaDateTime(kudos.created_at)}
+                        </td>
+                        <td className="py-3 px-4 whitespace-nowrap">
+                          <div className="font-bold text-white flex items-center gap-1.5">
+                            <span>{kudos.from_staff_name}</span>
+                          </div>
+                          <span className="text-[10px] text-slate-400">
+                            {kudos.from_staff_venue || 'Outlet'}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 whitespace-nowrap">
+                          <div className="font-bold text-amber-300 flex items-center gap-1.5">
+                            <span>⭐</span>
+                            <span>{kudos.to_staff_name}</span>
+                          </div>
+                          <span className="text-[10px] text-slate-400">
+                            {kudos.to_staff_venue || 'Outlet'}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4">
+                          <div className="p-2 rounded-xl bg-slate-900/80 border border-white/5 text-slate-200 text-[11.5px] italic leading-relaxed">
+                            "{kudos.reason}"
+                          </div>
+                        </td>
+                        <td className="py-3 px-4 whitespace-nowrap">
+                          <span className="px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 font-mono text-[10.5px] border border-white/10 font-bold">
+                            {kudos.week_key || '-'}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

@@ -38,6 +38,8 @@ import {
 } from '../../utils/api';
 import DevicePermissionModal from './DevicePermissionModal';
 import StaffThemeModal, { getStaffTheme, saveStaffTheme } from './StaffThemeModal';
+import StaffKudosModal from './StaffKudosModal';
+import { getStreakTier } from '../../utils/streakFrames';
 
 const MOOD_EMOJIS = ['😊', '🔥', '😐', '😴', '😮‍💨', '😢', '😡', '💔'];
 
@@ -121,7 +123,11 @@ export default function KioskPortalScreen({
   const [toastMessage, setToastMessage] = useState(null);
 
   const [themeModalOpen, setThemeModalOpen] = useState(false);
+  const [kudosModalOpen, setKudosModalOpen] = useState(false);
   const [staffTheme, setStaffTheme] = useState(() => getStaffTheme(staff?.id));
+
+  const currentStreak = staff?.streak || activeShift?.streak || 0;
+  const streakTier = getStreakTier(currentStreak);
 
   useEffect(() => {
     if (staff?.id) {
@@ -444,19 +450,19 @@ export default function KioskPortalScreen({
 
           {/* Profile Details: Avatar + Name + Role + Actions */}
           <div className="flex items-center gap-3">
-            {/* Real Profile Photo Avatar */}
+            {/* Real Profile Photo Avatar with Streak-Unlocked Frame */}
             <button
               type="button"
               onClick={handleOpenPhotoModal}
               className="relative group shrink-0 focus:outline-none cursor-pointer"
-              title="Ganti Foto Profil"
+              title={`Bingkai Avatar: ${streakTier.name} (${currentStreak} Hari Streak)`}
             >
-              <div className={`w-14 h-14 rounded-2xl bg-[#232938] border border-white/15 overflow-hidden flex items-center justify-center shadow-inner transition-all duration-300 ${staffTheme?.avatarRing || ''}`}>
+              <div className={`w-14 h-14 rounded-2xl bg-[#232938] overflow-hidden flex items-center justify-center shadow-inner transition-all duration-300 ${streakTier.ringClasses} ${staffTheme?.avatarRing || ''}`}>
                 {staff?.profile_photo_url ? (
                   <img
                     src={staff.profile_photo_url}
                     alt={staff?.name || 'Foto Profil'}
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-cover rounded-[13px]"
                   />
                 ) : (
                   <span className="text-base font-black tracking-tight text-slate-200">
@@ -464,15 +470,33 @@ export default function KioskPortalScreen({
                   </span>
                 )}
               </div>
+              {streakTier.badge && (
+                <span
+                  className={`absolute -top-1.5 -left-1.5 w-5 h-5 rounded-full text-[10px] flex items-center justify-center shadow-lg z-10 ${streakTier.badgeClasses}`}
+                  title={`${streakTier.name} (${currentStreak} Hari Streak)`}
+                >
+                  {streakTier.badge}
+                </span>
+              )}
               <span className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-indigo-500 text-white flex items-center justify-center border-2 border-[#181d26] shadow">
                 <Pencil className="w-2.5 h-2.5" />
               </span>
             </button>
 
             <div className="min-w-0 flex-1">
-              <h1 className="text-base sm:text-lg font-black text-white truncate leading-tight">
-                {staff?.name || 'Staff'}
-              </h1>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h1 className="text-base sm:text-lg font-black text-white truncate leading-tight">
+                  {staff?.name || 'Staff'}
+                </h1>
+                {/* Streak Badge */}
+                <span
+                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black border shadow-sm ${streakTier.pillBg}`}
+                  title={`Streak On-Time: ${currentStreak} hari berturut-turut (${streakTier.name})`}
+                >
+                  <span>🔥</span>
+                  <span>{currentStreak} Hari Streak</span>
+                </span>
+              </div>
               <div className="text-xs text-slate-400 font-medium flex items-center gap-1.5 mt-0.5 truncate">
                 <span>{staff?.role || 'Staff'}</span>
                 <span className="text-slate-600">•</span>
@@ -481,7 +505,7 @@ export default function KioskPortalScreen({
                 </span>
               </div>
 
-              {/* Action Pills Row: Ganti Foto, Update Wajah, Mood */}
+              {/* Action Pills Row: Ganti Foto, Update Wajah, Mood, Bintang Apresiasi, Theme */}
               <div className="flex flex-wrap items-center gap-1.5 mt-2">
                 <button
                   type="button"
@@ -546,6 +570,17 @@ export default function KioskPortalScreen({
                     </div>
                   )}
                 </div>
+
+                {/* Peer Kudos Star Button */}
+                <button
+                  type="button"
+                  onClick={() => setKudosModalOpen(true)}
+                  className={`inline-flex items-center gap-1 text-[10.5px] font-bold rounded-full px-2.5 py-0.5 transition cursor-pointer active:scale-95 border shadow-sm bg-gradient-to-r from-amber-500/20 to-yellow-500/15 hover:from-amber-500/30 hover:to-yellow-500/25 border-amber-400/40 text-amber-200`}
+                  title="Kirim 1 Bintang Apresiasi (Kudos) ke rekan kerja minggu ini"
+                >
+                  <span>⭐</span>
+                  <span className="font-extrabold">Apresiasi</span>
+                </button>
 
                 {/* Theme Customization Button */}
                 <button
@@ -1185,6 +1220,17 @@ export default function KioskPortalScreen({
           setToastMessage(`Tema ${theme.name} diterapkan! ${theme.icon}`);
         }}
       />
+
+      {/* Staff Peer Kudos (Bintang Apresiasi) Modal */}
+      {kudosModalOpen && (
+        <StaffKudosModal
+          staff={staff}
+          onClose={() => setKudosModalOpen(false)}
+          onSuccess={() => {
+            setToastMessage('Bintang Apresiasi berhasil dikirimkan! ⭐');
+          }}
+        />
+      )}
     </div>
   );
 }

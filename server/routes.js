@@ -1502,6 +1502,11 @@ router.post('/staff/verify-pin', async (req, res) => {
     await resolveAttendancePhotoUrls([staffPayload], ['biometric_photo_url']);
   }
 
+  // Attach on-time streak to staff payload
+  const staffStreak = await getStaffStreakRecord(staff.id, staff.uuid);
+  staffPayload.streak = staffStreak.currentStreak || 0;
+  staffPayload.longestStreak = staffStreak.longestStreak || 0;
+
   res.json({
     success: true,
     staff: staffPayload,
@@ -2142,6 +2147,156 @@ router.post('/staff/:id/mood', async (req, res) => {
   }
 });
 
+// Helper: Auto-seed initial streaks from cloud logs if not yet populated
+let isStreakSeeding = false;
+async function seedInitialStreaksFromLogs() {
+  if (isStreakSeeding || !supabase) return {};
+  isStreakSeeding = true;
+  try {
+    const { data: logs } = await supabase
+      .from('attendance_logs')
+      .select('staff_id, shift_date, flags')
+      .order('shift_date', { ascending: false })
+      .limit(500);
+
+    const { data: staffList } = await supabase
+      .from('staff')
+      .select('id, legacy_code');
+
+    const codeByUuid = {};
+    for (const s of staffList || []) {
+      if (s.legacy_code) codeByUuid[s.id] = s.legacy_code;
+    }
+
+    const byStaff = {};
+    for (const l of logs || []) {
+      if (!byStaff[l.staff_id]) byStaff[l.staff_id] = [];
+      byStaff[l.staff_id].push(l);
+    }
+
+    const streakMap = {};
+    for (const [staffUuid, sLogs] of Object.entries(byStaff)) {
+      let streak = 0;
+      let lastOnTime = null;
+      let lastCheckin = sLogs[0]?.shift_date || null;
+      for (const log of sLogs) {
+        const isLate = (log.flags || []).some(f => String(f).includes('Late') || String(f).includes('LATE'));
+        if (!isLate) {
+          streak++;
+          if (!lastOnTime) lastOnTime = log.shift_date;
+        } else {
+          break;
+        }
+      }
+      const record = {
+        currentStreak: streak,
+        longestStreak: streak,
+        lastOnTimeDate: lastOnTime,
+        lastCheckinDate: lastCheckin
+      };
+      streakMap[staffUuid] = record;
+      const legCode = codeByUuid[staffUuid];
+      if (legCode) streakMap[legCode] = record;
+    }
+
+    setSetting('staff_streaks', streakMap);
+    await cloudDb.saveSetting('staff_streaks', streakMap, 'Live Staff On-Time Streaks');
+    return streakMap;
+  } catch (err) {
+    console.warn('Initial streak auto-seed note:', err.message);
+    return {};
+  } finally {
+    isStreakSeeding = false;
+  }
+}
+
+// Helper: Get Staff Consecutive On-Time Streak Record
+export async function getStaffStreakRecord(staffId, staffUuid = null) {
+  let streakMap = getSetting('staff_streaks') || {};
+  if (isSupabaseConfigured) {
+    try {
+      const cloudStreaks = await cloudDb.getSetting('staff_streaks');
+      if (cloudStreaks && typeof cloudStreaks === 'object' && Object.keys(cloudStreaks).length > 0) {
+        streakMap = cloudStreaks;
+      } else {
+        streakMap = await seedInitialStreaksFromLogs();
+      }
+    } catch {}
+  }
+  const key = staffUuid || staffId;
+  const streak = streakMap[key] || streakMap[staffId] || {
+    currentStreak: 0,
+    longestStreak: 0,
+    lastOnTimeDate: null,
+    lastCheckinDate: null
+  };
+  return streak;
+}
+
+// Helper: Update Staff Streak on Check-In
+export async function updateStaffStreak(staff, isLate, checkinTime) {
+  let streakMap = getSetting('staff_streaks') || {};
+  if (isSupabaseConfigured) {
+    try {
+      const cloudStreaks = await cloudDb.getSetting('staff_streaks');
+      if (cloudStreaks && typeof cloudStreaks === 'object') streakMap = cloudStreaks;
+    } catch {}
+  }
+
+  const staffKey = staff.uuid || staff.id;
+  let userStreak = streakMap[staffKey] || streakMap[staff.id] || {
+    currentStreak: 0,
+    longestStreak: 0,
+    lastOnTimeDate: null,
+    lastCheckinDate: null
+  };
+
+  const now = new Date(checkinTime || Date.now());
+  const dateStr = getOperationalDateYMD(now);
+  const yesterdayStr = getOperationalYesterdayYMD(now);
+
+  if (!isLate) {
+    if (userStreak.lastOnTimeDate === dateStr) {
+      // Same day checkin: maintain current streak
+    } else if (userStreak.lastOnTimeDate === yesterdayStr) {
+      // Consecutive on-time working day
+      userStreak.currentStreak = (userStreak.currentStreak || 0) + 1;
+    } else {
+      // New streak initiated
+      userStreak.currentStreak = 1;
+    }
+    userStreak.lastOnTimeDate = dateStr;
+    userStreak.longestStreak = Math.max(userStreak.longestStreak || 0, userStreak.currentStreak);
+  } else {
+    // Reset streak on late check-in
+    userStreak.currentStreak = 0;
+  }
+  userStreak.lastCheckinDate = dateStr;
+
+  streakMap[staffKey] = userStreak;
+  if (staff.id && staff.id !== staffKey) {
+    streakMap[staff.id] = userStreak;
+  }
+
+  setSetting('staff_streaks', streakMap);
+  try {
+    db.prepare(`
+      INSERT OR REPLACE INTO staff_streaks (staff_id, current_streak, longest_streak, last_ontime_date, last_checkin_date, updated_at)
+      VALUES (?, ?, ?, ?, ?, datetime('now'))
+    `).run(staff.id, userStreak.currentStreak, userStreak.longestStreak, userStreak.lastOnTimeDate, userStreak.lastCheckinDate);
+  } catch {}
+
+  if (isSupabaseConfigured) {
+    try {
+      await cloudDb.saveSetting('staff_streaks', streakMap, 'Live Staff On-Time Streaks');
+    } catch (e) {
+      console.warn('Failed to save staff_streaks to Supabase:', e.message);
+    }
+  }
+
+  return userStreak;
+}
+
 // 10. Staff Check-In
 router.post('/checkin', async (req, res) => {
   const { staffId, pin, lat, lng, accuracy, photoBase64, timestamp, confirmedShift, lateReason, latePhotoBase64 } = req.body;
@@ -2433,10 +2588,17 @@ router.post('/checkin', async (req, res) => {
   `).get(result.lastInsertRowid);
   if (newShift) newShift.flags = flags;
 
+  // Calculate and persist On-Time Streak
+  const streakRecord = await updateStaffStreak(staff, isLate, checkinTime);
+
   const shiftResponse = newShift || supaShift;
-  if (shiftResponse) await resolveAttendancePhotoUrls([shiftResponse]);
+  if (shiftResponse) {
+    shiftResponse.streak = streakRecord.currentStreak || 0;
+    await resolveAttendancePhotoUrls([shiftResponse]);
+  }
 
   broadcastEvent('SHIFT_UPDATE', { action: 'CHECKIN', shift: shiftResponse });
+  broadcastEvent('LEADERBOARD_UPDATE');
 
   let responseMessage = 'Absensi Masuk Berhasil Dicatat!';
   if (faceRecogResult.status === 'MISMATCH') {
@@ -2447,6 +2609,7 @@ router.post('/checkin', async (req, res) => {
     success: true,
     message: responseMessage,
     shift: shiftResponse,
+    streak: streakRecord.currentStreak || 0,
     flags,
     faceRecog: faceRecogResult
   });
@@ -3071,14 +3234,24 @@ router.post('/checkout', async (req, res) => {
     };
   }
 
-  if (updatedShift) await resolveAttendancePhotoUrls([updatedShift]);
+  // Fetch current streak
+  const streakRecord = await getStaffStreakRecord(shift.staff_id, staff?.uuid);
+  const checkoutPayload = {
+    ...updatedShift,
+    streak: streakRecord.currentStreak || 0
+  };
 
-  broadcastEvent('SHIFT_UPDATE', { action: 'CHECKOUT', shift: updatedShift });
+  if (checkoutPayload) await resolveAttendancePhotoUrls([checkoutPayload]);
+
+  broadcastEvent('SHIFT_UPDATE', { action: 'CHECKOUT', shift: checkoutPayload });
+  broadcastEvent('LEADERBOARD_UPDATE');
 
   res.json({
     success: true,
     message: 'Absensi Keluar Berhasil Dicatat! Shift selesai.',
-    shift: updatedShift,
+    shift: checkoutPayload,
+    streak: streakRecord.currentStreak || 0,
+    durationMinutes,
     flags: finalFlags
   });
 });
@@ -5639,6 +5812,202 @@ router.post('/reports/:id/status', async (req, res) => {
   } catch (err) {
     console.error('Error updating report status:', err);
     return res.status(500).json({ error: 'Gagal memperbarui status laporan: ' + err.message });
+  }
+});
+
+// ==========================================
+// 15e. STAFF KUDOS (BINTANG APRESIASI PEER-TO-PEER)
+// ==========================================
+
+// 1. Kirim Bintang Apresiasi (Maksimal 1 Bintang per Minggu)
+router.post('/staff/kudos', async (req, res) => {
+  const { fromStaffId, toStaffId, reason } = req.body || {};
+
+  if (!fromStaffId || !toStaffId) {
+    return res.status(400).json({ error: 'Pengirim dan penerima apresiasi wajib dipilih.' });
+  }
+
+  if (String(fromStaffId) === String(toStaffId)) {
+    return res.status(400).json({ error: 'Anda tidak dapat mengirimkan Bintang Apresiasi kepada diri sendiri.' });
+  }
+
+  const cleanReason = (reason || '').trim();
+  if (!cleanReason || cleanReason.length < 3) {
+    return res.status(400).json({ error: 'Alasan atau pesan apresiasi minimal 3 karakter.' });
+  }
+
+  try {
+    let fromStaff = db.prepare('SELECT id, name, venue, role FROM staff WHERE id = ?').get(fromStaffId);
+    let toStaff = db.prepare('SELECT id, name, venue, role FROM staff WHERE id = ?').get(toStaffId);
+
+    if (isSupabaseConfigured) {
+      if (!fromStaff) {
+        const sf = await findStaffInSupabase(fromStaffId);
+        if (sf) fromStaff = { id: sf.legacy_code || sf.id, name: sf.name, venue: sf.venue, role: sf.role };
+      }
+      if (!toStaff) {
+        const st = await findStaffInSupabase(toStaffId);
+        if (st) toStaff = { id: st.legacy_code || st.id, name: st.name, venue: st.venue, role: st.role };
+      }
+    }
+
+    if (!fromStaff) return res.status(404).json({ error: 'Data staf pengirim tidak ditemukan.' });
+    if (!toStaff) return res.status(404).json({ error: 'Data staf penerima tidak ditemukan.' });
+
+    const weekKey = getWitaWeekKey();
+
+    // Check if sender already sent a kudos this week
+    let existingKudos = null;
+    try {
+      existingKudos = db.prepare('SELECT id FROM staff_kudos WHERE week_key = ? AND from_staff_id = ?').get(weekKey, fromStaff.id);
+    } catch {}
+
+    let cloudKudosList = [];
+    if (isSupabaseConfigured) {
+      try {
+        const val = await cloudDb.getSetting('staff_kudos_logs');
+        if (Array.isArray(val)) cloudKudosList = val;
+        if (!existingKudos) {
+          existingKudos = cloudKudosList.find(k => k.week_key === weekKey && (k.from_staff_id === fromStaff.id || k.from_staff_id === fromStaffId));
+        }
+      } catch {}
+    }
+
+    if (existingKudos) {
+      return res.status(400).json({
+        error: 'Anda sudah mengirimkan 1 Bintang Apresiasi untuk minggu ini. Kuota 1 bintang per minggu akan dibuka kembali Senin depan!'
+      });
+    }
+
+    const kudosId = `kudos_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    const nowIso = new Date().toISOString();
+
+    const kudosRecord = {
+      id: kudosId,
+      from_staff_id: fromStaff.id,
+      from_staff_name: fromStaff.name,
+      from_staff_venue: fromStaff.venue || 'Outlet',
+      to_staff_id: toStaff.id,
+      to_staff_name: toStaff.name,
+      to_staff_venue: toStaff.venue || 'Outlet',
+      reason: cleanReason,
+      week_key: weekKey,
+      created_at: nowIso
+    };
+
+    // Save SQLite
+    try {
+      db.prepare(`
+        INSERT INTO staff_kudos (id, from_staff_id, from_staff_name, from_staff_venue, to_staff_id, to_staff_name, to_staff_venue, reason, week_key, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        kudosRecord.id,
+        kudosRecord.from_staff_id,
+        kudosRecord.from_staff_name,
+        kudosRecord.from_staff_venue,
+        kudosRecord.to_staff_id,
+        kudosRecord.to_staff_name,
+        kudosRecord.to_staff_venue,
+        kudosRecord.reason,
+        kudosRecord.week_key,
+        kudosRecord.created_at
+      );
+    } catch (e) {
+      console.warn('SQLite kudos insert note:', e.message);
+    }
+
+    // Save Supabase
+    if (isSupabaseConfigured) {
+      try {
+        const nextList = [kudosRecord, ...cloudKudosList].slice(0, 500);
+        await cloudDb.saveSetting('staff_kudos_logs', nextList, 'Peer Staff Appreciation Stars (Kudos)');
+      } catch (e) {
+        console.warn('Supabase kudos save note:', e.message);
+      }
+    }
+
+    broadcastEvent('KUDOS_UPDATE', { kudos: kudosRecord });
+
+    return res.json({
+      success: true,
+      message: `Bintang Apresiasi berhasil dikirimkan kepada ${toStaff.name}! ⭐`,
+      kudos: kudosRecord
+    });
+  } catch (err) {
+    console.error('Error sending staff kudos:', err);
+    return res.status(500).json({ error: 'Gagal mengirimkan bintang apresiasi: ' + err.message });
+  }
+});
+
+// 2. Status Kuota & Bintang Diterima Staf Minggu Ini
+router.get('/staff/kudos/status', async (req, res) => {
+  const { staffId } = req.query;
+  if (!staffId) return res.status(400).json({ error: 'staffId wajib disertakan.' });
+
+  try {
+    const weekKey = getWitaWeekKey();
+    let sentThisWeek = null;
+    let receivedList = [];
+
+    // Check SQLite
+    try {
+      sentThisWeek = db.prepare('SELECT * FROM staff_kudos WHERE week_key = ? AND from_staff_id = ?').get(weekKey, staffId);
+      receivedList = db.prepare('SELECT * FROM staff_kudos WHERE to_staff_id = ? ORDER BY created_at DESC LIMIT 50').all(staffId);
+    } catch {}
+
+    // Check Supabase if empty or configured
+    if (isSupabaseConfigured) {
+      try {
+        const cloudKudos = (await cloudDb.getSetting('staff_kudos_logs')) || [];
+        if (!sentThisWeek) {
+          sentThisWeek = cloudKudos.find(k => k.week_key === weekKey && (k.from_staff_id === staffId || k.from_staff_id === String(staffId))) || null;
+        }
+        if (receivedList.length === 0) {
+          receivedList = cloudKudos.filter(k => k.to_staff_id === staffId || k.to_staff_id === String(staffId));
+        }
+      } catch {}
+    }
+
+    return res.json({
+      success: true,
+      weekKey,
+      canSend: !sentThisWeek,
+      sentThisWeek: sentThisWeek || null,
+      receivedCount: receivedList.length,
+      recentReceived: receivedList.slice(0, 5)
+    });
+  } catch (err) {
+    console.error('Error fetching staff kudos status:', err);
+    return res.status(500).json({ error: 'Gagal memuat status bintang apresiasi: ' + err.message });
+  }
+});
+
+// 3. Manager Audit Log: Semua Riwayat Pengiriman Bintang Apresiasi
+router.get('/admin/kudos', async (req, res) => {
+  try {
+    let logs = [];
+
+    // Load from Supabase first if configured
+    if (isSupabaseConfigured) {
+      try {
+        const cloudLogs = await cloudDb.getSetting('staff_kudos_logs');
+        if (Array.isArray(cloudLogs)) logs = cloudLogs;
+      } catch {}
+    }
+
+    if (!logs || logs.length === 0) {
+      try {
+        logs = db.prepare('SELECT * FROM staff_kudos ORDER BY created_at DESC LIMIT 200').all();
+      } catch {}
+    }
+
+    return res.json({
+      success: true,
+      logs: logs || []
+    });
+  } catch (err) {
+    console.error('Error fetching admin kudos audit logs:', err);
+    return res.status(500).json({ error: 'Gagal memuat log bintang apresiasi: ' + err.message });
   }
 });
 
