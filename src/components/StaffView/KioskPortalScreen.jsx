@@ -23,7 +23,8 @@ import {
   BookOpen,
   Sparkles,
   Smile,
-  Crown
+  Crown,
+  Palette
 } from 'lucide-react';
 import {
   getAppNow,
@@ -36,6 +37,7 @@ import {
   updateStaffMood
 } from '../../utils/api';
 import DevicePermissionModal from './DevicePermissionModal';
+import StaffThemeModal, { getStaffTheme, saveStaffTheme } from './StaffThemeModal';
 
 const MOOD_EMOJIS = ['😊', '🔥', '😐', '😴', '😮‍💨', '😢', '😡', '💔'];
 
@@ -117,6 +119,15 @@ export default function KioskPortalScreen({
   const [shiftModalOpen, setShiftModalOpen] = useState(false);
   const [selectedShiftChoice, setSelectedShiftChoice] = useState(null);
   const [toastMessage, setToastMessage] = useState(null);
+
+  const [themeModalOpen, setThemeModalOpen] = useState(false);
+  const [staffTheme, setStaffTheme] = useState(() => getStaffTheme(staff?.id));
+
+  useEffect(() => {
+    if (staff?.id) {
+      setStaffTheme(getStaffTheme(staff.id));
+    }
+  }, [staff?.id]);
 
   const moodContainerRef = useRef(null);
 
@@ -349,8 +360,16 @@ export default function KioskPortalScreen({
     announcements?.[0]?.title || 'Lihat info operasional & jadwal terbaru';
 
   return (
-    <div className="min-h-screen bg-[#111318] text-slate-100 pb-10 px-3 pt-3 sm:px-6">
-      <div className="max-w-md mx-auto space-y-3">
+    <div className={`min-h-screen ${staffTheme?.wrapperBg || 'bg-[#111318]'} text-slate-100 pb-10 px-3 pt-3 sm:px-6 transition-colors duration-300 relative overflow-hidden`}>
+      {/* Dynamic ambient background glow */}
+      {staffTheme?.ambientGlow && (
+        <div
+          className="pointer-events-none absolute -top-40 left-1/2 -translate-x-1/2 w-[520px] h-[520px] rounded-full blur-[130px] transition-all duration-500"
+          style={{ backgroundColor: staffTheme.ambientGlow }}
+        />
+      )}
+
+      <div className="max-w-md mx-auto space-y-3 relative z-10">
         {/* Toast feedback banner */}
         {toastMessage && (
           <div className="bg-[#1f2634] border border-amber-500/40 text-amber-100 text-xs font-medium px-3.5 py-2.5 rounded-2xl shadow-lg flex items-center justify-between gap-2 animate-fade-in">
@@ -368,11 +387,11 @@ export default function KioskPortalScreen({
         {/* =========================================================
             1. UNIFIED PROFILE & IDENTITY CARD (Mobile Optimized)
            ========================================================= */}
-        <section className="bg-[#181d26] border border-white/[0.08] rounded-3xl p-3.5 sm:p-4 shadow-xl space-y-3">
+        <section className={`${staffTheme?.cardBg || 'bg-[#181d26]'} ${staffTheme?.cardBorder || 'border-white/[0.08]'} border rounded-3xl p-3.5 sm:p-4 shadow-xl space-y-3 transition-colors duration-300`}>
           {/* Top Bar: Venue & Clock on Left | Duty Status & Logout on Right */}
           <div className="flex items-center justify-between gap-2 border-b border-white/[0.06] pb-2.5">
             <div className="flex items-center gap-2 min-w-0">
-              <span className="px-2.5 py-0.5 rounded-full bg-indigo-500/20 border border-indigo-400/30 text-indigo-300 font-extrabold text-[10px] tracking-wide shrink-0">
+              <span className={`px-2.5 py-0.5 rounded-full ${staffTheme?.accentBadge || 'bg-indigo-500/20 text-indigo-300 border-indigo-400/30'} font-extrabold text-[10px] tracking-wide shrink-0 transition-colors duration-300`}>
                 {staff?.venue || 'LuckyCat'}
               </span>
               <span className="text-[11px] text-slate-400 font-mono flex items-center gap-1 shrink-0">
@@ -513,6 +532,17 @@ export default function KioskPortalScreen({
                     </div>
                   )}
                 </div>
+
+                {/* Theme Customization Button */}
+                <button
+                  type="button"
+                  onClick={() => setThemeModalOpen(true)}
+                  className="inline-flex items-center gap-1 text-[10.5px] font-semibold text-slate-200 bg-[#232938] hover:bg-[#2c3345] border border-white/10 rounded-full px-2 py-0.5 transition cursor-pointer active:scale-95"
+                  title="Kustomisasi Tema & Nuansa Dashboard"
+                >
+                  <span className="text-xs">{staffTheme?.icon || '🎨'}</span>
+                  <span>{staffTheme?.name?.split(' ')[0] || 'Tema'}</span>
+                </button>
               </div>
             </div>
           </div>
@@ -1123,6 +1153,18 @@ export default function KioskPortalScreen({
       <DevicePermissionModal
         isOpen={permModalOpen}
         onClose={() => setPermModalOpen(false)}
+      />
+
+      {/* Staff Theme Customization Modal */}
+      <StaffThemeModal
+        isOpen={themeModalOpen}
+        onClose={() => setThemeModalOpen(false)}
+        staff={staff}
+        currentThemeId={staffTheme?.id}
+        onSelectTheme={(theme) => {
+          setStaffTheme(theme);
+          setToastMessage(`Tema ${theme.name} diterapkan! ${theme.icon}`);
+        }}
       />
     </div>
   );
