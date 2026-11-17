@@ -100,7 +100,7 @@ export default function PointManagementTab({ adminAuth, isReadOnly = false, onPo
           return;
         }
         ctx.drawImage(img, 0, 0, width, height);
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.70);
         setProofPhoto(dataUrl);
         setProofPhotoPreview(dataUrl);
       };

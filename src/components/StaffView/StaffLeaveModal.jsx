@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 import { getLeaveRequests, getStaffLeaveBalance, submitLeaveRequest } from '../../utils/api';
 import { getOperationalDateYMD, formatWitaDateOnly } from '../../utils/time';
-import { stampPhotoWithAppTime } from '../../utils/watermark';
+import { stampPhotoWithAppTime, compressImageFile } from '../../utils/watermark';
 
 export default function StaffLeaveModal({ isOpen, onClose, staff, onRefreshShifts, onMarkViewed, activeShift, initialCategory }) {
   const [activeTab, setActiveTab] = useState('HISTORY'); // 'HISTORY' | 'CUTI' | 'IZIN'
@@ -183,7 +183,7 @@ export default function StaffLeaveModal({ isOpen, onClose, staff, onRefreshShift
       canvas.height = videoRef.current.videoHeight || 480;
       const ctx = canvas.getContext('2d');
       ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
-      const base64 = canvas.toDataURL('image/jpeg', 0.85);
+      const base64 = canvas.toDataURL('image/jpeg', 0.68);
       if (cameraTarget === 'IZIN') {
         setIzinSelfie(base64);
       } else {
@@ -203,17 +203,18 @@ export default function StaffLeaveModal({ isOpen, onClose, staff, onRefreshShift
         staffName: staff?.name || 'Staff',
         status: 'Dokumen Pendukung Permohonan Izin',
         locationName: staff?.venue || '',
-        maxWidth: 1280,
-        quality: 0.82
+        maxWidth: 800,
+        quality: 0.68
       });
       setIzinDocPhoto(stamped);
     } catch (err) {
-      console.error('Failed to stamp uploaded doc:', err);
-      const reader = new FileReader();
-      reader.onload = () => {
-        setIzinDocPhoto(reader.result);
-      };
-      reader.readAsDataURL(file);
+      console.error('Failed to stamp uploaded doc, falling back to compress:', err);
+      try {
+        const compressed = await compressImageFile(file, 800, 0.68);
+        setIzinDocPhoto(compressed);
+      } catch (cErr) {
+        console.error('Fallback compression failed:', cErr);
+      }
     }
   };
 

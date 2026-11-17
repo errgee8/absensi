@@ -134,7 +134,7 @@ export default function FaceRegistrationModal({
       const sy = Math.max(0, ((video.videoHeight || 480) - size) / 2);
       ctx.drawImage(video, sx, sy, size, size, 0, 0, 480, 480);
 
-      const base64 = canvas.toDataURL('image/jpeg', 0.88);
+      const base64 = canvas.toDataURL('image/jpeg', 0.75);
       setStepCompleted({ 1: true, 2: true, 3: true });
       setPreviewPhoto(base64);
       handleSavePhoto(base64);
@@ -162,7 +162,7 @@ export default function FaceRegistrationModal({
         const sx = Math.max(0, (img.width - size) / 2);
         const sy = Math.max(0, (img.height - size) / 2);
         ctx.drawImage(img, sx, sy, size, size, 0, 0, 480, 480);
-        const base64 = canvas.toDataURL('image/jpeg', 0.88);
+        const base64 = canvas.toDataURL('image/jpeg', 0.75);
         setStepCompleted({ 1: true, 2: true, 3: true });
         setPreviewPhoto(base64);
         handleSavePhoto(base64);

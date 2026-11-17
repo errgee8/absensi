@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Megaphone, X, ShieldAlert, Camera, Upload, AlertTriangle, CheckCircle2, Loader2, Lock, Eye, Clock, Award, History, MessageSquare, ChevronRight } from 'lucide-react';
 import { submitStaffReport, getMyStaffReports } from '../../utils/api';
 import { formatWitaDateTime } from '../../utils/time';
+import { compressImageFile } from '../../utils/watermark';
 
 const REPORT_CATEGORIES = [
   'Pelanggaran Integritas / Kecurangan / Manipulasi',
@@ -49,22 +50,17 @@ export default function StaffReportModal({ staff, isOpen, onClose, onSuccess }) 
     loadMyReports();
   }, [staff?.id]);
 
-  const handlePhotoSelect = (e) => {
+  const handlePhotoSelect = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 8 * 1024 * 1024) {
-      setErrorMsg('Ukuran file foto maksimal 8 MB.');
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = () => {
-      setPhotoPreview(reader.result);
+    try {
+      const compressed = await compressImageFile(file, 800, 0.68);
+      setPhotoPreview(compressed);
       setErrorMsg(null);
-    };
-    reader.onerror = () => setErrorMsg('Gagal memproses file foto.');
-    reader.readAsDataURL(file);
+    } catch (err) {
+      setErrorMsg('Gagal memproses file foto: ' + err.message);
+    }
   };
 
   const handleSubmit = async (e) => {

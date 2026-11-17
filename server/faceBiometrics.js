@@ -39,7 +39,7 @@ export async function decodeImageData(input) {
     const trimmed = input.trim();
     if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 7000);
+      const timeout = setTimeout(() => controller.abort(), 4000);
       try {
         const resp = await fetch(trimmed, { signal: controller.signal });
         if (!resp.ok) throw new Error(`HTTP ${resp.status} ${resp.statusText}`);

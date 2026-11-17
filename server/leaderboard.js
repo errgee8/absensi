@@ -95,25 +95,7 @@ export async function computeLeaderboard(targetMonthStr) {
     }
   }
 
-  // Also query recent overall attendance photos to ensure every staff has their latest selfie
-  try {
-    const { data: recentPhotos } = await supabase
-      .from('attendance_logs')
-      .select('staff_id, check_in_photo_url, created_at')
-      .not('check_in_photo_url', 'is', null)
-      .order('created_at', { ascending: false })
-      .limit(100);
-
-    for (const r of recentPhotos || []) {
-      if (!staffPhotoMap[r.staff_id]) {
-        staffPhotoMap[r.staff_id] = r.check_in_photo_url;
-      }
-    }
-  } catch (e) {
-    console.warn('Recent photos query note:', e.message);
-  }
-
-  // Build maps for manager points and manual day adjustments
+  // Build maps for manager points and manual day adjustments (strictly scoped to target month)
   const staffPointsMap = {};
   for (const pt of staffPointsList) {
     if (!pt.staff_id) continue;
@@ -150,6 +132,7 @@ export async function computeLeaderboard(targetMonthStr) {
       role: s.role || 'Staff',
       venue: s.venue || 'JP / LC',
       division: s.division || s.department || 'Operasional',
+      avatar: s.avatar || null,
       workDays: new Set(),
       totalLateSeconds: 0,
       earlyBird15mCount: 0,       // >= 15m early (+2.0 pts)
@@ -314,7 +297,7 @@ export async function computeLeaderboard(targetMonthStr) {
       role: st.role,
       venue: st.venue,
       division: st.division,
-      photo_url: staffPhotoMap[st.staff_id] || null,
+      photo_url: staffPhotoMap[st.staff_id] || st.avatar || null,
       actual_days: actualDays,
       manual_days: manualDays,
       total_days: totalDays,

@@ -100,6 +100,10 @@ db.exec(`
     FOREIGN KEY(staff_id) REFERENCES staff(id)
   );
 
+  CREATE INDEX IF NOT EXISTS idx_shifts_date ON shifts(date);
+  CREATE INDEX IF NOT EXISTS idx_shifts_staff_status ON shifts(staff_id, status);
+  CREATE INDEX IF NOT EXISTS idx_shifts_date_staff ON shifts(date, staff_id);
+
   CREATE TABLE IF NOT EXISTS announcements (
     id TEXT PRIMARY KEY,
     title TEXT NOT NULL,
@@ -150,6 +154,10 @@ db.exec(`
     updated_at TEXT DEFAULT (datetime('now')),
     FOREIGN KEY(staff_id) REFERENCES staff(id)
   );
+
+  CREATE INDEX IF NOT EXISTS idx_shifts_date ON shifts(date);
+  CREATE INDEX IF NOT EXISTS idx_shifts_staff_status ON shifts(staff_id, status);
+  CREATE INDEX IF NOT EXISTS idx_shifts_date_staff ON shifts(date, staff_id);
 
   CREATE TABLE IF NOT EXISTS announcements (
     id TEXT PRIMARY KEY,

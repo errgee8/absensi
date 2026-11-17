@@ -149,8 +149,8 @@ export async function captureAndWatermark({
   status = 'Check-In',
   locationName = '',
   isGpsValid = true,
-  maxWidth = 960,
-  quality = 0.72
+  maxWidth = 720,
+  quality = 0.65
 }) {
   return stampPhotoWithAppTime({
     source: videoElement || imageElement,
@@ -172,5 +172,45 @@ export async function watermarkFile(file, options = {}) {
   return stampPhotoWithAppTime({
     source: file,
     ...options
+  });
+}
+
+/**
+ * Compresses an image file client-side before upload to prevent serverless timeouts and payload limits
+ */
+export function compressImageFile(file, maxWidth = 800, quality = 0.68) {
+  return new Promise((resolve, reject) => {
+    if (!file) return resolve(null);
+    if (!file.type || !file.type.startsWith('image/')) {
+      return reject(new Error('File yang dipilih bukan gambar.'));
+    }
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('Gagal membaca file gambar.'));
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error('File gambar rusak atau tidak valid.'));
+      img.onload = () => {
+        let width = img.width;
+        let height = img.height;
+        if (width > maxWidth || height > maxWidth) {
+          if (width > height) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          } else {
+            width = Math.round((width * maxWidth) / height);
+            height = maxWidth;
+          }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return resolve(reader.result);
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
   });
 }

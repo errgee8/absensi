@@ -2,7 +2,7 @@ import { isWithinGeofence } from './geofence.js';
 import { validateClientNetwork } from './network.js';
 import { getSetting, db } from './db.js';
 import { getOperationalDateYMD } from './shifts.js';
-import { isSupabaseConfigured, cloudDb } from './supabase.js';
+import { isSupabaseConfigured, cloudDb, autoPurgeOldAttendancePhotos } from './supabase.js';
 
 export const FLAG_TYPES = {
   MISSING_CHECKOUT: 'FLAG_MISSING_CHECKOUT',
@@ -227,6 +227,10 @@ export async function auditOpenShifts() {
     } catch (e) {
       console.warn('Supabase autoCloseCutoffShifts error:', e.message);
     }
+    // Background auto-purge photos older than 60 days (throttled to once daily)
+    autoPurgeOldAttendancePhotos(60).catch(err => {
+      console.warn('Auto purge trigger note:', err.message);
+    });
   }
 
   // 2. SQLite local audit and auto-close

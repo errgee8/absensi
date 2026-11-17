@@ -191,6 +191,137 @@ export async function resolveAttendancePhotoUrls(
   return items;
 }
 
+/**
+ * Auto-purge photos older than retentionDays (default 60 days) from Supabase Storage
+ * Preserves all database logs, shift records, hours, and active profile/biometric photos.
+ */
+export async function autoPurgeOldAttendancePhotos(retentionDays = 60, force = false) {
+  if (!isSupabaseConfigured || !supabase) {
+    return { success: false, reason: 'Supabase not configured' };
+  }
+
+  try {
+    const todayYmd = new Date().toISOString().substring(0, 10);
+    if (!force) {
+      const lastPurge = await cloudDb.getSetting('last_photo_purge_date');
+      if (lastPurge === todayYmd) {
+        return { success: true, skipped: true, message: 'Auto-purge already executed today' };
+      }
+    }
+
+    const cutoffMs = Date.now() - (retentionDays * 24 * 60 * 60 * 1000);
+    const cutoffDate = new Date(cutoffMs);
+
+    // 1. Collect protected paths (active profile & biometric photos)
+    const protectedPaths = new Set();
+    try {
+      const { data: staffList } = await supabase.from('staff').select('avatar');
+      for (const s of staffList || []) {
+        if (s.avatar) {
+          const p = extractAttendancePhotoPath(s.avatar);
+          if (p) protectedPaths.add(p);
+        }
+      }
+      const profiles = (await cloudDb.getSetting('staff_profiles')) || {};
+      for (const k of Object.keys(profiles)) {
+        if (profiles[k]?.photo_url) {
+          const p = extractAttendancePhotoPath(profiles[k].photo_url);
+          if (p) protectedPaths.add(p);
+        }
+      }
+      const biometrics = (await cloudDb.getSetting('staff_biometrics')) || {};
+      for (const k of Object.keys(biometrics)) {
+        if (biometrics[k]?.photo_url) {
+          const p = extractAttendancePhotoPath(biometrics[k].photo_url);
+          if (p) protectedPaths.add(p);
+        }
+      }
+    } catch (e) {
+      console.warn('Protected photos scan note:', e.message);
+    }
+
+    // 2. Scan Supabase Storage uploads directory
+    let totalPurged = 0;
+    let page = 0;
+    const PAGE_SIZE = 100;
+    let hasMore = true;
+
+    while (hasMore && page < 5) {
+      page++;
+      const { data: files, error: listError } = await supabase.storage
+        .from('attendance-photos')
+        .list('uploads', {
+          limit: PAGE_SIZE,
+          offset: (page - 1) * PAGE_SIZE,
+          sortBy: { column: 'created_at', order: 'asc' }
+        });
+
+      if (listError || !Array.isArray(files) || files.length === 0) {
+        hasMore = false;
+        break;
+      }
+
+      if (files.length < PAGE_SIZE) {
+        hasMore = false;
+      }
+
+      const toDelete = [];
+      for (const file of files) {
+        if (!file.name || file.name === '.emptyFolderPlaceholder') continue;
+        const filePath = `uploads/${file.name}`;
+
+        // Never delete active profile or biometric photos
+        if (
+          protectedPaths.has(filePath) ||
+          file.name.startsWith('profile_') ||
+          file.name.startsWith('biometric_')
+        ) {
+          continue;
+        }
+
+        // Determine creation time from Supabase metadata or filename timestamp
+        let fileTimestamp = file.created_at ? new Date(file.created_at).getTime() : 0;
+        if (!fileTimestamp || isNaN(fileTimestamp)) {
+          const match = file.name.match(/_(\d{12,14})_/);
+          if (match && match[1]) {
+            fileTimestamp = Number(match[1]);
+          }
+        }
+
+        if (fileTimestamp && fileTimestamp < cutoffMs) {
+          toDelete.push(filePath);
+        }
+      }
+
+      if (toDelete.length > 0) {
+        const { error: delErr } = await supabase.storage
+          .from('attendance-photos')
+          .remove(toDelete);
+
+        if (delErr) {
+          console.warn('Supabase storage remove batch error:', delErr.message);
+        } else {
+          totalPurged += toDelete.length;
+        }
+      }
+    }
+
+    // Record last run date
+    await cloudDb.saveSetting('last_photo_purge_date', todayYmd, 'Tanggal eksekusi auto-purge foto > 60 hari');
+    console.log(`[Auto-Purge] Berhasil membersihkan ${totalPurged} foto (> ${retentionDays} hari) dari Supabase Storage. Log database tetap utuh.`);
+
+    return {
+      success: true,
+      purgedCount: totalPurged,
+      cutoffDate: cutoffDate.toISOString(),
+      retentionDays
+    };
+  } catch (err) {
+    console.warn('autoPurgeOldAttendancePhotos error:', err.message);
+    return { success: false, error: err.message };
+  }
+}
+
 const LEGACY_ALIAS_MAP = {
   'JP-CSH-01': 'JP-CAS-01', // Ica
   'JP-CSH-02': 'JP-CAS-02', // Adis

@@ -5,7 +5,7 @@ import { db, getSetting, setSetting, uploadsDir } from './db.js';
 import { calculateDistanceMeters, isWithinGeofence } from './geofence.js';
 import { getClientIp, validateClientNetwork } from './network.js';
 import { evaluateCheckinFlags, evaluateCheckoutFlags, evaluateBreakFlags, auditOpenShifts, FLAG_TYPES } from './flags.js';
-import { isSupabaseConfigured, uploadPhotoToSupabase, resolveAttendancePhotoUrls, cloudDb, supabase, findStaffInSupabase } from './supabase.js';
+import { isSupabaseConfigured, uploadPhotoToSupabase, resolveAttendancePhotoUrls, cloudDb, supabase, findStaffInSupabase, autoPurgeOldAttendancePhotos } from './supabase.js';
 import { detectShiftSchedule, getBreakCutoff, isBreakAllowedNow, getWitaTimeString, getWitaDateYMD, getOperationalDateYMD, getOperationalYesterdayYMD, getPointCycleInfo, getPointCycleFromKey, getRecentPointCycles } from './shifts.js';
 import { computeLeaderboard } from './leaderboard.js';
 import { getVapidPublicKey, savePushSubscription, sendPushNotification } from './push.js';
@@ -158,6 +158,21 @@ router.post('/admin/backups/restore', async (req, res) => {
   }
   try {
     const result = await restoreSystemSnapshot(backupId);
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// 5. Auto-Purge Old Attendance Photos (>60 Days) Manual Trigger (Manager Pin Required)
+router.post('/admin/photos/purge', async (req, res) => {
+  const { pin, retentionDays = 60 } = req.body || {};
+  const auth = await verifyManagementAuth(pin);
+  if (!auth.authorized) {
+    return res.status(403).json({ error: 'Akses ditolak: PIN Manager salah.' });
+  }
+  try {
+    const result = await autoPurgeOldAttendancePhotos(Number(retentionDays) || 60, true);
     res.json(result);
   } catch (e) {
     res.status(500).json({ error: e.message });
