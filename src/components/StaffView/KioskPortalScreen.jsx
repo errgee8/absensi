@@ -431,7 +431,9 @@ export default function KioskPortalScreen({
               <button
                 type="button"
                 onClick={onLogout}
-                className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#232938] hover:bg-rose-500/20 text-slate-300 hover:text-rose-200 border border-white/10 text-[10.5px] font-semibold transition cursor-pointer"
+                className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10.5px] font-bold transition cursor-pointer border shadow-sm ${
+                  staffTheme?.pillBorder || 'bg-[#232938] hover:bg-rose-500/20 text-slate-300 border-white/10'
+                }`}
                 title="Keluar dari akun staff"
               >
                 <LogOut className="w-3 h-3" />
@@ -484,7 +486,9 @@ export default function KioskPortalScreen({
                 <button
                   type="button"
                   onClick={handleOpenPhotoModal}
-                  className="inline-flex items-center gap-1 text-[10.5px] font-semibold text-slate-300 bg-[#232938] hover:bg-[#2c3345] border border-white/10 rounded-full px-2 py-0.5 transition cursor-pointer"
+                  className={`inline-flex items-center gap-1 text-[10.5px] font-bold rounded-full px-2 py-0.5 transition cursor-pointer shadow-sm active:scale-95 border ${
+                    staffTheme?.pillBorder || 'bg-[#232938] hover:bg-[#2c3345] border-white/10 text-slate-300'
+                  }`}
                 >
                   <Camera className="w-3 h-3 text-indigo-400" />
                   <span>Foto</span>
@@ -494,7 +498,9 @@ export default function KioskPortalScreen({
                   <button
                     type="button"
                     onClick={onOpenFaceRegistration}
-                    className="inline-flex items-center gap-1 text-[10.5px] font-bold text-emerald-300 bg-emerald-950/70 hover:bg-emerald-900/80 border border-emerald-500/40 rounded-full px-2 py-0.5 transition cursor-pointer shadow-sm active:scale-95"
+                    className={`inline-flex items-center gap-1 text-[10.5px] font-bold rounded-full px-2 py-0.5 transition cursor-pointer shadow-sm active:scale-95 border ${
+                      staffTheme?.pillBorder || 'bg-emerald-950/70 hover:bg-emerald-900/80 border-emerald-500/40 text-emerald-300'
+                    }`}
                     title="Perbarui master biometrik wajah Anda"
                   >
                     <Smile className="w-3 h-3 text-emerald-400 shrink-0" />
@@ -508,9 +514,11 @@ export default function KioskPortalScreen({
                     type="button"
                     onClick={() => setMoodDropdownOpen((prev) => !prev)}
                     disabled={savingMood}
-                    className="inline-flex items-center gap-1 text-[10.5px] font-semibold text-slate-200 bg-[#232938] hover:bg-[#2c3345] border border-white/10 rounded-full px-2 py-0.5 transition cursor-pointer"
+                    className={`inline-flex items-center gap-1 text-[10.5px] font-bold rounded-full px-2 py-0.5 transition cursor-pointer shadow-sm border ${
+                      staffTheme?.pillBorder || 'bg-[#232938] hover:bg-[#2c3345] border-white/10 text-slate-200'
+                    }`}
                   >
-                    <span className="text-slate-400">Mood:</span>
+                    <span className="opacity-75">Mood:</span>
                     {currentMood ? (
                       <span className="text-xs leading-none">{currentMood}</span>
                     ) : (
@@ -641,7 +649,7 @@ export default function KioskPortalScreen({
         {/* =========================================================
             2. HERO ABSENSI SHIFT (Top Priority - Immediately Accessible)
            ========================================================= */}
-        <section className="bg-[#181d26] border border-white/[0.08] rounded-3xl p-3.5 sm:p-4 shadow-xl space-y-2.5">
+        <section className={`${staffTheme?.cardBg || 'bg-[#181d26]'} ${staffTheme?.cardBorder || 'border-white/[0.08]'} border rounded-3xl p-3.5 sm:p-4 shadow-xl space-y-2.5 transition-all duration-300`}>
           <div className="flex items-center justify-between border-b border-white/[0.06] pb-2">
             <span className="text-xs font-black uppercase tracking-wider text-slate-200 flex items-center gap-1.5">
               <Sparkles className="w-3.5 h-3.5 text-amber-400" />
@@ -660,8 +668,8 @@ export default function KioskPortalScreen({
               disabled={Boolean(activeShift)}
               className={`w-full px-4 py-3 rounded-2xl flex items-center justify-between text-xs font-black transition ${
                 activeShift
-                  ? 'bg-[#12151d] text-slate-500 border border-white/5 cursor-not-allowed'
-                  : 'bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-lg shadow-emerald-500/25 active:scale-[0.98] cursor-pointer'
+                  ? 'bg-black/30 text-slate-500 border border-white/5 cursor-not-allowed'
+                  : `${staffTheme?.primaryBtn || 'bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-lg shadow-emerald-500/25'} active:scale-[0.98] cursor-pointer`
               }`}
             >
               <span className="flex items-center gap-2.5">
@@ -671,7 +679,9 @@ export default function KioskPortalScreen({
                 </span>
               </span>
               {!activeShift && (
-                <span className="px-2.5 py-1 rounded-xl bg-slate-950/20 text-slate-950 text-[11px] font-extrabold shrink-0">
+                <span className={`px-2.5 py-1 rounded-xl text-[11px] font-extrabold shrink-0 shadow-sm ${
+                  staffTheme?.primaryBtnBadge || 'bg-slate-950/20 text-slate-950'
+                }`}>
                   Foto Selfie →
                 </span>
               )}
@@ -684,10 +694,10 @@ export default function KioskPortalScreen({
               disabled={!canClickBreak}
               className={`w-full px-4 py-3 rounded-2xl flex items-center justify-between text-xs font-black transition border ${
                 !canClickBreak
-                  ? 'bg-[#12151d] text-slate-600 border-white/5 cursor-not-allowed'
+                  ? 'bg-black/25 text-slate-600 border-white/5 cursor-not-allowed'
                   : isOnBreak
                   ? 'bg-amber-400 hover:bg-amber-300 text-slate-950 border-amber-300 shadow-lg shadow-amber-400/25 cursor-pointer animate-pulse'
-                  : 'bg-[#222836] hover:bg-[#2b3345] text-slate-100 border-white/10 cursor-pointer active:scale-[0.98]'
+                  : `${staffTheme?.secondaryBtn || 'bg-[#222836] hover:bg-[#2b3345] text-slate-100 border-white/10'} cursor-pointer active:scale-[0.98]`
               }`}
             >
               <span className="flex items-center gap-2.5">
@@ -866,10 +876,10 @@ export default function KioskPortalScreen({
           <button
             type="button"
             onClick={onOpenStaffLeaveModal}
-            className="bg-[#181d26] hover:bg-[#202734] border border-sky-400/30 rounded-2xl p-3 flex flex-col justify-between text-left shadow-lg transition active:scale-[0.98] cursor-pointer min-h-[110px]"
+            className={`${staffTheme?.bentoCard || 'bg-[#181d26] hover:bg-[#202734] border border-sky-400/30'} rounded-2xl p-3 flex flex-col justify-between text-left shadow-lg transition active:scale-[0.98] cursor-pointer min-h-[110px]`}
           >
             <div className="flex items-center justify-between w-full">
-              <div className="w-8 h-8 rounded-xl bg-sky-500/20 text-sky-300 border border-sky-400/30 flex items-center justify-center">
+              <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${staffTheme?.bentoIconBg || 'bg-sky-500/20 text-sky-300 border border-sky-400/30'}`}>
                 <FileText className="w-4 h-4" />
               </div>
               {leaveUpdateCount > 0 ? (
@@ -877,7 +887,7 @@ export default function KioskPortalScreen({
                   {leaveUpdateCount} Update
                 </span>
               ) : (
-                <span className="text-[10.5px] font-bold text-sky-400">Buat →</span>
+                <span className={`text-[10.5px] font-bold ${staffTheme?.accentLink || 'text-sky-400'}`}>Buat →</span>
               )}
             </div>
             <div className="mt-2.5">
@@ -892,13 +902,13 @@ export default function KioskPortalScreen({
           <button
             type="button"
             onClick={onSelectToilet}
-            className="bg-[#181d26] hover:bg-[#202734] border border-teal-400/30 rounded-2xl p-3 flex flex-col justify-between text-left shadow-lg transition active:scale-[0.98] cursor-pointer min-h-[110px]"
+            className={`${staffTheme?.bentoCard || 'bg-[#181d26] hover:bg-[#202734] border border-teal-400/30'} rounded-2xl p-3 flex flex-col justify-between text-left shadow-lg transition active:scale-[0.98] cursor-pointer min-h-[110px]`}
           >
             <div className="flex items-center justify-between w-full">
-              <div className="w-8 h-8 rounded-xl bg-teal-500/20 text-teal-300 border border-teal-400/30 flex items-center justify-center">
+              <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${staffTheme?.bentoIconBg || 'bg-teal-500/20 text-teal-300 border border-teal-400/30'}`}>
                 <QrCode className="w-4 h-4" />
               </div>
-              <span className="text-[10.5px] font-bold text-teal-400">Scan →</span>
+              <span className={`text-[10.5px] font-bold ${staffTheme?.accentLink || 'text-teal-400'}`}>Scan →</span>
             </div>
             <div className="mt-2.5">
               <div className="text-xs font-black text-white">Cek Restroom</div>
@@ -920,7 +930,7 @@ export default function KioskPortalScreen({
             className={`w-full rounded-2xl p-3 flex items-center justify-between gap-2.5 text-left shadow-lg active:scale-[0.99] transition cursor-pointer border ${
               unreadAnnouncementsCount > 0
                 ? 'bg-amber-500/15 hover:bg-amber-500/20 border-amber-400/50'
-                : 'bg-[#181d26] hover:bg-[#202734] border-white/10'
+                : `${staffTheme?.cardBg || 'bg-[#181d26]'} hover:brightness-110 ${staffTheme?.cardBorder || 'border-white/10'}`
             }`}
           >
             <div className="flex items-center gap-2.5 min-w-0">
@@ -928,7 +938,7 @@ export default function KioskPortalScreen({
                 className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 border ${
                   unreadAnnouncementsCount > 0
                     ? 'bg-amber-500 text-slate-950 border-amber-300'
-                    : 'bg-[#222836] text-amber-300 border-white/10'
+                    : `${staffTheme?.bentoIconBg || 'bg-[#222836] text-amber-300 border-white/10'}`
                 }`}
               >
                 <Megaphone className="w-4 h-4" />
@@ -951,7 +961,7 @@ export default function KioskPortalScreen({
               className={`px-2.5 py-1 rounded-xl text-[10.5px] font-bold shrink-0 border ${
                 unreadAnnouncementsCount > 0
                   ? 'bg-amber-400 text-slate-950 border-amber-300'
-                  : 'bg-[#222836] text-slate-200 border-white/10'
+                  : `${staffTheme?.pillBorder || 'bg-[#222836] text-slate-200 border-white/10'}`
               }`}
             >
               Baca →
