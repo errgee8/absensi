@@ -110,7 +110,8 @@ function LeaderboardColumn({
   icon: HeaderIcon,
   themeColor = 'amber', // 'amber' | 'blue'
   list = [],
-  type = 'attendance' // 'attendance' | 'toilet'
+  type = 'attendance', // 'attendance' | 'toilet'
+  onVisitStaff = null
 }) {
   const isAttendance = type === 'attendance';
   const activeParticipants = isAttendance ? list.filter(item => item.total_days > 0) : list;
@@ -188,7 +189,11 @@ function LeaderboardColumn({
                 
                 {/* #2 SILVER (Kiri) */}
                 {top2 ? (
-                  <div className="flex flex-col items-center text-center">
+                  <div
+                    onClick={() => onVisitStaff?.(top2)}
+                    className="flex flex-col items-center text-center cursor-pointer hover:opacity-90 active:scale-95 transition"
+                    title="Klik untuk visit dashboard profil staf"
+                  >
                     <StaffAvatarFrame
                       photo={top2.photo_url}
                       name={top2.name}
@@ -217,7 +222,11 @@ function LeaderboardColumn({
 
                 {/* #1 GOLD (Tengah - Elevated) */}
                 {top1 ? (
-                  <div className="flex flex-col items-center text-center -translate-y-2">
+                  <div
+                    onClick={() => onVisitStaff?.(top1)}
+                    className="flex flex-col items-center text-center -translate-y-2 cursor-pointer hover:opacity-90 active:scale-95 transition"
+                    title="Klik untuk visit dashboard profil staf"
+                  >
                     <StaffAvatarFrame
                       photo={top1.photo_url}
                       name={top1.name}
@@ -261,7 +270,11 @@ function LeaderboardColumn({
 
                 {/* #3 BRONZE (Kanan) */}
                 {top3 ? (
-                  <div className="flex flex-col items-center text-center">
+                  <div
+                    onClick={() => onVisitStaff?.(top3)}
+                    className="flex flex-col items-center text-center cursor-pointer hover:opacity-90 active:scale-95 transition"
+                    title="Klik untuk visit dashboard profil staf"
+                  >
                     <StaffAvatarFrame
                       photo={top3.photo_url}
                       name={top3.name}
@@ -300,7 +313,9 @@ function LeaderboardColumn({
               {restList.map((item) => (
                 <div
                   key={item.staff_id || item.name}
-                  className="p-2.5 rounded-2xl bg-slate-900/80 border border-slate-800 hover:border-slate-700 transition flex items-center justify-between gap-2.5 shadow-sm"
+                  onClick={() => onVisitStaff?.(item)}
+                  className="p-2.5 rounded-2xl bg-slate-900/80 border border-slate-800 hover:border-slate-700 transition flex items-center justify-between gap-2.5 shadow-sm cursor-pointer hover:bg-slate-800/80 active:scale-[0.99]"
+                  title="Klik untuk visit dashboard profil staf"
                 >
                   <div className="flex items-center space-x-2.5 min-w-0">
                     <StaffAvatarFrame
@@ -494,7 +509,7 @@ function NeedsImprovementSpotlight({ staff }) {
   );
 }
 
-export default function LeaderboardModal({ isOpen, onClose }) {
+export default function LeaderboardModal({ isOpen, onClose, onVisitStaff = null }) {
   if (!isOpen) return null;
 
   const [data, setData] = useState(null);
@@ -641,6 +656,7 @@ export default function LeaderboardModal({ isOpen, onClose }) {
                   themeColor="amber"
                   list={attendanceList}
                   type="attendance"
+                  onVisitStaff={onVisitStaff}
                 />
 
                 {/* COLUMN 2: INSPEKSI TOILET (TOP 5) */}
@@ -651,6 +667,7 @@ export default function LeaderboardModal({ isOpen, onClose }) {
                   themeColor="blue"
                   list={toiletList}
                   type="toilet"
+                  onVisitStaff={onVisitStaff}
                 />
 
               </div>

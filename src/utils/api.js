@@ -552,6 +552,25 @@ export async function updateStaffMood(staffId, emoji) {
   return data;
 }
 
+export async function updateStaffBio(staffId, bio) {
+  const res = await fetch(`${API_BASE}/staff/${encodeURIComponent(staffId)}/bio`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ bio })
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Gagal menyimpan bio profil');
+  return data;
+}
+
+export async function getStaffPublicProfile(staffId, visitorStaffId = '') {
+  const query = visitorStaffId ? `?visitorStaffId=${encodeURIComponent(visitorStaffId)}` : '';
+  const res = await fetch(`${API_BASE}/staff/${encodeURIComponent(staffId)}/public-profile${query}`);
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Gagal memuat profil staf');
+  return data;
+}
+
 // 9f. Staff Personal Attendance History (Lates, Absences & Leaves)
 export async function getStaffAttendanceHistory(staffId, monthKey) {
   const query = monthKey ? `?monthKey=${encodeURIComponent(monthKey)}` : '';
@@ -772,11 +791,11 @@ export async function getQuizLeaderboard(weekKey) {
 }
 
 // 12. Peer Kudos (Bintang Apresiasi)
-export async function sendStaffKudos({ fromStaffId, toStaffId, reason }) {
+export async function sendStaffKudos({ fromStaffId, toStaffId, reason, isAnonymous = false }) {
   const res = await fetch(`${API_BASE}/staff/kudos`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ fromStaffId, toStaffId, reason })
+    body: JSON.stringify({ fromStaffId, toStaffId, reason, isAnonymous })
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'Gagal mengirim Bintang Apresiasi');

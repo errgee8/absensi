@@ -24,6 +24,7 @@ import {
   Sparkles,
   Smile,
   Crown,
+  Quote,
   Palette
 } from 'lucide-react';
 import {
@@ -39,6 +40,8 @@ import {
 import DevicePermissionModal from './DevicePermissionModal';
 import StaffThemeModal, { getStaffTheme, saveStaffTheme } from './StaffThemeModal';
 import StaffKudosModal from './StaffKudosModal';
+import StaffBioModal from './StaffBioModal';
+import StaffPublicProfileModal from './StaffPublicProfileModal';
 import { getStreakTier, isVipStaff } from '../../utils/streakFrames';
 
 const MOOD_EMOJIS = ['😊', '🔥', '😐', '😴', '😮‍💨', '😢', '😡', '💔'];
@@ -125,6 +128,10 @@ export default function KioskPortalScreen({
   const isVip = isVipStaff(staff);
   const [themeModalOpen, setThemeModalOpen] = useState(false);
   const [kudosModalOpen, setKudosModalOpen] = useState(false);
+  const [bioModalOpen, setBioModalOpen] = useState(false);
+  const [staffBio, setStaffBio] = useState(staff?.bio || '');
+  const [visitedStaffId, setVisitedStaffId] = useState(null);
+  const [targetKudosStaff, setTargetKudosStaff] = useState(null);
   const [staffTheme, setStaffTheme] = useState(() => getStaffTheme(staff?.id, staff));
 
   const currentStreak = isVip ? 888 : (staff?.streak || activeShift?.streak || 0);
@@ -133,6 +140,7 @@ export default function KioskPortalScreen({
   useEffect(() => {
     if (staff) {
       setStaffTheme(getStaffTheme(staff?.id, staff));
+      setStaffBio(staff?.bio || '');
     }
   }, [staff]);
 
@@ -541,6 +549,28 @@ export default function KioskPortalScreen({
                 )}
               </div>
 
+              {/* Staff Bio Display */}
+              {staffBio ? (
+                <div
+                  onClick={() => setBioModalOpen(true)}
+                  className="mt-1 text-[11px] text-slate-300 italic line-clamp-2 cursor-pointer hover:text-amber-300 transition flex items-start gap-1 group"
+                  title="Ketuk untuk mengedit bio profil"
+                >
+                  <Quote className="w-2.5 h-2.5 text-indigo-400 shrink-0 mt-0.5" />
+                  <span className="leading-tight">"{staffBio}"</span>
+                  <Pencil className="w-2.5 h-2.5 text-slate-500 group-hover:text-amber-300 opacity-0 group-hover:opacity-100 transition shrink-0 ml-1" />
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setBioModalOpen(true)}
+                  className="mt-0.5 text-[10px] text-indigo-300/80 hover:text-indigo-200 transition flex items-center gap-1 font-medium cursor-pointer"
+                >
+                  <Quote className="w-2.5 h-2.5 text-indigo-400" />
+                  <span>+ Tulis bio singkat profil kamu</span>
+                </button>
+              )}
+
               {/* Action Pills Row: Ganti Foto, Update Wajah, Mood, Bintang Apresiasi, Theme */}
               <div className="flex flex-wrap items-center gap-1.5 mt-2">
                 <button
@@ -630,6 +660,19 @@ export default function KioskPortalScreen({
                   <span className="text-[9.5px] opacity-75 font-bold">Theme :</span>
                   <span>{staffTheme?.icon || '🎨'}</span>
                   <span className="font-black">{staffTheme?.shortName || staffTheme?.name || 'Custom'}</span>
+                </button>
+
+                {/* Staff Bio Button */}
+                <button
+                  type="button"
+                  onClick={() => setBioModalOpen(true)}
+                  className={`inline-flex items-center gap-1 text-[10.5px] font-bold rounded-full px-2 py-0.5 transition cursor-pointer active:scale-95 border shadow-sm ${
+                    staffTheme?.pillBorder || 'bg-[#232938] hover:bg-[#2c3345] border-white/10 text-slate-300'
+                  }`}
+                  title="Tulis atau perbarui bio singkat profil kamu (maks 150 kata)"
+                >
+                  <Quote className="w-3 h-3 text-indigo-400" />
+                  <span>Bio</span>
                 </button>
               </div>
             </div>
@@ -1261,12 +1304,48 @@ export default function KioskPortalScreen({
       {kudosModalOpen && (
         <StaffKudosModal
           staff={staff}
-          onClose={() => setKudosModalOpen(false)}
+          targetStaff={targetKudosStaff}
+          onVisitStaff={(c) => {
+            setKudosModalOpen(false);
+            setVisitedStaffId(c.id || c.uuid);
+          }}
+          onClose={() => {
+            setKudosModalOpen(false);
+            setTargetKudosStaff(null);
+          }}
           onSuccess={() => {
             setToastMessage('Bintang Apresiasi berhasil dikirimkan! ⭐');
+            setTargetKudosStaff(null);
           }}
         />
       )}
+
+      {/* Staff Bio Customization Modal */}
+      <StaffBioModal
+        isOpen={bioModalOpen}
+        staff={staff}
+        currentBio={staffBio}
+        onClose={() => setBioModalOpen(false)}
+        onSuccess={(newBio) => {
+          setStaffBio(newBio);
+          if (staff) staff.bio = newBio;
+          setToastMessage('Bio profil berhasil diperbarui! ✨');
+        }}
+      />
+
+      {/* Staff Public Profile Modal (When visiting colleague dashboard) */}
+      <StaffPublicProfileModal
+        isOpen={Boolean(visitedStaffId)}
+        staffId={visitedStaffId}
+        visitorStaff={staff}
+        isManager={false}
+        onClose={() => setVisitedStaffId(null)}
+        onGiveStar={(target) => {
+          setVisitedStaffId(null);
+          setTargetKudosStaff(target);
+          setKudosModalOpen(true);
+        }}
+      />
     </div>
   );
 }

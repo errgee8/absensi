@@ -241,6 +241,8 @@ const ensureColumn = (tableName, columnName, definition) => {
 
 ensureColumn('staff', 'venue', "TEXT DEFAULT 'JP Karaoke'");
 ensureColumn('staff', 'division', "TEXT DEFAULT 'Server and Cashier'");
+ensureColumn('staff', 'bio', 'TEXT');
+ensureColumn('staff_kudos', 'is_anonymous', 'INTEGER DEFAULT 0');
 ensureColumn('staff_points', 'proof_photo_url', 'TEXT');
 ensureColumn('staff_points', 'point_type', "TEXT DEFAULT 'MINUS'");
 ensureColumn('staff_points', 'type', "TEXT DEFAULT 'MINUS'");

@@ -1075,12 +1075,26 @@ router.get('/staff', async (req, res) => {
 
       const { data, error } = await supaQuery.order('venue', { ascending: true }).order('name', { ascending: true });
       if (!error && data && data.length > 0) {
-        return res.json(data.map(s => ({
-          ...s,
-          id: s.legacy_code || s.id,
-          uuid: s.id,
-          is_active: 1
-        })));
+        const profilesMap = getSetting('staff_profiles') || {};
+        const biometricsMap = getSetting('staff_biometrics') || {};
+        const biosMap = getSetting('staff_bios') || {};
+
+        const mapped = data.map(s => {
+          const sId = s.legacy_code || s.id;
+          const sUuid = s.id;
+          const prof = profilesMap[sUuid] || profilesMap[sId];
+          const bioM = biometricsMap[sUuid] || biometricsMap[sId];
+          return {
+            ...s,
+            id: sId,
+            uuid: sUuid,
+            profile_photo_url: prof?.photo_url || bioM?.photo_url || null,
+            bio: biosMap[sUuid] || biosMap[sId] || s.bio || '',
+            is_active: 1
+          };
+        });
+        await resolveAttendancePhotoUrls(mapped, ['profile_photo_url']);
+        return res.json(mapped);
       }
     } catch (e) {
       console.warn('Supabase staff query error, falling back to SQLite:', e.message);
@@ -1098,7 +1112,21 @@ router.get('/staff', async (req, res) => {
 
   query += ' ORDER BY venue ASC, division ASC, name ASC';
   const staff = db.prepare(query).all(...params);
-  res.json(staff);
+  const profilesMap = getSetting('staff_profiles') || {};
+  const biometricsMap = getSetting('staff_biometrics') || {};
+  const biosMap = getSetting('staff_bios') || {};
+
+  const mapped = staff.map(s => {
+    const prof = profilesMap[s.uuid] || profilesMap[s.id];
+    const bioM = biometricsMap[s.uuid] || biometricsMap[s.id];
+    return {
+      ...s,
+      profile_photo_url: prof?.photo_url || bioM?.photo_url || null,
+      bio: biosMap[s.uuid] || biosMap[s.id] || s.bio || ''
+    };
+  });
+  await resolveAttendancePhotoUrls(mapped, ['profile_photo_url']);
+  res.json(mapped);
 });
 
 // 5. Manager Admin Staff Roster
@@ -1492,6 +1520,10 @@ router.post('/staff/verify-pin', async (req, res) => {
     face_biometrics_registered: Boolean(biometricEntry?.photo_url || profileEntry?.photo_url || staff.avatar),
     biometric_photo_url: biometricEntry?.photo_url || profileEntry?.photo_url || staff.avatar || null,
     mood_emoji: moodEntry && moodEntry.date_ymd === currentOpDate ? moodEntry.emoji : null,
+    bio: (() => {
+      const biosMap = getSetting('staff_bios') || {};
+      return biosMap?.[staff.uuid] || biosMap?.[staff.id] || biosMap?.[staff.legacy_code] || staff.bio || '';
+    })(),
     monthlyStats
   };
 
@@ -5819,9 +5851,9 @@ router.post('/reports/:id/status', async (req, res) => {
 // 15e. STAFF KUDOS (BINTANG APRESIASI PEER-TO-PEER)
 // ==========================================
 
-// 1. Kirim Bintang Apresiasi (Maksimal 1 Bintang per Minggu)
+// 1. Kirim Bintang Apresiasi (Maksimal 1 Bintang per Minggu, Opsi Anonim)
 router.post('/staff/kudos', async (req, res) => {
-  const { fromStaffId, toStaffId, reason } = req.body || {};
+  const { fromStaffId, toStaffId, reason, isAnonymous } = req.body || {};
 
   if (!fromStaffId || !toStaffId) {
     return res.status(400).json({ error: 'Pengirim dan penerima apresiasi wajib dipilih.' });
@@ -5879,6 +5911,7 @@ router.post('/staff/kudos', async (req, res) => {
       });
     }
 
+    const isAnon = Boolean(isAnonymous);
     const kudosId = `kudos_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
     const nowIso = new Date().toISOString();
 
@@ -5892,14 +5925,15 @@ router.post('/staff/kudos', async (req, res) => {
       to_staff_venue: toStaff.venue || 'Outlet',
       reason: cleanReason,
       week_key: weekKey,
+      is_anonymous: isAnon ? 1 : 0,
       created_at: nowIso
     };
 
     // Save SQLite
     try {
       db.prepare(`
-        INSERT INTO staff_kudos (id, from_staff_id, from_staff_name, from_staff_venue, to_staff_id, to_staff_name, to_staff_venue, reason, week_key, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO staff_kudos (id, from_staff_id, from_staff_name, from_staff_venue, to_staff_id, to_staff_name, to_staff_venue, reason, week_key, is_anonymous, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
         kudosRecord.id,
         kudosRecord.from_staff_id,
@@ -5910,6 +5944,7 @@ router.post('/staff/kudos', async (req, res) => {
         kudosRecord.to_staff_venue,
         kudosRecord.reason,
         kudosRecord.week_key,
+        kudosRecord.is_anonymous,
         kudosRecord.created_at
       );
     } catch (e) {
@@ -5930,7 +5965,7 @@ router.post('/staff/kudos', async (req, res) => {
 
     return res.json({
       success: true,
-      message: `Bintang Apresiasi berhasil dikirimkan kepada ${toStaff.name}! ⭐`,
+      message: `Bintang Apresiasi berhasil dikirimkan kepada ${toStaff.name}! ${isAnon ? '(Mode Anonim 🎭)' : '⭐'}`,
       kudos: kudosRecord
     });
   } catch (err) {
@@ -5939,7 +5974,7 @@ router.post('/staff/kudos', async (req, res) => {
   }
 });
 
-// 2. Status Kuota & Bintang Diterima Staf Minggu Ini
+// 2. Status Kuota & Bintang Diterima Staf Minggu Ini (Kerahasiaan Pengirim Dijamin)
 router.get('/staff/kudos/status', async (req, res) => {
   const { staffId } = req.query;
   if (!staffId) return res.status(400).json({ error: 'staffId wajib disertakan.' });
@@ -5968,13 +6003,24 @@ router.get('/staff/kudos/status', async (req, res) => {
       } catch {}
     }
 
+    // Mask anonymous senders so the recipient never knows who sent it
+    const sanitizedReceived = (receivedList || []).map((r) => {
+      const isAnon = Boolean(r.is_anonymous === 1 || r.is_anonymous === true || r.is_anonymous === '1');
+      return {
+        ...r,
+        is_anonymous: isAnon ? 1 : 0,
+        from_staff_name: isAnon ? 'Rekan Kerja (Anonim) 🎭' : r.from_staff_name,
+        from_staff_id: isAnon ? null : r.from_staff_id
+      };
+    });
+
     return res.json({
       success: true,
       weekKey,
       canSend: !sentThisWeek,
       sentThisWeek: sentThisWeek || null,
       receivedCount: receivedList.length,
-      recentReceived: receivedList.slice(0, 5)
+      recentReceived: sanitizedReceived.slice(0, 10)
     });
   } catch (err) {
     console.error('Error fetching staff kudos status:', err);
@@ -5982,7 +6028,7 @@ router.get('/staff/kudos/status', async (req, res) => {
   }
 });
 
-// 3. Manager Audit Log: Semua Riwayat Pengiriman Bintang Apresiasi
+// 3. Manager Audit Log: Semua Riwayat Pengiriman Bintang Apresiasi (Lengkap untuk Manajemen)
 router.get('/admin/kudos', async (req, res) => {
   try {
     let logs = [];
@@ -6008,6 +6054,202 @@ router.get('/admin/kudos', async (req, res) => {
   } catch (err) {
     console.error('Error fetching admin kudos audit logs:', err);
     return res.status(500).json({ error: 'Gagal memuat log bintang apresiasi: ' + err.message });
+  }
+});
+
+// 4. Update Staff Bio (Maksimal 150 Kata)
+router.post('/staff/:id/bio', async (req, res) => {
+  const { id } = req.params;
+  const { bio } = req.body || {};
+
+  const cleanBio = (bio || '').trim();
+  const words = cleanBio ? cleanBio.split(/\s+/).filter(Boolean) : [];
+  if (words.length > 150) {
+    return res.status(400).json({ error: `Bio maksimal 150 kata (saat ini: ${words.length} kata).` });
+  }
+
+  try {
+    let staff = null;
+    if (isSupabaseConfigured) {
+      staff = await findStaffInSupabase(id);
+    }
+    if (!staff) {
+      staff = db.prepare('SELECT * FROM staff WHERE id = ? OR uuid = ?').get(id, id);
+    }
+    if (!staff) {
+      return res.status(404).json({ error: 'Staff tidak ditemukan.' });
+    }
+
+    const staffId = staff.legacy_code || staff.id;
+    const staffUuid = staff.uuid || staff.id;
+
+    // Save SQLite
+    try {
+      db.prepare('UPDATE staff SET bio = ? WHERE id = ? OR uuid = ?').run(cleanBio, staffId, staffUuid);
+    } catch (e) {
+      console.warn('SQLite bio update note:', e.message);
+    }
+
+    // Save Settings Map
+    const localBios = getSetting('staff_bios') || {};
+    localBios[staffId] = cleanBio;
+    if (staffUuid) localBios[staffUuid] = cleanBio;
+    setSetting('staff_bios', localBios);
+
+    if (isSupabaseConfigured) {
+      try {
+        await cloudDb.saveSetting('staff_bios_map', localBios, 'Staff Bio Descriptions');
+      } catch (e) {
+        console.warn('Supabase bio save note:', e.message);
+      }
+    }
+
+    broadcastEvent('STAFF_UPDATE', { action: 'BIO_UPDATED', staffId, bio: cleanBio });
+
+    return res.json({
+      success: true,
+      message: 'Bio profil berhasil diperbarui.',
+      bio: cleanBio
+    });
+  } catch (err) {
+    console.error('Error saving staff bio:', err);
+    return res.status(500).json({ error: 'Gagal menyimpan bio staf: ' + err.message });
+  }
+});
+
+// 5. Public Staff Profile (Untuk Fitur Visit Dashboard Rekan Kerja / Manager)
+// Menyembunyikan data sensitif (poin, sanksi, telat), hanya menampilkan data positif: total hari kerja, streak, mood, jumlah bintang, bio, & posisi leaderboard
+router.get('/staff/:id/public-profile', async (req, res) => {
+  const { id } = req.params;
+  const { visitorStaffId } = req.query;
+
+  try {
+    let staff = null;
+    if (isSupabaseConfigured) {
+      staff = await findStaffInSupabase(id);
+    }
+    if (!staff) {
+      staff = db.prepare('SELECT * FROM staff WHERE id = ? OR uuid = ?').get(id, id);
+    }
+    if (!staff) {
+      return res.status(404).json({ error: 'Data staf tidak ditemukan.' });
+    }
+
+    const staffId = staff.legacy_code || staff.id;
+    const staffUuid = staff.uuid || staff.id;
+
+    const isVip = (
+      String(staff.name || '').toLowerCase().includes('ryan gerrit') ||
+      String(staff.pin || '') === '8894' ||
+      staffId === 'JP-MAN-5613695' ||
+      staffUuid === 'ed5f6cd5-9564-490a-b2b0-bfae2cc21379'
+    );
+
+    // 1. Resolve Profile Photo
+    let profilePhotoUrl = null;
+    const profilesMap = getSetting('staff_profiles') || {};
+    const biometricsMap = getSetting('staff_biometrics') || {};
+    const profEntry = profilesMap[staffUuid] || profilesMap[staffId];
+    const bioMEntry = biometricsMap[staffUuid] || biometricsMap[staffId];
+    profilePhotoUrl = profEntry?.photo_url || bioMEntry?.photo_url || staff.avatar || null;
+    if (profilePhotoUrl) {
+      const tempObj = { profile_photo_url: profilePhotoUrl };
+      await resolveAttendancePhotoUrls([tempObj], ['profile_photo_url']);
+      profilePhotoUrl = tempObj.profile_photo_url;
+    }
+
+    // 2. Resolve Bio
+    const biosMap = getSetting('staff_bios') || {};
+    const bio = biosMap[staffUuid] || biosMap[staffId] || staff.bio || '';
+
+    // 3. Resolve Mood Today
+    const currentOpDate = getOperationalDateYMD();
+    const moodsMap = getSetting('staff_moods') || {};
+    const moodEntry = moodsMap[staffUuid] || moodsMap[staffId];
+    const moodEmoji = moodEntry && moodEntry.date_ymd === currentOpDate ? moodEntry.emoji : null;
+
+    // 4. Resolve Streak (888 permanen untuk Ryan Gerrit)
+    let streak = 0;
+    if (isVip) {
+      streak = 888;
+    } else {
+      const streakRecord = await getStaffStreakRecord(staffId, staffUuid);
+      streak = streakRecord?.currentStreak || 0;
+    }
+
+    // 5. Total Work Days this month (Out of 26 days)
+    let workDays = 0;
+    try {
+      const nowWita = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Makassar' }));
+      const yyyy = nowWita.getFullYear();
+      const mm = String(nowWita.getMonth() + 1).padStart(2, '0');
+      const monthPrefix = `${yyyy}-${mm}`;
+      const countRow = db.prepare(`
+        SELECT COUNT(DISTINCT shift_date) as cnt
+        FROM shifts
+        WHERE (staff_id = ? OR staff_id = ?) AND shift_date LIKE ? AND check_out_time IS NOT NULL
+      `).get(staffId, staffUuid, `${monthPrefix}%`);
+      workDays = countRow?.cnt || 0;
+    } catch {}
+
+    // 6. Total Kudos Stars Received
+    let kudosCount = 0;
+    try {
+      const kRow = db.prepare('SELECT COUNT(*) as cnt FROM staff_kudos WHERE to_staff_id = ? OR to_staff_id = ?').get(staffId, staffUuid);
+      kudosCount = kRow?.cnt || 0;
+    } catch {}
+
+    // 7. Leaderboard Rank (Attendance Leaderboard for this month)
+    let leaderboardRank = null;
+    try {
+      const nowWita = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Makassar' }));
+      const monthKey = `${nowWita.getFullYear()}-${String(nowWita.getMonth() + 1).padStart(2, '0')}`;
+      const lb = await computeLeaderboard(monthKey);
+      const allParts = [
+        ...(lb?.attendance?.podium || []),
+        ...(lb?.attendance?.rest || [])
+      ];
+      const match = allParts.find(p => String(p.staff_id) === String(staffId) || String(p.staff_id) === String(staffUuid) || p.name === staff.name);
+      if (match) {
+        leaderboardRank = match.rank || null;
+      }
+    } catch {}
+
+    // 8. Visitor's ability to give star
+    let canGiveStar = false;
+    if (visitorStaffId && String(visitorStaffId) !== String(staffId) && String(visitorStaffId) !== String(staffUuid)) {
+      const weekKey = getWitaWeekKey();
+      let alreadySent = null;
+      try {
+        alreadySent = db.prepare('SELECT id FROM staff_kudos WHERE week_key = ? AND from_staff_id = ?').get(weekKey, visitorStaffId);
+      } catch {}
+      canGiveStar = !alreadySent;
+    }
+
+    return res.json({
+      success: true,
+      profile: {
+        id: staffId,
+        uuid: staffUuid,
+        name: staff.name,
+        venue: staff.venue,
+        division: staff.division,
+        role: staff.role,
+        department: staff.department,
+        profile_photo_url: profilePhotoUrl,
+        bio,
+        mood_emoji: moodEmoji,
+        is_vip: isVip,
+        streak,
+        work_days: workDays,
+        kudos_count: kudosCount,
+        leaderboard_rank: leaderboardRank,
+        can_give_star: canGiveStar
+      }
+    });
+  } catch (err) {
+    console.error('Error fetching public staff profile:', err);
+    return res.status(500).json({ error: 'Gagal memuat profil staf: ' + err.message });
   }
 });
 

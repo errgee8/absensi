@@ -29,6 +29,7 @@ export default function ShiftTable({
   onReviewLate,
   onInspectStaff,
   onAuthorizeEarlyCheckout,
+  onVisitStaffProfile,
   readersSet,
   hasActiveAnnouncement,
   density = 'compact'
@@ -333,16 +334,26 @@ export default function ShiftTable({
                           <img
                             src={shift.staff_profile_photo_url}
                             alt={shift.staff_name}
-                            className="w-8 h-8 rounded-xl object-cover border border-slate-700 shrink-0 shadow-xs"
+                            onClick={() => onVisitStaffProfile?.(shift.staff_id || shift.staff_uuid || shift.staff_name)}
+                            className="w-8 h-8 rounded-xl object-cover border border-slate-700 shrink-0 shadow-xs cursor-pointer hover:border-amber-400 hover:scale-105 transition"
+                            title="Klik untuk visit dashboard profil staf"
                           />
                         ) : (
-                          <div className="w-8 h-8 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center text-[10px] font-black text-slate-400 shrink-0">
+                          <div
+                            onClick={() => onVisitStaffProfile?.(shift.staff_id || shift.staff_uuid || shift.staff_name)}
+                            className="w-8 h-8 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center text-[10px] font-black text-slate-400 shrink-0 cursor-pointer hover:border-amber-400 hover:text-white transition"
+                            title="Klik untuk visit dashboard profil staf"
+                          >
                             {shift.staff_name ? shift.staff_name.slice(0, 2).toUpperCase() : 'ST'}
                           </div>
                         )}
                         <div className="min-w-0">
                           <div className="flex items-center space-x-1 flex-wrap gap-y-0.5">
-                            <span className="font-black text-slate-100 text-xs truncate max-w-[110px] leading-snug">
+                            <span
+                              onClick={() => onVisitStaffProfile?.(shift.staff_id || shift.staff_uuid || shift.staff_name)}
+                              className="font-black text-slate-100 text-xs truncate max-w-[110px] leading-snug cursor-pointer hover:text-amber-300 transition"
+                              title="Klik untuk visit dashboard profil staf"
+                            >
                               {shift.staff_name}
                             </span>
                             {shift.mood_emoji && (

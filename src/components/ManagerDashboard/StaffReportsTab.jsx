@@ -636,8 +636,13 @@ export default function StaffReportsTab({ adminAuth }) {
                           {formatWitaDateTime(kudos.created_at)}
                         </td>
                         <td className="py-3 px-4 whitespace-nowrap">
-                          <div className="font-bold text-white flex items-center gap-1.5">
+                          <div className="font-bold text-white flex items-center gap-1.5 flex-wrap">
                             <span>{kudos.from_staff_name}</span>
+                            {Boolean(kudos.is_anonymous) && (
+                              <span className="px-1.5 py-0.2 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/40 text-[9px] font-black" title="Pengirim memilih mode anonim (nama disamarkan kepada penerima, namun tetap tercatat untuk manajer)">
+                                Anonim 🎭
+                              </span>
+                            )}
                           </div>
                           <span className="text-[10px] text-slate-400">
                             {kudos.from_staff_venue || 'Outlet'}

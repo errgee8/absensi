@@ -4,6 +4,7 @@ import StaffView from './components/StaffView/StaffView';
 import ManagerDashboard from './components/ManagerDashboard/ManagerDashboard';
 import AdminPinModal from './components/ManagerDashboard/AdminPinModal';
 import LeaderboardModal from './components/Leaderboard/LeaderboardModal';
+import StaffPublicProfileModal from './components/StaffView/StaffPublicProfileModal';
 import ToastContainer, { showToast } from './components/Common/Toast';
 import { getNetworkStatus, getStaffList, getSettings, getServerTime } from './utils/api';
 import { Smartphone, Download } from 'lucide-react';
@@ -23,6 +24,7 @@ export default function App() {
 
   // Staff Monthly Performance Leaderboard State
   const [leaderboardOpen, setLeaderboardOpen] = useState(false);
+  const [visitedStaffId, setVisitedStaffId] = useState(null);
 
   const loadAppData = async () => {
     try {
@@ -175,6 +177,16 @@ export default function App() {
       <LeaderboardModal
         isOpen={leaderboardOpen}
         onClose={() => setLeaderboardOpen(false)}
+        onVisitStaff={(staffItem) => setVisitedStaffId(staffItem.staff_id || staffItem.id || staffItem.uuid || staffItem.name)}
+      />
+
+      {/* Staff Public Profile Modal (from Leaderboard / General Visit) */}
+      <StaffPublicProfileModal
+        isOpen={Boolean(visitedStaffId)}
+        staffId={visitedStaffId}
+        visitorStaff={null}
+        isManager={Boolean(adminAuth)}
+        onClose={() => setVisitedStaffId(null)}
       />
 
       {/* Global Toast Notification System */}

@@ -13,7 +13,7 @@ const QUICK_REASONS = [
   'Bikin suasana kerja jadi ceria 💖'
 ];
 
-export default function StaffKudosModal({ staff, onClose, onSuccess }) {
+export default function StaffKudosModal({ staff, targetStaff = null, onVisitStaff = null, onClose, onSuccess }) {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
@@ -21,8 +21,15 @@ export default function StaffKudosModal({ staff, onClose, onSuccess }) {
 
   const [status, setStatus] = useState(null);
   const [colleagues, setColleagues] = useState([]);
-  const [selectedStaffId, setSelectedStaffId] = useState('');
+  const [selectedStaffId, setSelectedStaffId] = useState(targetStaff?.id || targetStaff?.uuid || '');
   const [reason, setReason] = useState('');
+  const [isAnonymous, setIsAnonymous] = useState(false);
+
+  useEffect(() => {
+    if (targetStaff) {
+      setSelectedStaffId(targetStaff.id || targetStaff.uuid || '');
+    }
+  }, [targetStaff]);
 
   // Load kudos status and colleagues list
   useEffect(() => {
@@ -82,7 +89,8 @@ export default function StaffKudosModal({ staff, onClose, onSuccess }) {
       const res = await sendStaffKudos({
         fromStaffId: staff.id,
         toStaffId: selectedStaffId,
-        reason: reason.trim()
+        reason: reason.trim(),
+        isAnonymous
       });
 
       // Launch cheerful celebratory star confetti
@@ -194,6 +202,11 @@ export default function StaffKudosModal({ staff, onClose, onSuccess }) {
                 <p className="text-[11px] text-slate-300 leading-relaxed">
                   Bintang telah kamu kirimkan ke{' '}
                   <strong className="text-white">{status.sentThisWeek?.to_staff_name || 'Rekan Tim'}</strong>
+                  {Boolean(status.sentThisWeek?.is_anonymous) && (
+                    <span className="ml-1 text-[10px] text-purple-300 font-bold bg-purple-500/20 px-1.5 py-0.2 rounded-full border border-purple-500/30">
+                      (Mode Anonim 🎭)
+                    </span>
+                  )}
                   {status.sentThisWeek?.reason ? `: "${status.sentThisWeek.reason}"` : '.'}
                 </p>
                 <div className="pt-1.5 text-[10px] text-slate-400 font-mono">
@@ -207,10 +220,24 @@ export default function StaffKudosModal({ staff, onClose, onSuccess }) {
               <form onSubmit={handleSendKudos} className="space-y-3">
                 {/* Select Recipient */}
                 <div>
-                  <label className="text-[11px] font-bold text-slate-300 mb-1 flex items-center gap-1">
-                    <Users className="w-3.5 h-3.5 text-amber-400" />
-                    <span>Pilih Rekan yang Ingin Diapresiasi:</span>
-                  </label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-[11px] font-bold text-slate-300 flex items-center gap-1">
+                      <Users className="w-3.5 h-3.5 text-amber-400" />
+                      <span>Pilih Rekan yang Ingin Diapresiasi:</span>
+                    </label>
+                    {selectedStaffId && onVisitStaff && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const target = colleagues.find(c => String(c.id) === String(selectedStaffId) || String(c.uuid) === String(selectedStaffId));
+                          if (target) onVisitStaff(target);
+                        }}
+                        className="text-[10px] font-bold text-amber-400 hover:text-amber-300 flex items-center gap-0.5 underline cursor-pointer"
+                      >
+                        <span>Lihat Profil Rekan 👁️</span>
+                      </button>
+                    )}
+                  </div>
                   <select
                     value={selectedStaffId}
                     onChange={(e) => setSelectedStaffId(e.target.value)}
@@ -262,6 +289,25 @@ export default function StaffKudosModal({ staff, onClose, onSuccess }) {
                   </div>
                 </div>
 
+                {/* Anonymous Option Toggle */}
+                <label className="flex items-start gap-2.5 p-2.5 rounded-xl bg-[#1a1f2c] border border-white/10 cursor-pointer transition hover:bg-[#22293a]">
+                  <input
+                    type="checkbox"
+                    checked={isAnonymous}
+                    onChange={(e) => setIsAnonymous(e.target.checked)}
+                    className="w-4 h-4 mt-0.5 rounded text-amber-400 focus:ring-0 cursor-pointer shrink-0"
+                  />
+                  <div className="text-[11px] leading-tight">
+                    <span className="font-black text-amber-300 flex items-center gap-1">
+                      <span>Kirim Secara Anonim</span>
+                      <span>🎭</span>
+                    </span>
+                    <span className="text-[9.5px] text-slate-400 block mt-0.5 leading-snug">
+                      Nama kamu disamarkan menjadi <em>"Rekan Kerja (Anonim)"</em> untuk penerima. Manajemen tetap dapat memantau untuk menjaga sportivitas.
+                    </span>
+                  </div>
+                </label>
+
                 {/* Submit Button */}
                 <button
                   type="submit"
@@ -273,7 +319,7 @@ export default function StaffKudosModal({ staff, onClose, onSuccess }) {
                   }`}
                 >
                   <Send className="w-3.5 h-3.5" />
-                  <span>{submitting ? 'Mengirimkan...' : 'Kirim Bintang Apresiasi ⭐'}</span>
+                  <span>{submitting ? 'Mengirimkan...' : isAnonymous ? 'Kirim Sebagai Anonim 🎭' : 'Kirim Bintang Apresiasi ⭐'}</span>
                 </button>
               </form>
             )}

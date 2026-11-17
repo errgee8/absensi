@@ -18,6 +18,7 @@ import PointManagementTab from './PointManagementTab';
 import StaffDetailManagementModal from './StaffDetailManagementModal';
 import StaffReportsTab from './StaffReportsTab';
 import QuizLeaderboardTab from './QuizLeaderboardTab';
+import StaffPublicProfileModal from '../StaffView/StaffPublicProfileModal';
 import { exportMonthlyPayrollReport, exportTimesheetToExcel } from '../../utils/excelExport';
 import { getShifts, getStats, getShiftSchedules, getStaffList, getLeaveRequests, getAnnouncements, getAnnouncementReaders, getPoints, getStaffDayAdjustments, subscribeRealtimeEvents, sendPresenceHeartbeat, authorizeEarlyCheckout } from '../../utils/api';
 import { getOperationalDateYMD, getOperationalYesterdayYMD, getWitaDateYMD, getAppNow, formatWitaDateTime } from '../../utils/time';
@@ -58,6 +59,7 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
   const [lateReviewShift, setLateReviewShift] = useState(null);
   const [selectedStaffHistory, setSelectedStaffHistory] = useState(null);
   const [staffModalInitialTab, setStaffModalInitialTab] = useState('POINTS');
+  const [visitedStaffId, setVisitedStaffId] = useState(null);
 
   // Early checkout authorization modal state
   const [earlyCheckoutShift, setEarlyCheckoutShift] = useState(null);
@@ -696,6 +698,7 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
               onInspectPhoto={(shift, type) => setInspectData({ shift, type })}
               onReviewLate={(shift) => setLateReviewShift(shift)}
               onAuthorizeEarlyCheckout={handleOpenEarlyCheckoutModal}
+              onVisitStaffProfile={(staffId) => setVisitedStaffId(staffId)}
               onInspectStaff={(shift, initialTab = 'POINTS') => {
                 setSelectedStaffHistory({
                   id: shift.staff_id,
@@ -935,6 +938,13 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
             </div>
           </div>
         )}
+        {/* Staff Public Profile Modal (Manager Visit View) */}
+        <StaffPublicProfileModal
+          isOpen={Boolean(visitedStaffId)}
+          staffId={visitedStaffId}
+          isManager={true}
+          onClose={() => setVisitedStaffId(null)}
+        />
       </div>
 
       {/* Printable Timesheet Layout (Active only on Print) */}
