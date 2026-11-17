@@ -31,10 +31,12 @@ export default function StaffPublicProfileModal({
   const [loading, setLoading] = useState(() => !profileClientCache.has(staffId));
   const [error, setError] = useState(null);
   const [profile, setProfile] = useState(() => profileClientCache.get(staffId) || null);
+  const [imgError, setImgError] = useState(false);
 
   useEffect(() => {
     if (!isOpen || !staffId) return;
     let isMounted = true;
+    setImgError(false);
 
     // Instant cache check
     if (profileClientCache.has(staffId)) {
@@ -127,10 +129,11 @@ export default function StaffPublicProfileModal({
                 <div
                   className={`w-20 h-20 rounded-2xl overflow-hidden bg-slate-800 flex items-center justify-center shadow-xl transition-all ${streakTier.ringClasses} ${visitedTheme.avatarRing || ''}`}
                 >
-                  {profile.profile_photo_url ? (
+                  {profile.profile_photo_url && !imgError ? (
                     <img
                       src={profile.profile_photo_url}
                       alt={profile.name}
+                      onError={() => setImgError(true)}
                       className="w-full h-full object-cover rounded-[14px]"
                     />
                   ) : (

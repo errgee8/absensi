@@ -1471,6 +1471,17 @@ router.post('/staff/verify-pin', async (req, res) => {
     if (!biometricEntry && biometricsMap?.[k]) biometricEntry = biometricsMap[k];
   }
 
+  if ((!profileEntry || !biometricEntry) && isSupabaseConfigured) {
+    try {
+      const cProfiles = await cloudDb.getStaffProfilesMap();
+      const cBiometrics = await cloudDb.getStaffBiometricsMap();
+      for (const k of targetLookupKeys) {
+        if (!profileEntry && cProfiles?.[k]) profileEntry = cProfiles[k];
+        if (!biometricEntry && cBiometrics?.[k]) biometricEntry = cBiometrics[k];
+      }
+    } catch {}
+  }
+
   const moodEntry = moodsMap?.[staff.uuid] || moodsMap?.[staff.id] || moodsMap?.[staff.legacy_code] || null;
   const isVip = (
     String(staff.name || '').toLowerCase().includes('ryan gerrit') ||
@@ -1514,6 +1525,15 @@ router.post('/staff/verify-pin', async (req, res) => {
     })(),
     monthlyStats
   };
+
+  if (isSupabaseConfigured) {
+    try {
+      await resolveAttendancePhotoUrls([staffPayload], ['profile_photo_url', 'biometric_photo_url']);
+      if (activeShift) {
+        await resolveAttendancePhotoUrls([activeShift], ['checkin_photo']);
+      }
+    } catch {}
+  }
 
   res.json({
     success: true,
@@ -6158,6 +6178,21 @@ async function refreshStaffWorkDaysCache() {
 }
 setTimeout(() => { refreshStaffWorkDaysCache().catch(() => {}); }, 1000);
 
+// Pre-fill staffThemesCache from Supabase Cloud app_settings
+async function refreshStaffThemesCache() {
+  try {
+    if (isSupabaseConfigured && supabase) {
+      const themesMap = (await cloudDb.getSetting('staff_themes_map')) || (await cloudDb.getSetting('staff_themes')) || {};
+      for (const [k, v] of Object.entries(themesMap)) {
+        if (v) staffThemesCache.set(String(k), v);
+      }
+    }
+  } catch (e) {
+    console.warn('Refresh staff themes cache note:', e.message);
+  }
+}
+setTimeout(() => { refreshStaffThemesCache().catch(() => {}); }, 1200);
+
 function getCachedStaffTheme(staffId, staffUuid, staffName, isVip) {
   if (isVip) return 'royal_obsidian_vip';
 
@@ -6290,7 +6325,19 @@ router.get('/staff/:id/public-profile', async (req, res) => {
     }
 
     const staffId = staff.legacy_code || staff.id;
-    const staffUuid = staff.uuid || staff.id;
+    const isValidUuid = (val) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(val || ''));
+    let staffUuid = staff.uuid;
+    if (!staffUuid || !isValidUuid(staffUuid)) {
+      if (isValidUuid(staff.id)) {
+        staffUuid = staff.id;
+      } else if (isSupabaseConfigured) {
+        const supaStaff = await findStaffInSupabase(id);
+        if (supaStaff && isValidUuid(supaStaff.id)) {
+          staffUuid = supaStaff.id;
+        }
+      }
+    }
+    if (!staffUuid) staffUuid = staff.id;
 
     const isVip = (
       String(staff.name || '').toLowerCase().includes('ryan gerrit') ||
@@ -6299,24 +6346,48 @@ router.get('/staff/:id/public-profile', async (req, res) => {
       staffUuid === 'ed5f6cd5-9564-490a-b2b0-bfae2cc21379'
     );
 
-    // 3. Resolve Profile Photo
+    // 3. Resolve Profile Photo (From Supabase Cloud + Private signed URL token)
     let profilePhotoUrl = staff.avatar || null;
-    const profilesMap = getSetting('staff_profiles') || {};
-    const biometricsMap = getSetting('staff_biometrics') || {};
-    const profEntry = profilesMap[staffUuid] || profilesMap[staffId];
-    const bioMEntry = biometricsMap[staffUuid] || biometricsMap[staffId];
+    let profilesMap = {};
+    let biometricsMap = {};
+    if (isSupabaseConfigured) {
+      profilesMap = await cloudDb.getStaffProfilesMap();
+      biometricsMap = await cloudDb.getStaffBiometricsMap();
+    } else {
+      profilesMap = getSetting('staff_profiles') || {};
+      biometricsMap = getSetting('staff_biometrics') || {};
+    }
+    const profEntry = profilesMap[staffUuid] || profilesMap[staffId] || (staff.name ? profilesMap[String(staff.name).toLowerCase()] : null);
+    const bioMEntry = biometricsMap[staffUuid] || biometricsMap[staffId] || (staff.name ? biometricsMap[String(staff.name).toLowerCase()] : null);
     if (profEntry?.photo_url || bioMEntry?.photo_url) {
       profilePhotoUrl = profEntry?.photo_url || bioMEntry?.photo_url;
     }
+    if (profilePhotoUrl && isSupabaseConfigured) {
+      const tempPhotoObj = [{ profile_photo_url: profilePhotoUrl }];
+      await resolveAttendancePhotoUrls(tempPhotoObj, ['profile_photo_url']);
+      profilePhotoUrl = tempPhotoObj[0].profile_photo_url;
+    }
 
     // 4. Resolve Bio
-    const biosMap = getSetting('staff_bios') || {};
-    const bio = biosMap[staffUuid] || biosMap[staffId] || staff.bio || '';
+    let biosMap = {};
+    if (isSupabaseConfigured) {
+      try { biosMap = (await cloudDb.getSetting('staff_bios')) || {}; } catch {}
+    }
+    if (!biosMap || Object.keys(biosMap).length === 0) {
+      biosMap = getSetting('staff_bios') || {};
+    }
+    const bio = biosMap[staffUuid] || biosMap[staffId] || (staff.name ? biosMap[String(staff.name).toLowerCase()] : null) || staff.bio || '';
 
     // 5. Resolve Mood Today
     const currentOpDate = getOperationalDateYMD();
-    const moodsMap = getSetting('staff_moods') || {};
-    const moodEntry = moodsMap[staffUuid] || moodsMap[staffId];
+    let moodsMap = {};
+    if (isSupabaseConfigured) {
+      try { moodsMap = await cloudDb.getStaffMoodsMap(); } catch {}
+    }
+    if (!moodsMap || Object.keys(moodsMap).length === 0) {
+      moodsMap = getSetting('staff_moods') || {};
+    }
+    const moodEntry = moodsMap[staffUuid] || moodsMap[staffId] || (staff.name ? moodsMap[String(staff.name).toLowerCase()] : null);
     const moodEmoji = moodEntry && moodEntry.date_ymd === currentOpDate ? moodEntry.emoji : null;
 
     // 6. Resolve Streak (Instant memory/SQLite lookup)
@@ -6347,10 +6418,9 @@ router.get('/staff/:id/public-profile', async (req, res) => {
       }
     }
 
-    // 7. Total Hari Kerja (Memory cached from attendance_logs & shifts)
+    // 7. Total Hari Kerja (Accurate UUID lookup from Supabase attendance_logs)
     let workDays = staffWorkDaysCache.get(staffUuid) || staffWorkDaysCache.get(staffId) || (staff.name ? staffWorkDaysCache.get(String(staff.name).toLowerCase()) : 0);
     if (typeof workDays !== 'number' || workDays === 0) {
-      const isValidUuid = (val) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(val || ''));
       if (isSupabaseConfigured && isValidUuid(staffUuid)) {
         try {
           const { data: logs } = await supabase
@@ -6394,11 +6464,32 @@ router.get('/staff/:id/public-profile', async (req, res) => {
     let leaderboardRank = null;
     try {
       const rankMap = await getCachedLeaderboardRanks();
-      leaderboardRank = rankMap[String(staffUuid)] || rankMap[String(staffId)] || rankMap[String(staff.name).toLowerCase()] || null;
+      leaderboardRank = rankMap[String(staffUuid)] || rankMap[String(staffId)] || (staff.name ? rankMap[String(staff.name).toLowerCase()] : null) || null;
     } catch {}
 
-    // 10. Staff Dashboard Theme Preference (Direct cache lookup with sleek 'midnight' default, NOT 'cyber_matrix')
-    const themeId = getCachedStaffTheme(staffId, staffUuid, staff.name, isVip);
+    // 10. Staff Dashboard Theme Preference (Direct Cloud + Cache lookup)
+    let themeId = isVip ? 'royal_obsidian_vip' : null;
+    if (!themeId) {
+      if (staffUuid && staffThemesCache.has(String(staffUuid))) themeId = staffThemesCache.get(String(staffUuid));
+      else if (staffId && staffThemesCache.has(String(staffId))) themeId = staffThemesCache.get(String(staffId));
+      else if (staff.name && staffThemesCache.has(String(staff.name).toLowerCase())) themeId = staffThemesCache.get(String(staff.name).toLowerCase());
+    }
+    if (!themeId && isSupabaseConfigured) {
+      try {
+        const cloudThemes = (await cloudDb.getSetting('staff_themes_map')) || (await cloudDb.getSetting('staff_themes')) || {};
+        themeId = cloudThemes[staffUuid] || cloudThemes[staffId] || (staff.name ? cloudThemes[String(staff.name).toLowerCase()] : null);
+        if (themeId) {
+          staffThemesCache.set(String(staffId), themeId);
+          if (staffUuid) staffThemesCache.set(String(staffUuid), themeId);
+          if (staff.name) staffThemesCache.set(String(staff.name).toLowerCase(), themeId);
+        }
+      } catch (e) {
+        console.warn('Error reading cloud themes in profile:', e.message);
+      }
+    }
+    if (!themeId) {
+      themeId = getCachedStaffTheme(staffId, staffUuid, staff.name, isVip);
+    }
 
     // 11. Visitor's ability to give star
     let canGiveStar = false;
@@ -6459,8 +6550,8 @@ router.post('/staff/:id/theme', async (req, res) => {
       staff = await findStaffInSupabase(id);
     }
 
-    const sId = staff?.id || id;
-    const sUuid = staff?.uuid || id;
+    const sId = staff?.legacy_code || staff?.id || id;
+    const sUuid = staff?.uuid || staff?.id || id;
     const sName = staff?.name ? staff.name.toLowerCase() : null;
 
     // 1. Update in-memory themes cache
@@ -6473,19 +6564,28 @@ router.post('/staff/:id/theme', async (req, res) => {
       db.prepare('UPDATE staff SET theme_id = ? WHERE id = ? OR uuid = ?').run(themeId, sId, sUuid);
     } catch (e) {}
 
-    // 3. Update SQLite settings map
-    const localThemes = getSetting('staff_themes') || {};
-    localThemes[sId] = themeId;
-    localThemes[sUuid] = themeId;
-    if (sName) localThemes[sName] = themeId;
-    setSetting('staff_themes', localThemes);
+    // 3. Load & Merge with existing Cloud / Local Themes Map
+    let themesMap = {};
+    if (isSupabaseConfigured) {
+      try {
+        themesMap = (await cloudDb.getSetting('staff_themes_map')) || (await cloudDb.getSetting('staff_themes')) || {};
+      } catch {}
+    }
+    if (!themesMap || Object.keys(themesMap).length === 0) {
+      themesMap = getSetting('staff_themes') || {};
+    }
+    themesMap[String(sId)] = themeId;
+    themesMap[String(sUuid)] = themeId;
+    if (sName) themesMap[String(sName)] = themeId;
+    setSetting('staff_themes', themesMap);
 
     // 4. Invalidate profile cache so visited profiles get new theme instantly
     publicProfileCache.clear();
 
     // 5. Background sync to Supabase app_settings
     if (isSupabaseConfigured) {
-      cloudDb.saveSetting('staff_themes_map', localThemes, 'Staff Dashboard Theme Preferences').catch(() => {});
+      await cloudDb.saveSetting('staff_themes_map', themesMap, 'Staff Dashboard Theme Preferences').catch(() => {});
+      await cloudDb.saveSetting('staff_themes', themesMap, 'Staff Dashboard Theme Preferences').catch(() => {});
     }
 
     broadcastEvent('THEME_UPDATE', { staffId: sId, staffUuid: sUuid, themeId });

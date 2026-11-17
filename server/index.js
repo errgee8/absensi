@@ -6,7 +6,7 @@ import { fileURLToPath } from 'url';
 import routes from './routes.js';
 import { auditOpenShifts } from './flags.js';
 import { uploadsDir } from './db.js';
-import cloudDb from './supabase.js';
+import { cloudDb } from './supabase.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

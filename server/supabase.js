@@ -1954,6 +1954,28 @@ export const cloudDb = {
     return record;
   },
 
+  async getStaffThemesMap() {
+    if (!supabase) return {};
+    try {
+      const val = (await this.getSetting('staff_themes_map')) || (await this.getSetting('staff_themes'));
+      return val && typeof val === 'object' && !Array.isArray(val) ? val : {};
+    } catch {
+      return {};
+    }
+  },
+
+  async saveStaffTheme({ staffId, staffUuid, staffName, themeId }) {
+    if (!supabase || !themeId) return null;
+    const current = await this.getStaffThemesMap();
+    const next = { ...current };
+    if (staffId) next[String(staffId)] = themeId;
+    if (staffUuid) next[String(staffUuid)] = themeId;
+    if (staffName) next[String(staffName).toLowerCase()] = themeId;
+    await this.saveSetting('staff_themes_map', next, 'Staff Dashboard Theme Preferences');
+    await this.saveSetting('staff_themes', next, 'Staff Dashboard Theme Preferences');
+    return next;
+  },
+
   async getStaffMonthlyStats(staffUuid, yearMonthStr) {
     if (!supabase || !staffUuid || !yearMonthStr) return null;
     try {
