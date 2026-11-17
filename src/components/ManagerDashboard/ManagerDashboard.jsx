@@ -19,6 +19,7 @@ import StaffDetailManagementModal from './StaffDetailManagementModal';
 import StaffReportsTab from './StaffReportsTab';
 import QuizLeaderboardTab from './QuizLeaderboardTab';
 import StaffPublicProfileModal from '../StaffView/StaffPublicProfileModal';
+import LoungeChatModal from '../StaffView/LoungeChatModal';
 import { exportMonthlyPayrollReport, exportTimesheetToExcel } from '../../utils/excelExport';
 import { getShifts, getStats, getShiftSchedules, getStaffList, getLeaveRequests, getAnnouncements, getAnnouncementReaders, getPoints, getStaffDayAdjustments, subscribeRealtimeEvents, sendPresenceHeartbeat, authorizeEarlyCheckout } from '../../utils/api';
 import { getOperationalDateYMD, getOperationalYesterdayYMD, getWitaDateYMD, getAppNow, formatWitaDateTime } from '../../utils/time';
@@ -60,6 +61,7 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
   const [selectedStaffHistory, setSelectedStaffHistory] = useState(null);
   const [staffModalInitialTab, setStaffModalInitialTab] = useState('POINTS');
   const [visitedStaffId, setVisitedStaffId] = useState(null);
+  const [chatModalOpen, setChatModalOpen] = useState(false);
 
   // Early checkout authorization modal state
   const [earlyCheckoutShift, setEarlyCheckoutShift] = useState(null);
@@ -530,11 +532,24 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
             )}
           </div>
 
-          {/* SSE Realtime Indicator */}
-          <div className="flex items-center space-x-2 px-3.5 py-2 rounded-xl bg-[#161b24] border border-slate-800 shadow-sm text-xs font-mono font-bold text-emerald-400">
-            <span className="flex h-2.5 w-2.5 rounded-full bg-emerald-500 animate-ping" />
-            <Radio className="w-4 h-4 text-emerald-400 stroke-[2.2]" />
-            <span>Realtime Live Sync Active</span>
+          <div className="flex items-center flex-wrap gap-2">
+            {/* Room Chat Lounge Button (Ghost Mode for Manager) */}
+            <button
+              type="button"
+              onClick={() => setChatModalOpen(true)}
+              className="flex items-center space-x-2 px-3.5 py-2 rounded-xl bg-gradient-to-r from-cyan-950/80 to-slate-900 border border-cyan-500/40 text-cyan-300 hover:text-cyan-100 hover:border-cyan-400 text-xs font-bold transition shadow-sm cursor-pointer active:scale-95"
+              title="Buka Lounge Room Chat (Ghost Mode: Nama Manager tidak akan muncul di daftar online staff)"
+            >
+              <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
+              <span>💬 Room Chat (Ghost)</span>
+            </button>
+
+            {/* SSE Realtime Indicator */}
+            <div className="flex items-center space-x-2 px-3.5 py-2 rounded-xl bg-[#161b24] border border-slate-800 shadow-sm text-xs font-mono font-bold text-emerald-400">
+              <span className="flex h-2.5 w-2.5 rounded-full bg-emerald-500 animate-ping" />
+              <Radio className="w-4 h-4 text-emerald-400 stroke-[2.2]" />
+              <span>Realtime Live Sync Active</span>
+            </div>
           </div>
         </div>
 
@@ -944,6 +959,23 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
           staffId={visitedStaffId}
           isManager={true}
           onClose={() => setVisitedStaffId(null)}
+        />
+
+        {/* Lounge Room Chat Modal (Manager Ghost Mode View) */}
+        <LoungeChatModal
+          isOpen={chatModalOpen}
+          currentStaff={{
+            id: 'manager',
+            name: adminAuth?.staffName || 'Operational Manager',
+            role: adminAuth?.role || 'Manager',
+            venue: 'Management'
+          }}
+          isManager={true}
+          onClose={() => setChatModalOpen(false)}
+          onVisitStaff={(target) => {
+            setChatModalOpen(false);
+            setVisitedStaffId(target.id || target.uuid);
+          }}
         />
       </div>
 

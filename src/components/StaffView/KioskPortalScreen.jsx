@@ -42,6 +42,8 @@ import StaffThemeModal, { getStaffTheme, saveStaffTheme } from './StaffThemeModa
 import StaffKudosModal from './StaffKudosModal';
 import StaffBioModal from './StaffBioModal';
 import StaffPublicProfileModal from './StaffPublicProfileModal';
+import StaffMampirModal from './StaffMampirModal';
+import LoungeChatModal from './LoungeChatModal';
 import { getStreakTier, isVipStaff } from '../../utils/streakFrames';
 
 const MOOD_EMOJIS = ['😊', '🔥', '😐', '😴', '😮‍💨', '😢', '😡', '💔'];
@@ -132,6 +134,8 @@ export default function KioskPortalScreen({
   const [staffBio, setStaffBio] = useState(staff?.bio || '');
   const [visitedStaffId, setVisitedStaffId] = useState(null);
   const [targetKudosStaff, setTargetKudosStaff] = useState(null);
+  const [mampirModalOpen, setMampirModalOpen] = useState(false);
+  const [chatModalOpen, setChatModalOpen] = useState(false);
   const [staffTheme, setStaffTheme] = useState(() => getStaffTheme(staff?.id, staff));
 
   const currentStreak = isVip ? 888 : (staff?.streak || activeShift?.streak || 0);
@@ -674,6 +678,42 @@ export default function KioskPortalScreen({
                   <Quote className="w-3 h-3 text-indigo-400" />
                   <span>Bio</span>
                 </button>
+
+                {/* Tombol Mampir (Cari & Visit Profil Rekan Kerja) */}
+                <button
+                  type="button"
+                  onClick={() => setMampirModalOpen(true)}
+                  className={`inline-flex items-center gap-1.5 text-[10.5px] font-black rounded-full px-2.5 py-0.5 transition cursor-pointer active:scale-95 border shadow-sm ${
+                    staffTheme?.pillBorder || 'bg-[#232938] hover:bg-[#2c3345] border-white/10 text-slate-200'
+                  }`}
+                  title="Mampir & jelajahi dashboard profil rekan kerja mana saja"
+                >
+                  <span>🏠</span>
+                  <span>Mampir</span>
+                </button>
+
+                {/* Tombol Room Chat (mIRC Style - Terbuka Sebelum/Setelah Shift, Terkunci Saat On Duty) */}
+                {isVip || !activeShift || Boolean(activeShift?.check_out_time) ? (
+                  <button
+                    type="button"
+                    onClick={() => setChatModalOpen(true)}
+                    className="inline-flex items-center gap-1.5 text-[10.5px] font-black rounded-full px-2.5 py-0.5 transition cursor-pointer active:scale-95 border shadow-sm bg-gradient-to-r from-cyan-500/25 via-sky-500/20 to-cyan-500/25 hover:from-cyan-500/35 hover:to-sky-500/30 border-cyan-400/50 text-cyan-200"
+                    title="Buka Room Chat Lounge Seluruh Staf (Realtime mIRC Style)"
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
+                    <span>💬 Chat</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setToastMessage('Fokus bertugas & melayani tamu dulu ya! Room Chat otomatis terbuka setelah absen pulang 🔒')}
+                    className="inline-flex items-center gap-1.5 text-[10.5px] font-bold rounded-full px-2.5 py-0.5 transition cursor-not-allowed border bg-black/40 border-white/10 text-slate-500"
+                    title="Room Chat terkunci saat sedang On Duty (otomatis terbuka setelah shift selesai)"
+                  >
+                    <Lock className="w-3 h-3 text-slate-500" />
+                    <span>Chat 🔒</span>
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -1344,6 +1384,28 @@ export default function KioskPortalScreen({
           setVisitedStaffId(null);
           setTargetKudosStaff(target);
           setKudosModalOpen(true);
+        }}
+      />
+
+      {/* Staff Mampir Modal (Explore & Visit Any Colleague Profile) */}
+      <StaffMampirModal
+        isOpen={mampirModalOpen}
+        currentStaff={staff}
+        onClose={() => setMampirModalOpen(false)}
+        onSelectStaff={(target) => {
+          setVisitedStaffId(target.id || target.uuid);
+        }}
+      />
+
+      {/* Lounge Room Chat Modal (Retro mIRC Style Lounge) */}
+      <LoungeChatModal
+        isOpen={chatModalOpen}
+        currentStaff={staff}
+        isManager={false}
+        onClose={() => setChatModalOpen(false)}
+        onVisitStaff={(target) => {
+          setChatModalOpen(false);
+          setVisitedStaffId(target.id || target.uuid);
         }}
       />
     </div>

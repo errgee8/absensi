@@ -395,6 +395,8 @@ export function subscribeRealtimeEvents(onEvent) {
       .on('broadcast', { event: 'POINT_UPDATE' }, handlePayload('POINT_UPDATE'))
       .on('broadcast', { event: 'SETTINGS_UPDATE' }, handlePayload('SETTINGS_UPDATE'))
       .on('broadcast', { event: 'LEADERBOARD_UPDATE' }, handlePayload('LEADERBOARD_UPDATE'))
+      .on('broadcast', { event: 'CHAT_MESSAGE_NEW' }, handlePayload('CHAT_MESSAGE_NEW'))
+      .on('broadcast', { event: 'CHAT_PRESENCE_UPDATE' }, handlePayload('CHAT_PRESENCE_UPDATE'))
       .subscribe();
 
     return () => {
@@ -814,5 +816,57 @@ export async function getAdminKudosLogs() {
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'Gagal memuat riwayat Bintang Apresiasi');
   return data;
+}
+
+// 13. Staff Theme Remote Sync
+export async function saveStaffThemeRemote(staffId, themeId) {
+  try {
+    const res = await fetch(`${API_BASE}/staff/${encodeURIComponent(staffId)}/theme`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ themeId })
+    });
+    return res.json();
+  } catch (err) {
+    console.warn('Failed to sync theme to remote:', err);
+  }
+}
+
+// 14. Lounge Room Chat (mIRC Style)
+export async function getLoungeChatMessages() {
+  const res = await fetch(`${API_BASE}/lounge/chat/messages`);
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Gagal memuat pesan lounge');
+  return data;
+}
+
+export async function sendLoungeChatMessage(payload) {
+  const res = await fetch(`${API_BASE}/lounge/chat/messages`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Gagal mengirim pesan');
+  return data;
+}
+
+export async function sendChatPresenceHeartbeat(payload) {
+  const res = await fetch(`${API_BASE}/lounge/chat/presence`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  return res.json();
+}
+
+export async function leaveChatPresence(staffId) {
+  try {
+    await fetch(`${API_BASE}/lounge/chat/leave`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ staffId })
+    });
+  } catch {}
 }
 

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X, Check, Palette, Sparkles, Zap, Heart, Crown } from 'lucide-react';
 import { isVipStaff } from '../../utils/streakFrames';
+import { saveStaffThemeRemote } from '../../utils/api';
 
 // ========================================================
 // 👑 EXCLUSIVE VIP THEME (KHUSUS RYAN GERRIT / OWNER)
@@ -292,6 +293,7 @@ export function saveStaffTheme(staffId, themeId) {
   try {
     if (staffId) {
       localStorage.setItem(`staff_theme_${staffId}`, themeId);
+      saveStaffThemeRemote(staffId, themeId);
     }
     localStorage.setItem('staff_theme_global', themeId);
   } catch (err) {

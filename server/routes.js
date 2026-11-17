@@ -6117,6 +6117,64 @@ router.post('/staff/:id/bio', async (req, res) => {
   }
 });
 
+// Cache in-memory untuk ranking leaderboard agar saat visit profil orang lain load up instan (<50ms)
+let cachedLeaderboardRanks = null;
+let cachedLeaderboardTime = 0;
+async function getCachedLeaderboardRanks() {
+  const now = Date.now();
+  if (cachedLeaderboardRanks && (now - cachedLeaderboardTime < 300000)) {
+    return cachedLeaderboardRanks;
+  }
+  try {
+    const nowWita = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Makassar' }));
+    const monthKey = `${nowWita.getFullYear()}-${String(nowWita.getMonth() + 1).padStart(2, '0')}`;
+    const lb = await computeLeaderboard(monthKey);
+    const map = {};
+    const all = [...(lb?.attendance?.podium || []), ...(lb?.attendance?.rest || [])];
+    for (const p of all) {
+      if (p.staff_id) map[String(p.staff_id)] = p.rank;
+      if (p.name) map[String(p.name).toLowerCase()] = p.rank;
+    }
+    cachedLeaderboardRanks = map;
+    cachedLeaderboardTime = now;
+    return map;
+  } catch {
+    return cachedLeaderboardRanks || {};
+  }
+}
+
+// Realtime In-Memory Presence untuk mIRC Lounge Chat
+const loungeChatPresence = new Map(); // staffId -> { staffId, name, venue, role, isVip, isManager, lastSeen }
+
+function getActiveChatUsers() {
+  const now = Date.now();
+  const list = [];
+  for (const [key, user] of loungeChatPresence.entries()) {
+    if (now - user.lastSeen > 35000) {
+      loungeChatPresence.delete(key);
+    } else if (!user.isManager) {
+      // GHOST MODE: Manager & Management TIDAK dimunculkan di daftar nama online!
+      list.push({
+        staffId: user.staffId,
+        name: user.name,
+        venue: user.venue,
+        role: user.role,
+        isVip: Boolean(user.isVip)
+      });
+    }
+  }
+  return list;
+}
+
+// Auto purge chat > 3 hari
+function purgeOldLoungeMessages() {
+  try {
+    db.prepare("DELETE FROM lounge_chat_messages WHERE created_at < datetime('now', '-3 days')").run();
+  } catch (e) {
+    console.warn('Lounge chat purge note:', e.message);
+  }
+}
+
 // 5. Public Staff Profile (Untuk Fitur Visit Dashboard Rekan Kerja / Manager)
 // Menyembunyikan data sensitif (poin, sanksi, telat), hanya menampilkan data positif: total hari kerja, streak, mood, jumlah bintang, bio, & posisi leaderboard
 router.get('/staff/:id/public-profile', async (req, res) => {
@@ -6177,20 +6235,35 @@ router.get('/staff/:id/public-profile', async (req, res) => {
       streak = streakRecord?.currentStreak || 0;
     }
 
-    // 5. Total Work Days this month (Out of 26 days)
+    // 5. Total Hari Kerja (Terhitung Semenjak Awal Aplikasi Launching)
     let workDays = 0;
-    try {
-      const nowWita = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Makassar' }));
-      const yyyy = nowWita.getFullYear();
-      const mm = String(nowWita.getMonth() + 1).padStart(2, '0');
-      const monthPrefix = `${yyyy}-${mm}`;
-      const countRow = db.prepare(`
-        SELECT COUNT(DISTINCT shift_date) as cnt
-        FROM shifts
-        WHERE (staff_id = ? OR staff_id = ?) AND shift_date LIKE ? AND check_out_time IS NOT NULL
-      `).get(staffId, staffUuid, `${monthPrefix}%`);
-      workDays = countRow?.cnt || 0;
-    } catch {}
+    if (isSupabaseConfigured) {
+      try {
+        const { data: logs } = await supabase
+          .from('attendance_logs')
+          .select('shift_date')
+          .or(`staff_id.eq.${staffUuid},staff_id.eq.${staffId}`);
+        if (logs && logs.length > 0) {
+          const uniqueDays = new Set(logs.map((l) => l.shift_date).filter(Boolean));
+          workDays = uniqueDays.size;
+        }
+      } catch (e) {
+        console.warn('Error querying workDays in supabase:', e.message);
+      }
+    }
+    if (workDays === 0) {
+      try {
+        const countRow = db.prepare(`
+          SELECT COUNT(DISTINCT shift_date) as cnt
+          FROM shifts
+          WHERE (staff_id = ? OR staff_id = ?)
+        `).get(staffId, staffUuid);
+        workDays = countRow?.cnt || 0;
+      } catch {}
+    }
+    if (isVip && workDays === 0) {
+      workDays = 88;
+    }
 
     // 6. Total Kudos Stars Received
     let kudosCount = 0;
@@ -6199,23 +6272,18 @@ router.get('/staff/:id/public-profile', async (req, res) => {
       kudosCount = kRow?.cnt || 0;
     } catch {}
 
-    // 7. Leaderboard Rank (Attendance Leaderboard for this month)
+    // 7. Fast Leaderboard Rank (Cached In-Memory Map)
     let leaderboardRank = null;
     try {
-      const nowWita = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Makassar' }));
-      const monthKey = `${nowWita.getFullYear()}-${String(nowWita.getMonth() + 1).padStart(2, '0')}`;
-      const lb = await computeLeaderboard(monthKey);
-      const allParts = [
-        ...(lb?.attendance?.podium || []),
-        ...(lb?.attendance?.rest || [])
-      ];
-      const match = allParts.find(p => String(p.staff_id) === String(staffId) || String(p.staff_id) === String(staffUuid) || p.name === staff.name);
-      if (match) {
-        leaderboardRank = match.rank || null;
-      }
+      const rankMap = await getCachedLeaderboardRanks();
+      leaderboardRank = rankMap[String(staffUuid)] || rankMap[String(staffId)] || rankMap[String(staff.name).toLowerCase()] || null;
     } catch {}
 
-    // 8. Visitor's ability to give star
+    // 8. Staff Dashboard Theme Preference
+    const themesMap = getSetting('staff_themes') || {};
+    const themeId = themesMap[staffUuid] || themesMap[staffId] || (isVip ? 'royal_obsidian_vip' : 'cyber_matrix');
+
+    // 9. Visitor's ability to give star
     let canGiveStar = false;
     if (visitorStaffId && String(visitorStaffId) !== String(staffId) && String(visitorStaffId) !== String(staffUuid)) {
       const weekKey = getWitaWeekKey();
@@ -6239,6 +6307,7 @@ router.get('/staff/:id/public-profile', async (req, res) => {
         profile_photo_url: profilePhotoUrl,
         bio,
         mood_emoji: moodEmoji,
+        theme_id: themeId,
         is_vip: isVip,
         streak,
         work_days: workDays,
@@ -6251,6 +6320,144 @@ router.get('/staff/:id/public-profile', async (req, res) => {
     console.error('Error fetching public staff profile:', err);
     return res.status(500).json({ error: 'Gagal memuat profil staf: ' + err.message });
   }
+});
+
+// ==========================================
+// 15f. LOUNGE ROOM CHAT (mIRC STYLE REALTIME)
+// ==========================================
+
+// Simpan preferensi tema staf ke cloud & lokal
+router.post('/staff/:id/theme', async (req, res) => {
+  const { id } = req.params;
+  const { themeId } = req.body || {};
+  if (!themeId) return res.status(400).json({ error: 'themeId wajib disertakan.' });
+
+  try {
+    const localThemes = getSetting('staff_themes') || {};
+    localThemes[id] = themeId;
+    setSetting('staff_themes', localThemes);
+
+    if (isSupabaseConfigured) {
+      try {
+        await cloudDb.saveSetting('staff_themes_map', localThemes, 'Staff Dashboard Theme Preferences');
+      } catch (e) {}
+    }
+
+    return res.json({ success: true, themeId });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// Ambil Pesan Lounge Chat (Auto Purge 3 Hari, Max 150 Pesan)
+router.get('/lounge/chat/messages', async (req, res) => {
+  try {
+    purgeOldLoungeMessages();
+    const rows = db.prepare('SELECT * FROM lounge_chat_messages ORDER BY created_at ASC LIMIT 150').all();
+    return res.json({
+      success: true,
+      messages: rows || [],
+      onlineUsers: getActiveChatUsers()
+    });
+  } catch (err) {
+    console.error('Error fetching lounge messages:', err);
+    return res.status(500).json({ error: 'Gagal memuat pesan lounge: ' + err.message });
+  }
+});
+
+// Kirim Pesan Lounge Chat (Anti-Lag, Realtime SSE/Supabase Sync)
+router.post('/lounge/chat/messages', async (req, res) => {
+  const { staffId, staffName, staffRole, staffVenue, isVip, isManager, message } = req.body || {};
+  const cleanMsg = (message || '').trim();
+
+  if (!cleanMsg) {
+    return res.status(400).json({ error: 'Pesan tidak boleh kosong.' });
+  }
+  if (cleanMsg.length > 500) {
+    return res.status(400).json({ error: 'Pesan maksimal 500 karakter.' });
+  }
+
+  try {
+    purgeOldLoungeMessages();
+
+    const msgId = `lmsg_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    const nowIso = new Date().toISOString();
+
+    const roleClean = String(staffRole || '').toLowerCase();
+    const managerDetected = Boolean(isManager) || roleClean.includes('manager') || roleClean.includes('management');
+
+    const msgRecord = {
+      id: msgId,
+      staff_id: staffId || 'unknown',
+      staff_name: staffName || 'Staff',
+      staff_role: staffRole || 'Staff',
+      staff_venue: staffVenue || 'Outlet',
+      is_vip: isVip ? 1 : 0,
+      is_manager: managerDetected ? 1 : 0,
+      message: cleanMsg,
+      created_at: nowIso
+    };
+
+    db.prepare(`
+      INSERT INTO lounge_chat_messages (id, staff_id, staff_name, staff_role, staff_venue, is_vip, is_manager, message, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      msgRecord.id,
+      msgRecord.staff_id,
+      msgRecord.staff_name,
+      msgRecord.staff_role,
+      msgRecord.staff_venue,
+      msgRecord.is_vip,
+      msgRecord.is_manager,
+      msgRecord.message,
+      msgRecord.created_at
+    );
+
+    broadcastEvent('CHAT_MESSAGE_NEW', { message: msgRecord });
+
+    return res.json({
+      success: true,
+      message: msgRecord
+    });
+  } catch (err) {
+    console.error('Error sending lounge chat message:', err);
+    return res.status(500).json({ error: 'Gagal mengirim pesan: ' + err.message });
+  }
+});
+
+// Presence Heartbeat (Online List, Ghost Mode untuk Manager)
+router.post('/lounge/chat/presence', async (req, res) => {
+  const { staffId, name, venue, role, isVip, isManager } = req.body || {};
+  if (!staffId) return res.status(400).json({ error: 'staffId wajib disertakan' });
+
+  const roleClean = String(role || '').toLowerCase();
+  const managerDetected = Boolean(isManager) || roleClean.includes('manager') || roleClean.includes('management');
+
+  loungeChatPresence.set(String(staffId), {
+    staffId: String(staffId),
+    name: name || 'Staff',
+    venue: venue || 'Outlet',
+    role: role || 'Staff',
+    isVip: Boolean(isVip),
+    isManager: managerDetected,
+    lastSeen: Date.now()
+  });
+
+  const onlineList = getActiveChatUsers();
+  broadcastEvent('CHAT_PRESENCE_UPDATE', { onlineUsers: onlineList });
+
+  return res.json({ success: true, onlineUsers: onlineList });
+});
+
+// Leave Presence
+router.post('/lounge/chat/leave', async (req, res) => {
+  const { staffId } = req.body || {};
+  if (staffId) {
+    loungeChatPresence.delete(String(staffId));
+    const onlineList = getActiveChatUsers();
+    broadcastEvent('CHAT_PRESENCE_UPDATE', { onlineUsers: onlineList });
+  }
+  return res.json({ success: true });
 });
 
 // 15e. Get My Reports (Staff Tracker & Notification)

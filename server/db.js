@@ -228,6 +228,19 @@ db.exec(`
     last_checkin_date TEXT,
     updated_at TEXT DEFAULT (datetime('now'))
   );
+
+  CREATE TABLE IF NOT EXISTS lounge_chat_messages (
+    id TEXT PRIMARY KEY,
+    staff_id TEXT NOT NULL,
+    staff_name TEXT NOT NULL,
+    staff_role TEXT,
+    staff_venue TEXT,
+    is_vip INTEGER DEFAULT 0,
+    is_manager INTEGER DEFAULT 0,
+    message TEXT NOT NULL,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+  CREATE INDEX IF NOT EXISTS idx_lounge_chat_created ON lounge_chat_messages(created_at);
 `);
 
 // Safe column migrations

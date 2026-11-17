@@ -11,11 +11,12 @@ import {
   Building2,
   Smile,
   ShieldCheck,
-  Send,
+  Palette,
   AlertCircle
 } from 'lucide-react';
 import { getStaffPublicProfile } from '../../utils/api';
 import { getStreakTier, isVipStaff } from '../../utils/streakFrames';
+import { VIP_THEME, STAFF_THEMES } from './StaffThemeModal';
 
 export default function StaffPublicProfileModal({
   isOpen,
@@ -61,9 +62,17 @@ export default function StaffPublicProfileModal({
   const streakTier = getStreakTier(currentStreak, isVip);
   const isSelf = visitorStaff && (String(visitorStaff.id) === String(profile?.id) || String(visitorStaff.uuid) === String(profile?.uuid));
 
+  // Ambil tema yang dipilih oleh staf yang sedang dikunjungi
+  const visitedTheme =
+    (isVip ? VIP_THEME : null) ||
+    [VIP_THEME, ...STAFF_THEMES].find((t) => t.id === profile?.theme_id) ||
+    STAFF_THEMES[0];
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-md animate-fade-in overflow-y-auto">
-      <div className="bg-[#121620] border border-white/15 rounded-3xl max-w-sm sm:max-w-md w-full p-4 sm:p-5 text-slate-100 shadow-2xl relative my-auto space-y-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md animate-fade-in overflow-y-auto">
+      <div
+        className={`${visitedTheme.cardBg || 'bg-[#121620]'} ${visitedTheme.cardBorder || 'border-white/15'} border rounded-3xl max-w-sm sm:max-w-md w-full p-4 sm:p-5 text-slate-100 shadow-2xl relative my-auto space-y-4 transition-all duration-300`}
+      >
         {/* Close Button */}
         <button
           type="button"
@@ -101,7 +110,7 @@ export default function StaffPublicProfileModal({
                   </div>
                 )}
                 <div
-                  className={`w-20 h-20 rounded-2xl overflow-hidden bg-slate-800 flex items-center justify-center shadow-xl transition-all ${streakTier.ringClasses}`}
+                  className={`w-20 h-20 rounded-2xl overflow-hidden bg-slate-800 flex items-center justify-center shadow-xl transition-all ${streakTier.ringClasses} ${visitedTheme.avatarRing || ''}`}
                 >
                   {profile.profile_photo_url ? (
                     <img
@@ -134,7 +143,7 @@ export default function StaffPublicProfileModal({
                   </h3>
                   {isVip ? (
                     <span
-                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 text-slate-950 shadow-[0_0_15px_rgba(234,179,8,0.7)] border border-yellow-200 tracking-wider animate-pulse"
+                      className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10.5px] font-black bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 text-slate-950 shadow-[0_0_15px_rgba(234,179,8,0.7)] border-2 border-yellow-200 tracking-wider animate-pulse"
                       title="👑 Executive VIP Owner"
                     >
                       <Crown className="w-3 h-3 text-slate-950 fill-slate-950" />
@@ -150,18 +159,24 @@ export default function StaffPublicProfileModal({
                   )}
                 </div>
 
-                <div className="text-[11px] text-slate-400 font-medium flex items-center justify-center gap-1.5 mt-1">
+                <div className="text-[11px] text-slate-400 font-medium flex items-center justify-center gap-1.5 mt-1 flex-wrap">
                   <span>{profile.role || 'Staff'}</span>
                   <span className="text-slate-600">•</span>
-                  <span className="text-indigo-300 font-semibold flex items-center gap-1">
-                    <Building2 className="w-3 h-3" />
+                  <span className="text-slate-300 font-semibold flex items-center gap-1">
+                    <Building2 className="w-3 h-3 text-indigo-400" />
                     <span>{profile.venue || 'Outlet'}</span>
+                  </span>
+                  <span className="text-slate-600">•</span>
+                  {/* Badge Tema Personal yang Digunakan Staff Ini */}
+                  <span className={`inline-flex items-center gap-1 px-2 py-0.2 rounded-full text-[9.5px] font-extrabold ${visitedTheme.pillBorder || 'border-white/10 bg-slate-800'}`}>
+                    <span>{visitedTheme.icon || '🎨'}</span>
+                    <span>{visitedTheme.shortName || visitedTheme.name}</span>
                   </span>
                 </div>
 
                 {/* Mood Hari Ini (Jika Diset) */}
                 {profile.mood_emoji && (
-                  <div className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-slate-800/90 border border-white/10 text-xs shadow-xs">
+                  <div className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-slate-900/90 border border-white/10 text-xs shadow-xs">
                     <Smile className="w-3 h-3 text-amber-400" />
                     <span className="text-[10px] text-slate-400 font-bold">Mood Hari Ini:</span>
                     <span className="text-sm leading-none">{profile.mood_emoji}</span>
@@ -171,7 +186,7 @@ export default function StaffPublicProfileModal({
             </div>
 
             {/* 2. Bio Singkat Staff */}
-            <div className="bg-[#181d28] border border-white/10 rounded-2xl p-3 relative overflow-hidden">
+            <div className={`p-3 rounded-2xl border transition-all ${visitedTheme.bentoCard || 'bg-[#181d28] border-white/10'}`}>
               <div className="flex items-center gap-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
                 <Quote className="w-3 h-3 text-amber-400" />
                 <span>Bio Profil:</span>
@@ -185,22 +200,22 @@ export default function StaffPublicProfileModal({
 
             {/* 3. Key Positive Metrics Bento (Privasi Terjaga: Poin & Telat Disembunyikan) */}
             <div className="grid grid-cols-2 gap-2">
-              {/* Total Hari Kerja */}
-              <div className="bg-[#161a24] border border-white/[0.08] rounded-2xl p-2.5 space-y-1">
+              {/* Total Hari Kerja (Sejak Awal Launching) */}
+              <div className={`${visitedTheme.metricBg || 'bg-[#161a24]'} border rounded-2xl p-2.5 space-y-1 transition-all`}>
                 <div className="text-[10px] font-bold text-slate-400 flex items-center gap-1">
                   <Calendar className="w-3.5 h-3.5 text-blue-400" />
-                  <span>Hari Kerja Bulan Ini</span>
+                  <span>Total Hari Kerja</span>
                 </div>
                 <div className="text-lg font-black text-white font-mono leading-none">
-                  {profile.work_days} <span className="text-xs text-slate-400 font-normal">/ 26h</span>
+                  {profile.work_days} <span className="text-xs text-slate-400 font-normal">hari</span>
                 </div>
                 <div className="text-[9.5px] text-blue-400/90 font-medium truncate">
-                  Aktif berkontribusi
+                  Sejak peluncuran aplikasi
                 </div>
               </div>
 
               {/* On-Time Streak */}
-              <div className="bg-[#161a24] border border-white/[0.08] rounded-2xl p-2.5 space-y-1">
+              <div className={`${visitedTheme.metricBg || 'bg-[#161a24]'} border rounded-2xl p-2.5 space-y-1 transition-all`}>
                 <div className="text-[10px] font-bold text-slate-400 flex items-center gap-1">
                   <Flame className="w-3.5 h-3.5 text-amber-400" />
                   <span>On-Time Streak</span>
@@ -214,7 +229,7 @@ export default function StaffPublicProfileModal({
               </div>
 
               {/* Bintang Apresiasi Diterima */}
-              <div className="bg-[#161a24] border border-white/[0.08] rounded-2xl p-2.5 space-y-1">
+              <div className={`${visitedTheme.metricBg || 'bg-[#161a24]'} border rounded-2xl p-2.5 space-y-1 transition-all`}>
                 <div className="text-[10px] font-bold text-slate-400 flex items-center gap-1">
                   <Star className="w-3.5 h-3.5 text-yellow-400" />
                   <span>Bintang Apresiasi</span>
@@ -228,7 +243,7 @@ export default function StaffPublicProfileModal({
               </div>
 
               {/* Peringkat Leaderboard */}
-              <div className="bg-[#161a24] border border-white/[0.08] rounded-2xl p-2.5 space-y-1">
+              <div className={`${visitedTheme.metricBg || 'bg-[#161a24]'} border rounded-2xl p-2.5 space-y-1 transition-all`}>
                 <div className="text-[10px] font-bold text-slate-400 flex items-center gap-1">
                   <Trophy className="w-3.5 h-3.5 text-emerald-400" />
                   <span>Peringkat Bulan Ini</span>
@@ -260,9 +275,12 @@ export default function StaffPublicProfileModal({
                     onClose();
                     if (onGiveStar) onGiveStar(profile);
                   }}
-                  className="w-full py-2.5 px-4 rounded-2xl text-xs font-black transition flex items-center justify-center gap-2 bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 hover:from-amber-300 hover:to-yellow-400 text-slate-950 shadow-lg shadow-amber-500/25 active:scale-95 cursor-pointer"
+                  className={`w-full py-2.5 px-4 rounded-2xl text-xs font-black transition flex items-center justify-center gap-2 active:scale-95 cursor-pointer shadow-lg ${
+                    visitedTheme.primaryBtn ||
+                    'bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 text-slate-950'
+                  }`}
                 >
-                  <Star className="w-4 h-4 fill-slate-950 text-slate-950" />
+                  <Star className="w-4 h-4 fill-current shrink-0" />
                   <span>Beri Bintang Apresiasi ke {profile.name.split(' ')[0]} ⭐</span>
                 </button>
               )}
