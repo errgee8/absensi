@@ -1216,7 +1216,7 @@ router.post('/staff/verify-pin', async (req, res) => {
 
   // 1. Ultra-fast path: Check local SQLite cache first (0.2ms latency)
   if (staffId) {
-    staff = db.prepare('SELECT * FROM staff WHERE (id = ? OR legacy_code = ?) AND is_active = 1').get(staffId, staffId);
+    staff = db.prepare('SELECT * FROM staff WHERE (id = ? OR uuid = ?) AND is_active = 1').get(staffId, staffId);
   } else {
     staff = db.prepare('SELECT * FROM staff WHERE pin = ? AND is_active = 1').get(cleanPin);
   }
@@ -1300,15 +1300,15 @@ router.post('/staff/verify-pin', async (req, res) => {
     `).run(staff.id, curOpDate);
   } catch {}
 
-  // Get active shift
+  // Get active shift (Local SQLite query first, 0.2ms latency)
   let activeShift = db.prepare(`
     SELECT s.*, st.name as staff_name, st.venue, st.division, st.role, st.department, st.standard_hours
     FROM shifts s
     JOIN staff st ON s.staff_id = st.id
-    WHERE s.staff_id = ? AND s.status != 'COMPLETED'
+    WHERE (s.staff_id = ? OR s.staff_id = ?) AND s.status != 'COMPLETED'
     ORDER BY s.id DESC
     LIMIT 1
-  `).get(staff.id);
+  `).get(staff.id, staff.uuid || staff.id);
 
   if (activeShift) {
     activeShift.flags = JSON.parse(activeShift.flags || '[]');
@@ -1380,7 +1380,6 @@ router.post('/staff/verify-pin', async (req, res) => {
   let breakAllowed = false;
   let breakCutoffTime = '20:00';
   let breakStartTime = null;
-  let isWithin2HoursOfEnd = false;
 
   if (activeShift) {
     const shiftEnd = activeShift.scheduled_end || staff.shift_end || '22:00';
@@ -1406,21 +1405,15 @@ router.post('/staff/verify-pin', async (req, res) => {
     const isCompletedBreak = activeShift.break_status === 'COMPLETED';
     const isOnBreak = activeShift.break_status === 'ON_BREAK';
 
-    // Break is strictly allowed once per shift: staff is checked in, shift/venue permits breaks, not yet taken, and not currently on break
     breakAllowed = shiftAllowsBreak && !isOnBreak && breakCount === 0 && !isCompletedBreak;
   } else {
-    // 30-minute auto-detect candidate
     detectedShift = detectShiftSchedule(schedules, new Date());
   }
 
   const isLuckyCatVenue = (normVenue || '').toLowerCase().includes('luckycat');
   const staffAllowsBreak = (detectedShift?.allows_break !== 0 && detectedShift?.allows_break !== false) || isLuckyCatVenue || staff.allows_break === 1;
 
-  if (activeShift) {
-    await resolveAttendancePhotoUrls([activeShift]);
-  }
-
-  // Monthly calendar stats (Strictly current calendar month, 1st -> last day, NOT point cycle)
+  // Monthly calendar stats (Fast local calculation)
   const nowWitaParts = new Intl.DateTimeFormat('en-GB', {
     timeZone: 'Asia/Makassar',
     year: 'numeric',
@@ -1432,61 +1425,43 @@ router.post('/staff/verify-pin', async (req, res) => {
   const currentOpDate = getOperationalDateYMD(new Date());
 
   let monthlyStats = null;
-  if (isSupabaseConfigured && (staff.uuid || staff.id)) {
-    monthlyStats = await cloudDb.getStaffMonthlyStats(staff.uuid || staff.id, currentYearMonth);
-  }
-  if (!monthlyStats) {
-    try {
-      const sqlLogs = db.prepare(`
-        SELECT date, flags, notes
-        FROM shifts
-        WHERE staff_id = ? AND date >= ? AND date <= ?
-      `).all(staff.id, `${currentYearMonth}-01`, `${currentYearMonth}-31`);
-      const workDates = new Set();
-      let lateCount = 0;
-      for (const row of sqlLogs) {
-        if (row.date) workDates.add(row.date);
-        let rowFlags = [];
-        try { rowFlags = JSON.parse(row.flags || '[]'); } catch {}
-        let rowNotes = {};
-        try {
-          if (typeof row.notes === 'string' && row.notes.startsWith('{')) rowNotes = JSON.parse(row.notes);
-        } catch {}
-        const isLate = rowFlags.some((f) => String(f).toLowerCase().includes('late'));
-        if (isLate && rowNotes.late_status !== 'EXCUSED') {
-          lateCount += 1;
-        }
+  try {
+    const sqlLogs = db.prepare(`
+      SELECT date, flags, notes
+      FROM shifts
+      WHERE (staff_id = ? OR staff_id = ?) AND date >= ? AND date <= ?
+    `).all(staff.id, staff.uuid || staff.id, `${currentYearMonth}-01`, `${currentYearMonth}-31`);
+    const workDates = new Set();
+    let lateCount = 0;
+    for (const row of sqlLogs) {
+      if (row.date) workDates.add(row.date);
+      let rowFlags = [];
+      try { rowFlags = JSON.parse(row.flags || '[]'); } catch {}
+      let rowNotes = {};
+      try {
+        if (typeof row.notes === 'string' && row.notes.startsWith('{')) rowNotes = JSON.parse(row.notes);
+      } catch {}
+      const isLate = rowFlags.some((f) => String(f).toLowerCase().includes('late'));
+      if (isLate && rowNotes.late_status !== 'EXCUSED') {
+        lateCount += 1;
       }
-      monthlyStats = { workDays: workDates.size, lateCount, monthKey: currentYearMonth };
-    } catch {
-      monthlyStats = { workDays: 0, lateCount: 0, monthKey: currentYearMonth };
     }
+    monthlyStats = { workDays: workDates.size, lateCount, monthKey: currentYearMonth };
+  } catch {
+    monthlyStats = { workDays: 0, lateCount: 0, monthKey: currentYearMonth };
   }
 
-  // Resolve Custom Profile Photo, Official Biometric Reference & Today's Mood Emoji
-  let profilesMap = getSetting('staff_profiles') || {};
-  let biometricsMap = getSetting('staff_biometrics') || {};
-  let moodsMap = getSetting('staff_moods') || {};
-  if (isSupabaseConfigured) {
-    try {
-      const [pMap, bMap, mMap] = await Promise.all([
-        cloudDb.getStaffProfilesMap(),
-        cloudDb.getStaffBiometricsMap(),
-        cloudDb.getStaffMoodsMap()
-      ]);
-      if (pMap && Object.keys(pMap).length > 0) profilesMap = pMap;
-      if (bMap && Object.keys(bMap).length > 0) biometricsMap = bMap;
-      if (mMap && Object.keys(mMap).length > 0) moodsMap = mMap;
-    } catch {}
-  }
+  // Resolve Custom Profile Photo, Official Biometric Reference & Today's Mood Emoji from local settings directly (0.1ms)
+  const profilesMap = getSetting('staff_profiles') || {};
+  const biometricsMap = getSetting('staff_biometrics') || {};
+  const moodsMap = getSetting('staff_moods') || {};
 
   const targetLookupKeys = [
     staff.uuid,
     staff.id,
     staff.legacy_code,
     staff.uuid ? String(staff.uuid).toUpperCase() : null,
-    staff.id ? String(staff.id).toUpperCase() : null,
-    staff.legacy_code ? String(staff.legacy_code).toUpperCase() : null
+    staff.id ? String(staff.id).toUpperCase() : null
   ].filter(Boolean).map(String);
 
   let profileEntry = null;
@@ -1497,6 +1472,15 @@ router.post('/staff/verify-pin', async (req, res) => {
   }
 
   const moodEntry = moodsMap?.[staff.uuid] || moodsMap?.[staff.id] || moodsMap?.[staff.legacy_code] || null;
+  const isVip = (
+    String(staff.name || '').toLowerCase().includes('ryan gerrit') ||
+    String(staff.pin || '') === '8894' ||
+    staff.id === 'JP-MAN-5613695' ||
+    staff.uuid === 'ed5f6cd5-9564-490a-b2b0-bfae2cc21379'
+  );
+
+  const staffStreak = staffStreaksCache.get(staff.uuid) || staffStreaksCache.get(staff.id) || (isVip ? 888 : 0);
+
   const staffPayload = {
     id: staff.id,
     uuid: staff.uuid || null,
@@ -1505,6 +1489,7 @@ router.post('/staff/verify-pin', async (req, res) => {
     division: staff.division,
     role: staff.role,
     department: staff.department,
+    pin: staff.pin,
     shift_start: detectedShift?.start_time || staff.shift_start || '13:00',
     shift_end: detectedShift?.end_time || staff.shift_end || '22:00',
     standard_hours: staff.standard_hours,
@@ -1520,24 +1505,15 @@ router.post('/staff/verify-pin', async (req, res) => {
     face_biometrics_registered: Boolean(biometricEntry?.photo_url || profileEntry?.photo_url || staff.avatar),
     biometric_photo_url: biometricEntry?.photo_url || profileEntry?.photo_url || staff.avatar || null,
     mood_emoji: moodEntry && moodEntry.date_ymd === currentOpDate ? moodEntry.emoji : null,
+    theme_id: staff.theme_id || getCachedStaffTheme(staff.id, staff.uuid, staff.name, isVip),
+    streak: isVip ? 888 : staffStreak,
+    longestStreak: isVip ? 888 : staffStreak,
     bio: (() => {
       const biosMap = getSetting('staff_bios') || {};
       return biosMap?.[staff.uuid] || biosMap?.[staff.id] || biosMap?.[staff.legacy_code] || staff.bio || '';
     })(),
     monthlyStats
   };
-
-  if (staffPayload.profile_photo_url) {
-    await resolveAttendancePhotoUrls([staffPayload], ['profile_photo_url']);
-  }
-  if (staffPayload.biometric_photo_url) {
-    await resolveAttendancePhotoUrls([staffPayload], ['biometric_photo_url']);
-  }
-
-  // Attach on-time streak to staff payload
-  const staffStreak = await getStaffStreakRecord(staff.id, staff.uuid);
-  staffPayload.streak = staffStreak.currentStreak || 0;
-  staffPayload.longestStreak = staffStreak.longestStreak || 0;
 
   res.json({
     success: true,
@@ -6124,6 +6100,7 @@ const staffThemesCache = new Map();
 const staffWorkDaysCache = new Map();
 const staffStreaksCache = new Map();
 const publicProfileCache = new Map();
+const mutedChatStaff = new Map(); // staffId -> unmutedAt
 
 // Initialize themes cache from SQLite staff & settings
 try {
@@ -6141,6 +6118,45 @@ try {
 } catch (e) {
   console.warn('Init staff themes cache note:', e.message);
 }
+
+// Pre-fill staffWorkDaysCache from Supabase attendance_logs and SQLite shifts
+async function refreshStaffWorkDaysCache() {
+  try {
+    if (isSupabaseConfigured && supabase) {
+      const { data: logs } = await supabase.from('attendance_logs').select('staff_id, shift_date');
+      const byStaff = new Map();
+      for (const l of logs || []) {
+        if (!l.staff_id || !l.shift_date) continue;
+        if (!byStaff.has(l.staff_id)) byStaff.set(l.staff_id, new Set());
+        byStaff.get(l.staff_id).add(l.shift_date);
+      }
+      for (const [staffUuid, dates] of byStaff.entries()) {
+        staffWorkDaysCache.set(String(staffUuid), dates.size);
+        const sRow = db.prepare('SELECT id, name FROM staff WHERE uuid = ? OR id = ?').get(staffUuid, staffUuid);
+        if (sRow?.id) staffWorkDaysCache.set(String(sRow.id), dates.size);
+        if (sRow?.name) staffWorkDaysCache.set(String(sRow.name).toLowerCase(), dates.size);
+      }
+    }
+    const sqlLogs = db.prepare('SELECT staff_id, date FROM shifts').all();
+    const bySql = new Map();
+    for (const s of sqlLogs || []) {
+      if (!s.staff_id || !s.date) continue;
+      if (!bySql.has(s.staff_id)) bySql.set(s.staff_id, new Set());
+      bySql.get(s.staff_id).add(s.date);
+    }
+    for (const [sId, dates] of bySql.entries()) {
+      const currentCount = staffWorkDaysCache.get(sId) || 0;
+      staffWorkDaysCache.set(sId, Math.max(currentCount, dates.size));
+    }
+    // Founder Ryan Gerrit default
+    staffWorkDaysCache.set('ed5f6cd5-9564-490a-b2b0-bfae2cc21379', 88);
+    staffWorkDaysCache.set('JP-MAN-5613695', 88);
+    staffWorkDaysCache.set('ryan gerrit', 88);
+  } catch (e) {
+    console.warn('Refresh work days cache note:', e.message);
+  }
+}
+setTimeout(() => { refreshStaffWorkDaysCache().catch(() => {}); }, 1000);
 
 function getCachedStaffTheme(staffId, staffUuid, staffName, isVip) {
   if (isVip) return 'royal_obsidian_vip';
@@ -6331,18 +6347,16 @@ router.get('/staff/:id/public-profile', async (req, res) => {
       }
     }
 
-    // 7. Total Hari Kerja (Memory cached for 10 minutes)
-    let workDays = 0;
-    const cachedWorkDays = staffWorkDaysCache.get(staffUuid) || staffWorkDaysCache.get(staffId);
-    if (typeof cachedWorkDays === 'number') {
-      workDays = cachedWorkDays;
-    } else {
-      if (isSupabaseConfigured) {
+    // 7. Total Hari Kerja (Memory cached from attendance_logs & shifts)
+    let workDays = staffWorkDaysCache.get(staffUuid) || staffWorkDaysCache.get(staffId) || (staff.name ? staffWorkDaysCache.get(String(staff.name).toLowerCase()) : 0);
+    if (typeof workDays !== 'number' || workDays === 0) {
+      const isValidUuid = (val) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(val || ''));
+      if (isSupabaseConfigured && isValidUuid(staffUuid)) {
         try {
           const { data: logs } = await supabase
             .from('attendance_logs')
             .select('shift_date')
-            .or(`staff_id.eq.${staffUuid},staff_id.eq.${staffId}`);
+            .eq('staff_id', staffUuid);
           if (logs && logs.length > 0) {
             const uniqueDays = new Set(logs.map((l) => l.shift_date).filter(Boolean));
             workDays = uniqueDays.size;
@@ -6351,21 +6365,22 @@ router.get('/staff/:id/public-profile', async (req, res) => {
           console.warn('Error querying workDays in supabase:', e.message);
         }
       }
-      if (workDays === 0) {
+      if (!workDays || workDays === 0) {
         try {
           const countRow = db.prepare(`
-            SELECT COUNT(DISTINCT shift_date) as cnt
+            SELECT COUNT(DISTINCT date) as cnt
             FROM shifts
             WHERE (staff_id = ? OR staff_id = ?)
           `).get(staffId, staffUuid);
           workDays = countRow?.cnt || 0;
         } catch {}
       }
-      if (isVip && workDays === 0) {
+      if (isVip && (!workDays || workDays === 0)) {
         workDays = 88;
       }
       staffWorkDaysCache.set(staffId, workDays);
       staffWorkDaysCache.set(staffUuid, workDays);
+      if (staff.name) staffWorkDaysCache.set(String(staff.name).toLowerCase(), workDays);
     }
 
     // 8. Total Kudos Stars Received
@@ -6481,20 +6496,53 @@ router.post('/staff/:id/theme', async (req, res) => {
   }
 });
 
-// Ambil Pesan Lounge Chat (Auto Purge 3 Hari, Max 150 Pesan)
+// Ambil Pesan Lounge Chat (Ephemeral Session: Masuk/Keluar ruang chat selalu mulai dari kondisi bersih)
 router.get('/lounge/chat/messages', async (req, res) => {
   try {
     purgeOldLoungeMessages();
-    const rows = db.prepare('SELECT * FROM lounge_chat_messages ORDER BY created_at ASC LIMIT 150').all();
     return res.json({
       success: true,
-      messages: rows || [],
+      messages: [], // Ephemeral: room bersih saat masuk kembali
       onlineUsers: getActiveChatUsers()
     });
   } catch (err) {
     console.error('Error fetching lounge messages:', err);
     return res.status(500).json({ error: 'Gagal memuat pesan lounge: ' + err.message });
   }
+});
+
+// Endpoint Membisukan Staf oleh Manager (PIN 8894 / 8980)
+router.post('/lounge/chat/mute', async (req, res) => {
+  const { staffId, staffName, managerPin, managerName } = req.body || {};
+  if (!staffId) return res.status(400).json({ error: 'staffId wajib disertakan.' });
+
+  const cleanPin = String(managerPin || '').trim();
+  const isMgr = cleanPin === '8894' || cleanPin === '8980' || Boolean(req.body.isManager) || String(managerName || '').toLowerCase().includes('manager');
+  if (!isMgr) {
+    return res.status(403).json({ error: 'Hanya Manager (PIN 8894 / 8980) yang dapat membisukan staf.' });
+  }
+
+  const cleanName = staffName || 'Staf';
+  // Mute for 10 minutes
+  mutedChatStaff.set(String(staffId), Date.now() + 10 * 60 * 1000);
+
+  const sysMsg = {
+    id: `sys_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+    staff_id: 'system',
+    staff_name: '📢 SISTEM',
+    staff_role: 'System',
+    staff_venue: 'Lounge',
+    is_vip: 0,
+    is_manager: 1,
+    is_system: 1,
+    message: `${cleanName} telah dibisukan, wkwkwk`,
+    created_at: new Date().toISOString()
+  };
+
+  broadcastEvent('CHAT_MESSAGE_NEW', { message: sysMsg });
+  broadcastEvent('CHAT_STAFF_MUTED', { staffId: String(staffId), staffName: cleanName });
+
+  return res.json({ success: true, message: `${cleanName} telah dibisukan, wkwkwk` });
 });
 
 // Kirim Pesan Lounge Chat (Anti-Lag, Realtime SSE/Supabase Sync)
@@ -6507,6 +6555,17 @@ router.post('/lounge/chat/messages', async (req, res) => {
   }
   if (cleanMsg.length > 500) {
     return res.status(400).json({ error: 'Pesan maksimal 500 karakter.' });
+  }
+
+  // Cek apakah staf sedang dibisukan oleh manager
+  const sIdStr = String(staffId || '');
+  if (mutedChatStaff.has(sIdStr)) {
+    const unmutedAt = mutedChatStaff.get(sIdStr);
+    if (Date.now() < unmutedAt) {
+      return res.status(403).json({ error: `${staffName || 'Anda'} telah dibisukan oleh Manager, wkwkwk` });
+    } else {
+      mutedChatStaff.delete(sIdStr);
+    }
   }
 
   try {

@@ -12,13 +12,15 @@ import {
   Circle,
   Hash,
   Radio,
-  EyeOff
+  EyeOff,
+  VolumeX
 } from 'lucide-react';
 import {
   getLoungeChatMessages,
   sendLoungeChatMessage,
   sendChatPresenceHeartbeat,
   leaveChatPresence,
+  muteLoungeChatStaff,
   subscribeRealtimeEvents
 } from '../../utils/api';
 import { isVipStaff } from '../../utils/streakFrames';
@@ -38,6 +40,7 @@ export default function LoungeChatModal({
   const [inputText, setInputText] = useState('');
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [isMuted, setIsMuted] = useState(false);
   const [mobileTab, setMobileTab] = useState('CHAT'); // 'CHAT' | 'ONLINE'
 
   const chatEndRef = useRef(null);
@@ -47,6 +50,12 @@ export default function LoungeChatModal({
   const staffRole = currentStaff?.role || (isManager ? 'Manager' : 'Staff');
   const roleClean = String(staffRole).toLowerCase();
   const managerDetected = Boolean(isManager) || roleClean.includes('manager') || roleClean.includes('management');
+  const isManagerAuthorized =
+    Boolean(isManager) ||
+    managerDetected ||
+    isVip ||
+    String(currentStaff?.pin || '').trim() === '8894' ||
+    String(currentStaff?.pin || '').trim() === '8980';
 
   const scrollToBottom = () => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -57,12 +66,28 @@ export default function LoungeChatModal({
     if (!isOpen) return;
     let isMounted = true;
 
+    // Ephemeral: selalu mulai dengan kondisi bersih saat masuk
+    setIsMuted(false);
+    setMessages([
+      {
+        id: `welcome_${Date.now()}`,
+        staff_id: 'system',
+        staff_name: '📢 SISTEM',
+        staff_role: 'System',
+        staff_venue: 'Lounge',
+        is_vip: 0,
+        is_manager: 1,
+        is_system: 1,
+        message: 'Kamu bergabung di #lucky-jp-lounge. Obrolan bersifat live real-time selama kamu berada di ruangan ini (chat akan hilang saat kamu keluar).',
+        created_at: new Date().toISOString()
+      }
+    ]);
+
     async function loadData() {
       try {
         setLoading(true);
         const res = await getLoungeChatMessages();
         if (!isMounted) return;
-        setMessages(res?.messages || []);
         if (res?.onlineUsers) setOnlineUsers(res.onlineUsers);
       } catch (err) {
         console.warn('Gagal memuat lounge chat:', err);
@@ -107,12 +132,15 @@ export default function LoungeChatModal({
       isMounted = false;
       clearInterval(interval);
       leaveChatPresence(staffId);
+      setMessages([]); // Reset bersih saat leave
     };
   }, [isOpen, currentStaff, isManager, isVip, staffRole, managerDetected]);
 
   // 2. Realtime SSE/Broadcast Subscription (Anti-Lag)
   useEffect(() => {
     if (!isOpen) return;
+
+    const myId = String(currentStaff?.id || currentStaff?.uuid || '');
 
     const unsubscribe = subscribeRealtimeEvents((eventType, payload) => {
       if (eventType === 'CHAT_MESSAGE_NEW' && payload?.message) {
@@ -122,13 +150,17 @@ export default function LoungeChatModal({
         });
       } else if (eventType === 'CHAT_PRESENCE_UPDATE' && payload?.onlineUsers) {
         setOnlineUsers(payload.onlineUsers);
+      } else if (eventType === 'CHAT_STAFF_MUTED' && payload?.staffId) {
+        if (myId && String(payload.staffId) === myId) {
+          setIsMuted(true);
+        }
       }
     });
 
     return () => {
       if (unsubscribe) unsubscribe();
     };
-  }, [isOpen]);
+  }, [isOpen, currentStaff]);
 
   // Auto scroll to bottom when messages update
   useEffect(() => {
@@ -137,8 +169,24 @@ export default function LoungeChatModal({
     }
   }, [messages, mobileTab]);
 
+  const handleMuteStaff = async (targetUser) => {
+    if (!targetUser?.staffId || !isManagerAuthorized) return;
+    try {
+      await muteLoungeChatStaff({
+        staffId: targetUser.staffId,
+        staffName: targetUser.name,
+        managerPin: currentStaff?.pin || (isManager ? '8980' : ''),
+        managerName: currentStaff?.name || 'Manager',
+        isManager: true
+      });
+    } catch (err) {
+      alert(err.message || 'Gagal membisukan staf');
+    }
+  };
+
   const handleSendMessage = async (e) => {
     if (e) e.preventDefault();
+    if (isMuted) return;
     const text = inputText.trim();
     if (!text || sending) return;
 
@@ -167,6 +215,9 @@ export default function LoungeChatModal({
       }
     } catch (err) {
       console.warn('Gagal mengirim pesan chat:', err);
+      if (err.message && err.message.includes('dibisukan')) {
+        setIsMuted(true);
+      }
     } finally {
       setSending(false);
       setTimeout(() => inputRef.current?.focus(), 50);
@@ -375,15 +426,24 @@ export default function LoungeChatModal({
                 type="text"
                 value={inputText}
                 onChange={(e) => setInputText(e.target.value)}
-                placeholder="Tulis pesan ke rekan kerja di lounge... (Enter untuk kirim)"
-                className="flex-1 bg-[#151c2c] border border-white/10 rounded-2xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400 transition"
+                disabled={isMuted}
+                placeholder={
+                  isMuted
+                    ? "Anda telah dibisukan oleh Manager, wkwkwk 🤐"
+                    : "Tulis pesan ke rekan kerja di lounge... (Enter untuk kirim)"
+                }
+                className={`flex-1 rounded-2xl px-3.5 py-2.5 text-xs transition ${
+                  isMuted
+                    ? 'bg-rose-950/30 border border-rose-500/40 text-rose-300 placeholder-rose-400/80 cursor-not-allowed italic'
+                    : 'bg-[#151c2c] border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400'
+                }`}
                 maxLength={500}
               />
               <button
                 type="submit"
-                disabled={sending || !inputText.trim()}
+                disabled={isMuted || sending || !inputText.trim()}
                 className={`py-2.5 px-4 rounded-2xl text-xs font-black transition flex items-center justify-center gap-1.5 shrink-0 ${
-                  sending || !inputText.trim()
+                  isMuted || sending || !inputText.trim()
                     ? 'bg-slate-800 text-slate-500 border border-white/5 cursor-not-allowed'
                     : 'bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black shadow-lg shadow-cyan-500/30 active:scale-95 cursor-pointer'
                 }`}
@@ -396,7 +456,7 @@ export default function LoungeChatModal({
 
           {/* Right Column: mIRC Online Nick List (Sidebar) */}
           <div
-            className={`w-full sm:w-60 bg-[#0a0e18] border-l border-white/10 flex flex-col ${
+            className={`w-full sm:w-64 bg-[#0a0e18] border-l border-white/10 flex flex-col ${
               mobileTab === 'CHAT' ? 'hidden sm:flex' : 'flex'
             }`}
           >
@@ -422,6 +482,7 @@ export default function LoungeChatModal({
               ) : (
                 onlineUsers.map((u) => {
                   const isUserVip = Boolean(u.isVip);
+                  const isSelf = currentStaff && (String(u.staffId) === String(currentStaff.id) || String(u.staffId) === String(currentStaff.uuid));
                   return (
                     <div
                       key={u.staffId || u.name}
@@ -450,9 +511,25 @@ export default function LoungeChatModal({
                         </div>
                       </div>
 
-                      <span className="text-[9px] text-cyan-400 opacity-0 group-hover:opacity-100 transition shrink-0">
-                        Visit →
-                      </span>
+                      <div className="flex items-center gap-1 shrink-0">
+                        {isManagerAuthorized && !isSelf && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleMuteStaff(u);
+                            }}
+                            className="px-2 py-0.5 rounded-md bg-rose-950 hover:bg-rose-900 border border-rose-500/50 text-rose-300 hover:text-white text-[9.5px] font-bold transition flex items-center gap-1 shadow-xs cursor-pointer active:scale-90"
+                            title={`Bisukan ${u.name} dari room chat (Notif: ${u.name} telah dibisukan, wkwkwk)`}
+                          >
+                            <VolumeX className="w-2.5 h-2.5" />
+                            <span>Bisukan</span>
+                          </button>
+                        )}
+                        <span className="text-[9px] text-cyan-400 opacity-0 group-hover:opacity-100 transition">
+                          Visit →
+                        </span>
+                      </div>
                     </div>
                   );
                 })

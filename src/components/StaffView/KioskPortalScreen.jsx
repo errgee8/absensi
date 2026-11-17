@@ -163,6 +163,22 @@ export default function KioskPortalScreen({
     }
   }, [staff]);
 
+  useEffect(() => {
+    // Broad scan & sync: Kirim semua tema staf yang tersimpan di localStorage browser ini ke server
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith('staff_theme_') && k !== 'staff_theme_global') {
+          const sId = k.replace('staff_theme_', '');
+          const tId = localStorage.getItem(k);
+          if (sId && tId) {
+            saveStaffThemeRemote(sId, tId);
+          }
+        }
+      }
+    } catch {}
+  }, []);
+
   const moodContainerRef = useRef(null);
 
   useEffect(() => {
