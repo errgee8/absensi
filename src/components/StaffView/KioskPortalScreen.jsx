@@ -39,7 +39,7 @@ import {
 import DevicePermissionModal from './DevicePermissionModal';
 import StaffThemeModal, { getStaffTheme, saveStaffTheme } from './StaffThemeModal';
 import StaffKudosModal from './StaffKudosModal';
-import { getStreakTier } from '../../utils/streakFrames';
+import { getStreakTier, isVipStaff } from '../../utils/streakFrames';
 
 const MOOD_EMOJIS = ['😊', '🔥', '😐', '😴', '😮‍💨', '😢', '😡', '💔'];
 
@@ -122,18 +122,19 @@ export default function KioskPortalScreen({
   const [selectedShiftChoice, setSelectedShiftChoice] = useState(null);
   const [toastMessage, setToastMessage] = useState(null);
 
+  const isVip = isVipStaff(staff);
   const [themeModalOpen, setThemeModalOpen] = useState(false);
   const [kudosModalOpen, setKudosModalOpen] = useState(false);
-  const [staffTheme, setStaffTheme] = useState(() => getStaffTheme(staff?.id));
+  const [staffTheme, setStaffTheme] = useState(() => getStaffTheme(staff?.id, staff));
 
   const currentStreak = staff?.streak || activeShift?.streak || 0;
-  const streakTier = getStreakTier(currentStreak);
+  const streakTier = getStreakTier(currentStreak, isVip);
 
   useEffect(() => {
-    if (staff?.id) {
-      setStaffTheme(getStaffTheme(staff.id));
+    if (staff) {
+      setStaffTheme(getStaffTheme(staff?.id, staff));
     }
-  }, [staff?.id]);
+  }, [staff]);
 
   const moodContainerRef = useRef(null);
 
@@ -403,9 +404,16 @@ export default function KioskPortalScreen({
           {/* Top Bar: Venue & Clock on Left | Duty Status & Logout on Right */}
           <div className="flex items-center justify-between gap-2 border-b border-white/[0.06] pb-2.5">
             <div className="flex items-center gap-2 min-w-0">
-              <span className={`px-2.5 py-0.5 rounded-full ${staffTheme?.accentBadge || 'bg-indigo-500/20 text-indigo-300 border-indigo-400/30'} font-extrabold text-[10px] tracking-wide shrink-0 transition-colors duration-300`}>
-                {staff?.venue || 'LuckyCat'}
-              </span>
+              {isVip ? (
+                <span className="px-2.5 py-0.5 rounded-full bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-500 text-slate-950 font-black text-[10px] tracking-wide shrink-0 border border-yellow-200 shadow-md shadow-amber-400/30 flex items-center gap-1 animate-pulse">
+                  <Crown className="w-3 h-3 text-slate-950 fill-slate-950" />
+                  <span>VIP OWNER</span>
+                </span>
+              ) : (
+                <span className={`px-2.5 py-0.5 rounded-full ${staffTheme?.accentBadge || 'bg-indigo-500/20 text-indigo-300 border-indigo-400/30'} font-extrabold text-[10px] tracking-wide shrink-0 transition-colors duration-300`}>
+                  {staff?.venue || 'LuckyCat'}
+                </span>
+              )}
               <span className="text-[11px] text-slate-400 font-mono flex items-center gap-1 shrink-0">
                 <Clock className="w-3 h-3 text-slate-500" />
                 <span>{formatWitaTimeOnly(now)} WITA</span>
@@ -450,13 +458,18 @@ export default function KioskPortalScreen({
 
           {/* Profile Details: Avatar + Name + Role + Actions */}
           <div className="flex items-center gap-3">
-            {/* Real Profile Photo Avatar with Streak-Unlocked Frame */}
+            {/* Real Profile Photo Avatar with Streak-Unlocked Frame or Exclusive VIP Frame */}
             <button
               type="button"
               onClick={handleOpenPhotoModal}
               className="relative group shrink-0 focus:outline-none cursor-pointer"
-              title={`Bingkai Avatar: ${streakTier.name} (${currentStreak} Hari Streak)`}
+              title={isVip ? '👑 Bingkai Eksklusif VIP Founder & Owner' : `Bingkai Avatar: ${streakTier.name} (${currentStreak} Hari Streak)`}
             >
+              {isVip && (
+                <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 z-20 pointer-events-none animate-bounce">
+                  <Crown className="w-5 h-5 text-yellow-300 fill-amber-300 drop-shadow-[0_0_8px_rgba(234,179,8,1)]" />
+                </div>
+              )}
               <div className={`w-14 h-14 rounded-2xl bg-[#232938] overflow-hidden flex items-center justify-center shadow-inner transition-all duration-300 ${streakTier.ringClasses} ${staffTheme?.avatarRing || ''}`}>
                 {staff?.profile_photo_url ? (
                   <img
@@ -473,12 +486,12 @@ export default function KioskPortalScreen({
               {streakTier.badge && (
                 <span
                   className={`absolute -top-1.5 -left-1.5 w-5 h-5 rounded-full text-[10px] flex items-center justify-center shadow-lg z-10 ${streakTier.badgeClasses}`}
-                  title={`${streakTier.name} (${currentStreak} Hari Streak)`}
+                  title={isVip ? '👑 VIP Executive Owner' : `${streakTier.name} (${currentStreak} Hari Streak)`}
                 >
                   {streakTier.badge}
                 </span>
               )}
-              <span className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-indigo-500 text-white flex items-center justify-center border-2 border-[#181d26] shadow">
+              <span className={`absolute -bottom-1 -right-1 w-5 h-5 rounded-full ${isVip ? 'bg-amber-400 text-slate-950 font-black' : 'bg-indigo-500 text-white'} flex items-center justify-center border-2 border-[#181d26] shadow`}>
                 <Pencil className="w-2.5 h-2.5" />
               </span>
             </button>
@@ -488,21 +501,44 @@ export default function KioskPortalScreen({
                 <h1 className="text-base sm:text-lg font-black text-white truncate leading-tight">
                   {staff?.name || 'Staff'}
                 </h1>
-                {/* Streak Badge */}
-                <span
-                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black border shadow-sm ${streakTier.pillBg}`}
-                  title={`Streak On-Time: ${currentStreak} hari berturut-turut (${streakTier.name})`}
-                >
-                  <span>🔥</span>
-                  <span>{currentStreak} Hari Streak</span>
-                </span>
+                {/* VIP Logo or Streak Badge */}
+                {isVip ? (
+                  <span
+                    className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-black bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 text-slate-950 shadow-[0_0_20px_rgba(234,179,8,0.85)] border-2 border-yellow-200 tracking-wider animate-pulse"
+                    title="👑 Executive VIP Owner"
+                  >
+                    <Crown className="w-3.5 h-3.5 text-slate-950 fill-slate-950 stroke-[2.5]" />
+                    <span>VIP</span>
+                  </span>
+                ) : (
+                  <span
+                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black border shadow-sm ${streakTier.pillBg}`}
+                    title={`Streak On-Time: ${currentStreak} hari berturut-turut (${streakTier.name})`}
+                  >
+                    <span>🔥</span>
+                    <span>{currentStreak} Hari Streak</span>
+                  </span>
+                )}
               </div>
               <div className="text-xs text-slate-400 font-medium flex items-center gap-1.5 mt-0.5 truncate">
-                <span>{staff?.role || 'Staff'}</span>
-                <span className="text-slate-600">•</span>
-                <span className="text-slate-300 font-mono text-[11px]">
-                  {shiftStartLabel} - {shiftEndLabel}
-                </span>
+                {isVip ? (
+                  <>
+                    <span className="text-amber-300 font-extrabold flex items-center gap-1">
+                      <span>👑</span>
+                      <span>Executive Management</span>
+                    </span>
+                    <span className="text-slate-600">•</span>
+                    <span className="text-amber-200/90 font-mono text-[11px]">Akses Penuh Seluruh Venue</span>
+                  </>
+                ) : (
+                  <>
+                    <span>{staff?.role || 'Staff'}</span>
+                    <span className="text-slate-600">•</span>
+                    <span className="text-slate-300 font-mono text-[11px]">
+                      {shiftStartLabel} - {shiftEndLabel}
+                    </span>
+                  </>
+                )}
               </div>
 
               {/* Action Pills Row: Ganti Foto, Update Wajah, Mood, Bintang Apresiasi, Theme */}

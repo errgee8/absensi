@@ -21,19 +21,24 @@ import {
   Eye,
   Coffee
 } from 'lucide-react';
-import { getStreakTier } from '../../utils/streakFrames';
+import { getStreakTier, isVipStaff } from '../../utils/streakFrames';
 
 // Reusable Elegant Framed Avatar Component with Fallback
-function StaffAvatarFrame({ photo, name, rank, streak = 0, size = 'md' }) {
+function StaffAvatarFrame({ photo, name, rank, streak = 0, size = 'md', isVip = false }) {
   const [imgError, setImgError] = useState(false);
-  const streakTier = getStreakTier(streak);
+  const vipDetected = isVip || isVipStaff({ name });
+  const streakTier = getStreakTier(streak, vipDetected);
 
   // Frame styles based on rank & streak milestone
   let ringClasses = streakTier.tier > 0 ? streakTier.ringClasses : 'ring-2 ring-slate-700 border border-slate-600';
   let badgeColor = 'bg-slate-700 text-slate-200';
   let crownColor = null;
 
-  if (rank === 1) {
+  if (vipDetected) {
+    ringClasses = streakTier.ringClasses;
+    crownColor = 'text-yellow-300 fill-amber-300 drop-shadow-[0_0_10px_rgba(234,179,8,1)]';
+    badgeColor = 'bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-500 text-slate-950 font-black border border-yellow-200 shadow-md';
+  } else if (rank === 1) {
     ringClasses = 'ring-4 ring-amber-400 shadow-xl shadow-amber-500/40 border-2 border-yellow-200 bg-gradient-to-br from-amber-400 via-yellow-200 to-amber-600 p-0.5';
     badgeColor = 'bg-gradient-to-r from-amber-400 to-yellow-300 text-slate-950 font-black border border-white';
     crownColor = 'text-amber-300 fill-amber-300';

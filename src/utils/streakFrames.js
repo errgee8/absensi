@@ -1,16 +1,49 @@
 /**
- * Streak-Based Unlockable Avatar Frames
- * Strict requirement: Milestone unlock is purely driven by on-time STREAK (consecutive working days on time),
- * NOT reputation, points, or manual score.
+ * Streak-Based Unlockable Avatar Frames + Exclusive VIP Owner Frame
+ * Strict requirement: Regular milestone unlock is purely driven by on-time STREAK (consecutive working days on time).
+ * Special VIP Frame: Exclusively reserved for Ryan Gerrit (Owner / Founder VIP).
  *
  * Tiers:
+ * - VIP Special : Royal Celestial Obsidian VIP Frame (👑 VIP - Exclusive to Ryan Gerrit)
  * - 0 - 6 days  : Standard Clean border
  * - 7 - 29 days : Ember Flame frame (🔥 7+ Streak)
  * - 30 - 79 days: Neon Crystal frame (⚡ 30+ Streak - Lebih Mewah)
  * - 80+ days    : Diamond Holographic Aura frame (👑 80+ Streak - Istimewa)
  */
 
-export function getStreakTier(streakCount = 0) {
+export function isVipStaff(staff) {
+  if (!staff) return false;
+  const name = String(staff.name || '').trim().toLowerCase();
+  const pin = String(staff.pin || '').trim();
+  const id = String(staff.id || '').trim();
+  const uuid = String(staff.uuid || '').trim();
+  return (
+    name === 'ryan gerrit' ||
+    name.includes('ryan gerrit') ||
+    pin === '8894' ||
+    id === 'JP-MAN-5613695' ||
+    uuid === 'ed5f6cd5-9564-490a-b2b0-bfae2cc21379'
+  );
+}
+
+export function getStreakTier(streakCount = 0, isVip = false) {
+  if (isVip) {
+    return {
+      tier: 99,
+      isVip: true,
+      name: 'Royal Celestial Obsidian VIP Frame',
+      label: '👑 VIP Executive Owner',
+      shortLabel: '👑 VIP Owner',
+      badge: '👑',
+      vipLogo: 'VIP',
+      minStreak: 0,
+      ringClasses: 'ring-4 ring-amber-300 shadow-[0_0_35px_rgba(245,158,11,0.9)] border-2 border-yellow-200 bg-gradient-to-tr from-yellow-300 via-amber-500 to-rose-500 p-[3px] animate-pulse',
+      badgeClasses: 'bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 text-slate-950 shadow-xl shadow-amber-400/80 border-2 border-white font-black',
+      textGlow: 'text-amber-300 drop-shadow-[0_0_10px_rgba(251,191,36,0.9)]',
+      pillBg: 'bg-gradient-to-r from-amber-400/30 via-yellow-400/25 to-amber-500/30 border-2 border-amber-300/80 text-amber-200 shadow-lg shadow-amber-950/60 font-black'
+    };
+  }
+
   const streak = Math.max(0, parseInt(streakCount, 10) || 0);
 
   if (streak >= 80) {

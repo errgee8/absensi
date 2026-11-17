@@ -1,5 +1,38 @@
 import React, { useState } from 'react';
-import { X, Check, Palette, Sparkles, Zap, Heart } from 'lucide-react';
+import { X, Check, Palette, Sparkles, Zap, Heart, Crown } from 'lucide-react';
+import { isVipStaff } from '../../utils/streakFrames';
+
+// ========================================================
+// 👑 EXCLUSIVE VIP THEME (KHUSUS RYAN GERRIT / OWNER)
+// Tidak ada di pilihan tema staff biasa
+// ========================================================
+export const VIP_THEME = {
+  id: 'royal_obsidian_vip',
+  name: 'Royal Obsidian & Celestial Gold',
+  shortName: 'Royal VIP',
+  category: 'VIP',
+  categoryLabel: '👑 VIP Exclusive',
+  tag: '👑 FOUNDER VIP',
+  icon: '👑',
+  description: 'Kemewahan absolut: Deep cosmic obsidian dengan cairan emas murni, aksen radiant aura, dan tombol imperial gold berlapis cahaya (Khusus Ryan Gerrit)',
+  accentText: 'text-amber-200',
+  wrapperBg: 'bg-gradient-to-b from-[#140e02] via-[#0b0802] to-[#040301]',
+  cardBg: 'bg-gradient-to-b from-[#1e1505] via-[#161004] to-[#0d0a02]',
+  cardBorder: 'border-2 border-amber-400/70 shadow-[0_10px_35px_rgba(217,119,6,0.45)] ring-1 ring-amber-300/40',
+  metricBg: 'bg-gradient-to-br from-amber-950/60 to-black/70 hover:from-amber-900/60 hover:to-black/80 border border-amber-400/40 shadow-inner',
+  accentBadge: 'bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 text-slate-950 font-black border-2 border-yellow-200 shadow-lg shadow-amber-400/50',
+  ambientGlow: '#eab308',
+  pillBorder: 'border-2 border-amber-400/70 text-amber-200 bg-amber-950/80 shadow-md shadow-amber-950/50 font-bold',
+  avatarRing: 'ring-4 ring-amber-300 shadow-[0_0_30px_rgba(245,158,11,0.85)] border-2 border-yellow-200',
+  primaryBtn: 'bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 hover:from-yellow-300 hover:to-amber-400 text-slate-950 font-black shadow-[0_0_30px_rgba(234,179,8,0.6)] border-2 border-yellow-200 ring-2 ring-amber-400/40',
+  primaryBtnBadge: 'bg-slate-950 text-amber-300 border border-amber-400/60 font-black',
+  secondaryBtn: 'bg-gradient-to-r from-amber-950/90 via-[#2a1d06] to-[#1a1204] hover:bg-amber-900/80 text-amber-100 border-2 border-amber-400/50 shadow-md',
+  bentoCard: 'bg-gradient-to-br from-[#271b07] via-[#1c1405] to-[#0e0a02] border-2 border-amber-400/50 hover:border-amber-300/80 shadow-lg shadow-amber-950/60',
+  bentoIconBg: 'bg-gradient-to-br from-amber-300 to-yellow-500 text-slate-950 font-black shadow-md shadow-amber-500/50',
+  accentLink: 'text-amber-300 font-black',
+  swatchColor: '#f59e0b',
+  previewGradient: 'from-amber-950 via-yellow-950 to-[#040301]'
+};
 
 export const STAFF_THEMES = [
   // ========================================================
@@ -227,7 +260,24 @@ export const STAFF_THEMES = [
   }
 ];
 
-export function getStaffTheme(staffId) {
+export function getStaffTheme(staffId, staff = null) {
+  const isVip = isVipStaff(staff) ||
+    staffId === 'JP-MAN-5613695' ||
+    staffId === 'ed5f6cd5-9564-490a-b2b0-bfae2cc21379' ||
+    String(staff?.name || '').toLowerCase().includes('ryan gerrit') ||
+    String(staff?.pin || '').trim() === '8894';
+
+  if (isVip) {
+    try {
+      const savedId = localStorage.getItem(`staff_theme_${staffId}`);
+      if (savedId) {
+        const matched = [VIP_THEME, ...STAFF_THEMES].find(t => t.id === savedId);
+        if (matched) return matched;
+      }
+    } catch {}
+    return VIP_THEME;
+  }
+
   if (!staffId) return STAFF_THEMES[0];
   try {
     const savedId = localStorage.getItem(`staff_theme_${staffId}`) || localStorage.getItem('staff_theme_global');
@@ -252,6 +302,7 @@ export function saveStaffTheme(staffId, themeId) {
 export default function StaffThemeModal({ isOpen, onClose, staff, currentThemeId, onSelectTheme }) {
   if (!isOpen) return null;
 
+  const isVip = isVipStaff(staff);
   const [activeTab, setActiveTab] = useState('ALL'); // 'ALL' | 'MANLY' | 'GIRLY'
 
   const filteredThemes = STAFF_THEMES.filter(t => {
@@ -335,6 +386,38 @@ export default function StaffThemeModal({ isOpen, onClose, staff, currentThemeId
 
         {/* Theme Cards Grid */}
         <div className="space-y-2.5 overflow-y-auto pr-1 flex-1 py-1">
+          {/* EXCLUSIVE VIP CARD (Hanya Muncul untuk Ryan Gerrit / Owner) */}
+          {isVip && (
+            <button
+              type="button"
+              onClick={() => handleChoose(VIP_THEME)}
+              className={`w-full p-3.5 rounded-2xl border-2 transition-all duration-300 text-left relative overflow-hidden mb-3 group cursor-pointer ${
+                currentThemeId === VIP_THEME.id
+                  ? 'border-yellow-300 bg-gradient-to-r from-amber-950/90 via-[#261907] to-[#140c03] ring-2 ring-yellow-400/60 shadow-[0_0_25px_rgba(234,179,8,0.5)]'
+                  : 'border-amber-500/40 bg-gradient-to-r from-[#1c1305] to-[#0e0902] hover:border-amber-300 shadow-md'
+              }`}
+            >
+              <div className="flex items-center justify-between mb-1.5">
+                <div className="flex items-center gap-2">
+                  <span className="text-xl">👑</span>
+                  <div>
+                    <h4 className="text-xs font-black text-amber-200 flex items-center gap-1.5">
+                      <span>{VIP_THEME.name}</span>
+                    </h4>
+                    <span className="text-[10px] text-amber-400/90 font-bold block">
+                      Edisi Eksklusif Founder &amp; VIP
+                    </span>
+                  </div>
+                </div>
+                <span className="px-2 py-0.5 rounded-full bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 text-slate-950 font-black text-[9px] shadow border border-white">
+                  KHUSUS ANDA
+                </span>
+              </div>
+              <p className="text-[10px] text-amber-100/70 italic leading-relaxed">
+                {VIP_THEME.description}
+              </p>
+            </button>
+          )}
           {filteredThemes.map((t) => {
             const isSelected = currentThemeId === t.id;
             return (
