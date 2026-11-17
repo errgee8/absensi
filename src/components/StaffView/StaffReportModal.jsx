@@ -4,10 +4,11 @@ import { submitStaffReport, getMyStaffReports } from '../../utils/api';
 import { formatWitaDateTime } from '../../utils/time';
 
 const REPORT_CATEGORIES = [
-  'Kecurangan Kasir / Finansial / Bill',
-  'Pelanggaran SOP / Titip Absen / Jam Kerja',
-  'Perilaku Buruk / Intimidasi Leader / Senioritas',
-  'Kerusakan / Masalah Fasilitas Meja',
+  'Pelanggaran Integritas / Kecurangan / Manipulasi',
+  'Pelanggaran SOP & Peraturan Perusahaan',
+  'Perilaku Buruk / Bullying / Intimidasi / Toxic',
+  'Penyalahgunaan Wewenang / Senioritas',
+  'Pencurian / Kerugian Aset Perusahaan',
   'Lainnya (Rahasia)'
 ];
 
@@ -242,7 +243,7 @@ export default function StaffReportModal({ staff, isOpen, onClose, onSuccess }) 
                     <span>Kerahasiaan &amp; Proteksi Identitas</span>
                   </div>
                   <p className="text-[10.5px] text-slate-200 leading-relaxed font-medium">
-                    Gunakan form ini untuk melaporkan kecurangan kasir, pelanggaran SOP, atau kelakuan buruk rekan/leader. Laporan yang terbukti valid akan diberikan <strong>Poin Apresiasi</strong> oleh Manajemen.
+                    Kanal resmi untuk melaporkan segala tindakan yang tidak sesuai peraturan perusahaan, kecurangan, perlakuan tidak baik/bullying, manipulasi data, atau hal yang merugikan integritas tim. Laporan yang terbukti valid akan diberikan <strong>Poin Apresiasi</strong> oleh Manajemen.
                   </p>
                 </div>
 
@@ -311,7 +312,7 @@ export default function StaffReportModal({ staff, isOpen, onClose, onSuccess }) 
                   <label className="text-[11px] font-bold text-slate-300 block">Perihal / Judul Singkat:</label>
                   <input
                     type="text"
-                    placeholder="Contoh: Titip Absen Meja Kasir / Pemalsuan Nota"
+                    placeholder="Contoh: Manipulasi Data / Pelanggaran Prosedur / Perilaku Tidak Etis"
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
                     className="w-full bg-[#12161f] border border-slate-700 rounded-xl px-3 py-2 text-white text-xs placeholder:text-slate-500 focus:outline-none focus:border-rose-400"

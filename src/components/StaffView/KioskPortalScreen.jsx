@@ -22,7 +22,8 @@ import {
   ShieldAlert,
   BookOpen,
   Sparkles,
-  Smile
+  Smile,
+  Crown
 } from 'lucide-react';
 import {
   getAppNow,
@@ -767,9 +768,9 @@ export default function KioskPortalScreen({
               </span>
             </div>
             <div className="mt-2.5">
-              <div className="text-xs font-black text-white">🚨 LAPOR Aduan</div>
+              <div className="text-xs font-black text-white">🚨 LAPOR Integritas</div>
               <div className="text-[10.5px] text-rose-200/80 mt-0.5 line-clamp-1">
-                Kecurangan &amp; SOP (Anonim)
+                Peraturan &amp; SOP (Anonim)
               </div>
             </div>
           </button>
@@ -800,20 +801,23 @@ export default function KioskPortalScreen({
             <button
               type="button"
               onClick={onOpenLeaderboard}
-              className="bg-[#181d26] hover:bg-[#202734] border border-indigo-400/30 rounded-2xl p-3 flex flex-col justify-between text-left shadow-lg transition active:scale-[0.98] cursor-pointer min-h-[110px]"
+              className="relative overflow-hidden bg-gradient-to-br from-[#2c220f] via-[#211a0d] to-[#141824] hover:from-[#3a2d14] hover:to-[#1a2233] border-2 border-amber-400/60 hover:border-amber-400 rounded-2xl p-3 flex flex-col justify-between text-left shadow-xl shadow-amber-950/50 transition-all duration-200 active:scale-[0.98] cursor-pointer min-h-[110px] group"
             >
-              <div className="flex items-center justify-between w-full">
-                <div className="w-8 h-8 rounded-xl bg-indigo-500/20 text-indigo-300 border border-indigo-400/30 flex items-center justify-center">
-                  <Trophy className="w-4 h-4" />
+              <div className="absolute -top-6 -right-6 w-16 h-16 bg-amber-400/15 rounded-full blur-xl pointer-events-none" />
+              <div className="flex items-center justify-between w-full relative z-10">
+                <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 text-slate-950 flex items-center justify-center shadow-md shadow-amber-500/30 group-hover:scale-110 transition-transform">
+                  <Crown className="w-4 h-4 text-slate-950 stroke-[2.5]" />
                 </div>
-                <span className="px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 font-bold text-[9.5px]">
-                  Peringkat
+                <span className="px-2 py-0.5 rounded-full bg-gradient-to-r from-amber-400/25 to-yellow-400/20 text-amber-300 font-black text-[9.5px] border border-amber-400/40 shadow-sm flex items-center gap-1">
+                  <span>👑</span> TOP RANK
                 </span>
               </div>
-              <div className="mt-2.5">
-                <div className="text-xs font-black text-white">Leaderboard</div>
-                <div className="text-[10.5px] text-slate-400 mt-0.5 line-clamp-1">
-                  Klasemen disiplin tim
+              <div className="mt-2.5 relative z-10">
+                <div className="text-xs font-black text-amber-100 flex items-center gap-1">
+                  Leaderboard <span className="text-amber-400">★</span>
+                </div>
+                <div className="text-[10.5px] text-amber-200/80 mt-0.5 line-clamp-1 font-medium">
+                  Klasemen Juara Tim
                 </div>
               </div>
             </button>
@@ -915,26 +919,33 @@ export default function KioskPortalScreen({
             </span>
           </button>
 
-          {/* Leaderboard Tim (Tampil jika staf LuckyCat, karena kuis di bento) */}
+          {/* Leaderboard Tim (Tampil jika staf LuckyCat, posisi tetap, desain dibuat menonjol dengan Crown) */}
           {String(staff?.venue || '').toLowerCase().includes('lucky') && (
             <button
               type="button"
               onClick={onOpenLeaderboard}
-              className="w-full bg-[#181d26] hover:bg-[#202734] active:scale-[0.99] border border-indigo-400/25 rounded-2xl p-3 flex items-center justify-between gap-2.5 text-left shadow-lg transition cursor-pointer"
+              className="relative overflow-hidden w-full bg-gradient-to-r from-[#2c220f] via-[#211a0d] to-[#141824] hover:from-[#3a2d14] hover:to-[#1a2233] active:scale-[0.99] border-2 border-amber-400/60 hover:border-amber-400 rounded-2xl p-3 flex items-center justify-between gap-2.5 text-left shadow-xl shadow-amber-950/40 transition-all duration-200 cursor-pointer group"
             >
-              <div className="flex items-center gap-2.5 min-w-0">
-                <div className="w-8 h-8 rounded-xl bg-indigo-500/20 border border-indigo-400/30 text-indigo-300 flex items-center justify-center shrink-0">
-                  <Trophy className="w-4 h-4" />
+              <div className="absolute -top-10 -right-10 w-24 h-24 bg-amber-400/15 rounded-full blur-2xl pointer-events-none" />
+              <div className="flex items-center gap-2.5 min-w-0 relative z-10">
+                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 text-slate-950 flex items-center justify-center shrink-0 shadow-md shadow-amber-500/30 group-hover:scale-105 transition-transform">
+                  <Crown className="w-5 h-5 text-slate-950 stroke-[2.5]" />
                 </div>
                 <div className="min-w-0">
-                  <div className="text-xs font-black text-white">Leaderboard &amp; Peringkat</div>
-                  <div className="text-[11px] text-slate-400 truncate mt-0.5">
+                  <div className="text-xs font-black text-amber-100 flex items-center gap-1.5">
+                    <span>Leaderboard &amp; Peringkat Juara</span>
+                    <span className="px-1.5 py-0.5 rounded-md bg-amber-400/20 text-amber-300 text-[9px] font-black border border-amber-400/40">
+                      👑 TOP
+                    </span>
+                  </div>
+                  <div className="text-[11px] text-amber-200/80 truncate mt-0.5 font-medium">
                     Klasemen kedisiplinan &amp; perolehan poin tim
                   </div>
                 </div>
               </div>
-              <span className="px-2.5 py-1 rounded-xl bg-indigo-500/20 text-indigo-200 border border-indigo-400/30 text-[10.5px] font-bold shrink-0">
-                Lihat →
+              <span className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-black text-[11px] shadow-md shadow-amber-500/25 shrink-0 flex items-center gap-1">
+                <span>Cek Juara</span>
+                <span>→</span>
               </span>
             </button>
           )}

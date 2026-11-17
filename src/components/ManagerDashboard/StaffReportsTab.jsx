@@ -199,7 +199,7 @@ export default function StaffReportsTab({ adminAuth }) {
               </span>
             </div>
             <p className="text-xs text-slate-300 mt-1 leading-relaxed">
-              Kanal khusus penerimaan aduan kecurangan kasir, pelanggaran SOP, atau perilaku buruk leader.
+              Kanal khusus penerimaan aduan pelanggaran peraturan perusahaan, kecurangan, perilaku tidak etis/bullying, atau tindakan yang merugikan integritas tim.
               Staf yang memilih opsi <strong>Anonim</strong> tetap dirahasiakan identitasnya dari rekan kerja, namun
               <strong> khusus Manager dapat melihat siapa pelapor</strong> untuk verifikasi dan pemberian reward poin.
             </p>

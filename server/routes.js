@@ -5379,7 +5379,7 @@ router.post('/reports', async (req, res) => {
     staff_name: staff?.name || 'Staf',
     staff_role: staff?.role || 'Staff',
     staff_venue: staff?.venue || venue || 'LuckyCat',
-    category: category || 'Kecurangan / SOP',
+    category: category || 'Pelanggaran Integritas / SOP',
     title: (title || 'Laporan Pelanggaran').trim(),
     description: description.trim(),
     evidence_photo_url: photoUrl,
