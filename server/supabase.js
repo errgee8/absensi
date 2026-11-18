@@ -1705,6 +1705,7 @@ export const cloudDb = {
         updated_at: new Date().toISOString()
       });
     if (error) throw error;
+    settingCache.set('staff_points', { value: updatedList, expiresAt: Date.now() + SETTING_CACHE_TTL_MS });
     return records;
   },
 
@@ -1745,12 +1746,14 @@ export const cloudDb = {
         updated_at: now
       });
     if (error) throw error;
+    settingCache.set('staff_points', { value: list, expiresAt: Date.now() + SETTING_CACHE_TTL_MS });
     return item;
   },
 
   async deleteStaffPoint(pointId) {
     if (!supabase) return false;
     const list = await this.getStaffPoints();
+    const deletedItem = list.find((p) => String(p.id) === String(pointId));
     const filtered = list.filter((p) => String(p.id) !== String(pointId));
     if (filtered.length === list.length) return false;
     const { error } = await supabase
@@ -1762,7 +1765,8 @@ export const cloudDb = {
         updated_at: new Date().toISOString()
       });
     if (error) throw error;
-    return true;
+    settingCache.set('staff_points', { value: filtered, expiresAt: Date.now() + SETTING_CACHE_TTL_MS });
+    return deletedItem || true;
   },
 
   // 14. Custom Staff Profile Photos (Gallery photo only) & Daily Emoji Mood

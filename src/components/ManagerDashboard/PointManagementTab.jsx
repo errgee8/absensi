@@ -47,7 +47,7 @@ export default function PointManagementTab({ adminAuth, isReadOnly = false, onPo
   const [staffSearchQuery, setStaffSearchQuery] = useState('');
   const [formVenueFilter, setFormVenueFilter] = useState('ALL');
   const [selectedStaffIds, setSelectedStaffIds] = useState([]);
-  const [pointType, setPointType] = useState('PLUS'); // 'PLUS' | 'VIOLATION'
+  const [pointType, setPointType] = useState('VIOLATION'); // Default 'VIOLATION' (Sanksi / Pelanggaran)
   const [pointAmount, setPointAmount] = useState('');
   const [reason, setReason] = useState('');
   const [proofPhoto, setProofPhoto] = useState(null);
@@ -976,6 +976,33 @@ export default function PointManagementTab({ adminAuth, isReadOnly = false, onPo
 
       {/* SECTION 2: Sub-tabs + Filters + Data Tables */}
       <div className="bg-[#161b24] border border-slate-800 rounded-3xl p-5 shadow-xl space-y-4">
+        {/* Banner Alert jika ada Poin yang Masih Menggantung / Belum Disetujui Staff */}
+        {stats.pending > 0 && (
+          <div className="p-4 bg-amber-500/10 border border-amber-500/35 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs animate-fade-in shadow-lg shadow-amber-950/20">
+            <div className="flex items-center gap-3 text-amber-300">
+              <Clock className="w-5 h-5 shrink-0 text-amber-400 animate-pulse" />
+              <div>
+                <div className="font-bold text-sm text-amber-200">
+                  Perhatian: Ada {stats.pending} catatan poin menunggu konfirmasi &quot;Saya Mengerti&quot; dari staff
+                </div>
+                <div className="text-[11px] text-amber-300/80 mt-0.5">
+                  Klik tombol di samping untuk langsung melihat rincian staf atau menghapus poin yang keliru.
+                </div>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setStatusFilter('PENDING');
+                setSubTab('LOG');
+              }}
+              className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs transition cursor-pointer shrink-0 shadow-md shadow-amber-500/30"
+            >
+              Lihat Log Menunggu Persetujuan ({stats.pending}) →
+            </button>
+          </div>
+        )}
+
         {/* Sub-tab switcher & Period/Filter Controls */}
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pb-4 border-b border-slate-800">
           <div className="flex bg-[#12161f] p-1 rounded-2xl border border-slate-800 gap-1 self-start">
@@ -1131,18 +1158,18 @@ export default function PointManagementTab({ adminAuth, isReadOnly = false, onPo
                         )}
                       </td>
                       <td className="py-3 px-3">
-                        {row.violation_count === 0 ? (
-                          <span className="text-[11px] text-slate-500">-</span>
-                        ) : row.pending_count === 0 ? (
+                        {row.pending_count > 0 ? (
+                          <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-950 text-amber-300 border border-amber-500/30">
+                            <Clock className="w-3 h-3" />
+                            <span>{row.pending_count} Belum Disetujui</span>
+                          </span>
+                        ) : row.acknowledged_count > 0 ? (
                           <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-950 text-emerald-300 border border-emerald-500/30">
                             <CheckCircle2 className="w-3 h-3" />
                             <span>Semua Disetujui ({row.acknowledged_count})</span>
                           </span>
                         ) : (
-                          <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-950 text-amber-300 border border-amber-500/30">
-                            <Clock className="w-3 h-3" />
-                            <span>{row.pending_count} Belum Disetujui</span>
-                          </span>
+                          <span className="text-[11px] text-slate-500">-</span>
                         )}
                       </td>
                       <td className="py-3 px-4 text-right space-x-1.5 whitespace-nowrap">
@@ -1153,7 +1180,7 @@ export default function PointManagementTab({ adminAuth, isReadOnly = false, onPo
                         >
                           + Beri Poin
                         </button>
-                        {row.violation_count > 0 && (
+                        {(row.violation_count > 0 || row.plus_count > 0 || row.pending_count > 0 || row.total_points !== 0) && (
                           <button
                             type="button"
                             onClick={() => {
