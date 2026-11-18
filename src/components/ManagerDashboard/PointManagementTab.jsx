@@ -18,6 +18,7 @@ import {
   Search,
   Send,
   ShieldCheck,
+  Star,
   Trash2,
   UserCheck,
   Users,
@@ -34,6 +35,7 @@ import {
 import { formatWitaDateTime, getPointCycleInfo } from '../../utils/time';
 import { showToast } from '../Common/Toast';
 import PointDeletionLogsModal from './PointDeletionLogsModal';
+import KudosAuditLogsModal from './KudosAuditLogsModal';
 
 export default function PointManagementTab({ adminAuth, isReadOnly = false, onPointsUpdated }) {
   const [staffList, setStaffList] = useState([]);
@@ -75,6 +77,9 @@ export default function PointManagementTab({ adminAuth, isReadOnly = false, onPo
   const [showDeletionModal, setShowDeletionModal] = useState(false);
   const [deletionLogs, setDeletionLogs] = useState([]);
   const [loadingDeletionLogs, setLoadingDeletionLogs] = useState(false);
+
+  // Peer Kudos Star Audit Modal State
+  const [showKudosModal, setShowKudosModal] = useState(false);
 
   const [exporting, setExporting] = useState(false);
 
@@ -154,9 +159,11 @@ export default function PointManagementTab({ adminAuth, isReadOnly = false, onPo
     setLoadingDeletionLogs(true);
     try {
       const res = await getPointDeletionLogs();
-      setDeletionLogs(res.logs || []);
+      const list = Array.isArray(res) ? res : (Array.isArray(res?.logs) ? res.logs : []);
+      setDeletionLogs(list);
     } catch (err) {
       console.warn('Failed to load point deletion logs:', err);
+      setDeletionLogs([]);
     } finally {
       setLoadingDeletionLogs(false);
     }
@@ -539,6 +546,16 @@ export default function PointManagementTab({ adminAuth, isReadOnly = false, onPo
                   {deletionLogs.length}
                 </span>
               )}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setShowKudosModal(true)}
+              className="px-3.5 py-2 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/35 text-amber-300 text-xs font-bold flex items-center space-x-1.5 transition cursor-pointer shadow-sm shadow-amber-950/20"
+              title="Buka Log Audit Pengiriman Bintang Apresiasi (Peer Kudos) antar staf. Identitas pengirim anonim tetap terlihat untuk Manager."
+            >
+              <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
+              <span>Log Bintang Apresiasi</span>
             </button>
 
             <button
@@ -1093,6 +1110,15 @@ export default function PointManagementTab({ adminAuth, isReadOnly = false, onPo
               <Trash2 className="w-4 h-4 text-rose-400" />
               <span>Riwayat Hapus Poin ({deletionLogs.length})</span>
             </button>
+            <button
+              type="button"
+              onClick={() => setShowKudosModal(true)}
+              className="px-4 py-2 rounded-xl text-xs font-bold flex items-center space-x-2 transition cursor-pointer text-slate-400 hover:text-amber-300 hover:bg-amber-500/10"
+              title="Buka Log Audit Pengiriman Bintang Apresiasi (Peer Kudos) antar staf. Identitas pengirim anonim tetap terlihat untuk Manager."
+            >
+              <Star className="w-4 h-4 text-amber-400 fill-amber-400" />
+              <span>Log Bintang Apresiasi</span>
+            </button>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
@@ -1509,6 +1535,12 @@ export default function PointManagementTab({ adminAuth, isReadOnly = false, onPo
         logs={deletionLogs}
         loading={loadingDeletionLogs}
         onRefresh={loadDeletionLogs}
+      />
+
+      {/* Peer Kudos Star Audit Trail Modal */}
+      <KudosAuditLogsModal
+        isOpen={showKudosModal}
+        onClose={() => setShowKudosModal(false)}
       />
     </div>
   );

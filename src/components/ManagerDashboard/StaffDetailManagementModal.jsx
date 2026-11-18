@@ -14,6 +14,7 @@ import {
   Edit3,
   Plus,
   Sparkles,
+  Star,
   History,
   ShieldAlert,
   ChevronRight,
@@ -25,12 +26,15 @@ import {
   getPoints,
   createStaffPoint,
   deleteStaffPoint,
+  getPointDeletionLogs,
   saveStaffDayAdjustment,
   clearShiftLateness,
   reviewLateCheckin,
   deleteShift,
   deleteLeaveRequest
 } from '../../utils/api';
+import PointDeletionLogsModal from './PointDeletionLogsModal';
+import KudosAuditLogsModal from './KudosAuditLogsModal';
 import {
   formatWitaDateFull,
   formatWitaDateOnly,
@@ -83,6 +87,26 @@ export default function StaffDetailManagementModal({
   const [actionReason, setActionReason] = useState('');
   const [actionSubmitting, setActionSubmitting] = useState(false);
   const [actionError, setActionError] = useState(null);
+
+  // Point Deletion & Kudos Modals State
+  const [showDeletionModal, setShowDeletionModal] = useState(false);
+  const [deletionLogs, setDeletionLogs] = useState([]);
+  const [loadingDeletionLogs, setLoadingDeletionLogs] = useState(false);
+  const [showKudosModal, setShowKudosModal] = useState(false);
+
+  const handleOpenDeletionLogs = async () => {
+    setShowDeletionModal(true);
+    setLoadingDeletionLogs(true);
+    try {
+      const res = await getPointDeletionLogs();
+      const list = Array.isArray(res) ? res : (Array.isArray(res?.logs) ? res.logs : []);
+      setDeletionLogs(list);
+    } catch {
+      setDeletionLogs([]);
+    } finally {
+      setLoadingDeletionLogs(false);
+    }
+  };
 
   // Sync initial tab when modal opens or initialTab prop changes
   useEffect(() => {
@@ -657,9 +681,31 @@ export default function StaffDetailManagementModal({
 
                   {/* List of Points */}
                   <div className="space-y-2">
-                    <div className="flex items-center justify-between text-xs font-black text-slate-400 px-1">
-                      <span>Daftar Riwayat Poin ({pointsList.length})</span>
-                      <span className="text-[10px] text-slate-500">Manajer dapat menghapus poin kapan saja</span>
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs font-black text-slate-400 px-1">
+                      <div>
+                        <span>Daftar Riwayat Poin ({pointsList.length})</span>
+                        <span className="text-[10px] text-slate-500 block">Manajer dapat menghapus poin kapan saja</span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <button
+                          type="button"
+                          onClick={handleOpenDeletionLogs}
+                          className="px-2.5 py-1.5 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/35 text-rose-300 text-[11px] font-bold flex items-center space-x-1 transition cursor-pointer"
+                          title="Buka Log Riwayat Poin yang Pernah Dihapus oleh Manajer"
+                        >
+                          <Trash2 className="w-3 h-3 text-rose-400" />
+                          <span>Riwayat Hapus Poin</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setShowKudosModal(true)}
+                          className="px-2.5 py-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/35 text-amber-300 text-[11px] font-bold flex items-center space-x-1 transition cursor-pointer"
+                          title="Buka Log Pengiriman Bintang Apresiasi (Peer Kudos)"
+                        >
+                          <Star className="w-3 h-3 text-amber-400 fill-amber-400" />
+                          <span>Log Bintang</span>
+                        </button>
+                      </div>
                     </div>
 
                     {pointsList.length === 0 ? (
@@ -1266,6 +1312,21 @@ export default function StaffDetailManagementModal({
           </div>
         </div>
       )}
+
+      {/* Point Deletion Logs Audit Modal */}
+      <PointDeletionLogsModal
+        isOpen={showDeletionModal}
+        onClose={() => setShowDeletionModal(false)}
+        logs={deletionLogs}
+        loading={loadingDeletionLogs}
+        onRefresh={handleOpenDeletionLogs}
+      />
+
+      {/* Peer Kudos Star Audit Modal */}
+      <KudosAuditLogsModal
+        isOpen={showKudosModal}
+        onClose={() => setShowKudosModal(false)}
+      />
     </div>
   );
 }

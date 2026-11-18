@@ -20,16 +20,18 @@ import StaffReportsTab from './StaffReportsTab';
 import QuizLeaderboardTab from './QuizLeaderboardTab';
 import StaffPublicProfileModal from '../StaffView/StaffPublicProfileModal';
 import LoungeChatModal from '../StaffView/LoungeChatModal';
+import KudosAuditLogsModal from './KudosAuditLogsModal';
 import { exportMonthlyPayrollReport, exportTimesheetToExcel } from '../../utils/excelExport';
 import { getShifts, getStats, getShiftSchedules, getStaffList, getLeaveRequests, getAnnouncements, getAnnouncementReaders, getPoints, getStaffDayAdjustments, subscribeRealtimeEvents, sendPresenceHeartbeat, authorizeEarlyCheckout } from '../../utils/api';
 import { getOperationalDateYMD, getOperationalYesterdayYMD, getWitaDateYMD, getAppNow, formatWitaDateTime } from '../../utils/time';
 import { resolveShift } from '../../utils/shiftResolver';
 import { showToast } from '../Common/Toast';
-import { LayoutDashboard, Users, Clock, Radio, Building2, Sparkles, Eye, ShieldAlert, Trophy, FileText, Megaphone, Activity, Award, Unlock, AlertCircle } from 'lucide-react';
+import { LayoutDashboard, Users, Clock, Radio, Building2, Sparkles, Eye, ShieldAlert, Trophy, FileText, Megaphone, Activity, Award, Unlock, AlertCircle, Star } from 'lucide-react';
 
 export default function ManagerDashboard({ venueSettings, refreshSettings, adminAuth, isReadOnly = false, onOpenLeaderboard }) {
   // Tabs: 'AUDIT' | 'SCHEDULES' | 'STAFF' | 'TOILET'
   const [activeTab, setActiveTab] = useState('AUDIT');
+  const [kudosModalOpen, setKudosModalOpen] = useState(false);
 
   const [shifts, setShifts] = useState([]);
   const [schedules, setSchedules] = useState([]);
@@ -534,6 +536,17 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
           </div>
 
           <div className="flex items-center flex-wrap gap-2">
+            {/* Peer Kudos Star Audit Button for Manager */}
+            <button
+              type="button"
+              onClick={() => setKudosModalOpen(true)}
+              className="flex items-center space-x-2 px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-950/80 to-slate-900 border border-amber-500/40 text-amber-300 hover:text-amber-100 hover:border-amber-400 text-xs font-bold transition shadow-sm cursor-pointer active:scale-95"
+              title="Buka Log Audit Pengiriman Bintang Apresiasi (Peer Kudos). Identitas pengirim anonim tetap terlihat untuk Manager."
+            >
+              <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
+              <span>⭐ Log Bintang</span>
+            </button>
+
             {/* Room Chat Lounge Button (Ghost Mode for Manager) */}
             <button
               type="button"
@@ -978,6 +991,12 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
             setChatModalOpen(false);
             setVisitedStaffId(target.id || target.uuid);
           }}
+        />
+
+        {/* Peer Kudos Star Audit Trail Modal */}
+        <KudosAuditLogsModal
+          isOpen={kudosModalOpen}
+          onClose={() => setKudosModalOpen(false)}
         />
       </div>
 

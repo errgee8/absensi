@@ -16,6 +16,24 @@ import {
 } from 'lucide-react';
 import { formatWitaDateTime, formatWitaDateOnly } from '../../utils/time';
 
+function safeFormatDate(val) {
+  if (!val) return '-';
+  try {
+    return formatWitaDateOnly(val);
+  } catch {
+    return String(val);
+  }
+}
+
+function safeFormatDateTime(val) {
+  if (!val) return '-';
+  try {
+    return formatWitaDateTime(val);
+  } catch {
+    return String(val);
+  }
+}
+
 export default function PointDeletionLogsModal({
   isOpen,
   onClose,
@@ -27,31 +45,41 @@ export default function PointDeletionLogsModal({
   const [venueFilter, setVenueFilter] = useState('ALL');
   const [typeFilter, setTypeFilter] = useState('ALL'); // 'ALL' | 'VIOLATION' | 'PLUS'
 
-  if (!isOpen) return null;
+  const safeLogs = useMemo(() => {
+    const raw = Array.isArray(logs) ? logs : (Array.isArray(logs?.logs) ? logs.logs : []);
+    return raw.filter((item) => item && typeof item === 'object');
+  }, [logs]);
 
   // Filter logs
   const filteredLogs = useMemo(() => {
-    return logs.filter((item) => {
+    return safeLogs.filter((item) => {
+      if (!item) return false;
+
       // Venue filter
-      if (venueFilter !== 'ALL' && item.staff_venue !== venueFilter) {
+      if (venueFilter !== 'ALL' && item.staff_venue && item.staff_venue !== venueFilter) {
         return false;
       }
+
       // Type filter
       if (typeFilter !== 'ALL') {
-        const isPlus = item.point_type === 'PLUS' || String(item.points).startsWith('+');
+        const isPlus = item.point_type === 'PLUS' || String(item.points || '').startsWith('+');
         if (typeFilter === 'PLUS' && !isPlus) return false;
         if (typeFilter === 'VIOLATION' && isPlus) return false;
       }
+
       // Search
       if (search.trim()) {
         const q = search.trim().toLowerCase();
-        const staffName = (item.staff_name || '').toLowerCase();
-        const reason = (item.reason || '').toLowerCase();
-        const delReason = (item.deletion_reason || '').toLowerCase();
-        const delBy = (item.deleted_by || '').toLowerCase();
-        const awardedBy = (item.awarded_by || '').toLowerCase();
+        const staffName = String(item.staff_name || '').toLowerCase();
+        const staffId = String(item.staff_id || '').toLowerCase();
+        const reason = String(item.reason || '').toLowerCase();
+        const delReason = String(item.deletion_reason || '').toLowerCase();
+        const delBy = String(item.deleted_by || '').toLowerCase();
+        const awardedBy = String(item.awarded_by || '').toLowerCase();
+
         if (
           !staffName.includes(q) &&
+          !staffId.includes(q) &&
           !reason.includes(q) &&
           !delReason.includes(q) &&
           !delBy.includes(q) &&
@@ -60,18 +88,21 @@ export default function PointDeletionLogsModal({
           return false;
         }
       }
+
       return true;
     });
-  }, [logs, search, venueFilter, typeFilter]);
+  }, [safeLogs, search, venueFilter, typeFilter]);
 
   // Statistics
-  const totalCount = logs.length;
-  const violationCount = logs.filter(
-    (l) => l.point_type !== 'PLUS' && !String(l.points).startsWith('+')
+  const totalCount = safeLogs.length;
+  const violationCount = safeLogs.filter(
+    (l) => l && (l.point_type !== 'PLUS' && !String(l.points || '').startsWith('+'))
   ).length;
-  const plusCount = logs.filter(
-    (l) => l.point_type === 'PLUS' || String(l.points).startsWith('+')
+  const plusCount = safeLogs.filter(
+    (l) => l && (l.point_type === 'PLUS' || String(l.points || '').startsWith('+'))
   ).length;
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md animate-fade-in overflow-y-auto">
@@ -204,13 +235,15 @@ export default function PointDeletionLogsModal({
             </div>
           ) : (
             filteredLogs.map((log, idx) => {
+              if (!log) return null;
               const isPlus =
-                log.point_type === 'PLUS' || String(log.points).startsWith('+');
+                log.point_type === 'PLUS' || String(log.points || '').startsWith('+');
               const absPoints = Math.abs(Number(log.points) || 1);
+              const staffName = log.staff_name || 'Staff';
 
               return (
                 <div
-                  key={log.id || idx}
+                  key={log.id || `pdel-${idx}`}
                   className="p-4 rounded-2xl bg-[#161b24] border border-slate-800 hover:border-slate-700 transition space-y-3"
                 >
                   {/* Top Bar: Timestamp & Badges */}
@@ -219,7 +252,7 @@ export default function PointDeletionLogsModal({
                       <span className="text-xs font-mono font-bold text-slate-400 flex items-center space-x-1">
                         <Calendar className="w-3.5 h-3.5 text-blue-400" />
                         <span>
-                          {log.created_at ? formatWitaDateTime(log.created_at) : '-'}
+                          {safeFormatDateTime(log.created_at)}
                         </span>
                       </span>
                       {log.staff_venue && (
@@ -247,14 +280,14 @@ export default function PointDeletionLogsModal({
                   <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-start">
                     <div className="md:col-span-4 flex items-center space-x-2.5">
                       <div className="w-9 h-9 rounded-xl bg-slate-800 border border-slate-700 text-slate-300 font-black text-xs flex items-center justify-center shrink-0">
-                        {(log.staff_name || 'S').substring(0, 2).toUpperCase()}
+                        {staffName.substring(0, 2).toUpperCase()}
                       </div>
                       <div className="min-w-0">
                         <span className="text-[10px] text-slate-400 block font-bold uppercase tracking-wider">
                           Karyawan Terkait
                         </span>
                         <div className="text-sm font-black text-white truncate">
-                          {log.staff_name}
+                          {staffName}
                         </div>
                         {log.staff_id && (
                           <div className="text-[10px] font-mono text-slate-400">
@@ -280,7 +313,7 @@ export default function PointDeletionLogsModal({
                         </span>
                         {log.awarded_at && (
                           <span>
-                            Tanggal: {formatWitaDateOnly(log.awarded_at)}
+                            Tanggal: {safeFormatDate(log.awarded_at)}
                           </span>
                         )}
                       </div>
@@ -316,7 +349,7 @@ export default function PointDeletionLogsModal({
         <div className="p-4 border-t border-slate-800/80 bg-[#161b24] flex items-center justify-between shrink-0">
           <span className="text-xs text-slate-400 font-medium">
             Menampilkan <strong className="text-white">{filteredLogs.length}</strong> dari{' '}
-            <strong className="text-white">{logs.length}</strong> riwayat penghapusan.
+            <strong className="text-white">{safeLogs.length}</strong> riwayat penghapusan.
           </span>
           <button
             type="button"
