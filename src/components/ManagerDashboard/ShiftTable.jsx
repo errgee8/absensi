@@ -17,7 +17,8 @@ import {
   CalendarX,
   AlertCircle,
   Unlock,
-  Check
+  Check,
+  FileText
 } from 'lucide-react';
 import { formatWitaTimeOnly, formatWitaDateOnly, formatDuration } from '../../utils/time';
 import { resolveShift } from '../../utils/shiftResolver';
