@@ -45,8 +45,10 @@ export default function StaffDetailManagementModal({
   staff,
   initialTab = 'POINTS', // 'POINTS' | 'WORK_DAYS' | 'LATE' | 'LEAVE' | 'AUDIT'
   adminAuth,
+  isReadOnly = false,
   onUpdate
 }) {
+  const canEditStaffData = !isReadOnly && (adminAuth?.role === 'MANAGER' || adminAuth?.role === 'FULL_ADMIN');
   const [activeTab, setActiveTab] = useState(initialTab);
   const [monthChoice, setMonthChoice] = useState('CURRENT'); // 'CURRENT' | 'PREVIOUS'
   const [loading, setLoading] = useState(true);
@@ -506,18 +508,31 @@ export default function StaffDetailManagementModal({
                       </div>
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={() => setShowAddPointForm(!showAddPointForm)}
-                      className="px-3.5 py-2 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-slate-950 font-black text-xs rounded-xl transition shadow-md flex items-center justify-center space-x-1.5 cursor-pointer shrink-0"
-                    >
-                      <Plus className="w-3.5 h-3.5 stroke-[3]" />
-                      <span>{showAddPointForm ? 'Batal Form Poin' : 'Beri Poin Baru'}</span>
-                    </button>
+                    {canEditStaffData ? (
+                      <button
+                        type="button"
+                        onClick={() => setShowAddPointForm(!showAddPointForm)}
+                        className="px-3.5 py-2 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-slate-950 font-black text-xs rounded-xl transition shadow-md flex items-center justify-center space-x-1.5 cursor-pointer shrink-0"
+                      >
+                        <Plus className="w-3.5 h-3.5 stroke-[3]" />
+                        <span>{showAddPointForm ? 'Batal Form Poin' : 'Beri Poin Baru'}</span>
+                      </button>
+                    ) : (
+                      <span className="px-3 py-1.5 rounded-xl bg-slate-800 text-slate-400 text-[11px] font-bold border border-slate-700 self-center">
+                        🔒 Akses Edit Khusus Manajer
+                      </span>
+                    )}
                   </div>
 
+                  {!canEditStaffData && (
+                    <div className="p-3 bg-slate-800/60 border border-slate-700/80 rounded-2xl flex items-center space-x-2 text-xs text-amber-300 font-bold">
+                      <ShieldAlert className="w-4 h-4 text-amber-400 shrink-0" />
+                      <span>Mode Pengawas (Assistant Manager): Anda dalam mode Lihat Saja (View Only). Penambahan dan penghapusan poin staf hanya dapat dilakukan oleh Operational Manager.</span>
+                    </div>
+                  )}
+
                   {/* Form: Add / Deduct Points */}
-                  {showAddPointForm && (
+                  {canEditStaffData && showAddPointForm && (
                     <form onSubmit={handleAddPointSubmit} className="p-4 bg-[#161b24] border border-amber-500/40 rounded-2xl space-y-3 animate-fade-in">
                       <div className="flex items-center justify-between text-xs font-black text-amber-300 border-b border-slate-800 pb-2">
                         <span className="flex items-center space-x-1.5">
@@ -681,21 +696,23 @@ export default function StaffDetailManagementModal({
                               </p>
                             </div>
 
-                            <button
-                              type="button"
-                              onClick={() => handleOpenActionModal({
-                                type: 'DELETE_POINT',
-                                id: pt.id,
-                                title: 'Hapus Catatan Poin',
-                                description: `Hapus catatan poin (${isPlus ? `+${pts}` : `-${pts}`} poin: "${pt.reason || pt.category}") dari staf ini? Tindakan ini akan dicatat transparan di audit log staf.`,
-                                defaultReason: 'Catatan poin dihapus/dibatalkan oleh Manajer'
-                              })}
-                              className="px-2.5 py-1.5 bg-rose-950/60 hover:bg-rose-900 border border-rose-700/80 text-rose-300 hover:text-white rounded-xl text-[11px] font-black transition flex items-center space-x-1 cursor-pointer shrink-0"
-                              title="Hapus Catatan Poin"
-                            >
-                              <Trash2 className="w-3 h-3 text-rose-400" />
-                              <span>Hapus Poin</span>
-                            </button>
+                            {canEditStaffData && (
+                              <button
+                                type="button"
+                                onClick={() => handleOpenActionModal({
+                                  type: 'DELETE_POINT',
+                                  id: pt.id,
+                                  title: 'Hapus Catatan Poin',
+                                  description: `Hapus catatan poin (${isPlus ? `+${pts}` : `-${pts}`} poin: "${pt.reason || pt.category}") dari staf ini? Tindakan ini akan dicatat transparan di audit log staf.`,
+                                  defaultReason: 'Catatan poin dihapus/dibatalkan oleh Manajer'
+                                })}
+                                className="px-2.5 py-1.5 bg-rose-950/60 hover:bg-rose-900 border border-rose-700/80 text-rose-300 hover:text-white rounded-xl text-[11px] font-black transition flex items-center space-x-1 cursor-pointer shrink-0"
+                                title="Hapus Catatan Poin"
+                              >
+                                <Trash2 className="w-3 h-3 text-rose-400" />
+                                <span>Hapus Poin</span>
+                              </button>
+                            )}
                           </div>
                         );
                       })
@@ -707,125 +724,137 @@ export default function StaffDetailManagementModal({
               {/* TAB 2: WORK DAYS & SHIFTS */}
               {activeTab === 'WORK_DAYS' && (
                 <div className="space-y-4">
-                  {/* Summary & Day Adjustment Form */}
-                  <div className="p-4 bg-gradient-to-br from-[#1a202c] to-[#12161f] border border-slate-700/80 rounded-2xl space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-2 text-white">
-                        <Sparkles className="w-4 h-4 text-amber-400" />
-                        <h4 className="text-xs font-black">⚡ Koreksi / Penyesuaian Hari Kerja (Otorisasi Manajer)</h4>
+                  {/* Summary & Day Adjustment Form (Manager Only) */}
+                  {!canEditStaffData ? (
+                    <div className="p-4 bg-slate-800/60 border border-slate-700/80 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                      <div className="flex items-center space-x-2 text-amber-300 font-bold">
+                        <ShieldAlert className="w-4 h-4 text-amber-400 shrink-0" />
+                        <span>Mode Pengawas (Assistant Manager): Koreksi hari kerja dan penghapusan shift hanya dapat dilakukan oleh Operational Manager.</span>
                       </div>
-                      <span className="text-xs font-mono font-black text-blue-300 bg-blue-500/20 px-2 py-0.5 rounded-md border border-blue-500/30">
-                        Total: {stats.workDays ?? 0} Hari (Aktual: {stats.actualWorkDays ?? 0}, Penyesuaian: {stats.manualDaysSum > 0 ? `+${stats.manualDaysSum}` : (stats.manualDaysSum || 0)})
+                      <span className="text-xs font-mono font-black text-blue-300 bg-blue-500/20 px-2.5 py-1 rounded-md border border-blue-500/30 self-start sm:self-auto shrink-0">
+                        Total: {stats.workDays ?? 0} Hari (Aktual: {stats.actualWorkDays ?? 0})
                       </span>
                     </div>
-
-                    <p className="text-[11px] text-slate-400 leading-relaxed font-bold">
-                      Gunakan fitur ini untuk menambah bonus hari kerja (misal: lembur/bantuan event) atau memotong hari kerja. Nilai ini otomatis mempengaruhi leaderboard dan perhitungan gaji.
-                    </p>
-
-                    {adjError && (
-                      <div className="p-2.5 bg-rose-950/50 border border-rose-500/50 rounded-xl text-xs text-rose-300 font-bold flex items-center space-x-2">
-                        <AlertCircle className="w-4 h-4 shrink-0" />
-                        <span>{adjError}</span>
+                  ) : (
+                    <div className="p-4 bg-gradient-to-br from-[#1a202c] to-[#12161f] border border-slate-700/80 rounded-2xl space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-2 text-white">
+                          <Sparkles className="w-4 h-4 text-amber-400" />
+                          <h4 className="text-xs font-black">⚡ Koreksi / Penyesuaian Hari Kerja (Otorisasi Manajer)</h4>
+                        </div>
+                        <span className="text-xs font-mono font-black text-blue-300 bg-blue-500/20 px-2 py-0.5 rounded-md border border-blue-500/30">
+                          Total: {stats.workDays ?? 0} Hari (Aktual: {stats.actualWorkDays ?? 0}, Penyesuaian: {stats.manualDaysSum > 0 ? `+${stats.manualDaysSum}` : (stats.manualDaysSum || 0)})
+                        </span>
                       </div>
-                    )}
 
-                    {adjSuccess && (
-                      <div className="p-2.5 bg-emerald-950/50 border border-emerald-500/50 rounded-xl text-xs text-emerald-300 font-bold flex items-center space-x-2">
-                        <CheckCircle2 className="w-4 h-4 shrink-0" />
-                        <span>{adjSuccess}</span>
-                      </div>
-                    )}
+                      <p className="text-[11px] text-slate-400 leading-relaxed font-bold">
+                        Gunakan fitur ini untuk menambah bonus hari kerja (misal: lembur/bantuan event) atau memotong hari kerja. Nilai ini otomatis mempengaruhi leaderboard dan perhitungan gaji.
+                      </p>
 
-                    <form onSubmit={handleSaveDayAdjustment} className="space-y-3 pt-1">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-[11px] font-black text-slate-300 mb-1">
-                            Nilai Penyesuaian Hari (+ / -):
-                          </label>
-                          <div className="flex items-center space-x-2">
-                            <input
-                              type="number"
-                              step="1"
-                              value={adjDays}
-                              onChange={(e) => setAdjDays(e.target.value)}
-                              required
-                              className="w-full bg-[#12161f] border border-slate-700 rounded-xl px-3 py-2 text-slate-100 font-black text-sm focus:outline-none focus:border-blue-500"
-                            />
-                            <div className="flex items-center space-x-1">
-                              <button
-                                type="button"
-                                onClick={() => setAdjDays(1)}
-                                className={`px-2.5 py-1.5 rounded-lg text-xs font-black border transition ${
-                                  Number(adjDays) === 1 ? 'bg-emerald-600 text-white border-emerald-500' : 'bg-slate-800 text-slate-300 border-slate-700'
-                                }`}
-                              >
-                                +1
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setAdjDays(-1)}
-                                className={`px-2.5 py-1.5 rounded-lg text-xs font-black border transition ${
-                                  Number(adjDays) === -1 ? 'bg-rose-600 text-white border-rose-500' : 'bg-slate-800 text-slate-300 border-slate-700'
-                                }`}
-                              >
-                                -1
-                              </button>
+                      {adjError && (
+                        <div className="p-2.5 bg-rose-950/50 border border-rose-500/50 rounded-xl text-xs text-rose-300 font-bold flex items-center space-x-2">
+                          <AlertCircle className="w-4 h-4 shrink-0" />
+                          <span>{adjError}</span>
+                        </div>
+                      )}
+
+                      {adjSuccess && (
+                        <div className="p-2.5 bg-emerald-950/50 border border-emerald-500/50 rounded-xl text-xs text-emerald-300 font-bold flex items-center space-x-2">
+                          <CheckCircle2 className="w-4 h-4 shrink-0" />
+                          <span>{adjSuccess}</span>
+                        </div>
+                      )}
+
+                      <form onSubmit={handleSaveDayAdjustment} className="space-y-3 pt-1">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-[11px] font-black text-slate-300 mb-1">
+                              Nilai Penyesuaian Hari (+ / -):
+                            </label>
+                            <div className="flex items-center space-x-2">
+                              <input
+                                type="number"
+                                step="1"
+                                value={adjDays}
+                                onChange={(e) => setAdjDays(e.target.value)}
+                                required
+                                className="w-full bg-[#12161f] border border-slate-700 rounded-xl px-3 py-2 text-slate-100 font-black text-sm focus:outline-none focus:border-blue-500"
+                              />
+                              <div className="flex items-center space-x-1">
+                                <button
+                                  type="button"
+                                  onClick={() => setAdjDays(1)}
+                                  className={`px-2.5 py-1.5 rounded-lg text-xs font-black border transition ${
+                                    Number(adjDays) === 1 ? 'bg-emerald-600 text-white border-emerald-500' : 'bg-slate-800 text-slate-300 border-slate-700'
+                                  }`}
+                                >
+                                  +1
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setAdjDays(-1)}
+                                  className={`px-2.5 py-1.5 rounded-lg text-xs font-black border transition ${
+                                    Number(adjDays) === -1 ? 'bg-rose-600 text-white border-rose-500' : 'bg-slate-800 text-slate-300 border-slate-700'
+                                  }`}
+                                >
+                                  -1
+                                </button>
+                              </div>
                             </div>
+                          </div>
+
+                          <div>
+                            <label className="block text-[11px] font-black text-slate-300 mb-1">
+                              PIN Otorisasi Manajer:
+                            </label>
+                            <input
+                              type="password"
+                              maxLength={8}
+                              value={adjPin}
+                              onChange={(e) => setAdjPin(e.target.value)}
+                              placeholder="PIN Manager..."
+                              required
+                              className="w-full bg-[#12161f] border border-slate-700 rounded-xl px-3 py-2 text-slate-100 font-mono tracking-widest text-sm focus:outline-none focus:border-blue-500"
+                            />
                           </div>
                         </div>
 
                         <div>
                           <label className="block text-[11px] font-black text-slate-300 mb-1">
-                            PIN Otorisasi Manajer:
+                            Alasan Penyesuaian (Wajib Diisi):
                           </label>
                           <input
-                            type="password"
-                            maxLength={8}
-                            value={adjPin}
-                            onChange={(e) => setAdjPin(e.target.value)}
-                            placeholder="PIN Manager..."
+                            type="text"
+                            value={adjReason}
+                            onChange={(e) => setAdjReason(e.target.value)}
+                            placeholder="Contoh: Bantuan operasional event / Koreksi lupa absensi"
                             required
-                            className="w-full bg-[#12161f] border border-slate-700 rounded-xl px-3 py-2 text-slate-100 font-mono tracking-widest text-sm focus:outline-none focus:border-blue-500"
+                            className="w-full bg-[#12161f] border border-slate-700 rounded-xl px-3 py-2 text-slate-100 text-xs focus:outline-none focus:border-blue-500"
                           />
                         </div>
-                      </div>
 
-                      <div>
-                        <label className="block text-[11px] font-black text-slate-300 mb-1">
-                          Alasan Penyesuaian (Wajib Diisi):
-                        </label>
-                        <input
-                          type="text"
-                          value={adjReason}
-                          onChange={(e) => setAdjReason(e.target.value)}
-                          placeholder="Contoh: Bantuan operasional event / Koreksi lupa absensi"
-                          required
-                          className="w-full bg-[#12161f] border border-slate-700 rounded-xl px-3 py-2 text-slate-100 text-xs focus:outline-none focus:border-blue-500"
-                        />
-                      </div>
-
-                      <div className="flex justify-end">
-                        <button
-                          type="submit"
-                          disabled={adjSubmitting || !adjPin.trim() || !adjReason.trim()}
-                          className="px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-black text-xs rounded-xl shadow-lg shadow-blue-600/30 transition disabled:opacity-50 flex items-center space-x-1.5 cursor-pointer"
-                        >
-                          {adjSubmitting ? (
-                            <>
-                              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                              <span>Menyimpan...</span>
-                            </>
-                          ) : (
-                            <>
-                              <Sparkles className="w-3.5 h-3.5" />
-                              <span>Terapkan Penyesuaian Hari</span>
-                            </>
-                          )}
-                        </button>
-                      </div>
-                    </form>
-                  </div>
+                        <div className="flex justify-end">
+                          <button
+                            type="submit"
+                            disabled={adjSubmitting || !adjPin.trim() || !adjReason.trim()}
+                            className="px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-black text-xs rounded-xl shadow-lg shadow-blue-600/30 transition disabled:opacity-50 flex items-center space-x-1.5 cursor-pointer"
+                          >
+                            {adjSubmitting ? (
+                              <>
+                                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                                <span>Menyimpan...</span>
+                              </>
+                            ) : (
+                              <>
+                                <Sparkles className="w-3.5 h-3.5" />
+                                <span>Terapkan Penyesuaian Hari</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      </form>
+                    </div>
+                  )}
 
                   {/* List of Shifts */}
                   <div className="space-y-2">
@@ -878,22 +907,24 @@ export default function StaffDetailManagementModal({
                             </div>
                           </div>
 
-                          <div className="pt-2 border-t border-slate-800/80 flex items-center justify-end">
-                            <button
-                              type="button"
-                              onClick={() => handleOpenActionModal({
-                                type: 'DELETE_SHIFT',
-                                id: shift.id,
-                                title: 'Hapus Riwayat Shift',
-                                description: `Hapus permanen riwayat shift tanggal ${shift.date} ini? Tindakan ini akan menghapus log presensi dari database dan mengurangi akumulasi hari kerja.`,
-                                defaultReason: 'Shift salah input/dihapus oleh Manajer'
-                              })}
-                              className="px-2.5 py-1.5 bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/30 rounded-xl text-[11px] font-black transition flex items-center space-x-1 cursor-pointer"
-                            >
-                              <Trash2 className="w-3 h-3 text-rose-400" />
-                              <span>Hapus Shift Ini</span>
-                            </button>
-                          </div>
+                          {canEditStaffData && (
+                            <div className="pt-2 border-t border-slate-800/80 flex items-center justify-end">
+                              <button
+                                type="button"
+                                onClick={() => handleOpenActionModal({
+                                  type: 'DELETE_SHIFT',
+                                  id: shift.id,
+                                  title: 'Hapus Riwayat Shift',
+                                  description: `Hapus permanen riwayat shift tanggal ${shift.date} ini? Tindakan ini akan menghapus log presensi dari database dan mengurangi akumulasi hari kerja.`,
+                                  defaultReason: 'Shift salah input/dihapus oleh Manajer'
+                                })}
+                                className="px-2.5 py-1.5 bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/30 rounded-xl text-[11px] font-black transition flex items-center space-x-1 cursor-pointer"
+                              >
+                                <Trash2 className="w-3 h-3 text-rose-400" />
+                                <span>Hapus Shift Ini</span>
+                              </button>
+                            </div>
+                          )}
                         </div>
                       ))
                     )}
@@ -904,9 +935,16 @@ export default function StaffDetailManagementModal({
               {/* TAB 3: LATENESS HISTORY & CLEAR LATE */}
               {activeTab === 'LATE' && (
                 <div className="space-y-3">
+                  {!canEditStaffData && (
+                    <div className="p-3 bg-slate-800/60 border border-slate-700/80 rounded-2xl flex items-center space-x-2 text-xs text-amber-300 font-bold">
+                      <ShieldAlert className="w-4 h-4 text-amber-400 shrink-0" />
+                      <span>Mode Pengawas (Assistant Manager): Anda dalam mode Lihat Saja. Pembatalan status telat dan review alasan hanya dapat dilakukan oleh Operational Manager.</span>
+                    </div>
+                  )}
+
                   <div className="flex items-center justify-between text-xs font-black text-slate-400 px-1">
                     <span>Riwayat Keterlambatan ({lateRecords.length})</span>
-                    <span className="text-[10px] text-slate-500">Klik "Hapus Status Telat" untuk memaafkan/membatalkan sanksi</span>
+                    <span className="text-[10px] text-slate-500">{canEditStaffData ? 'Klik "Hapus Status Telat" untuk memaafkan/membatalkan sanksi' : 'Daftar riwayat keterlambatan staf'}</span>
                   </div>
 
                   {lateRecords.length === 0 ? (
@@ -954,55 +992,57 @@ export default function StaffDetailManagementModal({
                         )}
 
                         {/* Management Actions */}
-                        <div className="pt-2 border-t border-slate-800/80 flex flex-wrap items-center justify-end gap-2">
-                          <button
-                            type="button"
-                            onClick={() => handleOpenActionModal({
-                              type: 'CLEAR_LATE',
-                              id: rec.shift_id,
-                              title: 'Hapus Status Keterlambatan',
-                              description: `Hapus status keterlambatan (+${rec.late_minutes} menit) pada shift tanggal ${rec.date}? Poin penalti akan dipulihkan dan perubahan dicatat di log audit staf.`,
-                              defaultReason: 'Keterlambatan dibatalkan oleh Manajer'
-                            })}
-                            className="px-2.5 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 rounded-xl text-[11px] font-black transition flex items-center space-x-1 cursor-pointer"
-                            title="Hapus status telat dari shift ini"
-                          >
-                            <Trash2 className="w-3 h-3" />
-                            <span>Hapus Status Telat</span>
-                          </button>
+                        {canEditStaffData && (
+                          <div className="pt-2 border-t border-slate-800/80 flex flex-wrap items-center justify-end gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handleOpenActionModal({
+                                type: 'CLEAR_LATE',
+                                id: rec.shift_id,
+                                title: 'Hapus Status Keterlambatan',
+                                description: `Hapus status keterlambatan (+${rec.late_minutes} menit) pada shift tanggal ${rec.date}? Poin penalti akan dipulihkan dan perubahan dicatat di log audit staf.`,
+                                defaultReason: 'Keterlambatan dibatalkan oleh Manajer'
+                              })}
+                              className="px-2.5 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 rounded-xl text-[11px] font-black transition flex items-center space-x-1 cursor-pointer"
+                              title="Hapus status telat dari shift ini"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                              <span>Hapus Status Telat</span>
+                            </button>
 
-                          <button
-                            type="button"
-                            onClick={() => handleOpenActionModal({
-                              type: 'REVIEW_LATE',
-                              id: rec.shift_id,
-                              title: rec.late_status === 'APPROVED' ? 'Tolak Keterlambatan' : 'Setujui (ACC) Keterlambatan',
-                              description: `Ubah status review keterlambatan tanggal ${rec.date} menjadi ${rec.late_status === 'APPROVED' ? 'DITOLAK' : 'DI-ACC'}?`,
-                              defaultReason: rec.late_status === 'APPROVED' ? 'Alasan ditolak oleh Manajer' : 'Di-ACC dan dimaafkan oleh Manajer',
-                              extra: { action: rec.late_status === 'APPROVED' ? 'REJECT' : 'APPROVE' }
-                            })}
-                            className="px-2.5 py-1.5 bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/30 rounded-xl text-[11px] font-black transition flex items-center space-x-1 cursor-pointer"
-                          >
-                            <Edit3 className="w-3 h-3" />
-                            <span>{rec.late_status === 'APPROVED' ? 'Ubah: Tolak' : 'Ubah: ACC'}</span>
-                          </button>
+                            <button
+                              type="button"
+                              onClick={() => handleOpenActionModal({
+                                type: 'REVIEW_LATE',
+                                id: rec.shift_id,
+                                title: rec.late_status === 'APPROVED' ? 'Tolak Keterlambatan' : 'Setujui (ACC) Keterlambatan',
+                                description: `Ubah status review keterlambatan tanggal ${rec.date} menjadi ${rec.late_status === 'APPROVED' ? 'DITOLAK' : 'DI-ACC'}?`,
+                                defaultReason: rec.late_status === 'APPROVED' ? 'Alasan ditolak oleh Manajer' : 'Di-ACC dan dimaafkan oleh Manajer',
+                                extra: { action: rec.late_status === 'APPROVED' ? 'REJECT' : 'APPROVE' }
+                              })}
+                              className="px-2.5 py-1.5 bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/30 rounded-xl text-[11px] font-black transition flex items-center space-x-1 cursor-pointer"
+                            >
+                              <Edit3 className="w-3 h-3" />
+                              <span>{rec.late_status === 'APPROVED' ? 'Ubah: Tolak' : 'Ubah: ACC'}</span>
+                            </button>
 
-                          <button
-                            type="button"
-                            onClick={() => handleOpenActionModal({
-                              type: 'DELETE_SHIFT',
-                              id: rec.shift_id,
-                              title: 'Hapus Riwayat Shift',
-                              description: `Hapus permanen seluruh data shift tanggal ${rec.date} ini? Tindakan ini akan menghapus log presensi dari database.`,
-                              defaultReason: 'Shift salah input/dihapus oleh Manajer'
-                            })}
-                            className="px-2.5 py-1.5 bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/30 rounded-xl text-[11px] font-black transition flex items-center space-x-1 cursor-pointer"
-                            title="Hapus permanen shift ini"
-                          >
-                            <Trash2 className="w-3 h-3 text-rose-400" />
-                            <span>Hapus Shift</span>
-                          </button>
-                        </div>
+                            <button
+                              type="button"
+                              onClick={() => handleOpenActionModal({
+                                type: 'DELETE_SHIFT',
+                                id: rec.shift_id,
+                                title: 'Hapus Riwayat Shift',
+                                description: `Hapus permanen seluruh data shift tanggal ${rec.date} ini? Tindakan ini akan menghapus log presensi dari database.`,
+                                defaultReason: 'Shift salah input/dihapus oleh Manajer'
+                              })}
+                              className="px-2.5 py-1.5 bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/30 rounded-xl text-[11px] font-black transition flex items-center space-x-1 cursor-pointer"
+                              title="Hapus permanen shift ini"
+                            >
+                              <Trash2 className="w-3 h-3 text-rose-400" />
+                              <span>Hapus Shift</span>
+                            </button>
+                          </div>
+                        )}
                       </div>
                     ))
                   )}
@@ -1012,9 +1052,16 @@ export default function StaffDetailManagementModal({
               {/* TAB 4: LEAVE & CUTI */}
               {activeTab === 'LEAVE' && (
                 <div className="space-y-3">
+                  {!canEditStaffData && (
+                    <div className="p-3 bg-slate-800/60 border border-slate-700/80 rounded-2xl flex items-center space-x-2 text-xs text-amber-300 font-bold">
+                      <ShieldAlert className="w-4 h-4 text-amber-400 shrink-0" />
+                      <span>Mode Pengawas (Assistant Manager): Anda dalam mode Lihat Saja. Penghapusan riwayat izin / cuti hanya dapat dilakukan oleh Operational Manager.</span>
+                    </div>
+                  )}
+
                   <div className="flex items-center justify-between text-xs font-black text-slate-400 px-1">
                     <span>Riwayat Izin &amp; Cuti ({absenceRecords.length})</span>
-                    <span className="text-[10px] text-slate-500">Hapus izin jika dibatalkan staf atau salah pengajuan</span>
+                    <span className="text-[10px] text-slate-500">{canEditStaffData ? 'Hapus izin jika dibatalkan staf atau salah pengajuan' : 'Daftar riwayat izin staf'}</span>
                   </div>
 
                   {absenceRecords.length === 0 ? (
@@ -1058,7 +1105,7 @@ export default function StaffDetailManagementModal({
                           </div>
                         )}
 
-                        {rec.type === 'LEAVE' && (
+                        {canEditStaffData && rec.type === 'LEAVE' && (
                           <div className="pt-2 border-t border-slate-800/80 flex items-center justify-end">
                             <button
                               type="button"

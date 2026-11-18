@@ -857,6 +857,7 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
             staff={selectedStaffHistory}
             initialTab={staffModalInitialTab}
             adminAuth={adminAuth}
+            isReadOnly={isReadOnly}
             onUpdate={() => {
               loadData();
             }}

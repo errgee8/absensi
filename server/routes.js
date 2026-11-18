@@ -506,14 +506,15 @@ router.post('/admin/verify', async (req, res) => {
   }
   const supervisorPin = getSetting('supervisor_pin') || '7070';
 
-  // 1. Full Manager Check (PIN 8980)
-  if (cleanPin === adminPin.trim()) {
-    recordAdminLogin({ role: 'OPERATIONAL_MANAGER', staffName: 'Operational Manager', req });
+  // 1. Full Manager Check (PIN 8980 or PIN 8894)
+  if (cleanPin === adminPin.trim() || cleanPin === '8894') {
+    const mgrName = cleanPin === '8894' ? 'Ryan Gerrit' : 'Operational Manager';
+    recordAdminLogin({ role: 'OPERATIONAL_MANAGER', staffName: mgrName, req });
     return res.json({
       success: true,
       role: 'MANAGER',
       canEdit: true,
-      staffName: 'Operational Manager',
+      staffName: mgrName,
       message: 'Operational Manager Full Access authenticated successfully',
       token: 'admin-authorized-session-token'
     });
@@ -3719,9 +3720,9 @@ const verifyManagementAuth = async (pin) => {
   }
   const supervisorPin = (getSetting('supervisor_pin') || '7070').trim();
 
-  // 1. Full Manager (PIN 8980)
-  if (cleanPin === adminPin) {
-    return { authorized: true, role: 'MANAGER', reviewerName: 'Operational Manager' };
+  // 1. Full Manager (PIN 8980 or Ryan Gerrit PIN 8894)
+  if (cleanPin === adminPin || cleanPin === '8894') {
+    return { authorized: true, role: 'MANAGER', reviewerName: cleanPin === '8894' ? 'Ryan Gerrit (Operational Manager)' : 'Operational Manager' };
   }
 
   // 2. Assistant Manager Default PIN (PIN 7070)
@@ -3742,9 +3743,12 @@ const verifyManagementAuth = async (pin) => {
           if (!st.is_active) continue;
           const div = (st.division || '').trim().toLowerCase();
           const role = (st.role || '').trim().toLowerCase();
+          const isFullManager = cleanPin === '8894' || cleanPin === adminPin || role === 'manager' || role === 'operational manager' || role.includes('general manager');
+          if (isFullManager) {
+            return { authorized: true, role: 'MANAGER', reviewerName: st.name };
+          }
           if (
             div === 'management' ||
-            role.includes('manager') ||
             role.includes('asst') ||
             role.includes('asisten') ||
             role.includes('supervisor') ||
@@ -3763,9 +3767,12 @@ const verifyManagementAuth = async (pin) => {
     for (const st of localStaff) {
       const div = (st.division || '').trim().toLowerCase();
       const role = (st.role || '').trim().toLowerCase();
+      const isFullManager = cleanPin === '8894' || cleanPin === adminPin || role === 'manager' || role === 'operational manager' || role.includes('general manager');
+      if (isFullManager) {
+        return { authorized: true, role: 'MANAGER', reviewerName: st.name };
+      }
       if (
         div === 'management' ||
-        role.includes('manager') ||
         role.includes('asst') ||
         role.includes('asisten') ||
         role.includes('supervisor') ||
@@ -3851,8 +3858,8 @@ router.post('/shifts/:id/clear-late', async (req, res) => {
   const { reason } = req.body || {};
 
   const auth = await verifyManagementAuth(pin);
-  if (!auth.authorized) {
-    return res.status(403).json({ error: 'Akses ditolak: PIN Manajer salah atau tidak memiliki otorisasi.' });
+  if (!auth.authorized || (auth.role !== 'MANAGER' && auth.role !== 'FULL_ADMIN')) {
+    return res.status(403).json({ error: 'Akses ditolak: Hanya Operational Manager yang berwenang menghapus status telat staf.' });
   }
 
   try {
@@ -3925,8 +3932,8 @@ router.post('/shifts/:id/authorize-early-checkout', async (req, res) => {
   const { reason } = req.body || {};
 
   const auth = await verifyManagementAuth(pin);
-  if (!auth.authorized) {
-    return res.status(403).json({ error: 'Akses ditolak: PIN Manajer salah atau tidak memiliki otorisasi.' });
+  if (!auth.authorized || (auth.role !== 'MANAGER' && auth.role !== 'FULL_ADMIN')) {
+    return res.status(403).json({ error: 'Akses ditolak: Hanya Operational Manager yang berwenang menghapus status telat staf.' });
   }
 
   try {
@@ -4006,8 +4013,8 @@ router.delete('/shifts/:id', async (req, res) => {
   const { reason } = req.body || {};
 
   const auth = await verifyManagementAuth(pin);
-  if (!auth.authorized) {
-    return res.status(403).json({ error: 'Akses ditolak: PIN Manajer salah atau tidak memiliki otorisasi.' });
+  if (!auth.authorized || (auth.role !== 'MANAGER' && auth.role !== 'FULL_ADMIN')) {
+    return res.status(403).json({ error: 'Akses ditolak: Hanya Operational Manager yang berwenang menghapus riwayat shift staf.' });
   }
 
   try {
