@@ -54,6 +54,9 @@ export default function StaffView({
   const [unreadAnnouncementsCount, setUnreadAnnouncementsCount] = useState(0);
   const [announcementModalOpen, setAnnouncementModalOpen] = useState(false);
   const [announcementInitialView, setAnnouncementInitialView] = useState('AUTO'); // 'AUTO' | 'LIST' | 'DETAIL'
+  const [publicAnnouncements, setPublicAnnouncements] = useState([]);
+  const [publicAnnouncementModalOpen, setPublicAnnouncementModalOpen] = useState(false);
+  const [selectedPublicAnnouncement, setSelectedPublicAnnouncement] = useState(null);
   const [showNotificationPrompt, setShowNotificationPrompt] = useState(false);
   const [leaveUpdateCount, setLeaveUpdateCount] = useState(0);
 
@@ -148,9 +151,9 @@ export default function StaffView({
         setStaffPointCycleLabel(pointsRes.currentCycle?.label || '');
       }
 
-      // If there is any unread URGENT announcement, auto-open pop-up modal so staff sees it immediately!
-      const hasUrgentUnread = unreadAnns.some(a => a.urgency === 'URGENT');
-      if (hasUrgentUnread) {
+      // If there is any unread announcement, auto-open pop-up modal so staff sees it immediately!
+      if (unreadAnns.length > 0) {
+        setAnnouncementInitialView(unreadAnns.some(a => a.urgency === 'URGENT') ? 'DETAIL' : 'LIST');
         setAnnouncementModalOpen(true);
       }
 
@@ -179,6 +182,22 @@ export default function StaffView({
     }
   };
 
+  // Load public announcements for kiosk login screen banner
+  const loadPublicAnnouncements = async () => {
+    try {
+      const data = await getAnnouncements({ activeOnly: true });
+      if (Array.isArray(data)) {
+        setPublicAnnouncements(data);
+      }
+    } catch (e) {
+      console.warn('Failed to load public announcements:', e);
+    }
+  };
+
+  useEffect(() => {
+    loadPublicAnnouncements();
+  }, []);
+
   useEffect(() => {
     if (loggedInStaff) {
       loadStaffNotifications(loggedInStaff);
@@ -188,6 +207,9 @@ export default function StaffView({
   // Realtime subscription for announcements, leave requests, and points
   useEffect(() => {
     const unsubscribe = subscribeRealtimeEvents((eventType) => {
+      if (eventType === 'ANNOUNCEMENT_UPDATE') {
+        loadPublicAnnouncements();
+      }
       if ((eventType === 'ANNOUNCEMENT_UPDATE' || eventType === 'ANNOUNCEMENT_READ' || eventType === 'LEAVE_UPDATE' || eventType === 'POINT_UPDATE') && loggedInStaff) {
         loadStaffNotifications(loggedInStaff);
       }
@@ -414,6 +436,11 @@ export default function StaffView({
           loading={loading}
           error={error}
           directToiletLocation={directToiletLocation}
+          publicAnnouncements={publicAnnouncements}
+          onOpenAnnouncement={(ann) => {
+            setSelectedPublicAnnouncement(ann);
+            setPublicAnnouncementModalOpen(true);
+          }}
         />
       )}
 
@@ -602,6 +629,22 @@ export default function StaffView({
           staff={loggedInStaff}
           initialView={announcementInitialView}
           onAcknowledge={handleAcknowledgeAnnouncement}
+        />
+      )}
+
+      {/* Public Announcement Modal for Login Screen */}
+      {publicAnnouncementModalOpen && (
+        <StaffAnnouncementModal
+          isOpen={publicAnnouncementModalOpen}
+          onClose={() => setPublicAnnouncementModalOpen(false)}
+          announcements={
+            selectedPublicAnnouncement
+              ? [selectedPublicAnnouncement, ...publicAnnouncements.filter((a) => a.id !== selectedPublicAnnouncement.id)]
+              : publicAnnouncements
+          }
+          staff={null}
+          initialView={selectedPublicAnnouncement ? 'DETAIL' : 'LIST'}
+          isPublicView={true}
         />
       )}
 

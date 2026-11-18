@@ -17,9 +17,10 @@ import {
   ArrowRight,
   Image as ImageIcon,
   Camera,
-  Trash2
+  Trash2,
+  Send
 } from 'lucide-react';
-import { getAnnouncements, createAnnouncement, updateAnnouncement, getAnnouncementReaders } from '../../utils/api';
+import { getAnnouncements, createAnnouncement, updateAnnouncement, getAnnouncementReaders, resendAnnouncementPush } from '../../utils/api';
 import { formatWitaDateTime } from '../../utils/time';
 import ZoomableImage from '../Common/ZoomableImage';
 import { showToast } from '../Common/Toast';
@@ -83,6 +84,28 @@ export default function AnnouncementManagementModal({
 
   // Operational Manager full privilege check
   const isManager = adminAuth?.role === 'FULL_ADMIN' || adminAuth?.role === 'MANAGER' || adminAuth?.pin === '8980' || !isReadOnly;
+  const [sendingPushId, setSendingPushId] = useState(null);
+
+  const handleResendPush = async (ann) => {
+    if (!isManager) {
+      showToast('Hanya Operational Manager yang berwenang mengirim notifikasi push.', 'warning');
+      return;
+    }
+    const effectivePin = (pin || adminAuth?.pin || (adminAuth?.role === 'MANAGER' ? '8980' : '')).trim();
+    if (!effectivePin) {
+      showToast('Silakan masukkan PIN Operational Manager untuk otorisasi.', 'warning');
+      return;
+    }
+    setSendingPushId(ann.id);
+    try {
+      const res = await resendAnnouncementPush(ann.id, effectivePin);
+      showToast(res.message || 'Notifikasi push berhasil dikirim ke seluruh HP staf!', 'success');
+    } catch (err) {
+      showToast(err.message || 'Gagal mengirim notifikasi push.', 'error');
+    } finally {
+      setSendingPushId(null);
+    }
+  };
 
   const loadData = async () => {
     setLoading(true);
@@ -410,7 +433,24 @@ export default function AnnouncementManagementModal({
                         </span>
                       </div>
 
-                      <div className="flex items-center space-x-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        {isManager && (
+                          <button
+                            type="button"
+                            onClick={() => handleResendPush(ann)}
+                            disabled={sendingPushId === ann.id}
+                            className="px-3 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-900 border border-blue-300 text-xs font-black transition flex items-center space-x-1 cursor-pointer disabled:opacity-50"
+                            title="Kirim ulang notifikasi push ke seluruh HP staf yang terdaftar"
+                          >
+                            {sendingPushId === ann.id ? (
+                              <RefreshCw className="w-3.5 h-3.5 animate-spin text-blue-600" />
+                            ) : (
+                              <Send className="w-3.5 h-3.5 text-blue-600" />
+                            )}
+                            <span>{sendingPushId === ann.id ? 'Mengirim...' : 'Kirim Push HP'}</span>
+                          </button>
+                        )}
+
                         <button
                           type="button"
                           onClick={() => handleOpenReaders(ann)}
@@ -702,6 +742,22 @@ export default function AnnouncementManagementModal({
                   </span>
                 </div>
                 <div className="flex items-center space-x-2">
+                  {isManager && (
+                    <button
+                      type="button"
+                      onClick={() => handleResendPush(selectedAnnouncement)}
+                      disabled={sendingPushId === selectedAnnouncement?.id}
+                      className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-black text-xs transition flex items-center space-x-1.5 shadow-md shadow-blue-600/30 cursor-pointer disabled:opacity-50"
+                      title="Kirim notifikasi push ke seluruh HP staf"
+                    >
+                      {sendingPushId === selectedAnnouncement?.id ? (
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <Send className="w-3.5 h-3.5" />
+                      )}
+                      <span>{sendingPushId === selectedAnnouncement?.id ? 'Mengirim...' : 'Kirim Push ke HP'}</span>
+                    </button>
+                  )}
                   <div className="px-3 py-1.5 rounded-xl bg-emerald-100 text-emerald-950 border border-emerald-300 font-black text-xs text-center">
                     <div>{readersReport?.read_count || 0} / {readersReport?.total_active_staff || 0}</div>
                     <div className="text-[9px] uppercase tracking-wider text-emerald-800">Membaca ({readersReport?.percentage || 0}%)</div>

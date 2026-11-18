@@ -27,7 +27,8 @@ export default function StaffAnnouncementModal({
   announcements = [],
   staff,
   onAcknowledge,
-  initialView = 'AUTO' // 'AUTO' | 'LIST' | 'DETAIL'
+  initialView = 'AUTO', // 'AUTO' | 'LIST' | 'DETAIL'
+  isPublicView = false
 }) {
   if (!isOpen || !announcements || announcements.length === 0) return null;
 
@@ -462,31 +463,37 @@ export default function StaffAnnouncementModal({
           <button
             type="button"
             onClick={onClose}
-            className="py-2.5 px-4 bg-white hover:bg-slate-200 border border-slate-300 rounded-xl text-xs font-black text-slate-800 transition"
+            className="py-2.5 px-4 bg-white hover:bg-slate-200 border border-slate-300 rounded-xl text-xs font-black text-slate-800 transition cursor-pointer"
           >
             Tutup
           </button>
 
-          {viewMode === 'DETAIL' && !isRead && (
+          {!isPublicView && viewMode === 'DETAIL' && !isRead && onAcknowledge && (
             <button
               type="button"
               disabled={submitting}
               onClick={handleConfirm}
-              className="flex-1 py-3 px-4 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-md shadow-emerald-600/30 transition flex items-center justify-center space-x-2"
+              className="flex-1 py-3 px-4 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-md shadow-emerald-600/30 transition flex items-center justify-center space-x-2 cursor-pointer"
             >
               <Check className="w-4 h-4 stroke-[3]" />
               <span>{submitting ? 'Menyimpan...' : 'Saya Mengerti & Menyetujui'}</span>
             </button>
           )}
 
-          {viewMode === 'LIST' && totalUnread > 0 && (
+          {isPublicView && (
+            <div className="text-[11px] font-bold text-slate-500 text-right flex-1 pr-2">
+              Masuk dengan PIN Anda untuk mencatat konfirmasi baca resmi.
+            </div>
+          )}
+
+          {!isPublicView && viewMode === 'LIST' && totalUnread > 0 && (
             <button
               type="button"
               onClick={() => {
-                const firstUnread = announcements.findIndex(a => !a.isRead);
+                const firstUnread = announcements.findIndex((a) => !a.isRead);
                 if (firstUnread >= 0) handleOpenDetail(firstUnread);
               }}
-              className="flex-1 py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-md shadow-blue-600/30 transition flex items-center justify-center space-x-2"
+              className="flex-1 py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-md shadow-blue-600/30 transition flex items-center justify-center space-x-2 cursor-pointer"
             >
               <span>Baca &amp; Setujui ({totalUnread} Belum)</span>
               <ChevronRight className="w-4 h-4" />

@@ -4669,16 +4669,38 @@ router.post('/announcements', async (req, res) => {
 
     // Send Web Push notification to all staff (if enabled in settings)
     const notifyAnnouncementsEnabled = getSetting('notify_announcements') !== 0 && getSetting('notify_announcements') !== 'false';
+    let pushResult = { sentCount: 0 };
     if (notifyAnnouncementsEnabled) {
       try {
         const urgencyTag = newAnnouncement.urgency === 'URGENT' ? '🚨 [URGENT] ' : '📢 ';
-        sendPushNotification({
-          staffIds: 'ALL',
-          title: `${urgencyTag}Pengumuman Management: ${newAnnouncement.title}`,
-          body: newAnnouncement.content.slice(0, 120) + (newAnnouncement.content.length > 120 ? '...' : ''),
-          url: '/',
-          tag: `announcement_${newAnnouncement.id}`
-        }).catch(errPush => console.warn('Push error:', errPush.message));
+
+        let targetStaffIds = 'ALL';
+        if (newAnnouncement.target_venue && newAnnouncement.target_venue !== 'ALL') {
+          try {
+            let staffList = [];
+            if (isSupabaseConfigured) {
+              staffList = await cloudDb.getStaff(newAnnouncement.target_venue);
+            } else {
+              staffList = db.prepare('SELECT id FROM staff WHERE is_active = 1').all();
+            }
+            if (Array.isArray(staffList) && staffList.length > 0) {
+              targetStaffIds = staffList.map((s) => String(s.id || s.code || s.uuid)).filter(Boolean);
+            }
+          } catch {}
+        }
+
+        // Await push delivery with a timeout so Vercel serverless does not terminate prematurely
+        pushResult = await Promise.race([
+          sendPushNotification({
+            staffIds: targetStaffIds,
+            title: `${urgencyTag}Pengumuman Management: ${newAnnouncement.title}`,
+            body: newAnnouncement.content.slice(0, 120) + (newAnnouncement.content.length > 120 ? '...' : ''),
+            url: '/',
+            tag: `announcement_${newAnnouncement.id}`
+          }),
+          new Promise((resolve) => setTimeout(() => resolve({ sentCount: 0, timeout: true }), 4500))
+        ]);
+        console.log(`Push notification sent to ${pushResult?.sentCount || 0} staff devices for announcement: ${newAnnouncement.title}`);
       } catch (e) {
         console.warn('Push dispatch error for announcement:', e.message);
       }
@@ -4686,7 +4708,8 @@ router.post('/announcements', async (req, res) => {
 
     return res.json({
       success: true,
-      message: 'Pengumuman resmi berhasil diterbitkan.',
+      message: `Pengumuman resmi berhasil diterbitkan. Notifikasi push terkirim ke ${pushResult?.sentCount || 0} perangkat staf.`,
+      pushSentCount: pushResult?.sentCount || 0,
       announcement: newAnnouncement
     });
   } catch (err) {
@@ -4893,6 +4916,71 @@ router.get('/announcements/:id/readers', async (req, res) => {
   } catch (err) {
     console.error('Error fetching announcement readers:', err);
     return res.status(500).json({ error: 'Gagal memuat laporan pembaca: ' + err.message });
+  }
+});
+
+// Re-send Web Push Notification for an Announcement (Operational Manager Only)
+router.post('/announcements/:id/send-push', async (req, res) => {
+  const { id } = req.params;
+  const pin = req.body?.pin || req.headers['x-manager-pin'];
+
+  const auth = await verifyManagementAuth(pin);
+  if (!auth.authorized || (auth.role !== 'FULL_ADMIN' && auth.role !== 'MANAGER')) {
+    return res.status(403).json({ error: 'Akses ditolak: Hanya Operational Manager yang berwenang mengirim notifikasi push.' });
+  }
+
+  try {
+    let announcement = null;
+    if (isSupabaseConfigured) {
+      const anns = await cloudDb.getAnnouncements();
+      announcement = anns.find((a) => String(a.id) === String(id));
+    }
+    if (!announcement) {
+      try {
+        announcement = db.prepare('SELECT * FROM announcements WHERE id = ?').get(id);
+      } catch {}
+    }
+    if (!announcement) {
+      return res.status(404).json({ error: 'Pengumuman tidak ditemukan.' });
+    }
+
+    const urgencyTag = announcement.urgency === 'URGENT' ? '🚨 [URGENT] ' : '📢 ';
+    let targetStaffIds = 'ALL';
+    if (announcement.target_venue && announcement.target_venue !== 'ALL') {
+      try {
+        let staffList = [];
+        if (isSupabaseConfigured) {
+          staffList = await cloudDb.getStaff(announcement.target_venue);
+        } else {
+          staffList = db.prepare('SELECT id FROM staff WHERE is_active = 1').all();
+        }
+        if (Array.isArray(staffList) && staffList.length > 0) {
+          targetStaffIds = staffList.map((s) => String(s.id || s.code || s.uuid)).filter(Boolean);
+        }
+      } catch {}
+    }
+
+    const pushResult = await Promise.race([
+      sendPushNotification({
+        staffIds: targetStaffIds,
+        title: `${urgencyTag}Pengumuman Management: ${announcement.title}`,
+        body: announcement.content.slice(0, 120) + (announcement.content.length > 120 ? '...' : ''),
+        url: '/',
+        tag: `announcement_${announcement.id}`
+      }),
+      new Promise((resolve) => setTimeout(() => resolve({ sentCount: 0, timeout: true }), 4500))
+    ]);
+
+    broadcastEvent('ANNOUNCEMENT_UPDATE', { action: 'PUSH_RESENT', announcementId: id });
+
+    return res.json({
+      success: true,
+      message: `Notifikasi push berhasil dikirim ke ${pushResult?.sentCount || 0} perangkat HP staf.`,
+      sentCount: pushResult?.sentCount || 0
+    });
+  } catch (err) {
+    console.error('Error resending push notification:', err);
+    return res.status(500).json({ error: 'Gagal mengirim push notifikasi: ' + err.message });
   }
 });
 

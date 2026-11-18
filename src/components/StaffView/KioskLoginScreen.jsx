@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Lock, Delete, AlertCircle, Loader2, Trophy, Clock, QrCode } from 'lucide-react';
+import { Lock, Delete, AlertCircle, Loader2, Trophy, Clock, QrCode, Megaphone } from 'lucide-react';
 
 export default function KioskLoginScreen({
   pin,
@@ -9,7 +9,9 @@ export default function KioskLoginScreen({
   onOpenLeaderboard,
   loading,
   error,
-  directToiletLocation
+  directToiletLocation,
+  publicAnnouncements = [],
+  onOpenAnnouncement
 }) {
   const [liveTime, setLiveTime] = useState(() => new Date());
 
@@ -113,6 +115,47 @@ export default function KioskLoginScreen({
           </span>
         </div>
       </div>
+
+      {/* Active Management Announcement Banner (Public Bulletin) */}
+      {publicAnnouncements && publicAnnouncements.length > 0 && (
+        <div
+          onClick={() => onOpenAnnouncement && onOpenAnnouncement(publicAnnouncements[0])}
+          className="w-full mb-4 p-3.5 rounded-3xl bg-gradient-to-r from-rose-500/25 via-amber-500/20 to-rose-500/25 hover:from-rose-500/35 hover:to-amber-500/30 border-2 border-amber-400/60 shadow-xl shadow-amber-950/30 cursor-pointer transition-all active:scale-[0.98] group animate-fade-in"
+        >
+          <div className="flex items-center justify-between gap-2.5">
+            <div className="flex items-center space-x-3 text-left min-w-0">
+              <div className="w-10 h-10 rounded-2xl bg-amber-400 text-slate-950 flex items-center justify-center shrink-0 shadow-md shadow-amber-400/40 animate-pulse">
+                <Megaphone className="w-5 h-5 stroke-[2.5]" />
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center space-x-1.5 flex-wrap">
+                  <span className={`px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider ${
+                    publicAnnouncements[0].urgency === 'URGENT'
+                      ? 'bg-rose-500 text-white animate-pulse'
+                      : 'bg-amber-400 text-slate-950'
+                  }`}>
+                    {publicAnnouncements[0].urgency === 'URGENT' ? '🚨 PENTING / URGENT' : '📢 PENGUMUMAN MANAJEMEN'}
+                  </span>
+                  {publicAnnouncements.length > 1 && (
+                    <span className="text-[10px] text-amber-300 font-bold">
+                      +{publicAnnouncements.length - 1} lainnya
+                    </span>
+                  )}
+                </div>
+                <div className="text-xs font-black text-white truncate mt-1 group-hover:text-amber-300 transition">
+                  {publicAnnouncements[0].title}
+                </div>
+                <div className="text-[10.5px] text-slate-300 line-clamp-1 mt-0.5">
+                  {publicAnnouncements[0].content}
+                </div>
+              </div>
+            </div>
+            <span className="px-3 py-1.5 rounded-xl bg-amber-400 group-hover:bg-amber-300 text-slate-950 text-xs font-black shrink-0 transition shadow-md shadow-amber-400/20">
+              Baca →
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* Luxurious Real-time Leaderboard Teaser Banner */}
       {onOpenLeaderboard && (

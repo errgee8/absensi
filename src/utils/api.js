@@ -374,6 +374,17 @@ export async function getAnnouncementReaders(id) {
   return data;
 }
 
+export async function resendAnnouncementPush(id, pin) {
+  const res = await fetch(`${API_BASE}/announcements/${encodeURIComponent(id)}/send-push`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ pin: String(pin || '').trim() })
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Gagal mengirim ulang notifikasi push');
+  return data;
+}
+
 export function subscribeRealtimeEvents(onEvent) {
   // Use direct Supabase Realtime WebSocket (Zero Vercel serverless function invocation)
   if (isSupabaseClientConfigured && supabase) {

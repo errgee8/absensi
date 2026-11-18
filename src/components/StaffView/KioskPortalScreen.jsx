@@ -829,6 +829,55 @@ export default function KioskPortalScreen({
               </span>
             </button>
           )}
+
+          {/* Top Priority Announcement Strip */}
+          {unreadAnnouncementsCount > 0 ? (
+            <button
+              type="button"
+              onClick={onOpenAnnouncements}
+              className="w-full mt-2 bg-gradient-to-r from-amber-500/25 via-amber-500/15 to-amber-600/25 hover:from-amber-500/35 hover:to-amber-600/35 border-2 border-amber-400/60 rounded-2xl px-3 py-2.5 flex items-center justify-between gap-2.5 text-left transition-all shadow-lg shadow-amber-500/10 cursor-pointer animate-pulse"
+            >
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-7 h-7 rounded-xl bg-amber-400 text-slate-950 flex items-center justify-center shrink-0 font-black shadow">
+                  <Megaphone className="w-4 h-4 stroke-[2.5]" />
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[11.5px] font-black text-amber-200">PENGUMUMAN BARU</span>
+                    <span className="px-1.5 py-0.2 rounded-full bg-amber-400 text-slate-950 text-[9px] font-black">
+                      {unreadAnnouncementsCount} Belum Dibaca
+                    </span>
+                  </div>
+                  <div className="text-[10.5px] font-medium text-slate-200 truncate mt-0.5">
+                    {latestAnnouncementTitle}
+                  </div>
+                </div>
+              </div>
+              <span className="px-2.5 py-1 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-[10.5px] font-black shrink-0 transition">
+                Buka →
+              </span>
+            </button>
+          ) : announcements && announcements.length > 0 ? (
+            <button
+              type="button"
+              onClick={onOpenAnnouncements}
+              className="w-full mt-2 bg-[#141822] hover:bg-[#1a202c] border border-white/10 rounded-2xl px-3 py-1.5 flex items-center justify-between gap-2 text-left transition cursor-pointer"
+            >
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="w-5 h-5 rounded-lg bg-amber-500/20 text-amber-300 flex items-center justify-center shrink-0">
+                  <Megaphone className="w-3 h-3" />
+                </div>
+                <div className="min-w-0">
+                  <span className="text-[10.5px] font-bold text-slate-300 truncate block">
+                    📢 {latestAnnouncementTitle}
+                  </span>
+                </div>
+              </div>
+              <span className="text-[9.5px] font-bold text-amber-300 shrink-0">
+                Lihat →
+              </span>
+            </button>
+          ) : null}
         </section>
 
         {/* =========================================================
