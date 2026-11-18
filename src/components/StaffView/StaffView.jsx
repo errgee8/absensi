@@ -130,12 +130,18 @@ export default function StaffView({
     if (!staff?.id) return;
     try {
       const [annData, leaveData, pointsRes] = await Promise.all([
-        getAnnouncements({ staffId: staff.id, venue: staff.venue, activeOnly: true }),
+        getAnnouncements({
+          staffId: staff.id,
+          staffUuid: staff.uuid || staff.id,
+          staffLegacyCode: staff.legacy_code || '',
+          venue: staff.venue,
+          activeOnly: true
+        }),
         getLeaveRequests({ staffId: staff.id }),
         getPoints({ staffId: staff.id, staffUuid: staff.uuid || '', cycleKey: 'CURRENT' }).catch(() => null)
       ]);
 
-      const annList = Array.isArray(annData) ? annData : [];
+      const annList = Array.isArray(annData) ? annData : (annData?.announcements || []);
       setAnnouncements(annList);
       const unreadAnns = annList.filter(a => !a.isRead);
       setUnreadAnnouncementsCount(unreadAnns.length);
@@ -186,9 +192,8 @@ export default function StaffView({
   const loadPublicAnnouncements = async () => {
     try {
       const data = await getAnnouncements({ activeOnly: true });
-      if (Array.isArray(data)) {
-        setPublicAnnouncements(data);
-      }
+      const list = Array.isArray(data) ? data : (data?.announcements || []);
+      setPublicAnnouncements(list);
     } catch (e) {
       console.warn('Failed to load public announcements:', e);
     }
@@ -231,7 +236,8 @@ export default function StaffView({
   const handleAcknowledgeAnnouncement = async (announcementId) => {
     if (!loggedInStaff) return;
     await acknowledgeAnnouncement(announcementId, {
-      staffId: loggedInStaff.id,
+      staffId: loggedInStaff.legacy_code || loggedInStaff.id,
+      staffUuid: loggedInStaff.uuid || loggedInStaff.id,
       staffName: loggedInStaff.name,
       venue: loggedInStaff.venue,
       division: loggedInStaff.division

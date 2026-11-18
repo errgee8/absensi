@@ -4521,7 +4521,7 @@ router.post('/leave-requests/:id/review', async (req, res) => {
 
 // Get Announcements (Staff & Manager)
 router.get('/announcements', async (req, res) => {
-  const { staffId, venue, activeOnly } = req.query;
+  const { staffId, staffUuid, staffLegacyCode, venue, activeOnly } = req.query;
 
   try {
     let announcements = [];
@@ -4568,9 +4568,17 @@ router.get('/announcements', async (req, res) => {
       });
     }
 
-    // If staffId is provided, attach reader info
+    // If staff identifier is provided, attach reader info
     const enriched = announcements.map(a => {
-      const staffRead = staffId ? reads.find(r => String(r.announcement_id) === String(a.id) && String(r.staff_id) === String(staffId)) : null;
+      const staffRead = staffId
+        ? reads.find(r =>
+            String(r.announcement_id) === String(a.id) &&
+            (String(r.staff_id) === String(staffId) ||
+              (staffUuid && String(r.staff_id) === String(staffUuid)) ||
+              (staffLegacyCode && String(r.staff_id) === String(staffLegacyCode)) ||
+              (r.staff_uuid && (String(r.staff_uuid) === String(staffId) || (staffUuid && String(r.staff_uuid) === String(staffUuid)))))
+          )
+        : null;
       const totalReads = reads.filter(r => String(r.announcement_id) === String(a.id)).length;
       let parsedImages = [];
       if (Array.isArray(a.images)) {

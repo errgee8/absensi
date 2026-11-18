@@ -112,7 +112,7 @@ export default function AnnouncementManagementModal({
     setError(null);
     try {
       const data = await getAnnouncements({ activeOnly: false });
-      setAnnouncements(data || []);
+      setAnnouncements(Array.isArray(data) ? data : (data?.announcements || []));
     } catch (e) {
       console.error('Failed to load announcements:', e);
       setError(e.message || 'Gagal memuat pengumuman');

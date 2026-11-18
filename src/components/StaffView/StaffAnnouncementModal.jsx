@@ -30,7 +30,30 @@ export default function StaffAnnouncementModal({
   initialView = 'AUTO', // 'AUTO' | 'LIST' | 'DETAIL'
   isPublicView = false
 }) {
-  if (!isOpen || !announcements || announcements.length === 0) return null;
+  if (!isOpen) return null;
+
+  if (!announcements || announcements.length === 0) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-md animate-fade-in text-slate-200">
+        <div className="bg-[#161b24] border border-slate-800 rounded-3xl max-w-sm w-full overflow-hidden shadow-2xl p-6 text-center space-y-4 animate-scale-up">
+          <div className="w-14 h-14 mx-auto rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
+            <Megaphone className="w-7 h-7" />
+          </div>
+          <div>
+            <h3 className="text-base font-black text-white">Tidak Ada Pengumuman Aktif</h3>
+            <p className="text-xs text-slate-400 mt-1">Saat ini belum ada pengumuman operasional baru dari manajemen.</p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold transition cursor-pointer"
+          >
+            Tutup
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const [viewMode, setViewMode] = useState('LIST'); // 'LIST' | 'DETAIL'

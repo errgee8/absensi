@@ -309,29 +309,95 @@ export async function getAnnouncements(params = {}) {
   // Direct client read from Supabase to bypass serverless execution
   if (isSupabaseClientConfigured) {
     try {
-      const data = await fetchSettingFromSupabase('management_announcements');
-      if (Array.isArray(data)) {
-        let list = data;
+      const [annData, readsData] = await Promise.all([
+        fetchSettingFromSupabase('management_announcements'),
+        params.staffId ? fetchSettingFromSupabase('announcement_reads') : Promise.resolve([])
+      ]);
+
+      if (Array.isArray(annData)) {
+        let list = annData;
+        const nowTs = Date.now();
+
+        // 1. Filter by active status and expiration
         if (params.activeOnly !== false && params.activeOnly !== 'false') {
-          list = list.filter((a) => a.is_active !== false);
+          list = list.filter((a) => {
+            if (a.is_active === false || a.is_active === 0) return false;
+            if (a.expires_at) {
+              const expTs = new Date(a.expires_at).getTime();
+              if (!isNaN(expTs) && nowTs > expTs) return false;
+            }
+            return true;
+          });
         }
+
+        // 2. Filter by target venue
         if (params.venue && params.venue !== 'ALL') {
-          list = list.filter((a) => !a.target_venue || a.target_venue === 'ALL' || a.target_venue === params.venue);
+          const vLow = params.venue.toLowerCase();
+          list = list.filter((a) => {
+            if (!a.target_venue || a.target_venue === 'ALL') return true;
+            const tLow = a.target_venue.toLowerCase();
+            if (tLow === vLow) return true;
+            if (vLow.includes('jp') && tLow.includes('jp')) return true;
+            if (vLow.includes('lucky') && tLow.includes('lucky')) return true;
+            return false;
+          });
         }
-        return { success: true, announcements: list };
+
+        const reads = Array.isArray(readsData) ? readsData : [];
+        const staffIdStr = params.staffId ? String(params.staffId) : '';
+        const staffUuidStr = params.staffUuid ? String(params.staffUuid) : '';
+        const staffLegacyCodeStr = params.staffLegacyCode ? String(params.staffLegacyCode) : '';
+
+        // 3. Enrich with isRead, totalReads, images
+        const enriched = list.map((a) => {
+          const staffRead = staffIdStr
+            ? reads.find(
+                (r) =>
+                  String(r.announcement_id) === String(a.id) &&
+                  (String(r.staff_id) === staffIdStr ||
+                    (staffUuidStr && String(r.staff_id) === staffUuidStr) ||
+                    (staffLegacyCodeStr && String(r.staff_id) === staffLegacyCodeStr) ||
+                    (r.staff_uuid && (String(r.staff_uuid) === staffIdStr || (staffUuidStr && String(r.staff_uuid) === staffUuidStr))))
+              )
+            : null;
+          const totalReads = reads.filter((r) => String(r.announcement_id) === String(a.id)).length;
+          let parsedImages = [];
+          if (Array.isArray(a.images)) {
+            parsedImages = a.images;
+          } else if (typeof a.images === 'string') {
+            try {
+              parsedImages = JSON.parse(a.images || '[]');
+            } catch {
+              parsedImages = [];
+            }
+          }
+          return {
+            ...a,
+            images: parsedImages,
+            isRead: Boolean(staffRead),
+            readAt: staffRead ? staffRead.read_at : null,
+            totalReads
+          };
+        });
+
+        return enriched;
       }
-    } catch {}
+    } catch (e) {
+      console.warn('Direct Supabase fetch for announcements failed, falling back to API:', e);
+    }
   }
 
   const q = new URLSearchParams();
   if (params.staffId) q.append('staffId', params.staffId);
+  if (params.staffUuid) q.append('staffUuid', params.staffUuid);
+  if (params.staffLegacyCode) q.append('staffLegacyCode', params.staffLegacyCode);
   if (params.venue) q.append('venue', params.venue);
   if (params.activeOnly !== undefined) q.append('activeOnly', params.activeOnly);
 
   const res = await fetch(`${API_BASE}/announcements?${q.toString()}`);
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'Gagal memuat pengumuman');
-  return data;
+  return Array.isArray(data) ? data : (data.announcements || []);
 }
 
 export async function createAnnouncement(payload) {

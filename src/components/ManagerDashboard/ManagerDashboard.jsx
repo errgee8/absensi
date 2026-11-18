@@ -134,7 +134,8 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
 
   const loadActiveAnnouncement = async () => {
     try {
-      const list = await getAnnouncements({ activeOnly: true });
+      const raw = await getAnnouncements({ activeOnly: true });
+      const list = Array.isArray(raw) ? raw : (raw?.announcements || []);
       if (Array.isArray(list) && list.length > 0) {
         const top = list[0];
         setActiveAnnouncement(top);
