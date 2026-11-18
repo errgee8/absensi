@@ -40,11 +40,30 @@ export async function getNetworkStatus() {
   return data;
 }
 
-export async function getStaffList(venue = 'ALL') {
+// In-memory staff list cache (45s TTL) for instant "Mampir" modal & roster lookups
+const staffListCache = new Map();
+const STAFF_LIST_CACHE_TTL_MS = 45000;
+
+export function invalidateStaffListCache() {
+  staffListCache.clear();
+}
+
+export async function getStaffList(venue = 'ALL', options = {}) {
+  const cacheKey = venue || 'ALL';
+  const now = Date.now();
+  if (!options?.bypassCache && staffListCache.has(cacheKey)) {
+    const cached = staffListCache.get(cacheKey);
+    if (now - cached.timestamp < STAFF_LIST_CACHE_TTL_MS) {
+      return cached.data;
+    }
+  }
+
   const query = venue && venue !== 'ALL' ? `?venue=${encodeURIComponent(venue)}` : '';
   const res = await fetch(`${API_BASE}/staff${query}`, { cache: 'no-store' });
   if (!res.ok) throw new Error('Gagal memuat daftar karyawan');
-  return res.json();
+  const data = await res.json();
+  staffListCache.set(cacheKey, { data, timestamp: now });
+  return data;
 }
 
 export async function getAdminStaffList() {
@@ -109,6 +128,7 @@ export async function createStaff(staffData) {
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'Failed to create staff');
+  invalidateStaffListCache();
   return data;
 }
 
@@ -120,6 +140,7 @@ export async function resetStaffPin(staffId, newPin) {
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'Failed to reset PIN');
+  invalidateStaffListCache();
   return data;
 }
 
@@ -131,6 +152,7 @@ export async function toggleStaffStatus(staffId, isActive) {
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'Failed to toggle status');
+  invalidateStaffListCache();
   return data;
 }
 
@@ -140,6 +162,7 @@ export async function deleteStaff(staffId) {
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'Failed to delete staff');
+  invalidateStaffListCache();
   return data;
 }
 
