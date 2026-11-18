@@ -62,21 +62,40 @@ export async function uploadAttendancePhotoClient(base64Data, filenamePrefix = '
   }
 }
 
+import { getCanonicalSettingKey } from '../constants/settingsKeys';
+
 /**
  * Direct client-side read of app_settings JSON data (Announcements, Points, etc.)
+ * Protected by getCanonicalSettingKey to prevent key mismatches between modules.
  */
 export async function fetchSettingFromSupabase(key) {
   if (!supabase) return null;
+  const canonicalKey = getCanonicalSettingKey(key);
+
   try {
     const { data, error } = await supabase
       .from('app_settings')
       .select('value')
-      .eq('key', key)
+      .eq('key', canonicalKey)
       .maybeSingle();
 
-    if (error || !data) return null;
-    return data.value;
-  } catch {
+    if (!error && data?.value !== undefined && data?.value !== null) {
+      return data.value;
+    }
+
+    // Secondary fallback to original key if alias was tried
+    if (canonicalKey !== key) {
+      const { data: altData } = await supabase
+        .from('app_settings')
+        .select('value')
+        .eq('key', key)
+        .maybeSingle();
+      return altData?.value ?? null;
+    }
+
+    return null;
+  } catch (e) {
+    console.warn(`fetchSettingFromSupabase failed for key "${key}":`, e);
     return null;
   }
 }

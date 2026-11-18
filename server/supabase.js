@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
 import { getPointCycleInfo } from './shifts.js';
+import { getCanonicalSettingKey, APP_SETTINGS_KEYS } from './settingsKeys.js';
 dotenv.config();
 
 const supabaseUrl = process.env.SUPABASE_URL;
@@ -1610,8 +1611,9 @@ export const cloudDb = {
 
   async getSetting(key) {
     if (!supabase) return null;
+    const canonicalKey = getCanonicalSettingKey(key);
     const now = Date.now();
-    const cached = settingCache.get(key);
+    const cached = settingCache.get(canonicalKey) || settingCache.get(key);
     if (cached && now < cached.expiresAt) {
       return cached.value;
     }
@@ -1619,12 +1621,31 @@ export const cloudDb = {
       const { data, error } = await supabase
         .from('app_settings')
         .select('value')
-        .eq('key', key)
+        .eq('key', canonicalKey)
         .maybeSingle();
-      if (error) throw error;
-      const val = data?.value ?? null;
-      settingCache.set(key, { value: val, expiresAt: now + SETTING_CACHE_TTL_MS });
-      return val;
+
+      if (!error && data?.value !== undefined && data?.value !== null) {
+        const val = data.value;
+        settingCache.set(canonicalKey, { value: val, expiresAt: now + SETTING_CACHE_TTL_MS });
+        settingCache.set(key, { value: val, expiresAt: now + SETTING_CACHE_TTL_MS });
+        return val;
+      }
+
+      // If alias was used and returned null, fallback to literal key
+      if (canonicalKey !== key) {
+        const { data: origData } = await supabase
+          .from('app_settings')
+          .select('value')
+          .eq('key', key)
+          .maybeSingle();
+        if (origData?.value !== undefined && origData?.value !== null) {
+          settingCache.set(key, { value: origData.value, expiresAt: now + SETTING_CACHE_TTL_MS });
+          return origData.value;
+        }
+      }
+
+      settingCache.set(key, { value: null, expiresAt: now + SETTING_CACHE_TTL_MS });
+      return null;
     } catch (e) {
       return null;
     }
@@ -1632,17 +1653,38 @@ export const cloudDb = {
 
   async saveSetting(key, value, description = '') {
     if (!supabase) return null;
+    const canonicalKey = getCanonicalSettingKey(key);
     settingCache.set(key, { value, expiresAt: Date.now() + SETTING_CACHE_TTL_MS });
+    settingCache.set(canonicalKey, { value, expiresAt: Date.now() + SETTING_CACHE_TTL_MS });
+
     try {
       const { error } = await supabase
         .from('app_settings')
         .upsert({
-          key,
+          key: canonicalKey,
           value,
-          description: description || `Setting for ${key}`,
+          description: description || `Setting for ${canonicalKey}`,
           updated_at: new Date().toISOString()
         }, { onConflict: 'key' });
       if (error) throw error;
+
+      // Dual-write legacy aliases to guarantee backward compatibility
+      if (canonicalKey === 'staff_themes_map' || key === 'staff_themes') {
+        await supabase.from('app_settings').upsert({
+          key: 'staff_themes',
+          value,
+          description: 'Staff Dashboard Theme Preferences',
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'key' }).catch(() => {});
+      } else if (canonicalKey === 'staff_bios_map' || key === 'staff_bios') {
+        await supabase.from('app_settings').upsert({
+          key: 'staff_bios',
+          value,
+          description: 'Staff Bio Descriptions',
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'key' }).catch(() => {});
+      }
+
       return value;
     } catch (e) {
       console.warn(`Failed to save setting ${key} to Supabase:`, e.message);

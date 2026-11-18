@@ -1076,9 +1076,9 @@ router.get('/staff', async (req, res) => {
 
       const { data, error } = await supaQuery.order('venue', { ascending: true }).order('name', { ascending: true });
       if (!error && data && data.length > 0) {
-        const profilesMap = getSetting('staff_profiles') || {};
-        const biometricsMap = getSetting('staff_biometrics') || {};
-        const biosMap = getSetting('staff_bios') || {};
+        const profilesMap = (isSupabaseConfigured ? await cloudDb.getStaffProfilesMap() : null) || getSetting('staff_profiles') || {};
+        const biometricsMap = (isSupabaseConfigured ? await cloudDb.getStaffBiometricsMap() : null) || getSetting('staff_biometrics') || {};
+        const biosMap = (isSupabaseConfigured ? await cloudDb.getSetting('staff_bios') : null) || getSetting('staff_bios') || {};
 
         const mapped = data.map(s => {
           const sId = s.legacy_code || s.id;
@@ -1520,9 +1520,15 @@ router.post('/staff/verify-pin', async (req, res) => {
     theme_id: staff.theme_id || getCachedStaffTheme(staff.id, staff.uuid, staff.name, isVip),
     streak: isVip ? 888 : staffStreak,
     longestStreak: isVip ? 888 : staffStreak,
-    bio: (() => {
-      const biosMap = getSetting('staff_bios') || {};
-      return biosMap?.[staff.uuid] || biosMap?.[staff.id] || biosMap?.[staff.legacy_code] || staff.bio || '';
+    bio: await (async () => {
+      let bMap = {};
+      if (isSupabaseConfigured) {
+        try { bMap = (await cloudDb.getSetting('staff_bios')) || {}; } catch {}
+      }
+      if (!bMap || Object.keys(bMap).length === 0) {
+        bMap = getSetting('staff_bios') || {};
+      }
+      return bMap?.[staff.uuid] || bMap?.[staff.id] || bMap?.[staff.legacy_code] || staff.bio || '';
     })(),
     monthlyStats
   };
@@ -6309,7 +6315,7 @@ router.post('/staff/:id/bio', async (req, res) => {
 
     if (isSupabaseConfigured) {
       try {
-        await cloudDb.saveSetting('staff_bios_map', localBios, 'Staff Bio Descriptions');
+        await cloudDb.saveSetting('staff_bios', localBios, 'Staff Bio Descriptions');
       } catch (e) {
         console.warn('Supabase bio save note:', e.message);
       }
