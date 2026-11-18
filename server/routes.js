@@ -4521,7 +4521,7 @@ router.post('/leave-requests/:id/review', async (req, res) => {
 
 // Get Announcements (Staff & Manager)
 router.get('/announcements', async (req, res) => {
-  const { staffId, staffUuid, staffLegacyCode, venue, activeOnly } = req.query;
+  const { staffId, staffUuid, staffLegacyCode, staffName, venue, activeOnly } = req.query;
 
   try {
     let announcements = [];
@@ -4568,16 +4568,28 @@ router.get('/announcements', async (req, res) => {
       });
     }
 
+    const staffIdStr = staffId ? String(staffId).trim().toLowerCase() : '';
+    const staffUuidStr = staffUuid ? String(staffUuid).trim().toLowerCase() : '';
+    const staffLegacyCodeStr = staffLegacyCode ? String(staffLegacyCode).trim().toLowerCase() : '';
+    const staffNameStr = staffName ? String(staffName).trim().toLowerCase() : '';
+
     // If staff identifier is provided, attach reader info
     const enriched = announcements.map(a => {
-      const staffRead = staffId
-        ? reads.find(r =>
-            String(r.announcement_id) === String(a.id) &&
-            (String(r.staff_id) === String(staffId) ||
-              (staffUuid && String(r.staff_id) === String(staffUuid)) ||
-              (staffLegacyCode && String(r.staff_id) === String(staffLegacyCode)) ||
-              (r.staff_uuid && (String(r.staff_uuid) === String(staffId) || (staffUuid && String(r.staff_uuid) === String(staffUuid)))))
-          )
+      const staffRead = (staffIdStr || staffUuidStr || staffLegacyCodeStr || staffNameStr)
+        ? reads.find(r => {
+            if (String(r.announcement_id) !== String(a.id)) return false;
+            const rStaffId = String(r.staff_id || '').trim().toLowerCase();
+            const rStaffUuid = String(r.staff_uuid || '').trim().toLowerCase();
+            const rStaffName = String(r.staff_name || '').trim().toLowerCase();
+            return (
+              (staffIdStr && rStaffId === staffIdStr) ||
+              (staffUuidStr && rStaffId === staffUuidStr) ||
+              (staffLegacyCodeStr && rStaffId === staffLegacyCodeStr) ||
+              (staffIdStr && rStaffUuid === staffIdStr) ||
+              (staffUuidStr && rStaffUuid === staffUuidStr) ||
+              (staffNameStr && rStaffName === staffNameStr)
+            );
+          })
         : null;
       const totalReads = reads.filter(r => String(r.announcement_id) === String(a.id)).length;
       let parsedImages = [];

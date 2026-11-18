@@ -134,6 +134,7 @@ export default function StaffView({
           staffId: staff.id,
           staffUuid: staff.uuid || staff.id,
           staffLegacyCode: staff.legacy_code || '',
+          staffName: staff.name || '',
           venue: staff.venue,
           activeOnly: true
         }),
@@ -235,13 +236,24 @@ export default function StaffView({
 
   const handleAcknowledgeAnnouncement = async (announcementId) => {
     if (!loggedInStaff) return;
-    await acknowledgeAnnouncement(announcementId, {
-      staffId: loggedInStaff.legacy_code || loggedInStaff.id,
-      staffUuid: loggedInStaff.uuid || loggedInStaff.id,
-      staffName: loggedInStaff.name,
-      venue: loggedInStaff.venue,
-      division: loggedInStaff.division
-    });
+    setAnnouncements((prev) =>
+      (prev || []).map((a) =>
+        String(a.id) === String(announcementId) ? { ...a, isRead: true, readAt: new Date().toISOString() } : a
+      )
+    );
+    setUnreadAnnouncementsCount((prev) => Math.max(0, prev - 1));
+
+    try {
+      await acknowledgeAnnouncement(announcementId, {
+        staffId: loggedInStaff.legacy_code || loggedInStaff.id,
+        staffUuid: loggedInStaff.uuid || loggedInStaff.id,
+        staffName: loggedInStaff.name,
+        venue: loggedInStaff.venue,
+        division: loggedInStaff.division
+      });
+    } catch (e) {
+      console.warn('acknowledgeAnnouncement error:', e);
+    }
     await loadStaffNotifications(loggedInStaff);
   };
 

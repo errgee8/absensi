@@ -311,7 +311,7 @@ export async function getAnnouncements(params = {}) {
     try {
       const [annData, readsData] = await Promise.all([
         fetchSettingFromSupabase('management_announcements'),
-        params.staffId ? fetchSettingFromSupabase('announcement_reads') : Promise.resolve([])
+        (params.staffId || params.staffName) ? fetchSettingFromSupabase('management_announcement_reads') : Promise.resolve([])
       ]);
 
       if (Array.isArray(annData)) {
@@ -344,21 +344,28 @@ export async function getAnnouncements(params = {}) {
         }
 
         const reads = Array.isArray(readsData) ? readsData : [];
-        const staffIdStr = params.staffId ? String(params.staffId) : '';
-        const staffUuidStr = params.staffUuid ? String(params.staffUuid) : '';
-        const staffLegacyCodeStr = params.staffLegacyCode ? String(params.staffLegacyCode) : '';
+        const staffIdStr = params.staffId ? String(params.staffId).trim().toLowerCase() : '';
+        const staffUuidStr = params.staffUuid ? String(params.staffUuid).trim().toLowerCase() : '';
+        const staffLegacyCodeStr = params.staffLegacyCode ? String(params.staffLegacyCode).trim().toLowerCase() : '';
+        const staffNameStr = params.staffName ? String(params.staffName).trim().toLowerCase() : '';
 
         // 3. Enrich with isRead, totalReads, images
         const enriched = list.map((a) => {
-          const staffRead = staffIdStr
-            ? reads.find(
-                (r) =>
-                  String(r.announcement_id) === String(a.id) &&
-                  (String(r.staff_id) === staffIdStr ||
-                    (staffUuidStr && String(r.staff_id) === staffUuidStr) ||
-                    (staffLegacyCodeStr && String(r.staff_id) === staffLegacyCodeStr) ||
-                    (r.staff_uuid && (String(r.staff_uuid) === staffIdStr || (staffUuidStr && String(r.staff_uuid) === staffUuidStr))))
-              )
+          const staffRead = (staffIdStr || staffUuidStr || staffLegacyCodeStr || staffNameStr)
+            ? reads.find((r) => {
+                if (String(r.announcement_id) !== String(a.id)) return false;
+                const rStaffId = String(r.staff_id || '').trim().toLowerCase();
+                const rStaffUuid = String(r.staff_uuid || '').trim().toLowerCase();
+                const rStaffName = String(r.staff_name || '').trim().toLowerCase();
+                return (
+                  (staffIdStr && rStaffId === staffIdStr) ||
+                  (staffUuidStr && rStaffId === staffUuidStr) ||
+                  (staffLegacyCodeStr && rStaffId === staffLegacyCodeStr) ||
+                  (staffIdStr && rStaffUuid === staffIdStr) ||
+                  (staffUuidStr && rStaffUuid === staffUuidStr) ||
+                  (staffNameStr && rStaffName === staffNameStr)
+                );
+              })
             : null;
           const totalReads = reads.filter((r) => String(r.announcement_id) === String(a.id)).length;
           let parsedImages = [];
@@ -391,6 +398,7 @@ export async function getAnnouncements(params = {}) {
   if (params.staffId) q.append('staffId', params.staffId);
   if (params.staffUuid) q.append('staffUuid', params.staffUuid);
   if (params.staffLegacyCode) q.append('staffLegacyCode', params.staffLegacyCode);
+  if (params.staffName) q.append('staffName', params.staffName);
   if (params.venue) q.append('venue', params.venue);
   if (params.activeOnly !== undefined) q.append('activeOnly', params.activeOnly);
 

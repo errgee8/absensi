@@ -85,10 +85,13 @@ export default function StaffAnnouncementModal({
     setActionSuccess(null);
   }, [currentIndex]);
 
+  const [localAcknowledgedIds, setLocalAcknowledgedIds] = useState(() => new Set());
+  const isAnnRead = (a) => Boolean(a?.isRead || (a?.id && localAcknowledgedIds.has(a.id)));
+
   const currentAnn = announcements[currentIndex] || announcements[0];
   const isUrgent = currentAnn?.urgency === 'URGENT';
-  const isRead = currentAnn?.isRead;
-  const totalUnread = announcements.filter((a) => !a.isRead).length;
+  const isRead = isAnnRead(currentAnn);
+  const totalUnread = announcements.filter((a) => !isAnnRead(a)).length;
 
   const handleOpenDetail = (idx) => {
     setCurrentIndex(idx);
@@ -104,6 +107,7 @@ export default function StaffAnnouncementModal({
       if (onAcknowledge) {
         await onAcknowledge(currentAnn.id);
       }
+      setLocalAcknowledgedIds((prev) => new Set([...prev, currentAnn.id]));
       setActionSuccess(`Terima kasih! Anda telah menyetujui "${currentAnn.title}".`);
       confetti({
         particleCount: 50,
@@ -114,7 +118,7 @@ export default function StaffAnnouncementModal({
       setTimeout(() => {
         setActionSuccess(null);
         // If there's another unread announcement, go to it, or return to list view
-        const nextUnreadIdx = announcements.findIndex((a, idx) => idx !== currentIndex && !a.isRead);
+        const nextUnreadIdx = announcements.findIndex((a, idx) => idx !== currentIndex && !isAnnRead(a));
         if (nextUnreadIdx >= 0) {
           setCurrentIndex(nextUnreadIdx);
           setSelectedImageIdx(0);
@@ -263,7 +267,7 @@ export default function StaffAnnouncementModal({
                             </span>
                           )}
 
-                          {ann.isRead ? (
+                          {isAnnRead(ann) ? (
                             <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300">
                               Disetujui ✓
                             </span>
@@ -513,7 +517,7 @@ export default function StaffAnnouncementModal({
             <button
               type="button"
               onClick={() => {
-                const firstUnread = announcements.findIndex((a) => !a.isRead);
+                const firstUnread = announcements.findIndex((a) => !isAnnRead(a));
                 if (firstUnread >= 0) handleOpenDetail(firstUnread);
               }}
               className="flex-1 py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-md shadow-blue-600/30 transition flex items-center justify-center space-x-2 cursor-pointer"
