@@ -23,9 +23,17 @@ import {
   Users,
   X
 } from 'lucide-react';
-import { getPoints, getStaffList, createStaffPoint, deleteStaffPoint, subscribeRealtimeEvents } from '../../utils/api';
+import {
+  getPoints,
+  getStaffList,
+  createStaffPoint,
+  deleteStaffPoint,
+  getPointDeletionLogs,
+  subscribeRealtimeEvents
+} from '../../utils/api';
 import { formatWitaDateTime, getPointCycleInfo } from '../../utils/time';
 import { showToast } from '../Common/Toast';
+import PointDeletionLogsModal from './PointDeletionLogsModal';
 
 export default function PointManagementTab({ adminAuth, isReadOnly = false, onPointsUpdated }) {
   const [staffList, setStaffList] = useState([]);
@@ -60,7 +68,13 @@ export default function PointManagementTab({ adminAuth, isReadOnly = false, onPo
   // Delete confirmation modal (strictly Operational Manager)
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deletePin, setDeletePin] = useState(adminAuth?.pin || '');
+  const [deleteReason, setDeleteReason] = useState('');
   const [deleting, setDeleting] = useState(false);
+
+  // Point Deletion History Modal State
+  const [showDeletionModal, setShowDeletionModal] = useState(false);
+  const [deletionLogs, setDeletionLogs] = useState([]);
+  const [loadingDeletionLogs, setLoadingDeletionLogs] = useState(false);
 
   const [exporting, setExporting] = useState(false);
 
@@ -136,19 +150,37 @@ export default function PointManagementTab({ adminAuth, isReadOnly = false, onPo
     }
   }, [selectedCycleKey]);
 
+  const loadDeletionLogs = useCallback(async () => {
+    setLoadingDeletionLogs(true);
+    try {
+      const res = await getPointDeletionLogs();
+      setDeletionLogs(res.logs || []);
+    } catch (err) {
+      console.warn('Failed to load point deletion logs:', err);
+    } finally {
+      setLoadingDeletionLogs(false);
+    }
+  }, []);
+
   useEffect(() => {
     loadData();
-  }, [loadData]);
+    loadDeletionLogs();
+  }, [loadData, loadDeletionLogs]);
 
   useEffect(() => {
     const unsubscribe = subscribeRealtimeEvents((eventType) => {
-      if (eventType === 'POINT_UPDATE' || eventType === 'STAFF_UPDATE') {
+      if (
+        eventType === 'POINT_UPDATE' ||
+        eventType === 'STAFF_UPDATE' ||
+        eventType === 'POINT_DELETION_LOG_UPDATE'
+      ) {
         loadData(true);
+        loadDeletionLogs();
         if (eventType === 'POINT_UPDATE' && onPointsUpdated) onPointsUpdated();
       }
     });
     return () => unsubscribe();
-  }, [loadData, onPointsUpdated]);
+  }, [loadData, loadDeletionLogs, onPointsUpdated]);
 
   const currentCycle = pointsData?.currentCycle || getPointCycleInfo();
   const activeCycleInfo = pointsData?.selectedCycle || currentCycle;
@@ -338,10 +370,11 @@ export default function PointManagementTab({ adminAuth, isReadOnly = false, onPo
 
     setDeleting(true);
     try {
-      await deleteStaffPoint(deleteTarget.id, effectivePin);
-      showToast('Catatan poin berhasil dihapus.', 'success');
+      await deleteStaffPoint(deleteTarget.id, effectivePin, deleteReason.trim() || 'Dihapus oleh Manajer');
+      showToast('Catatan poin berhasil dihapus dan dicatat di riwayat log.', 'success');
       setDeleteTarget(null);
-      await loadData(true);
+      setDeleteReason('');
+      await Promise.all([loadData(true), loadDeletionLogs()]);
       if (onPointsUpdated) onPointsUpdated();
     } catch (err) {
       showToast(err.message || 'Gagal menghapus catatan poin.', 'error');
@@ -490,6 +523,24 @@ export default function PointManagementTab({ adminAuth, isReadOnly = false, onPo
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setShowDeletionModal(true);
+                loadDeletionLogs();
+              }}
+              className="px-3.5 py-2 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/35 text-rose-300 text-xs font-bold flex items-center space-x-1.5 transition cursor-pointer shadow-sm shadow-rose-950/20"
+              title="Lihat riwayat dan log penghapusan poin yang dilakukan oleh Manager"
+            >
+              <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+              <span>Riwayat Hapus Poin</span>
+              {deletionLogs.length > 0 && (
+                <span className="px-1.5 py-0.5 rounded-full bg-rose-500/30 text-rose-200 text-[10px] font-mono font-bold">
+                  {deletionLogs.length}
+                </span>
+              )}
+            </button>
+
             <button
               type="button"
               onClick={() => loadData(false)}
@@ -1030,6 +1081,18 @@ export default function PointManagementTab({ adminAuth, isReadOnly = false, onPo
               <History className="w-4 h-4" />
               <span>Log Riwayat &amp; Persetujuan ({filteredLogs.length})</span>
             </button>
+            <button
+              type="button"
+              onClick={() => {
+                setShowDeletionModal(true);
+                loadDeletionLogs();
+              }}
+              className="px-4 py-2 rounded-xl text-xs font-bold flex items-center space-x-2 transition cursor-pointer text-slate-400 hover:text-rose-300 hover:bg-rose-500/10"
+              title="Buka riwayat dan log penghapusan poin yang dilakukan oleh Manager"
+            >
+              <Trash2 className="w-4 h-4 text-rose-400" />
+              <span>Riwayat Hapus Poin ({deletionLogs.length})</span>
+            </button>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
@@ -1366,10 +1429,25 @@ export default function PointManagementTab({ adminAuth, isReadOnly = false, onPo
                   />
                 </div>
               )}
+              <div>
+                <label className="text-xs text-slate-300 font-bold block mb-1">
+                  Alasan Penghapusan (Opsional)
+                </label>
+                <input
+                  type="text"
+                  value={deleteReason}
+                  onChange={(e) => setDeleteReason(e.target.value)}
+                  placeholder="Contoh: Salah input / Koreksi poin / Dibatalkan oleh Manajer"
+                  className="w-full bg-[#12161f] border border-slate-700 rounded-xl px-3 py-2 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-rose-500"
+                />
+              </div>
               <div className="flex space-x-2">
                 <button
                   type="button"
-                  onClick={() => setDeleteTarget(null)}
+                  onClick={() => {
+                    setDeleteTarget(null);
+                    setDeleteReason('');
+                  }}
                   className="flex-1 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-300 cursor-pointer"
                 >
                   Batal
@@ -1423,6 +1501,15 @@ export default function PointManagementTab({ adminAuth, isReadOnly = false, onPo
           </div>
         </div>
       )}
+
+      {/* Point Deletion Logs Audit Trail Modal */}
+      <PointDeletionLogsModal
+        isOpen={showDeletionModal}
+        onClose={() => setShowDeletionModal(false)}
+        logs={deletionLogs}
+        loading={loadingDeletionLogs}
+        onRefresh={loadDeletionLogs}
+      />
     </div>
   );
 }

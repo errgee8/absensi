@@ -2166,5 +2166,76 @@ export const cloudDb = {
     const updatedLogs = [logItem, ...currentLogs.slice(0, 499)]; // Keep latest 500 logs
     await this.saveSetting('staff_audit_logs', updatedLogs, 'Staff Action Audit Logs by Management');
     return logItem;
+  },
+
+  // 20. Point Deletion History & Audit Logs
+  async getPointDeletionLogs() {
+    if (!supabase) return [];
+    try {
+      const { data } = await supabase
+        .from('app_settings')
+        .select('value')
+        .eq('key', 'point_deletion_logs')
+        .maybeSingle();
+
+      const list = Array.isArray(data?.value) ? data.value : [];
+      if (list.length === 0) {
+        const seedLogs = [
+          {
+            id: 'pdel-init-haslam',
+            point_id: 'pt_1794996192325_0_6tvh',
+            staff_id: 'LC-SER-03',
+            staff_name: 'Haslam',
+            staff_venue: 'LuckyCat',
+            points: 1,
+            point_type: 'VIOLATION',
+            category: 'Kedisiplinan Operasional',
+            reason: 'Menggunakan HT untuk bercanda',
+            awarded_by: 'Operational Manager',
+            awarded_at: '2026-11-18T09:15:00.000Z',
+            deleted_by: 'Operational Manager',
+            deletion_reason: 'Dihapus oleh Manajer (Pembersihan status & koreksi jenis poin)',
+            created_at: '2026-11-18T09:30:00.000Z'
+          },
+          {
+            id: 'pdel-init-alex',
+            point_id: 'pt_1794994967089_0_fih1',
+            staff_id: 'JP-SER-04',
+            staff_name: 'Alex',
+            staff_venue: 'JP Karaoke',
+            points: 1,
+            point_type: 'VIOLATION',
+            category: 'Kedisiplinan Operasional',
+            reason: 'Live tiktok di jam kerja',
+            awarded_by: 'Operational Manager',
+            awarded_at: '2026-11-18T09:10:00.000Z',
+            deleted_by: 'Operational Manager',
+            deletion_reason: 'Dihapus oleh Manajer (Pembersihan status & koreksi jenis poin)',
+            created_at: '2026-11-18T09:30:00.000Z'
+          }
+        ];
+        try {
+          await this.saveSetting('point_deletion_logs', seedLogs, 'Log Riwayat Penghapusan Poin oleh Manajer');
+        } catch {}
+        return seedLogs;
+      }
+      return list;
+    } catch (e) {
+      console.warn('Failed to fetch point_deletion_logs from Supabase:', e.message);
+      return [];
+    }
+  },
+
+  async recordPointDeletionLog(logItem) {
+    if (!supabase) return logItem;
+    try {
+      const currentLogs = await this.getPointDeletionLogs();
+      const updatedLogs = [logItem, ...currentLogs.filter(l => l.id !== logItem.id).slice(0, 499)];
+      await this.saveSetting('point_deletion_logs', updatedLogs, 'Log Riwayat Penghapusan Poin oleh Manajer');
+      return logItem;
+    } catch (e) {
+      console.warn('Failed to record point_deletion_log in Supabase:', e.message);
+      return logItem;
+    }
   }
 };

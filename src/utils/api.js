@@ -506,17 +506,30 @@ export async function acknowledgeStaffPoint(id, payload) {
   return data;
 }
 
-export async function deleteStaffPoint(id, pin) {
+export async function deleteStaffPoint(id, pin, reason = 'Dihapus oleh Manajer') {
   const res = await fetch(`${API_BASE}/points/${encodeURIComponent(id)}`, {
     method: 'DELETE',
     headers: {
       'Content-Type': 'application/json',
       'x-manager-pin': String(pin || '').trim()
     },
-    body: JSON.stringify({ pin: String(pin || '').trim() })
+    body: JSON.stringify({
+      pin: String(pin || '').trim(),
+      reason: String(reason || 'Dihapus oleh Manajer').trim()
+    })
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'Gagal menghapus catatan poin');
+  return data;
+}
+
+export async function getPointDeletionLogs(params = {}) {
+  const query = new URLSearchParams();
+  if (params.search) query.append('search', params.search);
+  const qs = query.toString() ? `?${query.toString()}` : '';
+  const res = await fetch(`${API_BASE}/points/deletion-logs${qs}`);
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Gagal memuat log penghapusan poin');
   return data;
 }
 

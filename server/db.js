@@ -205,6 +205,24 @@ db.exec(`
     updated_at TEXT DEFAULT (datetime('now'))
   );
 
+  CREATE TABLE IF NOT EXISTS point_deletion_logs (
+    id TEXT PRIMARY KEY,
+    point_id TEXT,
+    staff_id TEXT NOT NULL,
+    staff_name TEXT NOT NULL,
+    staff_venue TEXT,
+    points REAL NOT NULL,
+    point_type TEXT DEFAULT 'VIOLATION',
+    category TEXT DEFAULT 'Kedisiplinan',
+    reason TEXT NOT NULL,
+    awarded_by TEXT,
+    awarded_at TEXT,
+    deleted_by TEXT NOT NULL,
+    deletion_reason TEXT,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+  CREATE INDEX IF NOT EXISTS idx_point_del_created ON point_deletion_logs(created_at DESC);
+
   CREATE TABLE IF NOT EXISTS staff_kudos (
     id TEXT PRIMARY KEY,
     from_staff_id TEXT NOT NULL,
@@ -456,8 +474,58 @@ export const seedExactStaffRoster = (force = false) => {
   }
 };
 
+const initPointDeletionLogs = () => {
+  try {
+    const row = db.prepare('SELECT COUNT(*) as cnt FROM point_deletion_logs').get();
+    if (row && row.cnt === 0) {
+      const insertStmt = db.prepare(`
+        INSERT OR REPLACE INTO point_deletion_logs 
+        (id, point_id, staff_id, staff_name, staff_venue, points, point_type, category, reason, awarded_by, awarded_at, deleted_by, deletion_reason, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+
+      insertStmt.run(
+        'pdel-init-haslam',
+        'pt_1794996192325_0_6tvh',
+        'LC-SER-03',
+        'Haslam',
+        'LuckyCat',
+        1,
+        'VIOLATION',
+        'Kedisiplinan Operasional',
+        'Menggunakan HT untuk bercanda',
+        'Operational Manager',
+        '2026-11-18T09:15:00.000Z',
+        'Operational Manager',
+        'Dihapus oleh Manajer (Pembersihan status & koreksi jenis poin)',
+        '2026-11-18T09:30:00.000Z'
+      );
+
+      insertStmt.run(
+        'pdel-init-alex',
+        'pt_1794994967089_0_fih1',
+        'JP-SER-04',
+        'Alex',
+        'JP Karaoke',
+        1,
+        'VIOLATION',
+        'Kedisiplinan Operasional',
+        'Live tiktok di jam kerja',
+        'Operational Manager',
+        '2026-11-18T09:10:00.000Z',
+        'Operational Manager',
+        'Dihapus oleh Manajer (Pembersihan status & koreksi jenis poin)',
+        '2026-11-18T09:30:00.000Z'
+      );
+    }
+  } catch (err) {
+    console.warn('initPointDeletionLogs note:', err.message);
+  }
+};
+
 initSettings();
 initShiftSchedules();
 seedExactStaffRoster();
+initPointDeletionLogs();
 
 export { db, uploadsDir };

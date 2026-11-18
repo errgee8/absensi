@@ -243,7 +243,7 @@ export default function StaffDetailManagementModal({
     setActionError(null);
     try {
       if (actionModal.type === 'DELETE_POINT') {
-        await deleteStaffPoint(actionModal.id, effectivePin);
+        await deleteStaffPoint(actionModal.id, effectivePin, actionReason.trim() || 'Catatan poin dihapus/dibatalkan oleh Manajer');
       } else if (actionModal.type === 'CLEAR_LATE') {
         await clearShiftLateness(actionModal.id, effectivePin, actionReason.trim() || 'Keterlambatan dibatalkan oleh Manajer');
       } else if (actionModal.type === 'REVIEW_LATE') {

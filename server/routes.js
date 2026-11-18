@@ -5326,9 +5326,58 @@ router.post('/points/:id/acknowledge', async (req, res) => {
   }
 });
 
+// Point Deletion Logs (Audit Trail for Manager)
+router.get(['/points/deletion-logs', '/admin/point-deletion-logs'], async (req, res) => {
+  try {
+    let logs = [];
+    if (isSupabaseConfigured) {
+      try {
+        logs = await cloudDb.getPointDeletionLogs();
+      } catch (e) {
+        console.warn('Supabase getPointDeletionLogs note:', e.message);
+      }
+    }
+
+    // Also merge SQLite point_deletion_logs
+    try {
+      const localLogs = db.prepare('SELECT * FROM point_deletion_logs ORDER BY created_at DESC').all();
+      if (localLogs && localLogs.length > 0) {
+        const existingIds = new Set(logs.map(l => l.id || l.point_id));
+        for (const loc of localLogs) {
+          if (!existingIds.has(loc.id) && !existingIds.has(loc.point_id)) {
+            logs.push(loc);
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('SQLite point_deletion_logs read note:', e.message);
+    }
+
+    // Sort newest first
+    logs.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+
+    // Optional search filter
+    const search = (req.query.search || '').trim().toLowerCase();
+    if (search) {
+      logs = logs.filter(l => 
+        (l.staff_name || '').toLowerCase().includes(search) ||
+        (l.reason || '').toLowerCase().includes(search) ||
+        (l.deletion_reason || '').toLowerCase().includes(search) ||
+        (l.deleted_by || '').toLowerCase().includes(search)
+      );
+    }
+
+    res.json({ success: true, logs });
+  } catch (err) {
+    console.error('Error fetching point deletion logs:', err);
+    res.status(500).json({ error: 'Gagal memuat log penghapusan poin: ' + err.message });
+  }
+});
+
 router.delete('/points/:id', async (req, res) => {
   const { id } = req.params;
   const pin = req.body?.pin || req.query?.pin || req.headers['x-admin-pin'] || req.headers['x-manager-pin'];
+  const deletionReason = req.body?.reason || req.query?.reason || 'Dihapus oleh Manajer';
 
   const auth = await verifyManagementAuth(pin);
   if (!auth.authorized || (auth.role !== 'MANAGER' && auth.role !== 'FULL_ADMIN')) {
@@ -5338,9 +5387,23 @@ router.delete('/points/:id', async (req, res) => {
   }
 
   try {
+    let existingPoint = null;
+    try {
+      existingPoint = db.prepare('SELECT * FROM staff_points WHERE id = ?').get(id);
+    } catch {}
+
+    if (!existingPoint && isSupabaseConfigured) {
+      try {
+        const supaPoints = await cloudDb.getStaffPoints();
+        existingPoint = supaPoints.find(p => String(p.id) === String(id));
+      } catch {}
+    }
+
     let deleted = false;
+    let supaDeletedItem = null;
     if (isSupabaseConfigured) {
-      deleted = await cloudDb.deleteStaffPoint(id);
+      supaDeletedItem = await cloudDb.deleteStaffPoint(id);
+      if (supaDeletedItem) deleted = true;
     }
     try {
       const info = db.prepare('DELETE FROM staff_points WHERE id = ?').run(id);
@@ -5351,23 +5414,60 @@ router.delete('/points/:id', async (req, res) => {
       return res.status(404).json({ error: 'Catatan poin tidak ditemukan.' });
     }
 
-    if (isSupabaseConfigured && deleted && typeof deleted === 'object') {
+    const pointInfo = (supaDeletedItem && typeof supaDeletedItem === 'object') ? supaDeletedItem : (existingPoint || {});
+    const nowIso = new Date().toISOString();
+    const logItem = {
+      id: `pdel-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      point_id: id,
+      staff_id: pointInfo.staff_id || 'UNKNOWN',
+      staff_name: pointInfo.staff_name || 'Staff',
+      staff_venue: pointInfo.staff_venue || pointInfo.venue || '',
+      points: pointInfo.points ? Math.abs(Number(pointInfo.points)) : 1,
+      point_type: pointInfo.point_type || (Number(pointInfo.points) > 0 ? 'PLUS' : 'VIOLATION'),
+      category: pointInfo.category || 'Kedisiplinan',
+      reason: pointInfo.reason || pointInfo.notes || 'Pelanggaran / Sanksi',
+      awarded_by: pointInfo.awarded_by || pointInfo.given_by || 'Operational Manager',
+      awarded_at: pointInfo.created_at || pointInfo.wita_date || nowIso,
+      deleted_by: auth.reviewerName || 'Operational Manager',
+      deletion_reason: deletionReason || 'Dihapus oleh Manajer',
+      created_at: nowIso
+    };
+
+    // Save to SQLite point_deletion_logs
+    try {
+      db.prepare(`
+        INSERT OR REPLACE INTO point_deletion_logs 
+        (id, point_id, staff_id, staff_name, staff_venue, points, point_type, category, reason, awarded_by, awarded_at, deleted_by, deletion_reason, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        logItem.id, logItem.point_id, logItem.staff_id, logItem.staff_name, logItem.staff_venue,
+        logItem.points, logItem.point_type, logItem.category, logItem.reason, logItem.awarded_by,
+        logItem.awarded_at, logItem.deleted_by, logItem.deletion_reason, logItem.created_at
+      );
+    } catch (e) {
+      console.warn('SQLite recordPointDeletionLog note:', e.message);
+    }
+
+    // Save to Supabase Cloud
+    if (isSupabaseConfigured) {
       try {
+        await cloudDb.recordPointDeletionLog(logItem);
         await cloudDb.recordStaffAuditLog({
-          staffId: deleted.staff_id,
-          staffName: deleted.staff_name,
+          staffId: logItem.staff_id,
+          staffName: logItem.staff_name,
           actionType: 'POINT_REMOVED',
-          description: `Poin ${Number(deleted.points) > 0 ? '+' + deleted.points : deleted.points} (${deleted.reason || 'Sanksi/Apresiasi'}) dihapus oleh Manajer.`,
+          description: `Poin ${logItem.point_type === 'PLUS' ? '+' : '-'}${logItem.points} (${logItem.reason}) dihapus oleh Manajer (${logItem.deletion_reason}).`,
           authorName: auth.reviewerName
         });
       } catch (logErr) {
-        console.warn('Audit log note:', logErr.message);
+        console.warn('Supabase point deletion logging note:', logErr.message);
       }
     }
 
     broadcastEvent('POINT_UPDATE', { action: 'DELETED', id });
+    broadcastEvent('POINT_DELETION_LOG_UPDATE', { action: 'RECORDED', log: logItem });
     broadcastEvent('LEADERBOARD_UPDATE');
-    return res.json({ success: true, message: 'Catatan poin berhasil dihapus.' });
+    return res.json({ success: true, message: 'Catatan poin berhasil dihapus dan dicatat di riwayat log.', log: logItem });
   } catch (err) {
     console.error('Error deleting staff point:', err);
     return res.status(500).json({ error: 'Gagal menghapus catatan poin: ' + err.message });
