@@ -4869,16 +4869,17 @@ router.put('/announcements/:id', async (req, res) => {
 // Staff Acknowledge / "Saya Mengerti"
 router.post('/announcements/:id/acknowledge', async (req, res) => {
   const { id } = req.params;
-  const { staffId, staffName, venue, division } = req.body || {};
+  const { staffId, staffUuid, staffName, venue, division } = req.body || {};
+  const cleanStaffId = String(staffId || staffUuid || '').trim();
 
-  if (!staffId) return res.status(400).json({ error: 'ID Staf wajib dicantumkan.' });
+  if (!cleanStaffId && !staffName) return res.status(400).json({ error: 'ID Staf atau Nama wajib dicantumkan.' });
 
   try {
     let receipt = null;
     if (isSupabaseConfigured) {
       receipt = await cloudDb.recordAnnouncementRead({
         announcementId: id,
-        staffId,
+        staffId: cleanStaffId,
         staffName: staffName || 'Staff',
         staffVenue: venue || 'JP Karaoke',
         staffDivision: division || 'Staff'
@@ -4894,7 +4895,7 @@ router.post('/announcements/:id/acknowledge', async (req, res) => {
       `).run(
         receipt?.id || readId,
         id,
-        staffId,
+        cleanStaffId,
         staffName || 'Staff',
         venue || 'JP Karaoke',
         division || 'Staff',
@@ -4905,7 +4906,7 @@ router.post('/announcements/:id/acknowledge', async (req, res) => {
     }
 
     announcementsCache = { data: null, ts: 0 };
-    broadcastEvent('ANNOUNCEMENT_READ', { announcementId: id, staffId, staffName });
+    broadcastEvent('ANNOUNCEMENT_READ', { announcementId: id, staffId: cleanStaffId, staffName });
 
     return res.json({
       success: true,
@@ -4938,7 +4939,8 @@ router.get('/announcements/:id/readers', async (req, res) => {
 
     // Filter reads for this announcement
     const thisReads = reads.filter(r => String(r.announcement_id) === String(id));
-    const readStaffIds = new Set(thisReads.map(r => String(r.staff_id)));
+    const readStaffIds = new Set(thisReads.map(r => String(r.staff_id || '').toLowerCase()));
+    const readStaffNames = new Set(thisReads.map(r => String(r.staff_name || '').toLowerCase()));
 
     // Active operational staff pool (exclude Management)
     const activeStaff = staffList.filter(s => s.is_active && s.division !== 'Management');
@@ -4952,7 +4954,12 @@ router.get('/announcements/:id/readers', async (req, res) => {
     })).sort((a, b) => new Date(b.read_at) - new Date(a.read_at));
 
     const unread = activeStaff
-      .filter(s => !readStaffIds.has(String(s.id)) && !readStaffIds.has(String(s.legacy_code)))
+      .filter(s => 
+        !readStaffIds.has(String(s.id || '').toLowerCase()) && 
+        !readStaffIds.has(String(s.uuid || '').toLowerCase()) &&
+        !readStaffIds.has(String(s.legacy_code || '').toLowerCase()) &&
+        !readStaffNames.has(String(s.name || '').toLowerCase())
+      )
       .map(s => ({
         staff_id: s.id,
         staff_name: s.name,

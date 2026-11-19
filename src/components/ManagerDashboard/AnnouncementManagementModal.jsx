@@ -20,7 +20,7 @@ import {
   Trash2,
   Send
 } from 'lucide-react';
-import { getAnnouncements, createAnnouncement, updateAnnouncement, getAnnouncementReaders, resendAnnouncementPush } from '../../utils/api';
+import { getAnnouncements, createAnnouncement, updateAnnouncement, getAnnouncementReaders, resendAnnouncementPush, subscribeRealtimeEvents } from '../../utils/api';
 import { formatWitaDateTime } from '../../utils/time';
 import ZoomableImage from '../Common/ZoomableImage';
 import { showToast } from '../Common/Toast';
@@ -129,6 +129,24 @@ export default function AnnouncementManagementModal({
       loadData();
     }
   }, [isOpen, initialTab]);
+
+  // Realtime subscription: otomatis sinkron saat ada staf yang membaca/menyetujui pengumuman
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const unsubscribe = subscribeRealtimeEvents((eventType, payload) => {
+      if (eventType === 'ANNOUNCEMENT_READ' || eventType === 'ANNOUNCEMENT_UPDATE') {
+        loadData();
+        if (selectedAnnouncement) {
+          getAnnouncementReaders(selectedAnnouncement.id).then(setReadersReport).catch(() => {});
+        }
+      }
+    });
+
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
+  }, [isOpen, selectedAnnouncement]);
 
   const calculateExpiresAt = () => {
     if (expiryPreset === 'FOREVER') return null;

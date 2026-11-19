@@ -1583,14 +1583,24 @@ export const cloudDb = {
   async recordAnnouncementRead({ announcementId, staffId, staffName, staffVenue, staffDivision }) {
     if (!supabase) return null;
     const reads = await this.getAnnouncementReads();
-    const existing = reads.find(r => r.announcement_id === announcementId && r.staff_id === staffId);
+    const cleanAnnId = String(announcementId || '').trim();
+    const cleanStaffId = String(staffId || '').trim();
+    const cleanName = String(staffName || '').trim();
+
+    const existing = reads.find(r =>
+      String(r.announcement_id) === cleanAnnId &&
+      (
+        (cleanStaffId && String(r.staff_id || '').toLowerCase() === cleanStaffId.toLowerCase()) ||
+        (cleanName && String(r.staff_name || '').toLowerCase() === cleanName.toLowerCase())
+      )
+    );
     if (existing) return existing;
 
     const newRecord = {
       id: `read_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-      announcement_id: announcementId,
-      staff_id: staffId,
-      staff_name: staffName,
+      announcement_id: cleanAnnId,
+      staff_id: cleanStaffId || 'staff',
+      staff_name: cleanName || 'Staff',
       staff_venue: staffVenue || 'JP Karaoke',
       staff_division: staffDivision || 'Staff',
       read_at: new Date().toISOString()

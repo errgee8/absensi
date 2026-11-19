@@ -332,9 +332,10 @@ export async function getAnnouncements(params = {}) {
   // Direct client read from Supabase to bypass serverless execution
   if (isSupabaseClientConfigured) {
     try {
+      // Selalu fetch management_announcement_reads agar totalReads terhitung akurat untuk manajer dan staf
       const [annData, readsData] = await Promise.all([
         fetchSettingFromSupabase('management_announcements'),
-        (params.staffId || params.staffName) ? fetchSettingFromSupabase('management_announcement_reads') : Promise.resolve([])
+        fetchSettingFromSupabase('management_announcement_reads')
       ]);
 
       if (Array.isArray(annData)) {
@@ -465,6 +466,65 @@ export async function acknowledgeAnnouncement(id, payload) {
 }
 
 export async function getAnnouncementReaders(id) {
+  // Direct client read from Supabase if configured for fast and reliable response
+  if (isSupabaseClientConfigured && supabase) {
+    try {
+      const [readsData, staffData] = await Promise.all([
+        fetchSettingFromSupabase('management_announcement_reads'),
+        supabase.from('staff').select('id, uuid, legacy_code, name, venue, division, is_active')
+      ]);
+
+      const allReads = Array.isArray(readsData) ? readsData : [];
+      const thisReads = allReads.filter((r) => String(r.announcement_id) === String(id));
+      const readStaffIds = new Set(thisReads.map((r) => String(r.staff_id || '').toLowerCase()));
+      const readStaffNames = new Set(thisReads.map((r) => String(r.staff_name || '').toLowerCase()));
+
+      const staffList = Array.isArray(staffData?.data) ? staffData.data : [];
+      const activeStaff = staffList.filter((s) => s.is_active && s.division !== 'Management');
+
+      const readers = thisReads
+        .map((r) => ({
+          staff_id: r.staff_id,
+          staff_name: r.staff_name,
+          staff_venue: r.staff_venue,
+          staff_division: r.staff_division,
+          read_at: r.read_at
+        }))
+        .sort((a, b) => new Date(b.read_at) - new Date(a.read_at));
+
+      const unread = activeStaff
+        .filter(
+          (s) =>
+            !readStaffIds.has(String(s.id || '').toLowerCase()) &&
+            !readStaffIds.has(String(s.uuid || '').toLowerCase()) &&
+            !readStaffIds.has(String(s.legacy_code || '').toLowerCase()) &&
+            !readStaffNames.has(String(s.name || '').toLowerCase())
+        )
+        .map((s) => ({
+          staff_id: s.id,
+          staff_name: s.name,
+          staff_venue: s.venue,
+          staff_division: s.division
+        }))
+        .sort((a, b) => a.staff_name.localeCompare(b.staff_name));
+
+      const totalCount = activeStaff.length;
+      const readCount = readers.length;
+      const percentage = totalCount > 0 ? Math.round((readCount / totalCount) * 100) : 0;
+
+      return {
+        announcement_id: id,
+        total_active_staff: totalCount,
+        read_count: readCount,
+        percentage,
+        readers,
+        unread
+      };
+    } catch (e) {
+      console.warn('Direct getAnnouncementReaders error, falling back to server:', e);
+    }
+  }
+
   const res = await fetch(`${API_BASE}/announcements/${encodeURIComponent(id)}/readers`);
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'Gagal memuat daftar pembaca');
