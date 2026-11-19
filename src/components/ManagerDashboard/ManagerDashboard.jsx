@@ -976,14 +976,17 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
           onClose={() => setVisitedStaffId(null)}
         />
 
-        {/* Lounge Room Chat Modal (Manager Ghost Mode View) */}
+        {/* Lounge Room Chat Modal (Manager Ghost Mode View, Founder Highlight for PIN 8894) */}
         <LoungeChatModal
           isOpen={chatModalOpen}
           currentStaff={{
-            id: 'manager',
-            name: adminAuth?.staffName || 'Operational Manager',
-            role: adminAuth?.role || 'Manager',
-            venue: 'Management'
+            id: adminAuth?.pin === '8894' ? 'ed5f6cd5-9564-490a-b2b0-bfae2cc21379' : (adminAuth?.staffId || 'manager'),
+            name: adminAuth?.pin === '8894' ? 'Ryan Gerrit' : (adminAuth?.staffName || 'Operational Manager'),
+            role: adminAuth?.pin === '8894' ? 'Founder & Owner' : (adminAuth?.role || 'Manager'),
+            venue: 'Management',
+            pin: adminAuth?.pin || '',
+            isVip: adminAuth?.pin === '8894' || Boolean(adminAuth?.isVip),
+            isFounder: adminAuth?.pin === '8894' || String(adminAuth?.staffName || '').toLowerCase().includes('ryan gerrit')
           }}
           isManager={true}
           onClose={() => setChatModalOpen(false)}

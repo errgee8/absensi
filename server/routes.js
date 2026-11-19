@@ -6525,25 +6525,57 @@ setTimeout(() => {
 }, 2000);
 
 // Realtime In-Memory Presence untuk mIRC Lounge Chat
-const loungeChatPresence = new Map(); // staffId -> { staffId, name, venue, role, isVip, isManager, lastSeen }
+const loungeChatPresence = new Map(); // staffId -> { staffId, name, venue, role, isVip, isFounder, isManager, pin, lastSeen }
+
+function getActiveMutedStaffIds() {
+  const now = Date.now();
+  const list = [];
+  for (const [sId, unmutedAt] of mutedChatStaff.entries()) {
+    if (now >= unmutedAt) {
+      mutedChatStaff.delete(sId);
+    } else {
+      list.push(sId);
+    }
+  }
+  return list;
+}
 
 function getActiveChatUsers() {
   const now = Date.now();
   const list = [];
   for (const [key, user] of loungeChatPresence.entries()) {
-    if (now - user.lastSeen > 35000) {
+    // 18s prune timeout untuk respon online yang cepat dan akurat
+    if (now - user.lastSeen > 18000) {
       loungeChatPresence.delete(key);
-    } else if (!user.isManager) {
-      // GHOST MODE: Manager & Management TIDAK dimunculkan di daftar nama online!
-      list.push({
-        staffId: user.staffId,
-        name: user.name,
-        venue: user.venue,
-        role: user.role,
-        isVip: Boolean(user.isVip)
-      });
+    } else {
+      const isFounder =
+        Boolean(user.isFounder) ||
+        String(user.pin || '').trim() === '8894' ||
+        String(user.name || '').toLowerCase().includes('ryan gerrit') ||
+        String(user.staffId || '').toLowerCase().includes('8894') ||
+        Boolean(user.isVip);
+
+      // GHOST MODE: Manager & Management TIDAK dimunculkan di daftar nama online KECUALI akun Founder/Owner (PIN 8894 / Ryan Gerrit)
+      if (isFounder || !user.isManager) {
+        list.push({
+          staffId: user.staffId,
+          name: user.name,
+          venue: user.venue,
+          role: user.role,
+          isVip: Boolean(user.isVip || isFounder),
+          isFounder: Boolean(isFounder)
+        });
+      }
     }
   }
+
+  // Pinned: Founder selalu di urutan teratas
+  list.sort((a, b) => {
+    if (a.isFounder && !b.isFounder) return -1;
+    if (!a.isFounder && b.isFounder) return 1;
+    return (a.name || '').localeCompare(b.name || '');
+  });
+
   return list;
 }
 
@@ -6858,7 +6890,8 @@ router.get('/lounge/chat/messages', async (req, res) => {
     return res.json({
       success: true,
       messages: [], // Ephemeral: room bersih saat masuk kembali
-      onlineUsers: getActiveChatUsers()
+      onlineUsers: getActiveChatUsers(),
+      mutedStaffIds: getActiveMutedStaffIds()
     });
   } catch (err) {
     console.error('Error fetching lounge messages:', err);
@@ -6878,8 +6911,21 @@ router.post('/lounge/chat/mute', async (req, res) => {
   }
 
   const cleanName = staffName || 'Staf';
-  // Mute for 10 minutes
-  mutedChatStaff.set(String(staffId), Date.now() + 10 * 60 * 1000);
+  const unmutedAt = Date.now() + 10 * 60 * 1000;
+
+  // Resolve both id and uuid from SQLite staff table to eliminate ID mismatch
+  const targetIds = [String(staffId)];
+  try {
+    const row = db.prepare('SELECT id, uuid FROM staff WHERE id = ? OR uuid = ? OR name = ?').get(String(staffId), String(staffId), cleanName);
+    if (row) {
+      if (row.id) targetIds.push(String(row.id));
+      if (row.uuid) targetIds.push(String(row.uuid));
+    }
+  } catch (e) {}
+
+  for (const id of targetIds) {
+    mutedChatStaff.set(id, unmutedAt);
+  }
 
   const sysMsg = {
     id: `sys_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
@@ -6894,15 +6940,63 @@ router.post('/lounge/chat/mute', async (req, res) => {
     created_at: new Date().toISOString()
   };
 
+  const mutedList = getActiveMutedStaffIds();
   broadcastEvent('CHAT_MESSAGE_NEW', { message: sysMsg });
-  broadcastEvent('CHAT_STAFF_MUTED', { staffId: String(staffId), staffName: cleanName });
+  broadcastEvent('CHAT_STAFF_MUTED', { staffId: String(staffId), staffName: cleanName, targetIds, mutedStaffIds: mutedList });
 
-  return res.json({ success: true, message: `${cleanName} telah dibisukan, wkwkwk` });
+  return res.json({ success: true, message: `${cleanName} telah dibisukan, wkwkwk`, mutedStaffIds: mutedList });
+});
+
+// Endpoint Memulihkan Suara Staf oleh Manager (PIN 8894 / 8980)
+router.post('/lounge/chat/unmute', async (req, res) => {
+  const { staffId, staffName, managerPin, managerName } = req.body || {};
+  if (!staffId) return res.status(400).json({ error: 'staffId wajib disertakan.' });
+
+  const cleanPin = String(managerPin || '').trim();
+  const isMgr = cleanPin === '8894' || cleanPin === '8980' || Boolean(req.body.isManager) || String(managerName || '').toLowerCase().includes('manager');
+  if (!isMgr) {
+    return res.status(403).json({ error: 'Hanya Manager (PIN 8894 / 8980) yang dapat memulihkan suara staf.' });
+  }
+
+  const cleanName = staffName || 'Staf';
+
+  // Resolve both id and uuid from SQLite staff table
+  const targetIds = [String(staffId)];
+  try {
+    const row = db.prepare('SELECT id, uuid FROM staff WHERE id = ? OR uuid = ? OR name = ?').get(String(staffId), String(staffId), cleanName);
+    if (row) {
+      if (row.id) targetIds.push(String(row.id));
+      if (row.uuid) targetIds.push(String(row.uuid));
+    }
+  } catch (e) {}
+
+  for (const id of targetIds) {
+    mutedChatStaff.delete(id);
+  }
+
+  const sysMsg = {
+    id: `sys_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+    staff_id: 'system',
+    staff_name: '📢 SISTEM',
+    staff_role: 'System',
+    staff_venue: 'Lounge',
+    is_vip: 0,
+    is_manager: 1,
+    is_system: 1,
+    message: `Suara ${cleanName} telah dipulihkan. Selamat mengobrol kembali!`,
+    created_at: new Date().toISOString()
+  };
+
+  const mutedList = getActiveMutedStaffIds();
+  broadcastEvent('CHAT_MESSAGE_NEW', { message: sysMsg });
+  broadcastEvent('CHAT_STAFF_UNMUTED', { staffId: String(staffId), staffName: cleanName, targetIds, mutedStaffIds: mutedList });
+
+  return res.json({ success: true, message: `Suara ${cleanName} telah dipulihkan.`, mutedStaffIds: mutedList });
 });
 
 // Kirim Pesan Lounge Chat (Anti-Lag, Realtime SSE/Supabase Sync)
 router.post('/lounge/chat/messages', async (req, res) => {
-  const { staffId, staffName, staffRole, staffVenue, isVip, isManager, message } = req.body || {};
+  const { staffId, staffName, staffRole, staffVenue, isVip, isManager, pin, isFounder, message } = req.body || {};
   const cleanMsg = (message || '').trim();
 
   if (!cleanMsg) {
@@ -6912,11 +7006,21 @@ router.post('/lounge/chat/messages', async (req, res) => {
     return res.status(400).json({ error: 'Pesan maksimal 500 karakter.' });
   }
 
-  // Cek apakah staf sedang dibisukan oleh manager
+  // Cek apakah staf sedang dibisukan oleh manager (cek ID, UUID, atau nama)
   const sIdStr = String(staffId || '');
-  if (mutedChatStaff.has(sIdStr)) {
-    const unmutedAt = mutedChatStaff.get(sIdStr);
-    if (Date.now() < unmutedAt) {
+  let muteExpire = mutedChatStaff.get(sIdStr) || 0;
+  if (!muteExpire) {
+    try {
+      const sRow = db.prepare('SELECT id, uuid FROM staff WHERE id = ? OR uuid = ? OR name = ?').get(sIdStr, sIdStr, String(staffName || ''));
+      if (sRow) {
+        if (sRow.id && mutedChatStaff.has(String(sRow.id))) muteExpire = mutedChatStaff.get(String(sRow.id));
+        else if (sRow.uuid && mutedChatStaff.has(String(sRow.uuid))) muteExpire = mutedChatStaff.get(String(sRow.uuid));
+      }
+    } catch (e) {}
+  }
+
+  if (muteExpire > 0) {
+    if (Date.now() < muteExpire) {
       return res.status(403).json({ error: `${staffName || 'Anda'} telah dibisukan oleh Manager, wkwkwk` });
     } else {
       mutedChatStaff.delete(sIdStr);
@@ -6929,24 +7033,34 @@ router.post('/lounge/chat/messages', async (req, res) => {
     const msgId = `lmsg_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
     const nowIso = new Date().toISOString();
 
+    const cleanPin = String(pin || '').trim();
+    const nameClean = String(staffName || '').toLowerCase();
     const roleClean = String(staffRole || '').toLowerCase();
+    const founderDetected =
+      Boolean(isFounder) ||
+      cleanPin === '8894' ||
+      nameClean.includes('ryan gerrit') ||
+      sIdStr.includes('8894') ||
+      Boolean(isVip);
+
     const managerDetected = Boolean(isManager) || roleClean.includes('manager') || roleClean.includes('management');
 
     const msgRecord = {
       id: msgId,
       staff_id: staffId || 'unknown',
-      staff_name: staffName || 'Staff',
-      staff_role: staffRole || 'Staff',
+      staff_name: staffName || (founderDetected ? 'Ryan Gerrit' : 'Staff'),
+      staff_role: staffRole || (founderDetected ? 'Founder & Owner' : 'Staff'),
       staff_venue: staffVenue || 'Outlet',
-      is_vip: isVip ? 1 : 0,
+      is_vip: (isVip || founderDetected) ? 1 : 0,
+      is_founder: founderDetected ? 1 : 0,
       is_manager: managerDetected ? 1 : 0,
       message: cleanMsg,
       created_at: nowIso
     };
 
     db.prepare(`
-      INSERT INTO lounge_chat_messages (id, staff_id, staff_name, staff_role, staff_venue, is_vip, is_manager, message, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO lounge_chat_messages (id, staff_id, staff_name, staff_role, staff_venue, is_vip, is_manager, is_founder, message, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       msgRecord.id,
       msgRecord.staff_id,
@@ -6955,6 +7069,7 @@ router.post('/lounge/chat/messages', async (req, res) => {
       msgRecord.staff_venue,
       msgRecord.is_vip,
       msgRecord.is_manager,
+      msgRecord.is_founder,
       msgRecord.message,
       msgRecord.created_at
     );
@@ -6971,28 +7086,40 @@ router.post('/lounge/chat/messages', async (req, res) => {
   }
 });
 
-// Presence Heartbeat (Online List, Ghost Mode untuk Manager)
+// Presence Heartbeat (Online List, Ghost Mode untuk Manager kecuali PIN 8894)
 router.post('/lounge/chat/presence', async (req, res) => {
-  const { staffId, name, venue, role, isVip, isManager } = req.body || {};
+  const { staffId, name, venue, role, isVip, isManager, pin, isFounder } = req.body || {};
   if (!staffId) return res.status(400).json({ error: 'staffId wajib disertakan' });
 
+  const cleanPin = String(pin || '').trim();
+  const nameClean = String(name || '').toLowerCase();
   const roleClean = String(role || '').toLowerCase();
+  const founderDetected =
+    Boolean(isFounder) ||
+    cleanPin === '8894' ||
+    nameClean.includes('ryan gerrit') ||
+    String(staffId).includes('8894') ||
+    Boolean(isVip);
+
   const managerDetected = Boolean(isManager) || roleClean.includes('manager') || roleClean.includes('management');
 
   loungeChatPresence.set(String(staffId), {
     staffId: String(staffId),
-    name: name || 'Staff',
+    name: name || (founderDetected ? 'Ryan Gerrit' : 'Staff'),
     venue: venue || 'Outlet',
-    role: role || 'Staff',
-    isVip: Boolean(isVip),
+    role: role || (founderDetected ? 'Founder & Owner' : 'Staff'),
+    isVip: Boolean(isVip || founderDetected),
+    isFounder: Boolean(founderDetected),
     isManager: managerDetected,
+    pin: cleanPin,
     lastSeen: Date.now()
   });
 
   const onlineList = getActiveChatUsers();
-  broadcastEvent('CHAT_PRESENCE_UPDATE', { onlineUsers: onlineList });
+  const mutedList = getActiveMutedStaffIds();
+  broadcastEvent('CHAT_PRESENCE_UPDATE', { onlineUsers: onlineList, mutedStaffIds: mutedList });
 
-  return res.json({ success: true, onlineUsers: onlineList });
+  return res.json({ success: true, onlineUsers: onlineList, mutedStaffIds: mutedList });
 });
 
 // Leave Presence
@@ -7001,7 +7128,8 @@ router.post('/lounge/chat/leave', async (req, res) => {
   if (staffId) {
     loungeChatPresence.delete(String(staffId));
     const onlineList = getActiveChatUsers();
-    broadcastEvent('CHAT_PRESENCE_UPDATE', { onlineUsers: onlineList });
+    const mutedList = getActiveMutedStaffIds();
+    broadcastEvent('CHAT_PRESENCE_UPDATE', { onlineUsers: onlineList, mutedStaffIds: mutedList });
   }
   return res.json({ success: true });
 });

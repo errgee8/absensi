@@ -1002,3 +1002,14 @@ export async function muteLoungeChatStaff({ staffId, staffName, managerPin, mana
   return data;
 }
 
+export async function unmuteLoungeChatStaff({ staffId, staffName, managerPin, managerName, isManager }) {
+  const res = await fetch(`${API_BASE}/lounge/chat/unmute`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ staffId, staffName, managerPin, managerName, isManager })
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Gagal memulihkan suara staf');
+  return data;
+}
+
