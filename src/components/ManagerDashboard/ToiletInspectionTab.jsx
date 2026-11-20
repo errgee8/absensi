@@ -28,7 +28,22 @@ export default function ToiletInspectionTab() {
   const [selectedTaskIndex, setSelectedTaskIndex] = useState(0);
   const [fullscreenPhoto, setFullscreenPhoto] = useState(null);
   const [currentTime, setCurrentTime] = useState(Date.now());
-  const [targetIntervalMinutes, setTargetIntervalMinutes] = useState(60); // Standar inspeksi toilet: tiap 60 menit (1 jam)
+  const [targetIntervalMinutes, setTargetIntervalMinutes] = useState(() => {
+    try {
+      const saved = localStorage.getItem('toilet_target_interval_minutes');
+      return saved ? Number(saved) : 120; // Standar inspeksi toilet default: tiap 120 menit (2 jam)
+    } catch (_) {
+      return 120;
+    }
+  });
+
+  const handleIntervalChange = (val) => {
+    const num = Number(val);
+    setTargetIntervalMinutes(num);
+    try {
+      localStorage.setItem('toilet_target_interval_minutes', String(num));
+    } catch (_) {}
+  };
 
   const handleOpenInspection = (ins, initialTaskIdx = 0) => {
     setSelectedInspection(ins);
@@ -200,14 +215,15 @@ export default function ToiletInspectionTab() {
             <span className="text-[11px] text-slate-400 font-bold hidden sm:inline">Jadwal Cek:</span>
             <select
               value={targetIntervalMinutes}
-              onChange={(e) => setTargetIntervalMinutes(Number(e.target.value))}
+              onChange={(e) => handleIntervalChange(e.target.value)}
               className="bg-transparent font-black text-slate-100 focus:outline-none cursor-pointer"
             >
               <option value={30} className="bg-[#161b24]">Tiap 30 Menit</option>
               <option value={45} className="bg-[#161b24]">Tiap 45 Menit</option>
-              <option value={60} className="bg-[#161b24]">Tiap 1 Jam (Standar)</option>
+              <option value={60} className="bg-[#161b24]">Tiap 1 Jam</option>
               <option value={90} className="bg-[#161b24]">Tiap 1.5 Jam</option>
-              <option value={120} className="bg-[#161b24]">Tiap 2 Jam</option>
+              <option value={120} className="bg-[#161b24]">Tiap 2 Jam (Standar Default)</option>
+              <option value={180} className="bg-[#161b24]">Tiap 3 Jam</option>
             </select>
           </div>
 
@@ -262,7 +278,7 @@ export default function ToiletInspectionTab() {
                       </span>
                     </p>
                     <div className="text-[10px] text-rose-800 font-bold pt-1 border-t border-rose-200">
-                      Batas jadwal tiap {targetIntervalMinutes} menit (1 jam)
+                      Batas jadwal tiap {targetIntervalMinutes} menit ({targetIntervalMinutes >= 60 ? `${targetIntervalMinutes / 60} jam` : `${targetIntervalMinutes} menit`})
                     </div>
                   </div>
                 )}

@@ -1147,7 +1147,7 @@ export default function KioskPortalScreen({
             <div className="mt-2.5">
               <div className="text-xs font-black text-white">Cek Restroom</div>
               <div className="text-[10.5px] text-slate-400 mt-0.5 line-clamp-1">
-                Scan checklist kebersihan
+                Scan checklist per 2 jam
               </div>
             </div>
           </button>

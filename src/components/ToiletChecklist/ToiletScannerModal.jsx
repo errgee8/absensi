@@ -84,7 +84,7 @@ export default function ToiletScannerModal({ isOpen, onClose, onLocationSelected
             </div>
             <div>
               <h3 className="text-base font-black text-slate-950">Scan QR Toilet</h3>
-              <p className="text-xs text-slate-700 font-bold">Checklist Kebersihan Toilet Berkala</p>
+              <p className="text-xs text-slate-700 font-bold">Checklist Kebersihan Toilet Berkala (Per 2 Jam)</p>
             </div>
           </div>
           <button
