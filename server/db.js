@@ -364,7 +364,7 @@ export const initShiftSchedules = (force = false) => {
   const schedules = [
     // --- JP Karaoke (No breaks allowed) ---
     // 1. Server and Cashier
-    { venue: 'JP Karaoke', division: 'Server and Cashier', shift_number: 1, name: 'Shift 1', start_time: '13:00', end_time: '22:00', is_flexible_checkout: 0, allows_break: 0, max_break_end: null },
+    { venue: 'JP Karaoke', division: 'Server and Cashier', shift_number: 1, name: 'Shift 1', start_time: '13:30', end_time: '22:00', is_flexible_checkout: 0, allows_break: 0, max_break_end: null },
     { venue: 'JP Karaoke', division: 'Server and Cashier', shift_number: 2, name: 'Shift 2', start_time: '18:30', end_time: '03:00', is_flexible_checkout: 1, allows_break: 0, max_break_end: null },
 
     // 2. Cleaning Service
@@ -427,13 +427,13 @@ export const seedExactStaffRoster = (force = false) => {
   const allStaff = [
     // --- JP Karaoke Staff (14 staff) ---
     { id: 'JP-CAS-01', name: 'Ica', venue: 'JP Karaoke', division: 'Server and Cashier', role: 'Cashier', department: 'Cashier', pin: '6443', shift_start: '18:30', shift_end: '03:00', standard_hours: 8.5 },
-    { id: 'JP-CAS-02', name: 'Adis', venue: 'JP Karaoke', division: 'Server and Cashier', role: 'Cashier', department: 'Cashier', pin: '3447', shift_start: '13:00', shift_end: '22:00', standard_hours: 9.0 },
+    { id: 'JP-CAS-02', name: 'Adis', venue: 'JP Karaoke', division: 'Server and Cashier', role: 'Cashier', department: 'Cashier', pin: '3447', shift_start: '13:30', shift_end: '22:00', standard_hours: 8.5 },
     { id: 'JP-SER-03', name: 'Rojes', venue: 'JP Karaoke', division: 'Server and Cashier', role: 'Server', department: 'Service', pin: '4108', shift_start: '18:30', shift_end: '03:00', standard_hours: 8.5 },
-    { id: 'JP-SER-04', name: 'Alex', venue: 'JP Karaoke', division: 'Server and Cashier', role: 'Server', department: 'Service', pin: '5144', shift_start: '13:00', shift_end: '22:00', standard_hours: 9.0 },
-    { id: 'JP-SER-05', name: 'Dio', venue: 'JP Karaoke', division: 'Server and Cashier', role: 'Server', department: 'Service', pin: '8069', shift_start: '13:00', shift_end: '22:00', standard_hours: 9.0 },
-    { id: 'JP-SER-06', name: 'Made', venue: 'JP Karaoke', division: 'Server and Cashier', role: 'Server', department: 'Service', pin: '2937', shift_start: '13:00', shift_end: '22:00', standard_hours: 9.0 },
+    { id: 'JP-SER-04', name: 'Alex', venue: 'JP Karaoke', division: 'Server and Cashier', role: 'Server', department: 'Service', pin: '5144', shift_start: '13:30', shift_end: '22:00', standard_hours: 8.5 },
+    { id: 'JP-SER-05', name: 'Dio', venue: 'JP Karaoke', division: 'Server and Cashier', role: 'Server', department: 'Service', pin: '8069', shift_start: '13:30', shift_end: '22:00', standard_hours: 8.5 },
+    { id: 'JP-SER-06', name: 'Made', venue: 'JP Karaoke', division: 'Server and Cashier', role: 'Server', department: 'Service', pin: '2937', shift_start: '13:30', shift_end: '22:00', standard_hours: 8.5 },
     { id: 'JP-SER-07', name: 'Dein', venue: 'JP Karaoke', division: 'Server and Cashier', role: 'Server', department: 'Service', pin: '3763', shift_start: '18:30', shift_end: '03:00', standard_hours: 8.5 },
-    { id: 'JP-SER-8978737', name: 'Hendy', venue: 'JP Karaoke', division: 'Server and Cashier', role: 'Server', department: 'Server and Cashier', pin: '2687', shift_start: '13:00', shift_end: '22:00', standard_hours: 8.5 },
+    { id: 'JP-SER-8978737', name: 'Hendy', venue: 'JP Karaoke', division: 'Server and Cashier', role: 'Server', department: 'Server and Cashier', pin: '2687', shift_start: '13:30', shift_end: '22:00', standard_hours: 8.5 },
     { id: 'JP-CLE-08', name: 'Yohan', venue: 'JP Karaoke', division: 'Cleaning Service', role: 'Cleaning Service', department: 'Housekeeping', pin: '9267', shift_start: '10:00', shift_end: '19:00', standard_hours: 9.0 },
     { id: 'JP-CLE-09', name: 'Emil', venue: 'JP Karaoke', division: 'Cleaning Service', role: 'Cleaning Service', department: 'Housekeeping', pin: '2005', shift_start: '18:30', shift_end: '03:00', standard_hours: 8.5 },
     { id: 'JP-CLE-10', name: 'Anang', venue: 'JP Karaoke', division: 'Cleaning Service', role: 'Cleaning Service', department: 'Housekeeping', pin: '2666', shift_start: '10:00', shift_end: '19:00', standard_hours: 9.0 },

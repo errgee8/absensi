@@ -813,6 +813,58 @@ router.get('/network-status', (req, res) => {
   });
 });
 
+export async function syncShiftSchedulesFromCloud() {
+  if (!isSupabaseConfigured) return;
+  try {
+    const [{ data: cloudSchedules, error: schedErr }, { data: bwRow }] = await Promise.all([
+      supabase
+        .from('shift_schedules')
+        .select('*')
+        .order('venue', { ascending: true })
+        .order('division', { ascending: true })
+        .order('shift_number', { ascending: true }),
+      supabase
+        .from('app_settings')
+        .select('value')
+        .eq('key', 'shift_break_windows')
+        .maybeSingle()
+    ]);
+
+    if (!schedErr && Array.isArray(cloudSchedules) && cloudSchedules.length > 0) {
+      const breakWindows = (bwRow && bwRow.value && typeof bwRow.value === 'object') ? bwRow.value : {};
+
+      db.prepare('DELETE FROM shift_schedules').run();
+
+      const insert = db.prepare(`
+        INSERT INTO shift_schedules (id, venue, division, shift_number, name, start_time, end_time, is_flexible_checkout, allows_break, max_break_end, break_start_time, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+
+      for (const s of cloudSchedules) {
+        const normVenue = s.venue ? (s.venue.replace(/\s+/g, '').toLowerCase() === 'luckycat' ? 'LuckyCat' : s.venue) : 'LuckyCat';
+        const bw = breakWindows[String(s.id)] || {};
+        insert.run(
+          s.id,
+          normVenue,
+          s.division,
+          s.shift_number,
+          s.name,
+          s.start_time,
+          s.end_time,
+          s.is_flexible_checkout ? 1 : 0,
+          s.allows_break ? 1 : 0,
+          bw.max_break_end || s.max_break_end || null,
+          bw.break_start_time || s.break_start_time || null,
+          s.updated_at || new Date().toISOString()
+        );
+      }
+      schedulesCache = { data: null, ts: 0 };
+    }
+  } catch (err) {
+    console.warn('syncShiftSchedulesFromCloud error:', err.message);
+  }
+}
+
 // 3. Shift Schedules Management (Timing Editor)
 router.get('/schedules', async (req, res) => {
   const nowMs = Date.now();
@@ -820,67 +872,11 @@ router.get('/schedules', async (req, res) => {
     return res.json(schedulesCache.data);
   }
 
-  let schedules = db.prepare('SELECT * FROM shift_schedules ORDER BY venue ASC, division ASC, shift_number ASC').all();
-  let breakWindows = {};
-
   if (isSupabaseConfigured) {
-    try {
-      const [{ data: cloudSchedules, error: schedErr }, { data: bwRow }] = await Promise.all([
-        supabase
-          .from('shift_schedules')
-          .select('*')
-          .order('venue', { ascending: true })
-          .order('division', { ascending: true })
-          .order('shift_number', { ascending: true }),
-        supabase
-          .from('app_settings')
-          .select('value')
-          .eq('key', 'shift_break_windows')
-          .maybeSingle()
-      ]);
-
-      if (bwRow && bwRow.value && typeof bwRow.value === 'object') {
-        breakWindows = bwRow.value;
-      }
-
-      if (!schedErr && cloudSchedules && cloudSchedules.length > 0) {
-        schedules = cloudSchedules.map((s) => {
-          const normVenue = s.venue ? (s.venue.replace(/\s+/g, '').toLowerCase() === 'luckycat' ? 'LuckyCat' : s.venue) : 'LuckyCat';
-          const bw = breakWindows[String(s.id)] || {};
-          return {
-            ...s,
-            venue: normVenue,
-            is_flexible_checkout: s.is_flexible_checkout ? 1 : 0,
-            allows_break: s.allows_break ? 1 : 0,
-            break_start_time: bw.break_start_time || s.break_start_time || null,
-            max_break_end: bw.max_break_end || s.max_break_end || null
-          };
-        });
-
-        for (const s of schedules) {
-          db.prepare(`
-            INSERT OR REPLACE INTO shift_schedules (id, venue, division, shift_number, name, start_time, end_time, is_flexible_checkout, allows_break, max_break_end, break_start_time)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-          `).run(
-            s.id,
-            s.venue,
-            s.division,
-            s.shift_number,
-            s.name,
-            s.start_time,
-            s.end_time,
-            s.is_flexible_checkout ? 1 : 0,
-            s.allows_break ? 1 : 0,
-            s.max_break_end || null,
-            s.break_start_time || null
-          );
-        }
-      }
-    } catch (e) {
-      console.warn('Supabase fetch schedules note:', e.message);
-    }
+    await syncShiftSchedulesFromCloud();
   }
 
+  let schedules = db.prepare('SELECT * FROM shift_schedules ORDER BY venue ASC, division ASC, shift_number ASC').all();
   // Ensure normalized venue
   schedules = schedules.map((s) => ({
     ...s,
@@ -977,6 +973,8 @@ router.put('/schedules/:id', async (req, res) => {
   const { venue, division, name, start_time, end_time, is_flexible_checkout, allows_break, max_break_end, break_start_time } = req.body;
 
   try {
+    const oldSchedule = db.prepare('SELECT * FROM shift_schedules WHERE id = ?').get(id);
+
     db.prepare(`
       UPDATE shift_schedules SET
         venue = COALESCE(?, venue),
@@ -1018,6 +1016,33 @@ router.put('/schedules/:id', async (req, res) => {
           value: currentBw,
           updated_at: new Date().toISOString()
         });
+
+        // Auto-update staff members' shift_start/shift_end who were assigned to this old timing
+        const targetVenue = venue || oldSchedule?.venue;
+        const targetDiv = division || oldSchedule?.division;
+        const oldStart = oldSchedule?.start_time;
+
+        if (targetVenue && targetDiv && oldStart && start_time && oldStart !== start_time) {
+          try {
+            await supabase
+              .from('staff')
+              .update({
+                shift_start: start_time,
+                shift_end: end_time || oldSchedule?.end_time || '22:00',
+                updated_at: new Date().toISOString()
+              })
+              .eq('venue', targetVenue)
+              .eq('division', targetDiv)
+              .eq('shift_start', oldStart);
+
+            db.prepare(`
+              UPDATE staff SET shift_start = ?, shift_end = COALESCE(?, shift_end)
+              WHERE venue = ? AND division = ? AND shift_start = ?
+            `).run(start_time, end_time, targetVenue, targetDiv, oldStart);
+          } catch (stErr) {
+            console.warn('Auto-update staff shift timing note:', stErr.message);
+          }
+        }
       } catch (e) {
         console.warn('Supabase schedule update error:', e.message);
       }
@@ -6525,6 +6550,11 @@ async function getCachedLeaderboardRanks() {
   }
   return await computeLeaderboardRanksInternal();
 }
+
+// Sync shift schedules from Cloud on startup
+setTimeout(() => {
+  syncShiftSchedulesFromCloud().catch(() => {});
+}, 600);
 
 // Pre-warm leaderboard ranks asynchronously on start
 setTimeout(() => {

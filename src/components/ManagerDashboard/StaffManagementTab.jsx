@@ -155,8 +155,8 @@ export default function StaffManagementTab({ onStaffUpdated, adminAuth }) {
         role: 'Cashier',
         division: 'Server and Cashier',
         label: 'Cashier (2 Shift)',
-        description: 'Shift 1: 13:00 - 22:00 | Shift 2: 18:30 - 03:00 (Tanpa Istirahat)',
-        start_time: '13:00',
+        description: 'Shift 1: 13:30 - 22:00 | Shift 2: 18:30 - 03:00 (Tanpa Istirahat)',
+        start_time: '13:30',
         end_time: '22:00',
         standard_hours: 8.5
       },
@@ -164,8 +164,8 @@ export default function StaffManagementTab({ onStaffUpdated, adminAuth }) {
         role: 'Server',
         division: 'Server and Cashier',
         label: 'Server (2 Shift)',
-        description: 'Shift 1: 13:00 - 22:00 | Shift 2: 18:30 - 03:00 (Tanpa Istirahat)',
-        start_time: '13:00',
+        description: 'Shift 1: 13:30 - 22:00 | Shift 2: 18:30 - 03:00 (Tanpa Istirahat)',
+        start_time: '13:30',
         end_time: '22:00',
         standard_hours: 8.5
       },
