@@ -346,12 +346,12 @@ export const initShiftSchedules = (force = false) => {
   if (existingCount >= 10 && !force) {
     // Always ensure LuckyCat Bar has 3 shifts
     try {
-      const hasLcMiddle = db.prepare("SELECT id FROM shift_schedules WHERE venue = 'LuckyCat' AND division = 'Bar, Cashier, and Server' AND start_time = '14:00'").get();
+      const hasLcMiddle = db.prepare("SELECT id FROM shift_schedules WHERE venue = 'LuckyCat' AND division = 'Bar, Cashier, and Server' AND shift_number = 2").get();
       if (!hasLcMiddle) {
         db.prepare("UPDATE shift_schedules SET shift_number = 3, name = 'Shift 3' WHERE venue = 'LuckyCat' AND division = 'Bar, Cashier, and Server' AND start_time = '18:30'").run();
         db.prepare(`
           INSERT INTO shift_schedules (venue, division, shift_number, name, start_time, end_time, is_flexible_checkout, allows_break, max_break_end, break_start_time)
-          VALUES ('LuckyCat', 'Bar, Cashier, and Server', 2, 'Shift 2 (Middle)', '14:00', '23:00', 0, 1, '20:00', '17:00')
+          VALUES ('LuckyCat', 'Bar, Cashier, and Server', 2, 'Shift 2 (Middle)', '16:00', '01:00', 0, 1, '23:00', '19:00')
         `).run();
       }
     } catch (e) {
@@ -382,7 +382,7 @@ export const initShiftSchedules = (force = false) => {
     // --- LuckyCat (Allows 1 hr break, max break end 16:00 for Shift 1, 20:00 for Middle, 01:00 for Shift 3) ---
     // 1. Bar, Cashier, and Server (3 shifts: Shift 1 10:00-19:00, Shift 2 Middle 14:00-23:00, Shift 3 Malam 18:30-03:30)
     { venue: 'LuckyCat', division: 'Bar, Cashier, and Server', shift_number: 1, name: 'Shift 1', start_time: '10:00', end_time: '19:00', is_flexible_checkout: 0, allows_break: 1, max_break_end: '16:00', break_start_time: '13:00' },
-    { venue: 'LuckyCat', division: 'Bar, Cashier, and Server', shift_number: 2, name: 'Shift 2 (Middle)', start_time: '14:00', end_time: '23:00', is_flexible_checkout: 0, allows_break: 1, max_break_end: '20:00', break_start_time: '17:00' },
+    { venue: 'LuckyCat', division: 'Bar, Cashier, and Server', shift_number: 2, name: 'Shift 2 (Middle)', start_time: '16:00', end_time: '01:00', is_flexible_checkout: 0, allows_break: 1, max_break_end: '23:00', break_start_time: '19:00' },
     { venue: 'LuckyCat', division: 'Bar, Cashier, and Server', shift_number: 3, name: 'Shift 3', start_time: '18:30', end_time: '03:30', is_flexible_checkout: 0, allows_break: 1, max_break_end: '01:00', break_start_time: '21:30' },
 
     // 2. Kitchen (LuckyCat Kitchen Shifts per prompt)

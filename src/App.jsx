@@ -1,13 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import Navigation from './components/Navigation';
 import StaffView from './components/StaffView/StaffView';
-import ManagerDashboard from './components/ManagerDashboard/ManagerDashboard';
 import AdminPinModal from './components/ManagerDashboard/AdminPinModal';
-import LeaderboardModal from './components/Leaderboard/LeaderboardModal';
 import StaffPublicProfileModal from './components/StaffView/StaffPublicProfileModal';
 import ToastContainer, { showToast } from './components/Common/Toast';
 import { getNetworkStatus, getStaffList, getSettings, getServerTime } from './utils/api';
 import { Smartphone, Download } from 'lucide-react';
+
+const ManagerDashboard = lazy(() => import('./components/ManagerDashboard/ManagerDashboard'));
+const LeaderboardModal = lazy(() => import('./components/Leaderboard/LeaderboardModal'));
 
 export default function App() {
   const [currentView, setView] = useState('staff'); // 'staff' | 'manager'
@@ -149,13 +150,15 @@ export default function App() {
             onOpenLeaderboard={() => setLeaderboardOpen(true)}
           />
         ) : (
-          <ManagerDashboard
-            venueSettings={venueSettings}
-            refreshSettings={loadAppData}
-            adminAuth={adminAuth}
-            isReadOnly={adminAuth?.role === 'VIEW_ONLY' || !adminAuth?.canEdit}
-            onOpenLeaderboard={() => setLeaderboardOpen(true)}
-          />
+          <Suspense fallback={<div className="min-h-screen bg-[#0e121a] flex items-center justify-center text-slate-400 font-bold">Memuat Dashboard Manager...</div>}>
+            <ManagerDashboard
+              venueSettings={venueSettings}
+              refreshSettings={loadAppData}
+              adminAuth={adminAuth}
+              isReadOnly={adminAuth?.role === 'VIEW_ONLY' || !adminAuth?.canEdit}
+              onOpenLeaderboard={() => setLeaderboardOpen(true)}
+            />
+          </Suspense>
         )}
       </main>
 
@@ -174,11 +177,15 @@ export default function App() {
       />
 
       {/* Real-time Monthly Staff Leaderboard Modal */}
-      <LeaderboardModal
-        isOpen={leaderboardOpen}
-        onClose={() => setLeaderboardOpen(false)}
-        onVisitStaff={(staffItem) => setVisitedStaffId(staffItem.staff_id || staffItem.id || staffItem.uuid || staffItem.name)}
-      />
+      {leaderboardOpen && (
+        <Suspense fallback={null}>
+          <LeaderboardModal
+            isOpen={leaderboardOpen}
+            onClose={() => setLeaderboardOpen(false)}
+            onVisitStaff={(staffItem) => setVisitedStaffId(staffItem.staff_id || staffItem.id || staffItem.uuid || staffItem.name)}
+          />
+        </Suspense>
+      )}
 
       {/* Staff Public Profile Modal (from Leaderboard / General Visit) */}
       <StaffPublicProfileModal

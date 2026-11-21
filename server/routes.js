@@ -6551,9 +6551,10 @@ async function getCachedLeaderboardRanks() {
   return await computeLeaderboardRanksInternal();
 }
 
-// Sync shift schedules from Cloud on startup
+// Sync shift schedules & staff roster from Cloud on startup
 setTimeout(() => {
   syncShiftSchedulesFromCloud().catch(() => {});
+  cloudDb.syncStaffToSqlite(db).catch(() => {});
 }, 600);
 
 // Pre-warm leaderboard ranks asynchronously on start
