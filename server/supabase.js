@@ -1177,23 +1177,8 @@ export const cloudDb = {
       }
     }
 
-    // 3. Wipe Points & Leave Requests (Izin, Cuti, Sakit) when scope is 'all' or 'master_reset'
-    // Stored in app_settings (Supabase key-value storage)
+    // 3. Clear daily mood emojis only (Points and Leave Requests are safely PRESERVED per Master Reset specification)
     if (scope === 'all' || scope === 'master_reset') {
-      try {
-        await this.saveSetting('staff_points', [], 'Staff Disciplinary & Plus Points');
-        pointsDeleted = 1;
-      } catch (err) {
-        console.warn('Failed to wipe staff_points in Supabase:', err.message);
-      }
-
-      try {
-        await this.saveSetting('leave_requests', [], 'Staff Leave Requests');
-        leavesDeleted = 1;
-      } catch (err) {
-        console.warn('Failed to wipe leave_requests in Supabase:', err.message);
-      }
-
       try {
         await this.saveSetting('staff_moods', {}, 'Daily Staff Mood Emojis');
       } catch (err) {

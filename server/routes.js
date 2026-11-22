@@ -3725,18 +3725,11 @@ router.post('/admin/wipe-leaderboard', async (req, res) => {
         }
       }
 
-      // If scope === 'all', also wipe SQLite leave_requests & clear points/leaves/moods settings
-      if (scope === 'all') {
-        try {
-          if (db) {
-            try { db.prepare('DELETE FROM leave_requests').run(); } catch (e) {}
-          }
-          setSetting('staff_points', []);
-          setSetting('leave_requests', []);
-          setSetting('staff_moods', {});
-        } catch (sqliteErr) {
-          console.warn('SQLite leave/points wipe note:', sqliteErr.message);
-        }
+      // Clear daily staff moods only. Leave requests & points are strictly preserved!
+      try {
+        setSetting('staff_moods', {});
+      } catch (sqliteErr) {
+        console.warn('SQLite moods wipe note:', sqliteErr.message);
       }
 
       // 2. Wipe Supabase Cloud tables
@@ -3748,13 +3741,11 @@ router.post('/admin/wipe-leaderboard', async (req, res) => {
       // 3. Broadcast real-time update events
       broadcastEvent('SHIFT_UPDATE');
       broadcastEvent('LEADERBOARD_UPDATE');
-      broadcastEvent('POINT_UPDATE');
-      broadcastEvent('LEAVE_UPDATE');
 
       return res.json({
         success: true,
         mode: 'wipe_records',
-        message: 'Master Reset Berhasil! Semua data trial (poin, absensi, keterlambatan, hari kerja, izin/cuti, toilet) telah kembali bersih ke 0. Nama staf, PIN, foto profil, dan biometrik wajah tetap aman.',
+        message: 'Master Reset Berhasil! Data absensi, keterlambatan, hari kerja, dan checklist inspeksi toilet telah kembali bersih ke 0. Poin, riwayat izin/cuti, nama staf, PIN, dan biometrik tetap aman 100%.',
         scope,
         result
       });

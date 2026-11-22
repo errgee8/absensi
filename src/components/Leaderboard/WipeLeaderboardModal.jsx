@@ -146,7 +146,7 @@ export default function WipeLeaderboardModal({ isOpen, onClose, onSuccess, curre
                     </span>
                   </div>
                   <p className="text-[11px] text-rose-900 font-bold mt-1 leading-relaxed">
-                    Membersihkan seluruh data ujicoba (trial) agar seluruh staf memulai pencatatan poin, absensi, keterlambatan, dan izin secara resmi dari 0.
+                    Membersihkan data trial (absensi, keterlambatan, hari kerja, dan checklist toilet) untuk operasional resmi. Poin dan riwayat cuti/izin TETAP AMAN.
                   </p>
                 </div>
               </label>
@@ -192,10 +192,8 @@ export default function WipeLeaderboardModal({ isOpen, onClose, onSuccess, curre
                     <span>DI-RESET KE 0 (DIHAPUS)</span>
                   </div>
                   <ul className="text-[10px] text-red-900 space-y-1 font-bold pl-1">
-                    <li>• Poin Sanksi &amp; Poin Plus (0 Poin)</li>
                     <li>• Riwayat Absensi &amp; Hari Kerja (0 Hari)</li>
                     <li>• Total Keterlambatan (0x Telat)</li>
-                    <li>• Riwayat Cuti, Izin &amp; Sakit (0 Hari)</li>
                     <li>• Checklist Inspeksi Toilet QR (0 Log)</li>
                   </ul>
                 </div>
@@ -207,10 +205,10 @@ export default function WipeLeaderboardModal({ isOpen, onClose, onSuccess, curre
                     <span>TETAP AMAN (TIDAK HILANG)</span>
                   </div>
                   <ul className="text-[10px] text-emerald-900 space-y-1 font-bold pl-1">
-                    <li>✓ Daftar Nama Seluruh Staf</li>
-                    <li>✓ PIN Login 4-Digit Staf</li>
-                    <li>✓ Foto Profil Staf</li>
-                    <li>✓ Pendaftaran Biometrik Wajah</li>
+                    <li>✓ Poin Sanksi &amp; Poin Plus (Termasuk Riwayat Poin)</li>
+                    <li>✓ Riwayat Cuti, Izin &amp; Sakit</li>
+                    <li>✓ Daftar Nama Seluruh Staf &amp; PIN 4-Digit</li>
+                    <li>✓ Foto Profil &amp; Pendaftaran Biometrik Wajah</li>
                     <li>✓ Role &amp; Venue Cabang (LuckyCat &amp; JP)</li>
                   </ul>
                 </div>
@@ -226,7 +224,7 @@ export default function WipeLeaderboardModal({ isOpen, onClose, onSuccess, curre
                   className="mt-0.5 w-4 h-4 accent-red-600 rounded cursor-pointer"
                 />
                 <span className="text-[11px] font-black text-amber-950 leading-tight">
-                  Saya mengonfirmasi Master Reset ini untuk membersihkan semua data trial dan memulai operasional resmi dari 0.
+                  Saya mengonfirmasi Master Reset ini untuk membersihkan absensi, keterlambatan, dan checklist toilet trial (Poin &amp; Cuti tetap aman).
                 </span>
               </label>
             </div>
