@@ -1888,20 +1888,28 @@ router.post('/staff/:id/biometrics', async (req, res) => {
 
     if (isSupabaseConfigured) {
       try {
-        await cloudDb.saveStaffBiometricPhoto({
-          staffId: staff.id,
-          staffUuid: staff.uuid,
-          legacyCode: staff.legacy_code,
-          photoUrl,
-          livenessVerified: Boolean(livenessVerified)
-        });
+        await Promise.race([
+          cloudDb.saveStaffBiometricPhoto({
+            staffId: staff.id,
+            staffUuid: staff.uuid,
+            legacyCode: staff.legacy_code,
+            photoUrl,
+            livenessVerified: Boolean(livenessVerified)
+          }),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Cloud biometric sync timeout')), 6000))
+        ]);
       } catch (e) {
         console.warn('saveStaffBiometricPhoto note:', e.message);
       }
     }
 
     const resolvedObj = { biometric_photo_url: photoUrl };
-    await resolveAttendancePhotoUrls([resolvedObj], ['biometric_photo_url']);
+    try {
+      await Promise.race([
+        resolveAttendancePhotoUrls([resolvedObj], ['biometric_photo_url']),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('resolveAttendancePhotoUrls timeout')), 3000))
+      ]);
+    } catch {}
 
     broadcastEvent('STAFF_UPDATE', { action: 'BIOMETRICS_REGISTERED', staffId: staff.id });
     return res.json({

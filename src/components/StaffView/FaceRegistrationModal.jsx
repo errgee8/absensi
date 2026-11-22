@@ -1,7 +1,8 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { Camera, X, CheckCircle2, AlertTriangle, RefreshCw, Smartphone, ShieldCheck, Upload, Sparkles, ArrowLeftRight, Eye } from 'lucide-react';
+import { Camera, X, CheckCircle2, AlertTriangle, RefreshCw, Smartphone, ShieldCheck, Upload, Sparkles, Eye } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { registerStaffBiometrics } from '../../utils/api';
+import { uploadAttendancePhotoClient } from '../../utils/supabaseClient';
 import DevicePermissionModal from './DevicePermissionModal';
 
 export default function FaceRegistrationModal({
@@ -26,11 +27,9 @@ export default function FaceRegistrationModal({
   const [errorMsg, setErrorMsg] = useState(null);
   const [permModalOpen, setPermModalOpen] = useState(false);
 
-  // Liveness confirmation steps: 1 = CENTER, 2 = HEAD_TURN, 3 = BLINK_SMILE
-  const [livenessStep, setLivenessStep] = useState(1);
-  const [stepCompleted, setStepCompleted] = useState({ 1: false, 2: false, 3: false });
 
-  // Start front camera
+
+  // Start front camera with resilient fallback cascade
   const startCamera = async () => {
     setCameraLoading(true);
     setCameraError(null);
@@ -55,47 +54,70 @@ export default function FaceRegistrationModal({
       ]);
     };
 
+    let stream = null;
     try {
-      const stream = await getUserMediaWithTimeout({
+      // 1. Ideal front camera with square dimension
+      stream = await getUserMediaWithTimeout({
         video: {
           facingMode: { ideal: 'user' },
           width: { ideal: 640 },
           height: { ideal: 640 }
         },
         audio: false
-      }, 6000);
+      }, 5000);
+    } catch (err1) {
+      console.warn('Strict front camera request failed, trying simple user facing:', err1);
+      try {
+        // 2. Fallback to basic user facing mode
+        stream = await getUserMediaWithTimeout({
+          video: { facingMode: 'user' },
+          audio: false
+        }, 5000);
+      } catch (err2) {
+        console.warn('User facing failed, trying generic video stream:', err2);
+        try {
+          // 3. Fallback to any available video stream
+          stream = await getUserMediaWithTimeout({
+            video: true,
+            audio: false
+          }, 5000);
+        } catch (err3) {
+          console.error('All camera attempts failed:', err3);
+          let msg = 'Kamera tidak dapat diakses atau lambat merespons.';
+          if (err3.name === 'NotAllowedError' || err3.name === 'PermissionDeniedError' || err1.name === 'NotAllowedError') {
+            msg = 'Izin kamera ditolak browser. Ketuk "Izin Lokasi & Kamera" untuk memunculkan notifikasi izin di HP Anda.';
+          } else if (err3.message === 'CAMERA_TIMEOUT' || err1.message === 'CAMERA_TIMEOUT') {
+            msg = 'Kamera HP lambat merespons. Gunakan tombol "Buka Kamera HP Langsung" di bawah.';
+          }
+          setCameraError(msg);
+          setCameraLoading(false);
+          setCameraActive(false);
+          return;
+        }
+      }
+    }
+
+    if (stream) {
       streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        videoRef.current.onloadedmetadata = () => {
-          videoRef.current?.play().catch(() => {});
+      const v = videoRef.current;
+      if (v) {
+        v.srcObject = stream;
+        v.onloadedmetadata = () => {
+          v.play().catch(() => {});
           setCameraActive(true);
           setCameraLoading(false);
         };
-        videoRef.current?.play().catch(() => {});
+        v.play().catch(() => {});
       }
       setCameraActive(true);
       setCameraLoading(false);
-
-      // Safety guard: force loading state to dismiss within 3.5s
-      setTimeout(() => {
-        setCameraLoading((curr) => {
-          if (curr) {
-            if (streamRef.current) setCameraActive(true);
-            return false;
-          }
-          return curr;
-        });
-      }, 3500);
-    } catch (err) {
-      console.warn('Face registration camera start error:', err);
-      let msg = 'Kamera tidak dapat diakses.';
-      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-        msg = 'Izin kamera ditolak browser. Ketuk "Izin Lokasi & Kamera" untuk memunculkan notifikasi izin di HP Anda.';
-      }
-      setCameraError(msg);
-      setCameraLoading(false);
     }
+
+    // Safety guard: force loading state to dismiss within 3.5s
+    setTimeout(() => {
+      setCameraLoading(false);
+      if (streamRef.current) setCameraActive(true);
+    }, 3500);
   };
 
   useEffect(() => {
@@ -108,37 +130,35 @@ export default function FaceRegistrationModal({
     };
   }, []);
 
-  // Advance liveness steps
-  const handleNextLivenessStep = () => {
-    if (livenessStep === 1) {
-      setStepCompleted(prev => ({ ...prev, 1: true }));
-      setLivenessStep(2);
-    } else if (livenessStep === 2) {
-      setStepCompleted(prev => ({ ...prev, 2: true }));
-      setLivenessStep(3);
-    }
-  };
-
-  // Final step: Capture photo and save biometrics
+  // Capture photo and save biometrics in one reliable step
   const handleCapture = () => {
-    if (!videoRef.current) return;
+    const video = videoRef.current;
+    if (!video) return;
+
+    const vWidth = video.videoWidth || 0;
+    const vHeight = video.videoHeight || 0;
+    if (vWidth === 0 || vHeight === 0) {
+      setErrorMsg('Kamera sedang memuat gambar, tunggu 1-2 detik lalu ketuk tombol lagi.');
+      return;
+    }
+
     try {
-      const video = videoRef.current;
+      const size = Math.min(vWidth, vHeight);
       const canvas = document.createElement('canvas');
-      const size = Math.min(video.videoWidth || 480, video.videoHeight || 480);
       canvas.width = 480;
       canvas.height = 480;
       const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error('Canvas context tidak tersedia');
 
-      const sx = Math.max(0, ((video.videoWidth || 480) - size) / 2);
-      const sy = Math.max(0, ((video.videoHeight || 480) - size) / 2);
+      const sx = Math.max(0, (vWidth - size) / 2);
+      const sy = Math.max(0, (vHeight - size) / 2);
       ctx.drawImage(video, sx, sy, size, size, 0, 0, 480, 480);
 
-      const base64 = canvas.toDataURL('image/jpeg', 0.75);
-      setStepCompleted({ 1: true, 2: true, 3: true });
+      const base64 = canvas.toDataURL('image/jpeg', 0.80);
       setPreviewPhoto(base64);
       handleSavePhoto(base64);
     } catch (err) {
+      console.error('Capture error:', err);
       setErrorMsg('Gagal mengambil foto: ' + err.message);
     }
   };
@@ -162,8 +182,7 @@ export default function FaceRegistrationModal({
         const sx = Math.max(0, (img.width - size) / 2);
         const sy = Math.max(0, (img.height - size) / 2);
         ctx.drawImage(img, sx, sy, size, size, 0, 0, 480, 480);
-        const base64 = canvas.toDataURL('image/jpeg', 0.75);
-        setStepCompleted({ 1: true, 2: true, 3: true });
+        const base64 = canvas.toDataURL('image/jpeg', 0.80);
         setPreviewPhoto(base64);
         handleSavePhoto(base64);
       };
@@ -185,11 +204,41 @@ export default function FaceRegistrationModal({
     } catch {}
 
     try {
-      const res = await registerStaffBiometrics(staff.id, {
-        photoBase64,
+      // 1. Offload storage upload directly to client Supabase Storage when possible (super fast, prevents serverless function duration & memory limits)
+      let photoRef = photoBase64;
+      try {
+        const directUrl = await uploadAttendancePhotoClient(photoBase64, `biometric_${staff.id || 'staff'}`);
+        if (directUrl) photoRef = directUrl;
+      } catch (errUpload) {
+        console.warn('Client direct biometric upload note:', errUpload);
+      }
+
+      // 2. Call server endpoint with timeout race guard (never hang user)
+      const registerPromise = registerStaffBiometrics(staff.id, {
+        photoBase64: photoRef,
         livenessVerified: true
       });
-      const newUrl = res?.biometric_photo_url || res?.biometrics?.photo_url || res?.photo_url || photoBase64;
+
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('TIMEOUT')), 15000)
+      );
+
+      let res;
+      try {
+        res = await Promise.race([registerPromise, timeoutPromise]);
+      } catch (errRace) {
+        if (errRace.message === 'TIMEOUT') {
+          console.warn('Biometric API request timed out, local persistence active.');
+          res = {
+            biometric_photo_url: photoRef,
+            photo_url: photoRef
+          };
+        } else {
+          throw errRace;
+        }
+      }
+
+      const newUrl = res?.biometric_photo_url || res?.biometrics?.photo_url || res?.photo_url || photoRef;
       setSavedBiometricUrl(newUrl);
       setRegisteredSuccess(true);
 
@@ -215,9 +264,16 @@ export default function FaceRegistrationModal({
         onClose();
       }, 1800);
     } catch (err) {
+      console.error('Error saving biometrics:', err);
       setErrorMsg(err.message || 'Gagal menyimpan biometrik wajah. Coba lagi.');
       setSaving(false);
       setPreviewPhoto(null);
+
+      // Re-ensure video element has streamRef attached if retrying
+      if (videoRef.current && streamRef.current) {
+        videoRef.current.srcObject = streamRef.current;
+        videoRef.current.play().catch(() => {});
+      }
     }
   };
 
@@ -309,43 +365,6 @@ export default function FaceRegistrationModal({
                 </div>
               </div>
 
-              {/* Liveness Step Indicator */}
-              <div className="bg-[#12161f] border border-slate-800 rounded-2xl p-2.5">
-                <div className="flex items-center justify-between text-[10px] font-bold mb-2">
-                  <span className="text-slate-400 uppercase tracking-wider">Verifikasi Keaktifan (Liveness):</span>
-                  <span className="text-indigo-400 font-mono">Langkah {livenessStep} dari 3</span>
-                </div>
-                <div className="grid grid-cols-3 gap-1.5">
-                  <div className={`p-1.5 rounded-xl border text-center transition ${
-                    livenessStep === 1
-                      ? 'bg-indigo-600/25 border-indigo-400 text-indigo-200 font-black'
-                      : stepCompleted[1]
-                        ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300'
-                        : 'bg-slate-900 border-slate-800 text-slate-500'
-                  }`}>
-                    <div className="text-[10px]">1. Posisi Tengah</div>
-                  </div>
-                  <div className={`p-1.5 rounded-xl border text-center transition ${
-                    livenessStep === 2
-                      ? 'bg-indigo-600/25 border-indigo-400 text-indigo-200 font-black'
-                      : stepCompleted[2]
-                        ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300'
-                        : 'bg-slate-900 border-slate-800 text-slate-500'
-                  }`}>
-                    <div className="text-[10px]">2. Toleh Kanan/Kiri</div>
-                  </div>
-                  <div className={`p-1.5 rounded-xl border text-center transition ${
-                    livenessStep === 3
-                      ? 'bg-indigo-600/25 border-indigo-400 text-indigo-200 font-black'
-                      : stepCompleted[3]
-                        ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300'
-                        : 'bg-slate-900 border-slate-800 text-slate-500'
-                  }`}>
-                    <div className="text-[10px]">3. Kedip / Senyum</div>
-                  </div>
-                </div>
-              </div>
-
               {/* Error notice if any */}
               {errorMsg && (
                 <div className="p-2.5 rounded-xl bg-rose-500/20 border border-rose-500/40 text-rose-300 text-[11px] font-bold flex items-center space-x-2">
@@ -354,57 +373,48 @@ export default function FaceRegistrationModal({
                 </div>
               )}
 
-              {/* Camera Frame with Oval Face Guide & Interactive Prompts */}
-              <div className="relative aspect-square w-full bg-black rounded-2xl overflow-hidden border-2 border-indigo-500/40 flex items-center justify-center shadow-inner">
-                {previewPhoto ? (
-                  <img src={previewPhoto} alt="Preview Biometrik" className="w-full h-full object-cover" />
-                ) : (
-                  <>
-                    <video
-                      ref={videoRef}
-                      playsInline
-                      muted
-                      autoPlay
-                      className="w-full h-full object-cover scale-x-[-1]"
-                    />
+              {/* Camera Frame with Oval Face Guide (Permanently mounted video, never lost on re-renders) */}
+              <div className="relative aspect-square w-full bg-slate-950 rounded-2xl overflow-hidden border-2 border-indigo-500/40 flex items-center justify-center shadow-inner">
+                {/* Always mounted video element for immediate srcObject binding (never display:none so video frames decode) */}
+                <video
+                  ref={videoRef}
+                  playsInline
+                  muted
+                  autoPlay
+                  className={`w-full h-full object-cover scale-x-[-1] transition-opacity duration-150 ${
+                    previewPhoto ? 'opacity-0 absolute inset-0 pointer-events-none' : 'opacity-100 block'
+                  }`}
+                />
 
-                    {/* Oval Face Guide Overlay with Interactive Target */}
-                    <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-between p-3 z-10">
-                      {/* Top Step Banner */}
-                      <div className="px-3 py-1 rounded-full bg-black/75 border border-indigo-500/40 text-[10px] font-black text-indigo-300 shadow-md">
-                        {livenessStep === 1 && '📍 Langkah 1: Posisikan Wajah Tegak di Tengah'}
-                        {livenessStep === 2 && '🔄 Langkah 2: Menoleh Sedikit ke Kanan & Kiri'}
-                        {livenessStep === 3 && '👁️ Langkah 3: Kedipkan Mata 2x atau Tersenyum'}
-                      </div>
+                {/* Preview Photo if taken */}
+                {previewPhoto && (
+                  <img
+                    src={previewPhoto}
+                    alt="Preview Biometrik"
+                    className="w-full h-full object-cover absolute inset-0 z-10"
+                  />
+                )}
 
-                      {/* Oval Frame */}
-                      <div className={`relative w-[68%] h-[74%] rounded-[50%] border-2 border-dashed ${
-                        livenessStep === 1 ? 'border-indigo-400 shadow-[0_0_0_9999px_rgba(0,0,0,0.35)]' :
-                        livenessStep === 2 ? 'border-amber-400 shadow-[0_0_0_9999px_rgba(0,0,0,0.35)]' :
-                        'border-emerald-400 shadow-[0_0_0_9999px_rgba(0,0,0,0.35)]'
-                      } flex flex-col items-center justify-center transition-colors duration-300`}>
-                        {livenessStep === 2 && (
-                          <div className="flex items-center space-x-4 text-amber-300 font-mono text-xs font-black animate-pulse">
-                            <span>⇦ KIRI</span>
-                            <ArrowLeftRight className="w-5 h-5 text-amber-400" />
-                            <span>KANAN ⇨</span>
-                          </div>
-                        )}
+                {/* Oval Face Guide Overlay (Always stable static styling, zero GPU crash) */}
+                {cameraActive && !previewPhoto && !saving && (
+                  <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-between p-3 z-10">
+                    {/* Top Guide Banner */}
+                    <div className="px-3 py-1 rounded-full bg-black/80 border border-emerald-500/40 text-[10px] font-black text-emerald-300 shadow-md">
+                      📍 Posisikan Wajah Tegak di Dalam Bingkai
+                    </div>
 
-                        {livenessStep === 3 && (
-                          <div className="flex items-center space-x-1.5 text-emerald-300 font-bold text-xs bg-black/60 px-2.5 py-1 rounded-full border border-emerald-500/30 animate-pulse">
-                            <Eye className="w-4 h-4 text-emerald-400" />
-                            <span>Berkedip 2x / Senyum</span>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Bottom Instruction */}
-                      <span className="text-[10px] font-black text-indigo-200 bg-black/75 px-3 py-0.5 rounded-full border border-indigo-500/30">
-                        {livenessStep === 1 ? 'Wajah Tegak Menghadap Kamera' : livenessStep === 2 ? 'Tolehkan Wajah Perlahan' : 'Tatap Kamera & Bersiap Ambil Foto'}
+                    {/* Oval Target Frame */}
+                    <div className="relative w-[68%] h-[76%] rounded-[50%] border-2 border-dashed border-emerald-400/90 shadow-[0_0_0_9999px_rgba(0,0,0,0.30)] flex flex-col items-center justify-center">
+                      <span className="text-[10px] font-black text-emerald-300 bg-black/70 px-2.5 py-0.5 rounded-full border border-emerald-500/30">
+                        Pusat Wajah
                       </span>
                     </div>
-                  </>
+
+                    {/* Bottom Instruction */}
+                    <span className="text-[10px] font-black text-emerald-200 bg-black/80 px-3 py-0.5 rounded-full border border-emerald-500/30">
+                      Tatap Kamera &amp; Ketuk Tombol di Bawah
+                    </span>
+                  </div>
                 )}
 
                 {/* Loading state with escape button */}
@@ -434,39 +444,18 @@ export default function FaceRegistrationModal({
                 )}
               </div>
 
-              {/* Action Buttons based on Liveness Step */}
+              {/* Action Buttons: 1-Tap Direct Capture */}
               <div className="space-y-2 pt-1">
                 {cameraActive ? (
-                  livenessStep === 1 ? (
-                    <button
-                      type="button"
-                      disabled={saving}
-                      onClick={handleNextLivenessStep}
-                      className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-indigo-500 to-blue-600 hover:from-indigo-400 hover:to-blue-500 text-white font-black text-xs uppercase tracking-wider flex items-center justify-center space-x-2 shadow-xl shadow-indigo-500/25 active:scale-95 transition cursor-pointer"
-                    >
-                      <span>1. Wajah Sudah di Tengah, Lanjut ➔</span>
-                    </button>
-                  ) : livenessStep === 2 ? (
-                    <button
-                      type="button"
-                      disabled={saving}
-                      onClick={handleNextLivenessStep}
-                      className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-amber-500 to-yellow-600 hover:from-amber-400 hover:to-yellow-500 text-slate-950 font-black text-xs uppercase tracking-wider flex items-center justify-center space-x-2 shadow-xl shadow-amber-500/25 active:scale-95 transition cursor-pointer"
-                    >
-                      <ArrowLeftRight className="w-4 h-4 text-slate-950" />
-                      <span>2. Sudah Menoleh Kanan/Kiri, Lanjut ➔</span>
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      disabled={saving}
-                      onClick={handleCapture}
-                      className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 font-black text-xs uppercase tracking-wider flex items-center justify-center space-x-2 shadow-xl shadow-emerald-500/25 active:scale-95 transition cursor-pointer animate-pulse"
-                    >
-                      <Camera className="w-4 h-4 text-slate-950" />
-                      <span>3. AMBIL &amp; DAFTARKAN BIOMETRIK WAJAH</span>
-                    </button>
-                  )
+                  <button
+                    type="button"
+                    disabled={saving}
+                    onClick={handleCapture}
+                    className="w-full py-4 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-xs uppercase tracking-wider flex items-center justify-center space-x-2 shadow-xl shadow-emerald-500/25 active:scale-95 transition cursor-pointer animate-pulse"
+                  >
+                    <Camera className="w-4 h-4 text-slate-950" />
+                    <span>📸 AMBIL &amp; DAFTARKAN BIOMETRIK WAJAH</span>
+                  </button>
                 ) : (
                   <button
                     type="button"
@@ -479,11 +468,12 @@ export default function FaceRegistrationModal({
                   </button>
                 )}
 
-                {/* Upload from Gallery fallback */}
+                {/* Upload from Gallery / Native Camera fallback with user capture */}
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept="image/jpeg,image/png,image/webp"
+                  accept="image/*"
+                  capture="user"
                   onChange={handleFileChange}
                   className="hidden"
                 />

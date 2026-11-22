@@ -1843,20 +1843,25 @@ export const cloudDb = {
   async saveStaffBiometricPhoto({ staffId, staffUuid, legacyCode, photoUrl, livenessVerified = true }) {
     if (!supabase || !photoUrl) return null;
     let current = {};
+    let curProf = {};
+
     try {
-      const { data } = await supabase
-        .from('app_settings')
-        .select('value')
-        .eq('key', 'staff_biometrics')
-        .maybeSingle();
-      if (data?.value && typeof data.value === 'object' && !Array.isArray(data.value)) {
-        current = data.value;
+      const [bioRes, profRes] = await Promise.allSettled([
+        supabase.from('app_settings').select('value').eq('key', 'staff_biometrics').maybeSingle(),
+        supabase.from('app_settings').select('value').eq('key', 'staff_profiles').maybeSingle()
+      ]);
+      if (bioRes.status === 'fulfilled' && bioRes.value?.data?.value && typeof bioRes.value.data.value === 'object' && !Array.isArray(bioRes.value.data.value)) {
+        current = bioRes.value.data.value;
+      }
+      if (profRes.status === 'fulfilled' && profRes.value?.data?.value && typeof profRes.value.data.value === 'object' && !Array.isArray(profRes.value.data.value)) {
+        curProf = profRes.value.data.value;
       }
     } catch {}
 
     const now = new Date().toISOString();
     const record = { photo_url: photoUrl, liveness_verified: livenessVerified, updated_at: now };
     const next = { ...current };
+    const nextProf = { ...curProf };
 
     const keysToBind = new Set([
       staffUuid,
@@ -1869,28 +1874,17 @@ export const cloudDb = {
 
     for (const k of keysToBind) {
       next[k] = record;
+      nextProf[k] = record;
     }
 
-    await this.saveSetting('staff_biometrics', next, 'Official Staff Biometric Face Reference');
-
-    // Also mirror to staff_profiles
     try {
-      let curProf = {};
-      const { data: pData } = await supabase
-        .from('app_settings')
-        .select('value')
-        .eq('key', 'staff_profiles')
-        .maybeSingle();
-      if (pData?.value && typeof pData.value === 'object' && !Array.isArray(pData.value)) {
-        curProf = pData.value;
-      }
-      const nextProf = { ...curProf };
-      const profRec = { photo_url: photoUrl, updated_at: now };
-      for (const k of keysToBind) {
-        nextProf[k] = profRec;
-      }
-      await this.saveSetting('staff_profiles', nextProf, 'Custom Staff Profile Photos');
-    } catch {}
+      await Promise.allSettled([
+        this.saveSetting('staff_biometrics', next, 'Official Staff Biometric Face Reference'),
+        this.saveSetting('staff_profiles', nextProf, 'Custom Staff Profile Photos')
+      ]);
+    } catch (e) {
+      console.warn('saveStaffBiometricPhoto parallel save note:', e.message);
+    }
 
     return record;
   },
