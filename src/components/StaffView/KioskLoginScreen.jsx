@@ -105,6 +105,22 @@ export default function KioskLoginScreen({
         </p>
       </div>
 
+      {/* Prominent Minimalist Guide & Install Button (Above Live Clock) */}
+      <div className="mb-3 flex items-center justify-center">
+        <button
+          type="button"
+          onClick={() => {
+            setGuideTab('guide');
+            setGuideModalOpen(true);
+          }}
+          className="inline-flex items-center space-x-2 px-4 py-2 rounded-full bg-gradient-to-r from-blue-500/15 via-indigo-500/20 to-blue-500/15 hover:from-blue-500/25 hover:to-indigo-500/30 border border-blue-400/50 hover:border-blue-400 text-blue-300 hover:text-white text-xs font-bold transition-all shadow-lg shadow-blue-950/40 active:scale-95 cursor-pointer backdrop-blur-sm"
+        >
+          <BookOpen className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+          <span>Cara menggunakan / Install aplikasi</span>
+          <ChevronRight className="w-3.5 h-3.5 text-blue-400/80" />
+        </button>
+      </div>
+
       {/* Live WITA Digital Clock Banner */}
       <div className="mb-4 flex items-center justify-center">
         <div className="inline-flex items-center space-x-2.5 px-4 py-2.5 rounded-2xl bg-[#141822] text-white shadow-md border border-slate-800">
@@ -293,20 +309,7 @@ export default function KioskLoginScreen({
           </div>
         )}
 
-        {/* Cara Menggunakan & Download Aplikasi Button */}
-        <div className="pt-2 text-center">
-          <button
-            type="button"
-            onClick={() => {
-              setGuideTab('guide');
-              setGuideModalOpen(true);
-            }}
-            className="w-full py-2.5 px-3 rounded-2xl bg-[#141822] hover:bg-[#1a2130] border border-slate-800 hover:border-slate-700 text-xs text-blue-400 hover:text-blue-300 font-bold flex items-center justify-center space-x-2 transition shadow-sm active:scale-[0.99] cursor-pointer"
-          >
-            <BookOpen className="w-4 h-4 text-blue-400 shrink-0" />
-            <span>Cara Menggunakan &amp; Download Aplikasi</span>
-          </button>
-        </div>
+
       </div>
 
       {/* Panduan Penggunaan & Download Aplikasi Modal */}
