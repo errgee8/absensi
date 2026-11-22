@@ -524,7 +524,7 @@ export default function PointManagementTab({ adminAuth, isReadOnly = false, onPo
                 </span>
               </div>
               <p className="text-xs text-slate-400 font-medium mt-0.5">
-                Siklus Reset Bulanan: <strong className="text-slate-200">Reset tanggal 13 per bulan (13 s/d 12 bulan berikutnya)</strong> • Periode aktif: <strong className="text-amber-300">{currentCycle.label}</strong>
+                Siklus Reset Bulanan: <strong className="text-slate-200">Reset tanggal 16 per bulan (16 s/d 15 bulan berikutnya)</strong> • Periode aktif: <strong className="text-amber-300">{currentCycle.label}</strong>
               </p>
             </div>
           </div>

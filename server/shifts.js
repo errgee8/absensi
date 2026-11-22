@@ -233,9 +233,9 @@ export function buildPointCycle(startYear, startMonth) {
     endMonth = 1;
     endYear += 1;
   }
-  const startDate = `${startYear}-${String(startMonth).padStart(2, '0')}-13`;
-  const cutoffDate = `${endYear}-${String(endMonth).padStart(2, '0')}-12`;
-  const label = `13 ${MONTH_SHORT_ID[startMonth - 1]} ${startYear} – 12 ${MONTH_SHORT_ID[endMonth - 1]} ${endYear}`;
+  const startDate = `${startYear}-${String(startMonth).padStart(2, '0')}-16`;
+  const cutoffDate = `${endYear}-${String(endMonth).padStart(2, '0')}-15`;
+  const label = `16 ${MONTH_SHORT_ID[startMonth - 1]} ${startYear} – 15 ${MONTH_SHORT_ID[endMonth - 1]} ${endYear}`;
   return {
     cycleKey: startDate,
     startDate,
@@ -255,7 +255,7 @@ export function getPointCycleFromKey(cycleKey) {
 
 /**
  * Returns the active monthly point accumulation cycle in WITA:
- * Resets on the 13th of each month and runs through the 12th of next month.
+ * Resets on the 16th of each month and runs through the 15th of next month.
  */
 export function getPointCycleInfo(date = new Date()) {
   const d = typeof date === 'string' ? new Date(date) : (date || new Date());
@@ -273,7 +273,7 @@ export function getPointCycleInfo(date = new Date()) {
 
   let startYear = year;
   let startMonth = month;
-  if (day < 13) {
+  if (day < 16) {
     startMonth -= 1;
     if (startMonth < 1) {
       startMonth = 12;
