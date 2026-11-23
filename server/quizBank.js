@@ -1229,6 +1229,7 @@ export function generateRandomWeeklyQuiz(count = 10, venue = 'LuckyCat') {
   const selected = shuffled.slice(0, count);
 
   // For each question, shuffle its options so position A/B/C/D is unpredictable
+  // STRICT ANTI-CHEAT: NEVER expose correctAnswer or explanation to client while taking quiz!
   return selected.map((q, idx) => {
     const shuffledOptions = [...q.options].sort(() => Math.random() - 0.5);
     return {
@@ -1236,9 +1237,7 @@ export function generateRandomWeeklyQuiz(count = 10, venue = 'LuckyCat') {
       id: q.id,
       category: q.category,
       question: q.question,
-      options: shuffledOptions,
-      correctAnswer: q.correctAnswer,
-      explanation: q.explanation
+      options: shuffledOptions
     };
   });
 }

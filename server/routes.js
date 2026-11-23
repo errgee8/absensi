@@ -7286,13 +7286,23 @@ router.get('/quiz/weekly', async (req, res) => {
     }
 
     // Generate 10 randomized questions with shuffled options
-    const questions = generateRandomWeeklyQuiz(10, 'LuckyCat');
+    const rawQuestions = generateRandomWeeklyQuiz(10, 'LuckyCat');
+    // STRICT ANTI-CHEAT: Ensure correctAnswer and explanation are completely stripped from client payload
+    const sanitizedQuestions = rawQuestions.map(q => ({
+      index: q.index,
+      id: q.id,
+      category: q.category,
+      question: q.question,
+      options: q.options
+    }));
+
     return res.json({
       alreadyCompleted: false,
       weekKey,
       durationMinutes: 8,
-      totalQuestions: questions.length,
-      questions
+      durationSeconds: 480,
+      totalQuestions: sanitizedQuestions.length,
+      questions: sanitizedQuestions
     });
   } catch (err) {
     console.error('Error fetching weekly quiz:', err);
@@ -7433,7 +7443,7 @@ export function computeQuizDiagnostic(record) {
 
 // 16b. Submit Quiz
 router.post('/quiz/submit', async (req, res) => {
-  const { staffId, weekKey, answers = {}, durationSeconds = 0, venue = 'LuckyCat' } = req.body || {};
+  const { staffId, weekKey, questionIds = [], answers = {}, durationSeconds = 0, venue = 'LuckyCat' } = req.body || {};
   const currentWeek = weekKey || getWitaWeekKey();
 
   if (!staffId) return res.status(400).json({ error: 'staffId wajib disertakan.' });
@@ -7466,14 +7476,22 @@ router.post('/quiz/submit', async (req, res) => {
     let correctCount = 0;
     const reviewList = [];
 
-    const answeredIds = Object.keys(answers);
-    const totalQuestions = Math.max(10, answeredIds.length);
+    // Determine complete question set to evaluate (all 10 questions, answered or unanswered)
+    let targetQuestionIds = Array.isArray(questionIds) && questionIds.length > 0
+      ? questionIds
+      : Object.keys(answers);
 
-    for (const qId of answeredIds) {
+    if (targetQuestionIds.length === 0) {
+      targetQuestionIds = LUCKYCAT_QUESTION_BANK.slice(0, 10).map(q => q.id);
+    }
+
+    const totalQuestions = Math.max(10, targetQuestionIds.length);
+
+    for (const qId of targetQuestionIds) {
       const qObj = questionsPool.find(q => q.id === qId);
       if (!qObj) continue;
       const staffAns = (answers[qId] || '').trim();
-      const isCorrect = staffAns === qObj.correctAnswer.trim();
+      const isCorrect = staffAns ? staffAns === qObj.correctAnswer.trim() : false;
       if (isCorrect) correctCount++;
 
       const opts = qObj.options || [];
@@ -7497,6 +7515,8 @@ router.post('/quiz/submit', async (req, res) => {
     }
 
     const score = Math.round((correctCount / totalQuestions) * 100);
+    // Strict 8-minute maximum duration (480s)
+    const boundedDuration = Math.min(480, Math.max(1, Number(durationSeconds) || 480));
     const now = new Date().toISOString();
 
     const record = {
@@ -7510,7 +7530,7 @@ router.post('/quiz/submit', async (req, res) => {
       score,
       correct_count: correctCount,
       total_questions: totalQuestions,
-      duration_seconds: durationSeconds,
+      duration_seconds: boundedDuration,
       results: reviewList,
       completed_at: now
     };

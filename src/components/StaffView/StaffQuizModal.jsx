@@ -20,10 +20,30 @@ export default function StaffQuizModal({
   const [secondsRemaining, setSecondsRemaining] = useState(480); // 8 minutes
   const [timerActive, setTimerActive] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [isTimeUp, setIsTimeUp] = useState(false);
   const [quizResults, setQuizResults] = useState(null); // Review state
   const [notApplicableMsg, setNotApplicableMsg] = useState(null);
 
   const timerRef = useRef(null);
+
+  // Synchronized refs to prevent stale closures in async/timer callbacks
+  const answersRef = useRef(answers);
+  const questionsRef = useRef(questions);
+  const secondsRemainingRef = useRef(secondsRemaining);
+  const submittingRef = useRef(false);
+  const quizResultsRef = useRef(quizResults);
+  const staffIdRef = useRef(staff?.legacy_code || staff?.id);
+  const weekKeyRef = useRef(weekKey);
+
+  useEffect(() => { answersRef.current = answers; }, [answers]);
+  useEffect(() => { questionsRef.current = questions; }, [questions]);
+  useEffect(() => { secondsRemainingRef.current = secondsRemaining; }, [secondsRemaining]);
+  useEffect(() => { submittingRef.current = submitting; }, [submitting]);
+  useEffect(() => { quizResultsRef.current = quizResults; }, [quizResults]);
+  useEffect(() => { staffIdRef.current = staff?.legacy_code || staff?.id; }, [staff]);
+  useEffect(() => { weekKeyRef.current = weekKey; }, [weekKey]);
+
+  const getSessionKey = (sId, wKey) => `lc_quiz_session_${sId || 'staff'}_${wKey || 'cur'}`;
 
   // Load questions or check previous completion
   useEffect(() => {
@@ -31,6 +51,7 @@ export default function StaffQuizModal({
     const fetchQuiz = async () => {
       setLoading(true);
       setErrorMsg(null);
+      setIsTimeUp(false);
       try {
         const data = await getWeeklyQuiz(staff.id, staff.venue || 'LuckyCat');
         if (!mounted) return;
@@ -42,7 +63,10 @@ export default function StaffQuizModal({
           return;
         }
 
-        setWeekKey(data.weekKey || '');
+        const currentWeekKey = data.weekKey || '';
+        setWeekKey(currentWeekKey);
+        weekKeyRef.current = currentWeekKey;
+
         if (data.alreadyCompleted && data.completion) {
           // Already completed this week
           setQuizResults({
@@ -57,13 +81,56 @@ export default function StaffQuizModal({
         }
 
         const qList = Array.isArray(data.questions) ? data.questions : [];
-        setQuestions(qList);
-        setSecondsRemaining(480);
-        setTimerActive(true);
+
+        // Check local storage session to ensure strict 8-minute limit across refresh / re-open
+        const sKey = getSessionKey(staff?.legacy_code || staff?.id, currentWeekKey);
+        let savedSession = null;
+        try {
+          const raw = localStorage.getItem(sKey);
+          if (raw) savedSession = JSON.parse(raw);
+        } catch (e) {}
+
+        const now = Date.now();
+        if (savedSession && savedSession.startedAt && Array.isArray(savedSession.questions) && savedSession.questions.length > 0) {
+          const elapsedSecs = Math.floor((now - savedSession.startedAt) / 1000);
+          const remain = Math.max(0, 480 - elapsedSecs);
+
+          setQuestions(savedSession.questions);
+          setAnswers(savedSession.answers || {});
+          setSecondsRemaining(remain);
+          setLoading(false);
+
+          if (remain <= 0) {
+            // Already expired (8 minutes exceeded)! Auto-submit immediately
+            setIsTimeUp(true);
+            setTimeout(() => {
+              handleFinalSubmit(savedSession.answers || {}, savedSession.questions, true, currentWeekKey);
+            }, 50);
+            return;
+          } else {
+            setTimerActive(true);
+          }
+        } else {
+          // Fresh 8-minute quiz session
+          const newSession = {
+            startedAt: now,
+            questions: qList,
+            answers: {}
+          };
+          try {
+            localStorage.setItem(sKey, JSON.stringify(newSession));
+          } catch (e) {}
+
+          setQuestions(qList);
+          setSecondsRemaining(480);
+          setTimerActive(true);
+          setLoading(false);
+        }
       } catch (err) {
-        if (mounted) setErrorMsg(err.message || 'Gagal memuat kuis mingguan.');
-      } finally {
-        if (mounted) setLoading(false);
+        if (mounted) {
+          setErrorMsg(err.message || 'Gagal memuat kuis mingguan.');
+          setLoading(false);
+        }
       }
     };
 
@@ -75,15 +142,20 @@ export default function StaffQuizModal({
     };
   }, [staff.id, staff.venue]);
 
-  // Countdown timer
+  // Countdown timer (Strict 8 minutes)
   useEffect(() => {
-    if (!timerActive || quizResults) return;
+    if (!timerActive || quizResults || isTimeUp) return;
 
     timerRef.current = setInterval(() => {
       setSecondsRemaining((prev) => {
         if (prev <= 1) {
           clearInterval(timerRef.current);
-          handleAutoSubmit();
+          setIsTimeUp(true);
+          setTimerActive(false);
+          // Strict 8-minute auto submit
+          setTimeout(() => {
+            handleFinalSubmit(answersRef.current, questionsRef.current, true);
+          }, 50);
           return 0;
         }
         return prev - 1;
@@ -91,33 +163,52 @@ export default function StaffQuizModal({
     }, 1000);
 
     return () => clearInterval(timerRef.current);
-  }, [timerActive, quizResults]);
+  }, [timerActive, quizResults, isTimeUp]);
 
   const handleSelectOption = (qId, optionText) => {
-    if (quizResults || submitting) return;
-    setAnswers((prev) => ({ ...prev, [qId]: optionText }));
+    if (quizResults || submitting || isTimeUp) return;
+    const newAnswers = { ...answers, [qId]: optionText };
+    setAnswers(newAnswers);
+
+    // Persist answer in local session
+    const sKey = getSessionKey(staffIdRef.current, weekKeyRef.current);
+    try {
+      const raw = localStorage.getItem(sKey);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        parsed.answers = newAnswers;
+        localStorage.setItem(sKey, JSON.stringify(parsed));
+      }
+    } catch (e) {}
   };
 
-  const handleAutoSubmit = () => {
-    handleFinalSubmit();
-  };
-
-  const handleFinalSubmit = async () => {
-    if (submitting || quizResults) return;
+  const handleFinalSubmit = async (forcedAnswers = null, forcedQuestions = null, isTimeout = false, customWeekKey = null) => {
+    if (submittingRef.current || quizResultsRef.current) return;
+    submittingRef.current = true;
     setSubmitting(true);
     setTimerActive(false);
     if (timerRef.current) clearInterval(timerRef.current);
 
-    const timeSpent = Math.max(1, 480 - secondsRemaining);
+    const targetWeekKey = customWeekKey || weekKeyRef.current || weekKey;
+    const currentAnswers = forcedAnswers !== null ? forcedAnswers : (answersRef.current || {});
+    const currentQuestions = forcedQuestions !== null ? forcedQuestions : (questionsRef.current || []);
+    const timeSpent = isTimeout ? 480 : Math.min(480, Math.max(1, 480 - (secondsRemainingRef.current ?? 0)));
 
     try {
       const res = await submitWeeklyQuiz({
         staffId: staff.id,
-        weekKey,
-        answers,
+        weekKey: targetWeekKey,
+        questionIds: currentQuestions.map(q => q.id),
+        answers: currentAnswers,
         durationSeconds: timeSpent,
         venue: staff.venue || 'LuckyCat'
       });
+
+      // Clear local session after successful completion
+      const sKey = getSessionKey(staffIdRef.current, targetWeekKey);
+      try {
+        localStorage.removeItem(sKey);
+      } catch (e) {}
 
       setQuizResults(res);
 
@@ -134,9 +225,9 @@ export default function StaffQuizModal({
       }
     } catch (err) {
       setErrorMsg(err.message || 'Gagal mengirim hasil kuis. Silakan coba lagi.');
-      setTimerActive(true);
-    } finally {
+      submittingRef.current = false;
       setSubmitting(false);
+      if (!isTimeout) setTimerActive(true);
     }
   };
 
@@ -421,9 +512,30 @@ export default function StaffQuizModal({
           )}
 
           {/* =========================================
+              TIMEOUT LOCK / AUTO-SUBMITTING STATE
+             ========================================= */}
+          {isTimeUp && !quizResults && (
+            <div className="py-12 px-4 text-center space-y-4 animate-fade-in">
+              <div className="w-16 h-16 rounded-2xl bg-rose-500/20 text-rose-400 border border-rose-400/40 flex items-center justify-center mx-auto shadow-lg">
+                <Clock className="w-8 h-8 animate-pulse text-rose-400" />
+              </div>
+              <div className="space-y-1.5">
+                <h4 className="text-base font-black text-white">⏱️ Batas Waktu 8 Menit Habis!</h4>
+                <p className="text-xs text-rose-200 leading-relaxed max-w-sm mx-auto">
+                  Kuis ditutup secara otomatis. Seluruh jawaban yang telah Anda pilih sedang dikumpulkan dan skor evaluasi sedang dihitung...
+                </p>
+              </div>
+              <div className="flex items-center justify-center gap-2 text-amber-400 text-xs font-bold pt-2">
+                <Loader2 className="w-4 h-4 animate-spin text-amber-400" />
+                <span>Menghitung skor evaluasi...</span>
+              </div>
+            </div>
+          )}
+
+          {/* =========================================
               ACTIVE QUIZ QUESTIONS
              ========================================= */}
-          {!loading && !quizResults && currentQ && (
+          {!loading && !quizResults && !isTimeUp && currentQ && (
             <div className="space-y-4">
               {/* Question Navigation Bubbles */}
               <div className="flex items-center justify-between pb-2 border-b border-slate-800">
@@ -521,7 +633,7 @@ export default function StaffQuizModal({
                   <button
                     type="button"
                     disabled={submitting}
-                    onClick={handleFinalSubmit}
+                    onClick={() => handleFinalSubmit(answers, questions, false)}
                     className="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs transition cursor-pointer shadow-lg shadow-emerald-900/40 flex items-center gap-1.5"
                   >
                     {submitting ? (

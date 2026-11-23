@@ -977,11 +977,11 @@ export async function getWeeklyQuiz(staffId, venue = 'LuckyCat') {
   return data;
 }
 
-export async function submitWeeklyQuiz({ staffId, weekKey, answers, durationSeconds, venue }) {
+export async function submitWeeklyQuiz({ staffId, weekKey, questionIds, answers, durationSeconds, venue }) {
   const res = await fetch(`${API_BASE}/quiz/submit`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ staffId, weekKey, answers, durationSeconds, venue })
+    body: JSON.stringify({ staffId, weekKey, questionIds, answers, durationSeconds, venue })
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'Gagal mengirim jawaban kuis');
