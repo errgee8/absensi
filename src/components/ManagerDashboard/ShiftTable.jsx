@@ -18,7 +18,8 @@ import {
   AlertCircle,
   Unlock,
   Check,
-  FileText
+  FileText,
+  Zap
 } from 'lucide-react';
 import { formatWitaTimeOnly, formatWitaDateOnly, formatDuration } from '../../utils/time';
 import { resolveShift } from '../../utils/shiftResolver';
@@ -60,7 +61,8 @@ export default function ShiftTable({
     const flags = Array.isArray(shift?.flags) ? shift.flags : [];
 
     const isLateApproved = shift?.late_status === 'APPROVED' || flags.includes('FLAG_LATE_EXCUSED');
-    const isLatePending = shift?.late_status === 'PENDING_REVIEW' || (flags.some(f => String(f).includes('Late Check-In')) && !shift?.late_status);
+    const isLatePartial = shift?.late_status === 'PARTIAL_APPROVED' || flags.includes('FLAG_LATE_PARTIAL');
+    const isLatePending = shift?.late_status === 'PENDING_REVIEW' || ((flags.some(f => String(f).includes('Late Check-In')) || flags.includes('FLAG_LATE_PARTIAL')) && !shift?.late_status);
 
     if (isLatePending) {
       actions.push({
@@ -103,11 +105,13 @@ export default function ShiftTable({
 
   const renderFlagBadges = (flags = [], shift = null) => {
     const isLateApproved = shift?.late_status === 'APPROVED' || flags?.includes('FLAG_LATE_EXCUSED');
-    const isLatePending = shift?.late_status === 'PENDING_REVIEW' || (flags?.some(f => String(f).includes('Late Check-In')) && !shift?.late_status);
+    const isLatePartial = shift?.late_status === 'PARTIAL_APPROVED' || flags?.includes('FLAG_LATE_PARTIAL');
+    const isLatePending = shift?.late_status === 'PENDING_REVIEW' || ((flags?.some(f => String(f).includes('Late Check-In')) || flags?.includes('FLAG_LATE_PARTIAL')) && !shift?.late_status);
     const isLateRejected = shift?.late_status === 'REJECTED';
 
     const nonLateFlags = (flags || []).filter(f => {
       if (isLateApproved && (f === 'FLAG_LATE_EXCUSED' || String(f).includes('Late Check-In'))) return false;
+      if (isLatePartial && (f === 'FLAG_LATE_PARTIAL' || String(f).includes('Late Check-In'))) return false;
       if ((isLatePending || isLateRejected) && String(f).includes('Late Check-In')) return false;
       return true;
     });
@@ -203,11 +207,12 @@ export default function ShiftTable({
   const renderLateReviewBadge = (shift) => {
     const flags = Array.isArray(shift?.flags) ? shift.flags : [];
     const isLateApproved = shift?.late_status === 'APPROVED' || flags.includes('FLAG_LATE_EXCUSED');
-    const isLatePending = shift?.late_status === 'PENDING_REVIEW' || (flags.some(f => String(f).includes('Late Check-In')) && !shift?.late_status);
+    const isLatePartial = shift?.late_status === 'PARTIAL_APPROVED' || flags.includes('FLAG_LATE_PARTIAL');
+    const isLatePending = shift?.late_status === 'PENDING_REVIEW' || ((flags.some(f => String(f).includes('Late Check-In')) || flags.includes('FLAG_LATE_PARTIAL')) && !shift?.late_status);
     const isLateRejected = shift?.late_status === 'REJECTED';
     const isLate = flags.some(f => String(f).includes('Late') || String(f).includes('LATE')) || shift.late_status;
 
-    if (!isLate && !isLateApproved && !isLatePending && !isLateRejected) {
+    if (!isLate && !isLateApproved && !isLatePartial && !isLatePending && !isLateRejected) {
       return (
         <span className="inline-flex items-center space-x-1 px-1.5 py-0.5 rounded text-[9px] font-bold text-slate-400 bg-slate-800/50 border border-slate-700/50">
           <CheckCircle className="w-2.5 h-2.5 text-emerald-400" />
@@ -223,10 +228,26 @@ export default function ShiftTable({
             type="button"
             onClick={() => onReviewLate?.(shift)}
             className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-md text-[9px] font-black border bg-emerald-500/15 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/25 transition cursor-pointer"
-            title={shift?.late_reviewed_by ? `Di-ACC oleh ${shift.late_reviewed_by}. Klik untuk lihat/ubah.` : 'Di-ACC. Klik untuk detail.'}
+            title={shift?.late_reviewed_by ? `Di-ACC penuh oleh ${shift.late_reviewed_by}. Klik untuk lihat/ubah.` : 'Di-ACC penuh. Klik untuk detail.'}
           >
             <CheckCircle className="w-2.5 h-2.5 stroke-[2.5]" />
             <span>Di-ACC ✓</span>
+          </button>
+        </div>
+      );
+    }
+
+    if (isLatePartial) {
+      return (
+        <div className="flex flex-col items-start leading-tight">
+          <button
+            type="button"
+            onClick={() => onReviewLate?.(shift)}
+            className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-md text-[9px] font-black border bg-amber-500/15 text-amber-300 border-amber-500/40 hover:bg-amber-500/25 transition cursor-pointer"
+            title={`ACC Sebagian: Ditoleransi ${shift?.late_excused_minutes || 0}m, sisa ${shift?.late_remaining_minutes || 0}m tetap telat. Klik untuk lihat/ubah.`}
+          >
+            <Zap className="w-2.5 h-2.5 stroke-[2.5] text-amber-400" />
+            <span>ACC Sebagian (+{shift?.late_remaining_minutes != null ? shift.late_remaining_minutes : '?'}m)</span>
           </button>
         </div>
       );

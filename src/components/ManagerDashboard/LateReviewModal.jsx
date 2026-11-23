@@ -1,18 +1,11 @@
 import React, { useState } from 'react';
-import { X, Clock, CheckCircle, AlertTriangle, Camera, User, Calendar, MapPin, Eye, Check, ShieldCheck } from 'lucide-react';
+import { X, Clock, CheckCircle, AlertTriangle, Camera, User, Calendar, MapPin, Eye, Check, ShieldCheck, Zap } from 'lucide-react';
 import { formatWitaDateTime, formatWitaDateOnly, formatWitaTimeOnly } from '../../utils/time';
 import { resolveShift } from '../../utils/shiftResolver';
 import { reviewLateCheckin } from '../../utils/api';
 
 export default function LateReviewModal({ shift, schedules = [], adminAuth, onClose, onShiftUpdated }) {
   if (!shift) return null;
-
-  const [pin, setPin] = useState(adminAuth?.pin || (adminAuth?.role === 'MANAGER' ? '8980' : ''));
-  const [managerNotes, setManagerNotes] = useState(shift.late_manager_note || '');
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState(null);
-  const [success, setSuccess] = useState(null);
-  const [zoomPhoto, setZoomPhoto] = useState(null);
 
   const shiftInfo = resolveShift(shift, schedules);
   const scheduledStart = shift.scheduled_start || shiftInfo.start_time || '10:00';
@@ -53,14 +46,44 @@ export default function LateReviewModal({ shift, schedules = [], adminAuth, onCl
   }
 
   const isApproved = shift.late_status === 'APPROVED' || shift.flags?.includes('FLAG_LATE_EXCUSED');
+  const isPartial = shift.late_status === 'PARTIAL_APPROVED' || shift.flags?.includes('FLAG_LATE_PARTIAL');
   const isRejected = shift.late_status === 'REJECTED';
-  const isPending = !isApproved && !isRejected;
+  const isPending = !isApproved && !isPartial && !isRejected;
 
-  const handleDecision = async (action) => {
+  const [pin, setPin] = useState(adminAuth?.pin || (adminAuth?.role === 'MANAGER' ? '8980' : ''));
+  const [managerNotes, setManagerNotes] = useState(shift.late_manager_note || '');
+  const [reviewMode, setReviewMode] = useState(() => (
+    isPartial ? 'PARTIAL' : (isApproved ? 'FULL' : (isRejected ? 'REJECT' : 'FULL'))
+  ));
+  const [toleratedMinutes, setToleratedMinutes] = useState(() => (
+    shift.late_excused_minutes != null
+      ? String(shift.late_excused_minutes)
+      : String(diffMinutes > 20 ? 20 : (Math.round(diffMinutes / 2) || 10))
+  ));
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState(null);
+  const [success, setSuccess] = useState(null);
+  const [zoomPhoto, setZoomPhoto] = useState(null);
+
+  const parsedTolerated = Math.max(0, parseInt(toleratedMinutes, 10) || 0);
+  const effectiveRemainingMinutes = Math.max(0, (diffMinutes || 0) - parsedTolerated);
+
+  const handleDecision = async (actionType) => {
     const activePin = pin.trim() || adminAuth?.pin || '8980';
     if (!activePin) {
       setError('Masukkan PIN Manager / Assistant Manager untuk otorisasi review.');
       return;
+    }
+
+    if (actionType === 'PARTIAL') {
+      if (parsedTolerated <= 0) {
+        setError('Masukkan menit toleransi yang dimaafkan (> 0 menit).');
+        return;
+      }
+      if (diffMinutes > 0 && parsedTolerated >= diffMinutes) {
+        setError(`Menit toleransi (${parsedTolerated}m) sama atau melebihi total telat (${diffMinutes}m). Gunakan opsi "ACC Penuh" jika ingin memaafkan seluruhnya.`);
+        return;
+      }
     }
 
     setSubmitting(true);
@@ -70,21 +93,28 @@ export default function LateReviewModal({ shift, schedules = [], adminAuth, onCl
     try {
       await reviewLateCheckin(shift.id, {
         pin: activePin,
-        action,
-        managerNotes: managerNotes.trim()
+        action: actionType,
+        managerNotes: managerNotes.trim(),
+        toleratedMinutes: actionType === 'PARTIAL' ? parsedTolerated : (actionType === 'APPROVE' ? diffMinutes : 0),
+        originalMinutes: diffMinutes || 0
       });
 
-      setSuccess(
-        action === 'APPROVE'
-          ? 'Alasan keterlambatan berhasil di-ACC (Dimaafkan / Bebas Penalti)!'
-          : 'Keterlambatan ditolak (Tetap dikenakan sanksi/penalti).'
-      );
+      let successMsg = 'Keputusan review berhasil disimpan!';
+      if (actionType === 'APPROVE') {
+        successMsg = 'Alasan keterlambatan berhasil di-ACC Penuh (Dimaafkan / Bebas Penalti)!';
+      } else if (actionType === 'PARTIAL') {
+        successMsg = `Alasan keterlambatan di-ACC Sebagian (Toleransi ${parsedTolerated}m, sisa ${effectiveRemainingMinutes}m tetap dihitung telat).`;
+      } else {
+        successMsg = 'Keterlambatan ditolak (Tetap dikenakan sanksi/penalti penuh).';
+      }
+
+      setSuccess(successMsg);
 
       if (onShiftUpdated) onShiftUpdated();
 
       setTimeout(() => {
         onClose();
-      }, 1000);
+      }, 1200);
     } catch (err) {
       setError(err.message || 'Gagal menyimpan keputusan review.');
     } finally {
@@ -271,22 +301,29 @@ export default function LateReviewModal({ shift, schedules = [], adminAuth, onCl
           </div>
 
           {/* Previous Review Log (If Already Reviewed) */}
-          {(shift.late_reviewed_by || isApproved || isRejected) && (
+          {(shift.late_reviewed_by || isApproved || isPartial || isRejected) && (
             <div className={`p-3.5 rounded-2xl border text-xs space-y-1 ${
               isApproved
                 ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-200'
+                : isPartial
+                ? 'bg-amber-500/10 border-amber-500/30 text-amber-200'
                 : 'bg-rose-500/10 border-rose-500/30 text-rose-200'
             }`}>
               <div className="flex items-center space-x-1.5 font-black">
                 {isApproved ? (
                   <>
                     <CheckCircle className="w-4 h-4 text-emerald-400 stroke-[2.5]" />
-                    <span>STATUS: SUDAH DI-ACC (DIMAAFKAN / BEBAS PENALTI)</span>
+                    <span>STATUS: SUDAH DI-ACC PENUH (DIMAAFKAN / BEBAS PENALTI)</span>
+                  </>
+                ) : isPartial ? (
+                  <>
+                    <Zap className="w-4 h-4 text-amber-400 stroke-[2.5]" />
+                    <span>STATUS: SUDAH DI-ACC SEBAGIAN (TOLERANSI {shift.late_excused_minutes || 0}M &bull; SISA {shift.late_remaining_minutes || 0}M TETAP TELAT)</span>
                   </>
                 ) : (
                   <>
                     <AlertTriangle className="w-4 h-4 text-rose-400 stroke-[2.5]" />
-                    <span>STATUS: DITOLAK (TETAP KENA PENALTI)</span>
+                    <span>STATUS: DITOLAK (TETAP KENA PENALTI PENUH)</span>
                   </>
                 )}
               </div>
@@ -302,18 +339,63 @@ export default function LateReviewModal({ shift, schedules = [], adminAuth, onCl
                 </div>
               )}
               <div className="text-[10px] text-slate-400 font-medium pt-1">
-                Anda dapat mengubah keputusan sewaktu-waktu di form bawah ini.
+                Anda dapat memperbarui keputusan review kapan saja di formulir bawah ini.
               </div>
             </div>
           )}
 
-          {/* Review Decision Form (1-Click ACC / Tolak) */}
-          <div className="bg-[#1a202d] border border-slate-800 rounded-2xl p-4 space-y-3 shadow-sm">
-            <div className="flex items-center space-x-2">
-              <ShieldCheck className="w-4 h-4 text-blue-400 stroke-[2.5]" />
-              <span className="font-black text-slate-100 text-xs">
-                Keputusan Management (1 Tombol ACC / Tolak)
-              </span>
+          {/* Review Decision Form */}
+          <div className="bg-[#1a202d] border border-slate-800 rounded-2xl p-4 space-y-3.5 shadow-sm">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <ShieldCheck className="w-4 h-4 text-blue-400 stroke-[2.5]" />
+                <span className="font-black text-slate-100 text-xs">
+                  Keputusan Review Management
+                </span>
+              </div>
+              <span className="text-[10px] font-bold text-slate-400">Pilih Opsi Review:</span>
+            </div>
+
+            {/* Mode Selector Tabs (3 Options) */}
+            <div className="grid grid-cols-3 gap-1.5 p-1 bg-[#12161f] border border-slate-800 rounded-xl">
+              <button
+                type="button"
+                onClick={() => setReviewMode('FULL')}
+                className={`py-2 px-1 text-center rounded-lg font-black text-[11px] transition cursor-pointer flex items-center justify-center space-x-1 ${
+                  reviewMode === 'FULL'
+                    ? 'bg-emerald-600 text-white shadow-md shadow-emerald-900/30'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <Check className="w-3.5 h-3.5" />
+                <span>ACC Penuh</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setReviewMode('PARTIAL')}
+                className={`py-2 px-1 text-center rounded-lg font-black text-[11px] transition cursor-pointer flex items-center justify-center space-x-1 ${
+                  reviewMode === 'PARTIAL'
+                    ? 'bg-amber-600 text-white shadow-md shadow-amber-900/30'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <Zap className="w-3.5 h-3.5" />
+                <span>ACC Sebagian</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setReviewMode('REJECT')}
+                className={`py-2 px-1 text-center rounded-lg font-black text-[11px] transition cursor-pointer flex items-center justify-center space-x-1 ${
+                  reviewMode === 'REJECT'
+                    ? 'bg-rose-600 text-white shadow-md shadow-rose-900/30'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <X className="w-3.5 h-3.5" />
+                <span>Tolak Telat</span>
+              </button>
             </div>
 
             {error && (
@@ -330,6 +412,93 @@ export default function LateReviewModal({ shift, schedules = [], adminAuth, onCl
               </div>
             )}
 
+            {/* Partial Tolerance Configuration Card */}
+            {reviewMode === 'PARTIAL' && (
+              <div className="p-3.5 bg-amber-950/30 border border-amber-500/30 rounded-2xl space-y-2.5 animate-fade-in">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-black text-amber-300 flex items-center space-x-1">
+                    <Zap className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Konfigurasi Toleransi Parsial (Menit)</span>
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-bold">
+                    Total Keterlambatan: <strong className="text-white">{diffMinutes} Menit</strong>
+                  </span>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <div className="flex-1">
+                    <label className="text-[10px] font-black text-slate-300 uppercase block mb-1">
+                      Menit Toleransi yang Dimaafkan:
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        min="1"
+                        max={Math.max(1, (diffMinutes || 60) - 1)}
+                        value={toleratedMinutes}
+                        onChange={(e) => setToleratedMinutes(e.target.value)}
+                        placeholder="Contoh: 20"
+                        className="w-full px-3 py-2 rounded-xl border border-amber-500/50 bg-[#12161f] text-amber-200 text-sm font-mono font-black focus:border-amber-400 focus:outline-none pr-14"
+                      />
+                      <span className="absolute right-3 top-2.5 text-xs text-amber-400/80 font-bold">Menit</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Quick Shortcuts */}
+                <div className="flex items-center space-x-1.5 flex-wrap gap-y-1">
+                  <span className="text-[10px] text-slate-400 font-bold mr-1">Pilihan Cepat:</span>
+                  {[10, 15, 20, 30].filter(m => m < diffMinutes).map((m) => (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => setToleratedMinutes(String(m))}
+                      className={`px-2 py-0.5 rounded-lg text-[10px] font-bold border transition cursor-pointer ${
+                        parsedTolerated === m
+                          ? 'bg-amber-500 text-black border-amber-400 font-black'
+                          : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
+                      }`}
+                    >
+                      {m} Menit
+                    </button>
+                  ))}
+                  {diffMinutes > 10 && (
+                    <button
+                      type="button"
+                      onClick={() => setToleratedMinutes(String(Math.round(diffMinutes / 2)))}
+                      className={`px-2 py-0.5 rounded-lg text-[10px] font-bold border transition cursor-pointer ${
+                        parsedTolerated === Math.round(diffMinutes / 2)
+                          ? 'bg-amber-500 text-black border-amber-400 font-black'
+                          : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
+                      }`}
+                    >
+                      50% ({Math.round(diffMinutes / 2)}m)
+                    </button>
+                  )}
+                </div>
+
+                {/* Live Real-time Calculation Breakdown */}
+                <div className="p-2.5 bg-[#12161f] border border-amber-500/20 rounded-xl grid grid-cols-3 gap-2 text-center text-[11px]">
+                  <div>
+                    <span className="text-[9px] text-slate-400 font-bold uppercase block">Total Telat</span>
+                    <span className="font-mono font-black text-rose-400">{diffMinutes} Menit</span>
+                  </div>
+                  <div>
+                    <span className="text-[9px] text-emerald-400 font-bold uppercase block">Dimaafkan (ACC)</span>
+                    <span className="font-mono font-black text-emerald-300">-{parsedTolerated} Menit</span>
+                  </div>
+                  <div>
+                    <span className="text-[9px] text-amber-300 font-bold uppercase block">Sisa Dihitung</span>
+                    <span className="font-mono font-black text-amber-400">+{effectiveRemainingMinutes} Menit</span>
+                  </div>
+                </div>
+
+                <p className="text-[10px] text-slate-300 italic font-medium leading-relaxed">
+                  * Catatan: Sisa keterlambatan <strong>+{effectiveRemainingMinutes} menit</strong> akan tetap dihitung sebagai keterlambatan di rekap bulanan &amp; leaderboard, sedangkan <strong>{parsedTolerated} menit</strong> berhasil dimaafkan.
+                </p>
+              </div>
+            )}
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
               <div>
                 <label className="text-[10px] font-black text-slate-400 uppercase block mb-1">
@@ -337,7 +506,13 @@ export default function LateReviewModal({ shift, schedules = [], adminAuth, onCl
                 </label>
                 <input
                   type="text"
-                  placeholder="Contoh: Ban bocor terverifikasi valid"
+                  placeholder={
+                    reviewMode === 'PARTIAL'
+                      ? 'Contoh: Toleransi 20m macet hujan, sisa 20m dihitung'
+                      : reviewMode === 'FULL'
+                      ? 'Contoh: Ban bocor terverifikasi valid'
+                      : 'Contoh: Alasan tidak dapat diterima'
+                  }
                   value={managerNotes}
                   onChange={(e) => setManagerNotes(e.target.value)}
                   className="w-full px-3 py-2 rounded-xl border border-slate-700 bg-[#12161f] text-slate-100 placeholder:text-slate-500 text-xs font-bold focus:border-blue-500 focus:outline-none"
@@ -358,27 +533,43 @@ export default function LateReviewModal({ shift, schedules = [], adminAuth, onCl
               </div>
             </div>
 
-            {/* 1-Click Action Buttons */}
-            <div className="flex items-center gap-2 pt-2">
-              <button
-                type="button"
-                disabled={submitting}
-                onClick={() => handleDecision('APPROVE')}
-                className="flex-1 py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-black text-xs transition shadow-lg shadow-emerald-600/30 flex items-center justify-center space-x-1.5 cursor-pointer"
-              >
-                <Check className="w-4 h-4 stroke-[3]" />
-                <span>ACC Telat (Hapus Penalti)</span>
-              </button>
+            {/* Submit Action Button based on chosen mode */}
+            <div className="pt-1">
+              {reviewMode === 'FULL' && (
+                <button
+                  type="button"
+                  disabled={submitting}
+                  onClick={() => handleDecision('APPROVE')}
+                  className="w-full py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-black text-xs transition shadow-lg shadow-emerald-600/30 flex items-center justify-center space-x-1.5 cursor-pointer"
+                >
+                  <Check className="w-4 h-4 stroke-[3]" />
+                  <span>Simpan: ACC Penuh (100% Bebas Penalti)</span>
+                </button>
+              )}
 
-              <button
-                type="button"
-                disabled={submitting}
-                onClick={() => handleDecision('REJECT')}
-                className="flex-1 py-3 px-4 rounded-xl bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white font-black text-xs transition shadow-lg shadow-rose-600/30 flex items-center justify-center space-x-1.5 cursor-pointer"
-              >
-                <X className="w-4 h-4 stroke-[3]" />
-                <span>Tolak (Tetap Kena Penalti)</span>
-              </button>
+              {reviewMode === 'PARTIAL' && (
+                <button
+                  type="button"
+                  disabled={submitting || parsedTolerated <= 0}
+                  onClick={() => handleDecision('PARTIAL')}
+                  className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 disabled:opacity-50 text-white font-black text-xs transition shadow-lg shadow-amber-600/30 flex items-center justify-center space-x-1.5 cursor-pointer"
+                >
+                  <Zap className="w-4 h-4 stroke-[2.5]" />
+                  <span>Simpan: ACC Sebagian (Toleransi {parsedTolerated}m, Sisa {effectiveRemainingMinutes}m Telat)</span>
+                </button>
+              )}
+
+              {reviewMode === 'REJECT' && (
+                <button
+                  type="button"
+                  disabled={submitting}
+                  onClick={() => handleDecision('REJECT')}
+                  className="w-full py-3 px-4 rounded-xl bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white font-black text-xs transition shadow-lg shadow-rose-600/30 flex items-center justify-center space-x-1.5 cursor-pointer"
+                >
+                  <X className="w-4 h-4 stroke-[3]" />
+                  <span>Simpan: Tolak Alasan (Tetap Kena Penalti Penuh)</span>
+                </button>
+              )}
             </div>
           </div>
         </div>

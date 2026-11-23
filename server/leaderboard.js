@@ -206,6 +206,7 @@ export async function computeLeaderboard(targetMonthStr) {
 
       // Check if late checkin was officially EXCUSED / WAIVED by management
       const isLateExcused = flagsArr.includes('FLAG_LATE_EXCUSED') || parsedLogNotes?.late_status === 'APPROVED';
+      const isPartial = flagsArr.includes('FLAG_LATE_PARTIAL') || parsedLogNotes?.late_status === 'PARTIAL_APPROVED';
 
       if (diffSecs <= -900) {
         // Rank 1: Early Bird >= 15 mins early (+2.0 pts)
@@ -223,7 +224,11 @@ export async function computeLeaderboard(targetMonthStr) {
         // Rank 5: > 10 mins late (past grace period) -> PENALTY
         if (!isLateExcused) {
           staffStats[sId].lateCount++;
-          staffStats[sId].totalLateSeconds += (diffSecs - 600);
+          if (isPartial && parsedLogNotes?.late_remaining_minutes != null) {
+            staffStats[sId].totalLateSeconds += (parsedLogNotes.late_remaining_minutes * 60);
+          } else {
+            staffStats[sId].totalLateSeconds += (diffSecs - 600);
+          }
         }
       }
     }

@@ -14,7 +14,8 @@ import {
   ShieldCheck,
   Award,
   Trash2,
-  Edit3
+  Edit3,
+  Zap
 } from 'lucide-react';
 import { getStaffAttendanceHistory } from '../../utils/api';
 import { formatWitaDateFull, formatWitaDateOnly, formatWitaTimeOnly } from '../../utils/time';
@@ -263,6 +264,7 @@ export default function StaffAttendanceHistoryModal({
               <div className="space-y-3">
                 {lateRecords.map((item, idx) => {
                   const isApproved = item.late_status === 'APPROVED';
+                  const isPartial = item.late_status === 'PARTIAL_APPROVED';
                   const isPending = item.late_status === 'PENDING_REVIEW';
                   const isRejected = item.late_status === 'REJECTED';
 
@@ -281,7 +283,9 @@ export default function StaffAttendanceHistoryModal({
                             <span>⚠️ Masuk: <strong className="font-mono text-white">{formatWitaTimeOnly(item.checkin_time)} WITA</strong></span>
                             <span className="text-slate-400 text-[11px] font-mono">(Jadwal: {item.scheduled_start || '-'})</span>
                             <span className="px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 text-[10px] font-black border border-amber-500/40">
-                              Telat +{item.late_minutes} menit
+                              {isPartial
+                                ? `Telat sisa +${item.late_remaining_minutes != null ? item.late_remaining_minutes : item.late_minutes}m (Toleransi ${item.late_excused_minutes || 0}m)`
+                                : `Telat +${item.late_minutes} menit`}
                             </span>
                           </div>
                         </div>
@@ -291,7 +295,12 @@ export default function StaffAttendanceHistoryModal({
                           {isApproved ? (
                             <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
                               <CheckCircle2 className="w-3 h-3 text-emerald-400" />
-                              <span>Di-ACC Manajer</span>
+                              <span>Di-ACC Penuh</span>
+                            </span>
+                          ) : isPartial ? (
+                            <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                              <Zap className="w-3 h-3 text-amber-400" />
+                              <span>ACC Sebagian (+{item.late_remaining_minutes != null ? item.late_remaining_minutes : item.late_minutes}m)</span>
                             </span>
                           ) : isPending ? (
                             <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-amber-500/20 text-amber-300 border border-amber-500/40 animate-pulse">

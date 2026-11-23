@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, MapPin, ShieldAlert, CheckCircle, Calendar, Clock, User, Coffee, LogIn, LogOut, Camera, ShieldCheck, Check, AlertTriangle, MessageSquare, Lock, RefreshCw, Eye, Unlock } from 'lucide-react';
+import { X, MapPin, ShieldAlert, CheckCircle, Calendar, Clock, User, Coffee, LogIn, LogOut, Camera, ShieldCheck, Check, AlertTriangle, MessageSquare, Lock, RefreshCw, Eye, Unlock, Zap } from 'lucide-react';
 import { formatWitaDateTime, formatDuration } from '../../utils/time';
 import { reviewLateCheckin, authorizeEarlyCheckout } from '../../utils/api';
 import ZoomableImage from '../Common/ZoomableImage';
@@ -56,9 +56,22 @@ export default function PhotoDetailModal({ shift, type = 'in', onClose, onShiftU
     setImgError(false);
   }, [activeTab, breakSubTab]);
 
+  const [lateMode, setLateMode] = useState(() => (
+    shift.late_status === 'PARTIAL_APPROVED' ? 'PARTIAL' : (shift.late_status === 'APPROVED' ? 'FULL' : (shift.late_status === 'REJECTED' ? 'REJECT' : 'FULL'))
+  ));
+  const [lateToleratedMinutes, setLateToleratedMinutes] = useState(() => (
+    shift.late_excused_minutes != null ? String(shift.late_excused_minutes) : '20'
+  ));
+
   const handleReviewLate = async (action) => {
     if (!latePin.trim()) {
       setLateReviewError('Masukkan PIN Manager / Assistant Manager untuk otorisasi.');
+      return;
+    }
+
+    const tol = Math.max(0, parseInt(lateToleratedMinutes, 10) || 0);
+    if (action === 'PARTIAL' && tol <= 0) {
+      setLateReviewError('Masukkan menit toleransi yang valid (> 0 menit).');
       return;
     }
 
@@ -70,9 +83,17 @@ export default function PhotoDetailModal({ shift, type = 'in', onClose, onShiftU
       await reviewLateCheckin(shift.id, {
         pin: latePin.trim(),
         action,
-        managerNotes: lateNotes.trim()
+        managerNotes: lateNotes.trim(),
+        toleratedMinutes: action === 'PARTIAL' ? tol : 0,
+        originalMinutes: shift.late_original_minutes || 0
       });
-      setLateReviewSuccess(action === 'APPROVE' ? 'Alasan telat berhasil di-ACC (Dimaafkan)!' : 'Alasan telat ditolak.');
+      setLateReviewSuccess(
+        action === 'APPROVE'
+          ? 'Alasan telat berhasil di-ACC Penuh (Dimaafkan)!'
+          : (action === 'PARTIAL'
+            ? `Alasan telat di-ACC Sebagian (Toleransi ${tol}m dimaafkan).`
+            : 'Alasan telat ditolak.')
+      );
       if (onShiftUpdated) onShiftUpdated();
     } catch (err) {
       setLateReviewError(err.message || 'Gagal me-review keterlambatan.');
@@ -486,7 +507,12 @@ export default function PhotoDetailModal({ shift, type = 'in', onClose, onShiftU
                 {shift.late_status === 'APPROVED' ? (
                   <span className="px-2.5 py-1 rounded-full text-[10px] font-black bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 flex items-center space-x-1">
                     <CheckCircle className="w-3 h-3 text-emerald-400 stroke-[2.5]" />
-                    <span>DI-ACC / DIMAAFKAN</span>
+                    <span>DI-ACC PENUH (BEBAS PENALTI)</span>
+                  </span>
+                ) : shift.late_status === 'PARTIAL_APPROVED' ? (
+                  <span className="px-2.5 py-1 rounded-full text-[10px] font-black bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center space-x-1">
+                    <Zap className="w-3 h-3 text-amber-400 stroke-[2.5]" />
+                    <span>ACC SEBAGIAN (TOLERANSI {shift.late_excused_minutes || 0}M &bull; SISA {shift.late_remaining_minutes || 0}M TELAT)</span>
                   </span>
                 ) : shift.late_status === 'REJECTED' ? (
                   <span className="px-2.5 py-1 rounded-full text-[10px] font-black bg-rose-500/20 text-rose-300 border border-rose-500/40 flex items-center space-x-1">
@@ -535,9 +561,71 @@ export default function PhotoDetailModal({ shift, type = 'in', onClose, onShiftU
 
               {/* Management Review Form */}
               <div className="pt-2 border-t border-slate-800 space-y-2">
-                <span className="text-[10px] font-black uppercase text-slate-400 block">
-                  Aksi Review (Khusus Operational Manager / Assistant Manager):
-                </span>
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-black uppercase text-slate-400 block">
+                    Aksi Review (Manager / Assistant Manager):
+                  </span>
+                  {/* Mode tabs */}
+                  <div className="flex items-center space-x-1 bg-slate-950 p-1 rounded-lg border border-slate-800 text-[10px]">
+                    <button
+                      type="button"
+                      onClick={() => setLateMode('FULL')}
+                      className={`px-2 py-0.5 rounded font-black cursor-pointer transition ${
+                        lateMode === 'FULL' ? 'bg-emerald-600 text-white' : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      ACC Penuh
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setLateMode('PARTIAL')}
+                      className={`px-2 py-0.5 rounded font-black cursor-pointer transition ${
+                        lateMode === 'PARTIAL' ? 'bg-amber-600 text-white' : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      ACC Sebagian
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setLateMode('REJECT')}
+                      className={`px-2 py-0.5 rounded font-black cursor-pointer transition ${
+                        lateMode === 'REJECT' ? 'bg-rose-600 text-white' : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      Tolak
+                    </button>
+                  </div>
+                </div>
+
+                {lateMode === 'PARTIAL' && (
+                  <div className="p-2.5 bg-amber-950/40 border border-amber-500/30 rounded-xl space-y-1.5 animate-fade-in text-[11px]">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-amber-300">Menit Toleransi yang Dimaafkan:</span>
+                      <div className="flex items-center space-x-1">
+                        <input
+                          type="number"
+                          min="1"
+                          value={lateToleratedMinutes}
+                          onChange={(e) => setLateToleratedMinutes(e.target.value)}
+                          className="w-16 bg-slate-950 border border-amber-500/50 rounded-lg px-2 py-1 text-xs text-amber-200 font-mono font-bold text-right focus:outline-none"
+                        />
+                        <span className="text-[10px] text-amber-400 font-bold">Menit</span>
+                      </div>
+                    </div>
+                    <div className="flex gap-1 flex-wrap">
+                      {[10, 15, 20, 30].map(m => (
+                        <button
+                          key={m}
+                          type="button"
+                          onClick={() => setLateToleratedMinutes(String(m))}
+                          className="px-2 py-0.5 bg-slate-850 hover:bg-slate-750 text-slate-300 border border-slate-700 rounded text-[9px] font-bold cursor-pointer"
+                        >
+                          {m}m
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 <div className="space-y-2">
                   <input
@@ -549,7 +637,7 @@ export default function PhotoDetailModal({ shift, type = 'in', onClose, onShiftU
                   />
                   <input
                     type="text"
-                    placeholder="Catatan manager (opsional, misal: 'Ban bocor terbukti valid')"
+                    placeholder="Catatan manager (opsional, misal: 'Toleransi 20m macet')"
                     value={lateNotes}
                     onChange={(e) => setLateNotes(e.target.value)}
                     className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-400"
@@ -567,25 +655,40 @@ export default function PhotoDetailModal({ shift, type = 'in', onClose, onShiftU
                     </div>
                   )}
 
-                  <div className="flex items-center space-x-2 pt-1">
-                    <button
-                      type="button"
-                      disabled={submittingLate}
-                      onClick={() => handleReviewLate('APPROVE')}
-                      className="flex-1 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs transition cursor-pointer flex items-center justify-center space-x-1 disabled:opacity-50"
-                    >
-                      <Check className="w-3.5 h-3.5" />
-                      <span>ACC / Maafkan Telat</span>
-                    </button>
-                    <button
-                      type="button"
-                      disabled={submittingLate}
-                      onClick={() => handleReviewLate('REJECT')}
-                      className="flex-1 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-black text-xs transition cursor-pointer flex items-center justify-center space-x-1 disabled:opacity-50"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                      <span>Tolak Alasan</span>
-                    </button>
+                  <div className="pt-1">
+                    {lateMode === 'FULL' && (
+                      <button
+                        type="button"
+                        disabled={submittingLate}
+                        onClick={() => handleReviewLate('APPROVE')}
+                        className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs transition cursor-pointer flex items-center justify-center space-x-1 disabled:opacity-50"
+                      >
+                        <Check className="w-3.5 h-3.5" />
+                        <span>Simpan: ACC Penuh (Bebas Penalti)</span>
+                      </button>
+                    )}
+                    {lateMode === 'PARTIAL' && (
+                      <button
+                        type="button"
+                        disabled={submittingLate}
+                        onClick={() => handleReviewLate('PARTIAL')}
+                        className="w-full py-2.5 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white font-black text-xs transition cursor-pointer flex items-center justify-center space-x-1 disabled:opacity-50"
+                      >
+                        <Zap className="w-3.5 h-3.5" />
+                        <span>Simpan: ACC Sebagian (Toleransi {lateToleratedMinutes} Menit)</span>
+                      </button>
+                    )}
+                    {lateMode === 'REJECT' && (
+                      <button
+                        type="button"
+                        disabled={submittingLate}
+                        onClick={() => handleReviewLate('REJECT')}
+                        className="w-full py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-black text-xs transition cursor-pointer flex items-center justify-center space-x-1 disabled:opacity-50"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                        <span>Simpan: Tolak Alasan (Kena Penalti Penuh)</span>
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>

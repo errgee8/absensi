@@ -1017,6 +1017,9 @@ export const cloudDb = {
         late_reviewed_by: parsedNotes.late_reviewed_by || null,
         late_reviewed_at: parsedNotes.late_reviewed_at || null,
         late_manager_note: parsedNotes.late_manager_note || null,
+        late_excused_minutes: parsedNotes.late_excused_minutes != null ? Number(parsedNotes.late_excused_minutes) : null,
+        late_remaining_minutes: parsedNotes.late_remaining_minutes != null ? Number(parsedNotes.late_remaining_minutes) : null,
+        late_original_minutes: parsedNotes.late_original_minutes != null ? Number(parsedNotes.late_original_minutes) : null,
         face_recog_status: parsedNotes.face_recog_status || null,
         face_recog_similarity: parsedNotes.face_recog_similarity != null ? Number(parsedNotes.face_recog_similarity) : null,
         face_recog_distance: parsedNotes.face_recog_distance != null ? Number(parsedNotes.face_recog_distance) : null,
@@ -1198,11 +1201,11 @@ export const cloudDb = {
     };
   },
 
-  async reviewLateCheckin({ shiftId, action, managerNotes, reviewerName }) {
+  async reviewLateCheckin({ shiftId, action, managerNotes, reviewerName, toleratedMinutes, originalMinutes }) {
     if (!supabase) return null;
     const { data: log, error: fetchErr } = await supabase
       .from('attendance_logs')
-      .select('id, flags, notes')
+      .select('id, staff_id, flags, notes')
       .eq('id', shiftId)
       .maybeSingle();
 
@@ -1220,15 +1223,50 @@ export const cloudDb = {
       : (typeof log.flags === 'string' ? JSON.parse(log.flags || '[]') : []);
 
     const now = new Date().toISOString();
-    parsedNotes.late_status = action === 'APPROVE' ? 'APPROVED' : 'REJECTED';
+    const isPartial = action === 'PARTIAL';
+    const isApprove = action === 'APPROVE';
+
+    parsedNotes.late_status = isApprove ? 'APPROVED' : (isPartial ? 'PARTIAL_APPROVED' : 'REJECTED');
     parsedNotes.late_reviewed_by = reviewerName || 'Management';
     parsedNotes.late_reviewed_at = now;
     parsedNotes.late_manager_note = managerNotes || null;
 
-    if (action === 'APPROVE') {
+    if (isPartial) {
+      const orig = Number(originalMinutes) || Number(parsedNotes.late_original_minutes) || 0;
+      const tol = Math.max(0, Number(toleratedMinutes) || 0);
+      const rem = Math.max(0, orig - tol);
+      parsedNotes.late_excused_minutes = tol;
+      parsedNotes.late_remaining_minutes = rem;
+      parsedNotes.late_original_minutes = orig;
+    } else if (isApprove) {
+      parsedNotes.late_excused_minutes = Number(originalMinutes) || Number(parsedNotes.late_original_minutes) || null;
+      parsedNotes.late_remaining_minutes = 0;
+    } else {
+      parsedNotes.late_excused_minutes = 0;
+      parsedNotes.late_remaining_minutes = Number(originalMinutes) || Number(parsedNotes.late_original_minutes) || null;
+    }
+
+    if (isApprove) {
       parsedFlags = parsedFlags.map(f => {
-        if (String(f).includes('Late') || String(f).includes('LATE')) {
+        if (String(f).includes('Late') || String(f).includes('LATE') || f === 'FLAG_LATE_PARTIAL') {
           return 'FLAG_LATE_EXCUSED';
+        }
+        return f;
+      });
+    } else if (isPartial) {
+      parsedFlags = parsedFlags.map(f => {
+        if (String(f).includes('Late') || String(f).includes('LATE') || f === 'FLAG_LATE_EXCUSED') {
+          return 'FLAG_LATE_PARTIAL';
+        }
+        return f;
+      });
+      if (!parsedFlags.includes('FLAG_LATE_PARTIAL')) {
+        parsedFlags.push('FLAG_LATE_PARTIAL');
+      }
+    } else {
+      parsedFlags = parsedFlags.map(f => {
+        if (f === 'FLAG_LATE_EXCUSED' || f === 'FLAG_LATE_PARTIAL') {
+          return 'FLAG: Late Check-In (>10m Grace)';
         }
         return f;
       });
@@ -1246,6 +1284,26 @@ export const cloudDb = {
       .maybeSingle();
 
     if (updateErr) throw updateErr;
+
+    // Log to staff audit trail
+    try {
+      if (log.staff_id) {
+        await this.logStaffAudit({
+          staffId: log.staff_id,
+          action: 'LATE_REVIEW',
+          description: isApprove
+            ? 'Manajer menyetujui (ACC Bebas Penalti) keterlambatan check-in.'
+            : (isPartial
+              ? `Manajer memberikan ACC Sebagian: Toleransi ${parsedNotes.late_excused_minutes}m, Sisa ${parsedNotes.late_remaining_minutes}m tetap dihitung telat.`
+              : 'Manajer menolak alasan keterlambatan check-in (Tetap dikenakan penalti).'),
+          reason: managerNotes || (isApprove ? 'Di-ACC penuh' : (isPartial ? `ACC Sebagian ${parsedNotes.late_excused_minutes}m` : 'Ditolak')),
+          actor: reviewerName || 'Management'
+        });
+      }
+    } catch (e) {
+      console.warn('Audit log for late review note:', e.message);
+    }
+
     return updated;
   },
 

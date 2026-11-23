@@ -2104,7 +2104,7 @@ router.get('/staff/:id/attendance-history', async (req, res) => {
 
     const flags = Array.isArray(s.flags) ? s.flags : (typeof s.flags === 'string' ? JSON.parse(s.flags || '[]') : []);
     const isLateFlag = flags.some(f => String(f).toLowerCase().includes('late'));
-    const isLateStatus = s.late_status === 'PENDING_REVIEW' || s.late_status === 'APPROVED' || s.late_status === 'REJECTED';
+    const isLateStatus = s.late_status === 'PENDING_REVIEW' || s.late_status === 'APPROVED' || s.late_status === 'PARTIAL_APPROVED' || s.late_status === 'REJECTED';
     const isLate = isLateFlag || isLateStatus || Boolean(s.late_reason);
 
     if (isLate) {
@@ -2143,7 +2143,10 @@ router.get('/staff/:id/attendance-history', async (req, res) => {
         late_minutes: lateMinutes,
         late_reason: s.late_reason || null,
         late_photo_url: s.late_photo_url || null,
-        late_status: s.late_status || (flags.includes('FLAG_LATE_EXCUSED') ? 'APPROVED' : 'PENDING_REVIEW'),
+        late_status: s.late_status || (flags.includes('FLAG_LATE_EXCUSED') ? 'APPROVED' : (flags.includes('FLAG_LATE_PARTIAL') ? 'PARTIAL_APPROVED' : 'PENDING_REVIEW')),
+        late_excused_minutes: s.late_excused_minutes || null,
+        late_remaining_minutes: s.late_remaining_minutes != null ? s.late_remaining_minutes : (s.late_status === 'PARTIAL_APPROVED' ? Math.max(0, lateMinutes - (s.late_excused_minutes || 0)) : null),
+        late_original_minutes: s.late_original_minutes || lateMinutes,
         late_reviewed_by: s.late_reviewed_by || null,
         late_reviewed_at: s.late_reviewed_at || null,
         late_manager_note: s.late_manager_note || null
@@ -3601,7 +3604,10 @@ router.get('/shifts', async (req, res) => {
       late_status: parsedNotes.late_status || null,
       late_reviewed_by: parsedNotes.late_reviewed_by || null,
       late_reviewed_at: parsedNotes.late_reviewed_at || null,
-      late_manager_note: parsedNotes.late_manager_note || null
+      late_manager_note: parsedNotes.late_manager_note || null,
+      late_excused_minutes: parsedNotes.late_excused_minutes != null ? Number(parsedNotes.late_excused_minutes) : null,
+      late_remaining_minutes: parsedNotes.late_remaining_minutes != null ? Number(parsedNotes.late_remaining_minutes) : null,
+      late_original_minutes: parsedNotes.late_original_minutes != null ? Number(parsedNotes.late_original_minutes) : null
     };
   });
 
@@ -4005,15 +4011,22 @@ const verifyManagementAuth = async (pin) => {
 // 1. Review Late Check-in Anomaly (Manager & Assistant Manager)
 router.post('/shifts/:id/review-late', async (req, res) => {
   const { id } = req.params;
-  const { pin, action, managerNotes } = req.body || {};
+  const { pin, action, managerNotes, toleratedMinutes, originalMinutes } = req.body || {};
 
   const auth = await verifyManagementAuth(pin);
   if (!auth.authorized) {
     return res.status(403).json({ error: 'Akses ditolak: Hanya Manager / Assistant Manager yang dapat me-review alasan keterlambatan.' });
   }
 
-  if (!action || !['APPROVE', 'REJECT'].includes(action)) {
-    return res.status(400).json({ error: 'Aksi review tidak valid (wajib APPROVE atau REJECT).' });
+  if (!action || !['APPROVE', 'REJECT', 'PARTIAL'].includes(action)) {
+    return res.status(400).json({ error: 'Aksi review tidak valid (wajib APPROVE, REJECT, atau PARTIAL).' });
+  }
+
+  if (action === 'PARTIAL') {
+    const tol = Number(toleratedMinutes);
+    if (isNaN(tol) || tol < 0) {
+      return res.status(400).json({ error: 'Jumlah menit toleransi tidak valid.' });
+    }
   }
 
   try {
@@ -4023,7 +4036,9 @@ router.post('/shifts/:id/review-late', async (req, res) => {
         shiftId: id,
         action,
         managerNotes,
-        reviewerName: auth.reviewerName
+        reviewerName: auth.reviewerName,
+        toleratedMinutes,
+        originalMinutes
       });
     }
 
@@ -4033,14 +4048,37 @@ router.post('/shifts/:id/review-late', async (req, res) => {
       if (shiftRow) {
         let parsedNotes = {};
         try { parsedNotes = JSON.parse(shiftRow.notes || '{}'); } catch {}
-        parsedNotes.late_status = action === 'APPROVE' ? 'APPROVED' : 'REJECTED';
+        const isPartial = action === 'PARTIAL';
+        const isApprove = action === 'APPROVE';
+
+        parsedNotes.late_status = isApprove ? 'APPROVED' : (isPartial ? 'PARTIAL_APPROVED' : 'REJECTED');
         parsedNotes.late_reviewed_by = auth.reviewerName;
         parsedNotes.late_reviewed_at = new Date().toISOString();
         parsedNotes.late_manager_note = managerNotes || null;
 
+        if (isPartial) {
+          const orig = Number(originalMinutes) || Number(parsedNotes.late_original_minutes) || 0;
+          const tol = Math.max(0, Number(toleratedMinutes) || 0);
+          const rem = Math.max(0, orig - tol);
+          parsedNotes.late_excused_minutes = tol;
+          parsedNotes.late_remaining_minutes = rem;
+          parsedNotes.late_original_minutes = orig;
+        } else if (isApprove) {
+          parsedNotes.late_excused_minutes = Number(originalMinutes) || Number(parsedNotes.late_original_minutes) || null;
+          parsedNotes.late_remaining_minutes = 0;
+        } else {
+          parsedNotes.late_excused_minutes = 0;
+          parsedNotes.late_remaining_minutes = Number(originalMinutes) || Number(parsedNotes.late_original_minutes) || null;
+        }
+
         let parsedFlags = JSON.parse(shiftRow.flags || '[]');
-        if (action === 'APPROVE') {
-          parsedFlags = parsedFlags.map(f => String(f).includes('Late') || String(f).includes('LATE') ? 'FLAG_LATE_EXCUSED' : f);
+        if (isApprove) {
+          parsedFlags = parsedFlags.map(f => String(f).includes('Late') || String(f).includes('LATE') || f === 'FLAG_LATE_PARTIAL' ? 'FLAG_LATE_EXCUSED' : f);
+        } else if (isPartial) {
+          parsedFlags = parsedFlags.map(f => String(f).includes('Late') || String(f).includes('LATE') || f === 'FLAG_LATE_EXCUSED' ? 'FLAG_LATE_PARTIAL' : f);
+          if (!parsedFlags.includes('FLAG_LATE_PARTIAL')) parsedFlags.push('FLAG_LATE_PARTIAL');
+        } else {
+          parsedFlags = parsedFlags.map(f => f === 'FLAG_LATE_EXCUSED' || f === 'FLAG_LATE_PARTIAL' ? 'FLAG: Late Check-In (>10m Grace)' : f);
         }
 
         db.prepare('UPDATE shifts SET notes = ?, flags = ?, updated_at = datetime("now") WHERE id = ?').run(
@@ -4056,9 +4094,15 @@ router.post('/shifts/:id/review-late', async (req, res) => {
     broadcastEvent('SHIFT_UPDATE');
     broadcastEvent('LEADERBOARD_UPDATE');
 
+    const msg = action === 'APPROVE'
+      ? 'Alasan terlambat berhasil di-ACC (Dimaafkan / Bebas Penalti).'
+      : (action === 'PARTIAL'
+        ? `Alasan terlambat di-ACC Sebagian (Toleransi ${toleratedMinutes} menit).`
+        : 'Alasan terlambat ditolak (Penalti tetap berlaku).');
+
     return res.json({
       success: true,
-      message: action === 'APPROVE' ? 'Alasan terlambat berhasil di-ACC (Dimaafkan).' : 'Alasan terlambat ditolak (Penalti tetap berlaku).',
+      message: msg,
       shift: updatedShift
     });
   } catch (err) {

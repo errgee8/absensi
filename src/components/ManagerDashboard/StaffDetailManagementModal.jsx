@@ -1082,11 +1082,19 @@ export default function StaffDetailManagementModal({
                           <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black border ${
                             rec.late_status === 'APPROVED'
                               ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
+                              : rec.late_status === 'PARTIAL_APPROVED'
+                              ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
                               : rec.late_status === 'REJECTED'
                               ? 'bg-rose-500/20 text-rose-400 border-rose-500/30'
                               : 'bg-amber-500/20 text-amber-400 border-amber-500/30'
                           }`}>
-                            {rec.late_status === 'APPROVED' ? '✓ Di-ACC Manajer' : rec.late_status === 'REJECTED' ? '✕ Ditolak' : '⏳ Menunggu Review'}
+                            {rec.late_status === 'APPROVED'
+                              ? '✓ Di-ACC Penuh'
+                              : rec.late_status === 'PARTIAL_APPROVED'
+                              ? `⚡ ACC Sebagian (+${rec.late_remaining_minutes != null ? rec.late_remaining_minutes : rec.late_minutes}m)`
+                              : rec.late_status === 'REJECTED'
+                              ? '✕ Ditolak'
+                              : '⏳ Menunggu Review'}
                           </span>
                         </div>
 

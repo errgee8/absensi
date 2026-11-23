@@ -149,15 +149,26 @@ function buildVenuePayrollSheet({
         flagsArr = [];
       }
 
-      if (flagsArr.some((f) => String(f).toLowerCase().includes('late') && !String(f).includes('EXCUSED'))) {
+      const isAcc = s.late_status === 'APPROVED' || flagsArr.includes('FLAG_LATE_EXCUSED');
+      const isPartial = s.late_status === 'PARTIAL_APPROVED' || flagsArr.includes('FLAG_LATE_PARTIAL');
+
+      if (!isAcc && (flagsArr.some((f) => String(f).toLowerCase().includes('late') && !String(f).includes('EXCUSED')) || isPartial || isLate)) {
         isLate = true;
         if (lateMinutes === 0) lateMinutes = 15;
+        if (isPartial) {
+          const remM = s.late_remaining_minutes != null ? s.late_remaining_minutes : Math.max(0, lateMinutes - (s.late_excused_minutes || 0));
+          lateMinutes = remM;
+        }
+      } else if (isAcc) {
+        isLate = false;
       }
 
       if (isLate) {
         lateOccurrences.push({
           date: inWita.dateStr,
-          text: `• ${inWita.dayName}, ${inWita.dateStr} jam ${inWita.timeStr} (Telat ${lateMinutes}m)`
+          text: isPartial
+            ? `• ${inWita.dayName}, ${inWita.dateStr} jam ${inWita.timeStr} (Telat sisa ${lateMinutes}m - Toleransi ${s.late_excused_minutes || 0}m)`
+            : `• ${inWita.dayName}, ${inWita.dateStr} jam ${inWita.timeStr} (Telat ${lateMinutes}m)`
         });
       }
     });
@@ -847,24 +858,36 @@ function buildLatenessDetailSheet({ workbook, shifts = [], allStaff = [], export
       flagsArr = [];
     }
 
-    const hasLateFlag = flagsArr.some((f) => String(f).toLowerCase().includes('late') && !String(f).includes('EXCUSED'));
+    const isAcc = flagsArr.some((f) => String(f).includes('LATE_APPROVED')) || flagsArr.includes('FLAG_LATE_EXCUSED') || s.late_status === 'APPROVED' || s.late_excused === 1;
+    const isPartial = flagsArr.includes('FLAG_LATE_PARTIAL') || s.late_status === 'PARTIAL_APPROVED';
+    const isRejected = flagsArr.some((f) => String(f).includes('LATE_REJECTED')) || s.late_status === 'REJECTED';
+
+    const hasLateFlag = flagsArr.some((f) => String(f).toLowerCase().includes('late') && !String(f).includes('EXCUSED')) || isPartial;
     if (hasLateFlag) {
       isLate = true;
       if (lateMinutes === 0) lateMinutes = 15;
     }
 
     if (isLate) {
-      const isAcc = flagsArr.some((f) => String(f).includes('LATE_APPROVED')) || s.late_excused === 1;
-      const isRejected = flagsArr.some((f) => String(f).includes('LATE_REJECTED'));
-      const statusText = isAcc ? 'Di-ACC Manajer' : isRejected ? 'Ditolak' : 'Menunggu Review';
+      const origMinutes = s.late_original_minutes || lateMinutes;
+      const effectiveLateMinutes = isPartial && s.late_remaining_minutes != null ? s.late_remaining_minutes : lateMinutes;
+      const statusText = isAcc
+        ? 'Di-ACC Manajer'
+        : isPartial
+        ? `ACC Sebagian (Toleransi ${s.late_excused_minutes || 0}m)`
+        : isRejected
+        ? 'Ditolak'
+        : 'Menunggu Review';
 
       lateShifts.push({
         shift: s,
         inWita,
         schedStart,
-        lateMinutes,
+        lateMinutes: effectiveLateMinutes,
+        originalLateMinutes: origMinutes,
         statusText,
         isAcc,
+        isPartial,
         isRejected,
         staffName: s.staff_name || matchedStaff?.name || '-',
         venue: s.staff_venue || s.venue || matchedStaff?.venue || '-',
@@ -947,7 +970,9 @@ function buildLatenessDetailSheet({ workbook, shifts = [], allStaff = [], export
       item.division,
       item.schedStart ? `${item.schedStart} WITA` : '-',
       item.shift.checkin_time ? `${item.inWita.timeStr} WITA` : '-',
-      `+${item.lateMinutes} Menit`,
+      item.isPartial
+        ? `+${item.lateMinutes}m (dari ${item.originalLateMinutes}m, ACC ${item.shift?.late_excused_minutes || 0}m)`
+        : `+${item.lateMinutes} Menit`,
       `"${item.reason}"`,
       item.statusText,
       item.reviewer
