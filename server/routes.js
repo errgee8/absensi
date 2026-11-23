@@ -3553,7 +3553,22 @@ router.get('/stats', async (req, res) => {
 router.get('/settings', async (req, res) => {
   if (isSupabaseConfigured) {
     try {
-      const { data: cloudSettings, error } = await supabase.from('app_settings').select('*');
+      const targetConfigKeys = [
+        'venue_name',
+        'venue_lat',
+        'venue_lng',
+        'geofence_radius',
+        'allowed_subnets',
+        'enforce_wifi',
+        'timezone',
+        'notify_announcements',
+        'shift_break_windows',
+        'admin_pin'
+      ];
+      const { data: cloudSettings, error } = await supabase
+        .from('app_settings')
+        .select('key, value')
+        .in('key', targetConfigKeys);
       if (!error && cloudSettings && cloudSettings.length > 0) {
         for (const item of cloudSettings) {
           setSetting(item.key, item.value);

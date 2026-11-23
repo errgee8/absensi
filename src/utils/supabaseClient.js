@@ -43,6 +43,7 @@ export async function uploadAttendancePhotoClient(base64Data, filenamePrefix = '
       .from('attendance-photos')
       .upload(filePath, blob, {
         contentType: `image/${matches[1]}`,
+        cacheControl: '2592000',
         upsert: true
       });
 

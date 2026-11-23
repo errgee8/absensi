@@ -93,8 +93,8 @@ export async function createSystemSnapshot(createdBy = 'Operational Manager') {
       activeBackups.unshift(metaRecord);
       await cloudDb.saveSetting('system_backups', activeBackups.slice(0, 30), 'System Disaster Recovery Snapshots');
 
-      // Save raw data to dedicated key for this backupId
-      await cloudDb.saveSetting(`backup_data_${backupId}`, snapshot, `Full Snapshot ${backupId}`);
+      // Note: Full raw snapshots are stored as .json files on local disk (backups/ folder)
+      // to keep Supabase database egress and table storage lightweight (< 300KB) and prevent quota exhaustion.
     } catch (e) {
       console.warn('Failed to save snapshot to Supabase:', e.message);
     }

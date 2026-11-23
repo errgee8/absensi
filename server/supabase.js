@@ -89,6 +89,7 @@ export async function uploadPhotoToSupabase(base64Data, filenamePrefix = 'selfie
     .from('attendance-photos')
     .upload(filePath, buffer, {
       contentType: `image/${matches[1]}`,
+      cacheControl: '2592000',
       upsert: true
     });
 
