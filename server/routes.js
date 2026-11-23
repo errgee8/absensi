@@ -7275,6 +7275,137 @@ router.get('/quiz/weekly', async (req, res) => {
   }
 });
 
+// Helper to diagnose quiz performance, categorizing errors and generating manager recommendations
+export function computeQuizDiagnostic(record) {
+  const score = Number(record.score ?? 0);
+  const correctCount = Number(record.correct_count ?? 0);
+  const totalQuestions = Number(record.total_questions ?? 10);
+  const durationSeconds = Number(record.duration_seconds ?? 0);
+  const results = Array.isArray(record.results) ? record.results : [];
+
+  // 1. Kecepatan Pengerjaan
+  let speedCategory = 'NORMAL';
+  let speedLabel = 'Normal / Standar';
+  let speedBadge = '⏱️ Normal';
+  if (durationSeconds > 0 && durationSeconds <= 180) {
+    speedCategory = 'FAST';
+    speedLabel = 'Sangat Cepat (< 3m)';
+    speedBadge = '⚡ Sangat Cepat';
+  } else if (durationSeconds > 360) {
+    speedCategory = 'SLOW';
+    speedLabel = 'Lambat / Ragu-ragu (> 6m)';
+    speedBadge = '⚠️ Lambat / Ragu';
+  }
+
+  // 2. Ketepatan / Grade
+  let accuracyGrade = 'D';
+  let accuracyLabel = 'Kurang (< 60)';
+  let gradeColor = 'rose';
+  if (score >= 90) {
+    accuracyGrade = 'A';
+    accuracyLabel = 'Sangat Menguasai (A)';
+    gradeColor = 'emerald';
+  } else if (score >= 75) {
+    accuracyGrade = 'B';
+    accuracyLabel = 'Menguasai / Baik (B)';
+    gradeColor = 'blue';
+  } else if (score >= 60) {
+    accuracyGrade = 'C';
+    accuracyLabel = 'Cukup / Standar (C)';
+    gradeColor = 'amber';
+  }
+
+  // 3. Domain Breakdown
+  const domainBreakdown = {
+    bar: { key: 'bar', name: 'Bar & Minuman', total: 0, wrong: 0, wrongQuestions: [] },
+    kitchen: { key: 'kitchen', name: 'Kitchen & Makanan', total: 0, wrong: 0, wrongQuestions: [] },
+    billiard: { key: 'billiard', name: 'Billiard & Fasilitas', total: 0, wrong: 0, wrongQuestions: [] },
+    management: { key: 'management', name: 'Manajemen & SOP', total: 0, wrong: 0, wrongQuestions: [] }
+  };
+
+  const classifyCategory = (cat = '') => {
+    const c = cat.toLowerCase();
+    if (c.includes('bar') || c.includes('cocktail') || c.includes('mocktail') || c.includes('kopi') || c.includes('minuman') || c.includes('arak')) return 'bar';
+    if (c.includes('kitchen') || c.includes('makanan') || c.includes('western') || c.includes('snack') || c.includes('wings') || c.includes('soup') || c.includes('nasi') || c.includes('main course') || c.includes('add-on')) return 'kitchen';
+    if (c.includes('meja') || c.includes('billiard') || c.includes('fasilitas') || c.includes('loker') || c.includes('gear') || c.includes('promo meja') || c.includes('paket meja') || c.includes('birthday') || c.includes('arisan') || c.includes('turnamen')) return 'billiard';
+    return 'management';
+  };
+
+  for (const item of results) {
+    const domainKey = classifyCategory(item.category || '');
+    domainBreakdown[domainKey].total++;
+    if (!item.isCorrect) {
+      domainBreakdown[domainKey].wrong++;
+      domainBreakdown[domainKey].wrongQuestions.push({
+        id: item.id,
+        category: item.category,
+        question: item.question,
+        staffAnswer: item.staffAnswer,
+        correctAnswer: item.correctAnswer,
+        explanation: item.explanation
+      });
+    }
+  }
+
+  // Find weak domains
+  const weakDomains = Object.values(domainBreakdown).filter(d => d.wrong > 0);
+  weakDomains.sort((a, b) => b.wrong - a.wrong);
+
+  // Formulate summary of weaknesses
+  let weaknessSummary = '';
+  if (score === 100) {
+    weaknessSummary = 'Sempurna (100% Menguasai Seluruh Materi)';
+  } else if (weakDomains.length === 0) {
+    weaknessSummary = 'Perlu pendalaman materi umum.';
+  } else {
+    const parts = weakDomains.map(w => `${w.name} (${w.wrong} salah)`);
+    weaknessSummary = `Kekurangan di: ${parts.join(', ')}`;
+    if (speedCategory === 'SLOW') {
+      weaknessSummary += ' • Kecepatan pengerjaan lambat / ragu-ragu';
+    }
+  }
+
+  // Formulate Manager Improvement Recommendation
+  const recs = [];
+  if (score >= 90) {
+    recs.push('Pertahankan penguasaan materi produk. Staf siap direkomendasikan menjadi buddy/mentor menu bagi staf junior di floor.');
+  } else {
+    for (const w of weakDomains) {
+      if (w.key === 'bar') {
+        recs.push('Briefing resep Bar: Manager/Head Bar perlu mereview takaran signature cocktail/mocktail & varian arak bersama staf.');
+      } else if (w.key === 'kitchen') {
+        recs.push('Review menu Kitchen: Head Chef Anto/Manager perlu evaluasi pemahaman menu masakan, upgrade nasi daun jeruk, & porsi platter.');
+      } else if (w.key === 'billiard') {
+        recs.push('Edukasi paket Billiard: Berikan lembar panduan tarif reguler/VIP, promo gratis main F&B 300K, & regulasi loker.');
+      } else if (w.key === 'management') {
+        recs.push('Review SOP operasional: Ingatkan jam operasional LuckyCat (11:00-03:00) dan struktur hirarki manajemen operasional.');
+      }
+    }
+
+    if (speedCategory === 'SLOW') {
+      recs.push('Latihan kecepatan tanggap: Berikan drill kuis cepat (flashcard menu) agar staf tidak ragu di depan pelanggan saat peak hours.');
+    }
+    if (score < 60) {
+      recs.push('Tindakan Prioritas: Jadwalkan sesi coaching 1-on-1 dengan Assistant Manager sebelum akhir pekan.');
+    }
+  }
+
+  const managerRecommendation = recs.length > 0 ? recs.join(' ') : 'Lakukan pemantauan rutin pada shift kerja berikutnya.';
+
+  return {
+    accuracyGrade,
+    accuracyLabel,
+    gradeColor,
+    speedCategory,
+    speedLabel,
+    speedBadge,
+    domainBreakdown,
+    weakDomains,
+    weaknessSummary,
+    managerRecommendation
+  };
+}
+
 // 16b. Submit Quiz
 router.post('/quiz/submit', async (req, res) => {
   const { staffId, weekKey, answers = {}, durationSeconds = 0, venue = 'LuckyCat' } = req.body || {};
@@ -7349,6 +7480,9 @@ router.post('/quiz/submit', async (req, res) => {
       completed_at: now
     };
 
+    // Calculate diagnostic evaluation
+    record.diagnostic = computeQuizDiagnostic(record);
+
     const updatedCompletions = [record, ...(Array.isArray(completions) ? completions.filter(c => !(c.staff_id === record.staff_id && c.week_key === currentWeek)) : [])];
 
     if (isSupabaseConfigured) {
@@ -7374,26 +7508,82 @@ router.post('/quiz/submit', async (req, res) => {
 
 // 16c. Quiz Leaderboard
 router.get('/quiz/leaderboard', async (req, res) => {
-  const weekKey = req.query.weekKey || getWitaWeekKey();
+  const currentWeek = getWitaWeekKey();
+  const requestedWeekKey = req.query.weekKey;
+  const requestedVenue = req.query.venue;
+
   try {
     let completions = [];
     if (isSupabaseConfigured) {
       completions = (await cloudDb.getSetting('staff_quiz_completions')) || [];
     }
 
-    const filtered = (Array.isArray(completions) ? completions : []).filter(
-      c => !weekKey || c.week_key === weekKey
-    );
+    const allCompletions = Array.isArray(completions) ? completions : [];
+    const availableWeeks = Array.from(new Set(allCompletions.map(c => c.week_key).filter(Boolean))).sort().reverse();
+    if (!availableWeeks.includes(currentWeek)) {
+      availableWeeks.unshift(currentWeek);
+    }
+
+    // Determine target week filter
+    // If requestedWeekKey is provided and not 'ALL', filter by it
+    // If requestedWeekKey is undefined/null, default to currentWeek. If no data in currentWeek, client can switch to ALL or W47.
+    let targetWeek = requestedWeekKey;
+    if (targetWeek === undefined) {
+      targetWeek = currentWeek;
+    }
+
+    let filtered = allCompletions;
+    if (targetWeek && targetWeek !== 'ALL') {
+      filtered = filtered.filter(c => c.week_key === targetWeek);
+    }
+
+    if (requestedVenue && requestedVenue !== 'ALL') {
+      const vq = requestedVenue.toLowerCase();
+      filtered = filtered.filter(c => String(c.staff_venue || c.venue || '').toLowerCase().includes(vq));
+    }
+
+    // Enrich each record with automated diagnostics
+    const enriched = filtered.map(item => {
+      const diag = item.diagnostic || computeQuizDiagnostic(item);
+      return {
+        ...item,
+        diagnostic: diag
+      };
+    });
 
     // Sort by score DESC, then durationSeconds ASC
-    filtered.sort((a, b) => {
+    enriched.sort((a, b) => {
       if (b.score !== a.score) return b.score - a.score;
       return (a.duration_seconds || 0) - (b.duration_seconds || 0);
     });
 
+    // Compute aggregate statistics for the view
+    const totalParticipants = enriched.length;
+    const averageScore = totalParticipants > 0
+      ? Math.round(enriched.reduce((acc, c) => acc + (c.score || 0), 0) / totalParticipants)
+      : 0;
+    const averageDuration = totalParticipants > 0
+      ? Math.round(enriched.reduce((acc, c) => acc + (c.duration_seconds || 0), 0) / totalParticipants)
+      : 0;
+
+    const domainMistakes = {
+      bar: enriched.reduce((acc, c) => acc + (c.diagnostic?.domainBreakdown?.bar?.wrong || 0), 0),
+      kitchen: enriched.reduce((acc, c) => acc + (c.diagnostic?.domainBreakdown?.kitchen?.wrong || 0), 0),
+      billiard: enriched.reduce((acc, c) => acc + (c.diagnostic?.domainBreakdown?.billiard?.wrong || 0), 0),
+      management: enriched.reduce((acc, c) => acc + (c.diagnostic?.domainBreakdown?.management?.wrong || 0), 0)
+    };
+
     return res.json({
-      weekKey,
-      leaderboard: filtered
+      weekKey: targetWeek,
+      currentWeek,
+      availableWeeks,
+      leaderboard: enriched,
+      stats: {
+        totalParticipants,
+        averageScore,
+        averageDuration,
+        domainMistakes
+      }
     });
   } catch (err) {
     console.error('Error fetching quiz leaderboard:', err);

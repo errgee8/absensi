@@ -965,9 +965,12 @@ export async function submitWeeklyQuiz({ staffId, weekKey, answers, durationSeco
   return data;
 }
 
-export async function getQuizLeaderboard(weekKey) {
-  const query = weekKey ? `?weekKey=${encodeURIComponent(weekKey)}` : '';
-  const res = await fetch(`${API_BASE}/quiz/leaderboard${query}`);
+export async function getQuizLeaderboard(weekKey, venue) {
+  const params = new URLSearchParams();
+  if (weekKey && weekKey !== 'ALL') params.append('weekKey', weekKey);
+  if (venue && venue !== 'ALL') params.append('venue', venue);
+  const qs = params.toString() ? `?${params.toString()}` : '';
+  const res = await fetch(`${API_BASE}/quiz/leaderboard${qs}`);
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'Gagal memuat leaderboard kuis');
   return data;

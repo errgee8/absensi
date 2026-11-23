@@ -473,13 +473,16 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
               onClick={() => setActiveTab('QUIZ')}
               className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-bold transition relative cursor-pointer ${
                 activeTab === 'QUIZ'
-                  ? 'bg-amber-600 text-slate-950 shadow-md shadow-amber-600/30 font-black'
-                  : 'text-amber-300 hover:text-white hover:bg-amber-950/40 border border-amber-500/20'
+                  ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 shadow-lg shadow-amber-600/30 font-black'
+                  : 'text-amber-300 hover:text-white hover:bg-amber-950/40 border border-amber-500/30 bg-amber-950/20'
               }`}
-              title="Hasil Kuis Pengetahuan Produk Mingguan"
+              title="History & Evaluasi Kuis Pengetahuan Produk Mingguan (LuckyCat)"
             >
-              <Trophy className="w-4 h-4 text-amber-400 stroke-[2.2]" />
-              <span>📝 Kuis Produk</span>
+              <Trophy className="w-4 h-4 text-amber-300 stroke-[2.2]" />
+              <span>📝 History Kuis</span>
+              <span className="px-1.5 py-0.2 rounded-md bg-amber-400/20 text-amber-200 text-[10px] font-black border border-amber-400/30">
+                LC
+              </span>
             </button>
 
             {onOpenLeaderboard && (
