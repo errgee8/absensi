@@ -72,7 +72,6 @@ export default function StaffView({
   // Whistleblower (Lapor) & Product Knowledge Quiz State
   const [staffReportModalOpen, setStaffReportModalOpen] = useState(false);
   const [staffQuizModalOpen, setStaffQuizModalOpen] = useState(false);
-  const [pendingBreakShift, setPendingBreakShift] = useState(false);
   const [reportSuccessAlert, setReportSuccessAlert] = useState(null);
 
   // Live Presence Heartbeat for active logged-in staff (direct WebSocket via Supabase Presence)
@@ -322,39 +321,13 @@ export default function StaffView({
       return;
     }
 
-    // Weekly quiz gating: must complete product quiz once a week before starting break!
-    // Kuis produk mingguan HANYA diwajibkan untuk staf LuckyCat (staf JP Karaoke tidak dikenakan)
-    if (type === 'break_start') {
-      const staffVenue = loggedInStaff.venue || 'LuckyCat';
-      const isLucky = String(staffVenue).toLowerCase().includes('lucky');
-      if (isLucky) {
-        try {
-          const quizStatus = await getWeeklyQuiz(loggedInStaff.id, staffVenue);
-          if (!quizStatus?.alreadyCompleted && !quizStatus?.notApplicable) {
-            setPendingBreakShift(shift || null);
-            setStaffQuizModalOpen(true);
-            return;
-          }
-        } catch (err) {
-          console.warn('Failed to verify weekly quiz status before break:', err);
-        }
-      }
-    }
-
     setCameraActionType(type);
     setConfirmedShift(shift || null);
     setCameraModalOpen(true);
   };
 
   const handleQuizCompleted = () => {
-    if (pendingBreakShift !== false) {
-      const shiftToConfirm = pendingBreakShift;
-      setPendingBreakShift(false);
-      setStaffQuizModalOpen(false);
-      setCameraActionType('break_start');
-      setConfirmedShift(shiftToConfirm);
-      setCameraModalOpen(true);
-    }
+    setStaffQuizModalOpen(false);
   };
 
   const handleFaceRegistered = (newBiometricUrl, registeredStaff) => {
@@ -506,10 +479,7 @@ export default function StaffView({
             setLoggedInStaff((prev) => (prev ? { ...prev, mood_emoji: emoji } : prev))
           }
           onOpenStaffReportModal={() => setStaffReportModalOpen(true)}
-          onOpenStaffQuizModal={() => {
-            setPendingBreakShift(false);
-            setStaffQuizModalOpen(true);
-          }}
+          onOpenStaffQuizModal={() => setStaffQuizModalOpen(true)}
         />
       )}
 
@@ -715,10 +685,7 @@ export default function StaffView({
         <StaffQuizModal
           staff={loggedInStaff}
           isOpen={staffQuizModalOpen}
-          onClose={() => {
-            setStaffQuizModalOpen(false);
-            setPendingBreakShift(false);
-          }}
+          onClose={() => setStaffQuizModalOpen(false)}
           onQuizCompleted={handleQuizCompleted}
         />
       )}

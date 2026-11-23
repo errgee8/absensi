@@ -106,7 +106,7 @@ export default function QuizLeaderboardTab({ adminAuth }) {
               </span>
             </div>
             <p className="text-xs text-slate-300 mt-1.5 leading-relaxed max-w-3xl">
-              Memantau hasil kuis produk mingguan (10 soal / 8 menit) staf sebelum jam istirahat. Sistem menganalisis secara otomatis tingkat <strong>kecepatan</strong>, <strong>ketepatan</strong>, <strong>titik kelemahan materi</strong> (Bar, Kitchen, Billiard, SOP), serta memberikan <strong>rekomendasi tindakan perbaikan (improvement)</strong> bagi Manager.
+              Memantau hasil kuis produk mingguan (10 soal / 8 menit) yang dapat dikerjakan staf secara fleksibel 1x per minggu (kapanpun termasuk saat waktu luang). Sistem menganalisis secara otomatis tingkat <strong>kecepatan</strong>, <strong>ketepatan</strong>, <strong>titik kelemahan materi</strong> (Bar, Kitchen, Billiard, SOP), serta memberikan <strong>rekomendasi tindakan perbaikan (improvement)</strong> bagi Manager.
             </p>
           </div>
         </div>
@@ -282,7 +282,7 @@ export default function QuizLeaderboardTab({ adminAuth }) {
           <h3 className="text-base font-black text-white">Belum Ada Riwayat Kuis Untuk Periode Ini</h3>
           <p className="text-xs text-slate-400 max-w-md mx-auto leading-relaxed">
             {selectedWeek === currentWeek
-              ? `Kuis minggu ${currentWeek} baru saja berjalan. Staf LuckyCat akan otomatis tercatat di sini saat mereka mengerjakan kuis 1x mingguan sebelum istirahat.`
+              ? `Kuis minggu ${currentWeek} baru saja berjalan. Staf LuckyCat akan otomatis tercatat di sini saat mereka menyelesaikan kuis produk mingguan (1x fleksibel kapan saja).`
               : 'Tidak ada data kuis ditemukan pada filter pencarian yang Anda pilih.'}
           </p>
           {selectedWeek === currentWeek && availableWeeks.length > 1 && (

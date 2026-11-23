@@ -243,7 +243,7 @@ export default function StaffQuizModal({
                   Menjawab benar <strong>{quizResults.correctCount}</strong> dari {quizResults.totalQuestions} soal.
                 </p>
                 <div className="text-[11px] font-bold text-emerald-400 pt-1">
-                  ✓ Kuis minggu ini selesai. Jam istirahat Anda sekarang telah terbuka!
+                  ✓ Kuis minggu ini selesai. Hasil evaluasi telah tersimpan!
                 </div>
               </div>
 
@@ -302,7 +302,7 @@ export default function StaffQuizModal({
                 onClick={onClose}
                 className="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs shadow-lg shadow-emerald-950/50 transition cursor-pointer"
               >
-                Selesai &amp; Lanjutkan Jam Istirahat ☕
+                Selesai &amp; Tutup Evaluasi
               </button>
             </div>
           )}

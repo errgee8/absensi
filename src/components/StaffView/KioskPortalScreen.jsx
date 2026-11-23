@@ -1076,7 +1076,7 @@ export default function KioskPortalScreen({
               <div className="mt-2.5">
                 <div className="text-xs font-black text-white">📝 Kuis Mingguan</div>
                 <div className="text-[10.5px] text-amber-200/80 mt-0.5 line-clamp-1">
-                  10 Soal • Syarat Break
+                  10 Soal • Fleksibel Kapan Saja
                 </div>
               </div>
             </button>
