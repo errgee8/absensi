@@ -1095,6 +1095,66 @@ router.delete('/schedules/:id', async (req, res) => {
   }
 });
 
+// Helper: Get staff IDs eligible for the Flexible 9-Hour Shift
+export async function getEligibleFlexible9hStaff() {
+  let list = null;
+  if (isSupabaseConfigured) {
+    try {
+      list = await cloudDb.getSetting('flexible_9h_staff_ids');
+    } catch (e) {}
+  }
+  if (!Array.isArray(list)) {
+    list = getSetting('flexible_9h_staff_ids');
+  }
+  // Default pre-population with HOD/Management staff if not set yet
+  if (!Array.isArray(list)) {
+    list = ['JP-MAN-5613695', 'LC-ASS-1191207', 'JP-ASS-2071819'];
+  }
+  return list;
+}
+
+// 3b. Flexible 9-Hour Shift Template & Eligible Staff Management
+router.get('/shift-schedules/flexible-9h', async (req, res) => {
+  try {
+    const eligibleStaffIds = await getEligibleFlexible9hStaff();
+    res.json({
+      template: {
+        id: 'sched_flex_9h',
+        name: 'Shift Fleksibel 9 Jam (HOD)',
+        shift_number: 99,
+        start_time: 'FLEXIBLE',
+        end_time: 'FLEXIBLE (9 Jam)',
+        standard_hours: 9,
+        is_flexible_checkout: 1,
+        allows_break: 1,
+        description: 'Bebas masuk jam berapapun tanpa penalti terlambat. Target durasi kerja 9 jam.'
+      },
+      eligibleStaffIds
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/shift-schedules/flexible-9h/eligible-staff', async (req, res) => {
+  try {
+    const { staffIds = [] } = req.body || {};
+    const cleanList = Array.isArray(staffIds)
+      ? Array.from(new Set(staffIds.map(String).filter(Boolean)))
+      : [];
+
+    setSetting('flexible_9h_staff_ids', cleanList);
+    if (isSupabaseConfigured) {
+      await cloudDb.saveSetting('flexible_9h_staff_ids', cleanList, 'Staff Eligible for Flexible 9H Shift');
+    }
+
+    broadcastEvent('SCHEDULES_UPDATE', { action: 'FLEXIBLE_9H_UPDATED', eligibleStaffIds: cleanList });
+    res.json({ success: true, eligibleStaffIds: cleanList });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // 4. Staff Endpoints (Public Roster for Kiosk)
 router.get('/staff', async (req, res) => {
   const { venue } = req.query;
@@ -1491,11 +1551,43 @@ router.post('/staff/verify-pin', async (req, res) => {
 
   // Fetch schedules for staff member's venue & division (normalize venue name)
   const normVenue = staff.venue && staff.venue.replace(/\s+/g, '').toLowerCase() === 'luckycat' ? 'LuckyCat' : staff.venue;
-  const schedules = db.prepare(`
+  let schedules = db.prepare(`
     SELECT * FROM shift_schedules 
     WHERE REPLACE(LOWER(venue), ' ', '') = REPLACE(LOWER(?), ' ', '') AND division = ?
     ORDER BY shift_number ASC
   `).all(normVenue, staff.division);
+
+  // Check if staff is authorized for Flexible 9H shift (e.g. HOD / chosen staff)
+  const eligibleFlexibleStaff = await getEligibleFlexible9hStaff();
+  const isEligibleFlexible = (
+    eligibleFlexibleStaff.includes(String(staff.id)) ||
+    (staff.legacy_code && eligibleFlexibleStaff.includes(String(staff.legacy_code))) ||
+    (staff.uuid && eligibleFlexibleStaff.includes(String(staff.uuid))) ||
+    staff.shift_start === 'FLEXIBLE'
+  );
+
+  const flex9hSchedule = {
+    id: 'sched_flex_9h',
+    venue: staff.venue,
+    division: staff.division,
+    shift_number: 99,
+    name: 'Shift Fleksibel 9 Jam (HOD)',
+    start_time: 'FLEXIBLE',
+    end_time: 'FLEXIBLE (9 Jam)',
+    is_flexible_checkout: 1,
+    allows_break: 1,
+    max_break_end: null,
+    break_start_time: null,
+    standard_hours: 9
+  };
+
+  if (isEligibleFlexible) {
+    if (staff.shift_start === 'FLEXIBLE') {
+      schedules = [flex9hSchedule, ...schedules];
+    } else {
+      schedules = [...schedules, flex9hSchedule];
+    }
+  }
 
   let detectedShift = null;
   let breakAllowed = false;
@@ -1508,7 +1600,8 @@ router.post('/staff/verify-pin', async (req, res) => {
     const cutoff = getBreakCutoff(shiftEnd);
     breakCutoffTime = cutoff.cutoffTimeStr;
 
-    detectedShift = schedules.find((s) => s.start_time === activeShift.scheduled_start) || {
+    detectedShift = schedules.find((s) => s.start_time === activeShift.scheduled_start) ||
+      (activeShift.scheduled_start === 'FLEXIBLE' ? flex9hSchedule : null) || {
       name: 'Shift Aktif',
       shift_number: 1,
       start_time: shiftStart,
@@ -1528,7 +1621,11 @@ router.post('/staff/verify-pin', async (req, res) => {
 
     breakAllowed = shiftAllowsBreak && !isOnBreak && breakCount === 0 && !isCompletedBreak;
   } else {
-    detectedShift = detectShiftSchedule(schedules, new Date());
+    if (staff.shift_start === 'FLEXIBLE') {
+      detectedShift = flex9hSchedule;
+    } else {
+      detectedShift = detectShiftSchedule(schedules, new Date());
+    }
   }
 
   const isLuckyCatVenue = (normVenue || '').toLowerCase().includes('luckycat');
@@ -2526,7 +2623,32 @@ router.post('/checkin', async (req, res) => {
   let shiftNumber = confirmedShift?.shift_number;
   let shiftName = confirmedShift?.name;
 
-  if (!scheduledStart) {
+  const isFlex9h = (
+    scheduledStart === 'FLEXIBLE' ||
+    (shiftName && shiftName.toLowerCase().includes('fleksibel 9')) ||
+    staff.shift_start === 'FLEXIBLE'
+  );
+
+  if (isFlex9h) {
+    scheduledStart = 'FLEXIBLE';
+    shiftNumber = 99;
+    shiftName = 'Shift Fleksibel 9 Jam (HOD)';
+    try {
+      const cinDate = new Date(checkinTime);
+      const targetEnd = new Date(cinDate.getTime() + 9 * 60 * 60 * 1000);
+      const parts = new Intl.DateTimeFormat('en-GB', {
+        timeZone: 'Asia/Makassar',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      }).formatToParts(targetEnd);
+      const endH = parts.find(p => p.type === 'hour')?.value || '00';
+      const endM = parts.find(p => p.type === 'minute')?.value || '00';
+      scheduledEnd = `${endH}:${endM}`;
+    } catch {
+      scheduledEnd = 'FLEXIBLE';
+    }
+  } else if (!scheduledStart) {
     const schedules = db.prepare(`
       SELECT * FROM shift_schedules 
       WHERE venue = ? AND division = ?

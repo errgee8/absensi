@@ -1,12 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { Clock, Edit2, Save, X, Coffee, Plus, Trash2, CheckCircle2, ShieldAlert, Sparkles, Building2 } from 'lucide-react';
-import { getShiftSchedules, updateShiftSchedule, createShiftSchedule, deleteShiftSchedule } from '../../utils/api';
+import { Clock, Edit2, Save, X, Coffee, Plus, Trash2, CheckCircle2, ShieldAlert, Sparkles, Building2, Users, CheckSquare, Square, Search, Zap, Check } from 'lucide-react';
+import { getShiftSchedules, updateShiftSchedule, createShiftSchedule, deleteShiftSchedule, getFlexible9hSettings, updateFlexible9hEligibleStaff, getAdminStaffList } from '../../utils/api';
 import { showToast } from '../Common/Toast';
 
 export default function ShiftSchedulesTab() {
   const [schedules, setSchedules] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState(null);
+
+  // Flexible 9H Shift Template State
+  const [flexData, setFlexData] = useState(null);
+  const [allStaffList, setAllStaffList] = useState([]);
+  const [manageStaffModalOpen, setManageStaffModalOpen] = useState(false);
+  const [selectedStaffIds, setSelectedStaffIds] = useState([]);
+  const [staffSearchQuery, setStaffSearchQuery] = useState('');
+  const [staffOutletFilter, setStaffOutletFilter] = useState('ALL');
+  const [savingEligibleStaff, setSavingEligibleStaff] = useState(false);
 
   // Edit form state
   const [editStartTime, setEditStartTime] = useState('');
@@ -59,8 +68,18 @@ export default function ShiftSchedulesTab() {
   const loadSchedules = async () => {
     setLoading(true);
     try {
-      const data = await getShiftSchedules();
+      const [data, flex, staffData] = await Promise.all([
+        getShiftSchedules(),
+        getFlexible9hSettings().catch(() => null),
+        getAdminStaffList().catch(() => [])
+      ]);
       setSchedules(data);
+      if (flex) {
+        setFlexData(flex);
+        setSelectedStaffIds(flex.eligibleStaffIds || []);
+      }
+      const roster = Array.isArray(staffData) ? staffData : (staffData?.staff || []);
+      setAllStaffList(roster);
     } catch (err) {
       console.error('Failed to load schedules:', err);
     } finally {
@@ -71,6 +90,52 @@ export default function ShiftSchedulesTab() {
   useEffect(() => {
     loadSchedules();
   }, []);
+
+  const handleSaveEligibleStaff = async (newIds) => {
+    const listToSave = newIds !== undefined ? newIds : selectedStaffIds;
+    setSavingEligibleStaff(true);
+    try {
+      const res = await updateFlexible9hEligibleStaff(listToSave);
+      setFlexData((prev) => ({ ...prev, eligibleStaffIds: res.eligibleStaffIds }));
+      setSelectedStaffIds(res.eligibleStaffIds);
+      setManageStaffModalOpen(false);
+      showToast('Izin shift fleksibel 9 jam berhasil disimpan!', 'success');
+      showNotification('Daftar staf yang diizinkan shift fleksibel berhasil diperbarui.');
+    } catch (err) {
+      showToast('Gagal menyimpan izin staf: ' + err.message, 'error');
+    } finally {
+      setSavingEligibleStaff(false);
+    }
+  };
+
+  const handleToggleStaffId = (sId) => {
+    setSelectedStaffIds((prev) =>
+      prev.includes(sId) ? prev.filter((id) => id !== sId) : [...prev, sId]
+    );
+  };
+
+  const handleQuickRemoveStaff = async (sId) => {
+    const nextList = (flexData?.eligibleStaffIds || []).filter((id) => id !== sId);
+    await handleSaveEligibleStaff(nextList);
+  };
+
+  const handleSelectAllHOD = () => {
+    const hodIds = allStaffList
+      .filter((s) => {
+        const r = (s.role || '').toLowerCase();
+        const d = (s.division || '').toLowerCase();
+        return (
+          d.includes('manage') ||
+          r.includes('manager') ||
+          r.includes('head') ||
+          r.includes('lead') ||
+          r.includes('spv') ||
+          r.includes('supervisor')
+        );
+      })
+      .map((s) => s.id);
+    setSelectedStaffIds((prev) => Array.from(new Set([...prev, ...hodIds])));
+  };
 
   const handleStartEdit = (sched) => {
     setEditingId(sched.id);
@@ -209,6 +274,125 @@ export default function ShiftSchedulesTab() {
           <span>{notification.msg}</span>
         </div>
       )}
+
+      {/* ========================================================
+          SPECIAL TEMPLATE: SHIFT FLEKSIBEL 9 JAM (KHUSUS HOD)
+         ======================================================== */}
+      <div className="bg-gradient-to-br from-[#1c1a2e] via-[#161a26] to-[#12151f] border-2 border-purple-500/40 rounded-3xl p-5 sm:p-6 shadow-xl relative overflow-hidden space-y-4">
+        {/* Glow ambient accent */}
+        <div className="absolute -top-12 -right-12 w-48 h-48 bg-purple-500/10 rounded-full blur-3xl pointer-events-none" />
+
+        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 relative z-10">
+          <div className="space-y-1">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-black uppercase tracking-wider bg-purple-500/20 text-purple-300 border border-purple-400/40 shadow-sm">
+              <Zap className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
+              <span>Template Khusus &bull; Jam Masuk &amp; Pulang Bebas</span>
+            </div>
+            <h4 className="text-lg sm:text-xl font-black text-white flex items-center gap-2 pt-1">
+              <span>Shift Fleksibel 9 Jam (HOD / Staf Pilihan)</span>
+              <span className="text-[11px] font-mono font-bold px-2.5 py-0.5 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                Target 9 Jam
+              </span>
+            </h4>
+            <p className="text-xs text-slate-300 max-w-2xl leading-relaxed">
+              Staf dengan shift ini <strong>bebas masuk jam berapapun</strong> tanpa jam masuk dan jam pulang yang mengikat, serta <strong>tidak pernah dikenakan penalti terlambat</strong>, asalkan durasi kerja memenuhi standar <strong>9 jam</strong>.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              setSelectedStaffIds(flexData?.eligibleStaffIds || []);
+              setStaffSearchQuery('');
+              setStaffOutletFilter('ALL');
+              setManageStaffModalOpen(true);
+            }}
+            className="px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-black text-xs shadow-lg shadow-purple-600/30 transition flex items-center justify-center gap-2 shrink-0 cursor-pointer self-start sm:self-auto"
+          >
+            <Users className="w-4 h-4" />
+            <span>Pilih Staf yang Berhak ({(flexData?.eligibleStaffIds || []).length})</span>
+          </button>
+        </div>
+
+        {/* Feature Specs Badges */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 text-xs">
+          <div className="p-2.5 rounded-2xl bg-[#12151f]/80 border border-purple-500/20 flex items-center gap-2.5">
+            <Clock className="w-4 h-4 text-purple-400 shrink-0" />
+            <div>
+              <div className="text-[10px] text-slate-400 uppercase font-black">Jam Masuk</div>
+              <div className="font-bold text-slate-100">Bebas Jam Berapapun</div>
+            </div>
+          </div>
+
+          <div className="p-2.5 rounded-2xl bg-[#12151f]/80 border border-purple-500/20 flex items-center gap-2.5">
+            <Zap className="w-4 h-4 text-amber-400 shrink-0" />
+            <div>
+              <div className="text-[10px] text-slate-400 uppercase font-black">Durasi Standar</div>
+              <div className="font-bold text-slate-100">Wajib 9 Jam Kerja</div>
+            </div>
+          </div>
+
+          <div className="p-2.5 rounded-2xl bg-[#12151f]/80 border border-purple-500/20 flex items-center gap-2.5">
+            <Coffee className="w-4 h-4 text-emerald-400 shrink-0" />
+            <div>
+              <div className="text-[10px] text-slate-400 uppercase font-black">Hak Istirahat</div>
+              <div className="font-bold text-slate-100">1 Jam Fleksibel</div>
+            </div>
+          </div>
+
+          <div className="p-2.5 rounded-2xl bg-[#12151f]/80 border border-purple-500/20 flex items-center gap-2.5">
+            <CheckCircle2 className="w-4 h-4 text-cyan-400 shrink-0" />
+            <div>
+              <div className="text-[10px] text-slate-400 uppercase font-black">Status Terlambat</div>
+              <div className="font-bold text-slate-100">Tanpa Late Flag</div>
+            </div>
+          </div>
+        </div>
+
+        {/* List of currently authorized staff */}
+        <div className="pt-2 border-t border-purple-500/20">
+          <div className="text-[11px] font-black text-slate-400 uppercase tracking-wider mb-2 flex items-center justify-between">
+            <span>Daftar Staf yang Diizinkan Mengambil Shift Ini:</span>
+            <span className="text-purple-300 font-mono font-bold">
+              {(flexData?.eligibleStaffIds || []).length} Staf Aktif
+            </span>
+          </div>
+
+          {(flexData?.eligibleStaffIds || []).length === 0 ? (
+            <div className="p-3 rounded-2xl bg-slate-900/40 border border-slate-800 text-slate-400 text-xs italic text-center">
+              Belum ada staf yang diizinkan. Klik tombol <strong>"Pilih Staf yang Berhak"</strong> di atas untuk memberikan akses khusus HOD.
+            </div>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {(flexData?.eligibleStaffIds || []).map((sId) => {
+                const staffObj = allStaffList.find(
+                  (s) => String(s.id) === String(sId) || String(s.legacy_code) === String(sId) || String(s.uuid) === String(sId)
+                );
+                const displayName = staffObj?.name || sId;
+                const roleLabel = staffObj?.role ? ` (${staffObj.role})` : '';
+                const venueLabel = staffObj?.venue === 'LuckyCat' ? '🐱 LC' : (staffObj?.venue === 'JP Karaoke' ? '🎤 JP' : '');
+
+                return (
+                  <div
+                    key={sId}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-500/20 hover:bg-purple-500/30 text-purple-200 border border-purple-400/40 text-xs font-bold transition shadow-xs"
+                  >
+                    <span>{venueLabel && `${venueLabel} • `}{displayName}{roleLabel}</span>
+                    <button
+                      type="button"
+                      onClick={() => handleQuickRemoveStaff(sId)}
+                      title="Cabut izin shift fleksibel staf ini"
+                      className="w-4 h-4 rounded-full bg-purple-400/20 hover:bg-rose-500 hover:text-white flex items-center justify-center text-purple-300 transition cursor-pointer text-[10px]"
+                    >
+                      &times;
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
 
       {/* 1. LuckyCat Section */}
       <div className="bg-[#161b24] border border-slate-800 rounded-3xl p-5 shadow-md">
@@ -836,6 +1020,208 @@ export default function ShiftSchedulesTab() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================
+          MODAL: KELOLA STAF YANG DIIZINKAN SHIFT FLEKSIBEL 9 JAM
+         ======================================================== */}
+      {manageStaffModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 animate-fade-in">
+          <div className="bg-[#161a24] border-2 border-purple-500/50 rounded-3xl max-w-xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+            {/* Header */}
+            <div className="p-4 sm:p-5 border-b border-slate-800 bg-gradient-to-r from-purple-950/70 via-[#1b1928] to-[#121620] flex items-center justify-between">
+              <div className="flex items-center space-x-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-purple-500/20 text-purple-300 border border-purple-400/40 flex items-center justify-center shrink-0">
+                  <Zap className="w-5 h-5 text-amber-400 fill-amber-400" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-white flex items-center gap-2">
+                    <span>Kelola Izin Shift Fleksibel 9 Jam</span>
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-400/30">
+                      Khusus HOD
+                    </span>
+                  </h3>
+                  <p className="text-xs text-slate-400 font-bold">
+                    Pilih staf mana saja yang berhak masuk jam berapapun dengan target kerja 9 jam.
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setManageStaffModalOpen(false)}
+                className="w-8 h-8 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Filter & Action Toolbar */}
+            <div className="p-4 border-b border-slate-800 bg-[#12151f] space-y-3">
+              <div className="flex flex-col sm:flex-row gap-2">
+                <div className="relative flex-1">
+                  <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
+                  <input
+                    type="text"
+                    value={staffSearchQuery}
+                    onChange={(e) => setStaffSearchQuery(e.target.value)}
+                    placeholder="Cari nama staf, jabatan, ID..."
+                    className="w-full bg-[#181d28] border border-slate-700 rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-500 font-bold"
+                  />
+                </div>
+
+                <select
+                  value={staffOutletFilter}
+                  onChange={(e) => setStaffOutletFilter(e.target.value)}
+                  className="bg-[#181d28] border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-bold focus:outline-none focus:border-purple-500 cursor-pointer"
+                >
+                  <option value="ALL">Semua Outlet</option>
+                  <option value="LuckyCat">LuckyCat</option>
+                  <option value="JP Karaoke">JP Karaoke</option>
+                </select>
+              </div>
+
+              <div className="flex flex-wrap gap-2 text-xs">
+                <button
+                  type="button"
+                  onClick={handleSelectAllHOD}
+                  className="px-3 py-1.5 rounded-xl bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 font-black border border-purple-400/40 transition flex items-center gap-1.5 cursor-pointer text-[11px]"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                  <span>+ Pilih Semua HOD &amp; Management</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    const visibleIds = allStaffList
+                      .filter((s) => {
+                        const q = staffSearchQuery.toLowerCase();
+                        const matchQ = !q || s.name?.toLowerCase().includes(q) || s.role?.toLowerCase().includes(q) || s.id?.toLowerCase().includes(q);
+                        const matchV = staffOutletFilter === 'ALL' || s.venue === staffOutletFilter;
+                        return matchQ && matchV;
+                      })
+                      .map((s) => s.id);
+                    setSelectedStaffIds((prev) => Array.from(new Set([...prev, ...visibleIds])));
+                  }}
+                  className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold border border-slate-700 transition cursor-pointer text-[11px]"
+                >
+                  Pilih Semua Terlihat
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setSelectedStaffIds([])}
+                  className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-rose-950/40 text-slate-400 hover:text-rose-300 font-bold border border-slate-700 hover:border-rose-500/40 transition cursor-pointer text-[11px] ml-auto"
+                >
+                  Kosongkan Semua
+                </button>
+              </div>
+            </div>
+
+            {/* Staff Checklist Roster */}
+            <div className="p-4 overflow-y-auto space-y-2 flex-1 max-h-96">
+              {allStaffList
+                .filter((s) => {
+                  const q = staffSearchQuery.toLowerCase();
+                  const matchQ = !q || s.name?.toLowerCase().includes(q) || s.role?.toLowerCase().includes(q) || s.id?.toLowerCase().includes(q);
+                  const matchV = staffOutletFilter === 'ALL' || s.venue === staffOutletFilter;
+                  return matchQ && matchV;
+                })
+                .map((s) => {
+                  const isChecked = selectedStaffIds.includes(s.id) || (s.uuid && selectedStaffIds.includes(s.uuid));
+                  const r = (s.role || '').toLowerCase();
+                  const d = (s.division || '').toLowerCase();
+                  const isHodRole = (
+                    d.includes('manage') ||
+                    r.includes('manager') ||
+                    r.includes('head') ||
+                    r.includes('lead') ||
+                    r.includes('spv') ||
+                    r.includes('supervisor')
+                  );
+
+                  return (
+                    <div
+                      key={s.id}
+                      onClick={() => handleToggleStaffId(s.id)}
+                      className={`p-3 rounded-2xl border transition cursor-pointer flex items-center justify-between gap-3 ${
+                        isChecked
+                          ? 'bg-purple-950/40 border-purple-500/60 text-white shadow-sm ring-1 ring-purple-500/30'
+                          : 'bg-[#181d28]/70 hover:bg-[#1f2533] border-slate-800 text-slate-300'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className={`w-5 h-5 rounded-lg flex items-center justify-center border transition shrink-0 ${
+                          isChecked
+                            ? 'bg-purple-500 border-purple-400 text-white'
+                            : 'border-slate-600 bg-slate-800'
+                        }`}>
+                          {isChecked && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+                        </div>
+
+                        <div>
+                          <div className="font-black text-xs text-white flex items-center gap-2">
+                            <span>{s.name}</span>
+                            {isHodRole && (
+                              <span className="px-1.5 py-0.2 rounded text-[9.5px] font-black bg-amber-500/20 text-amber-300 border border-amber-400/30">
+                                HOD
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-[11px] text-slate-400 font-bold mt-0.5">
+                            {s.role} &bull; {s.division}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-lg border ${
+                          s.venue === 'LuckyCat'
+                            ? 'bg-amber-500/10 text-amber-300 border-amber-400/30'
+                            : 'bg-indigo-500/10 text-indigo-300 border-indigo-400/30'
+                        }`}>
+                          {s.venue === 'LuckyCat' ? '🐱 LuckyCat' : '🎤 JP Karaoke'}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 border-t border-slate-800 bg-[#12151f] flex items-center justify-between">
+              <span className="text-xs font-bold text-slate-300">
+                <strong className="text-purple-400 font-black">{selectedStaffIds.length}</strong> staf dipilih berhak
+              </span>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setManageStaffModalOpen(false)}
+                  className="px-4 py-2.5 bg-[#1c2230] hover:bg-[#252d3d] text-slate-300 rounded-xl text-xs font-black border border-slate-700 transition cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="button"
+                  disabled={savingEligibleStaff}
+                  onClick={() => handleSaveEligibleStaff()}
+                  className="px-5 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-black rounded-xl text-xs shadow-lg shadow-purple-600/30 transition cursor-pointer flex items-center gap-1.5"
+                >
+                  {savingEligibleStaff ? (
+                    <span>Menyimpan...</span>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="w-4 h-4" />
+                      <span>Simpan Izin Staf ({selectedStaffIds.length})</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

@@ -25,7 +25,8 @@ import {
   Smile,
   Crown,
   Quote,
-  Palette
+  Palette,
+  Zap
 } from 'lucide-react';
 import {
   getAppNow,
@@ -1280,6 +1281,7 @@ export default function KioskPortalScreen({
                 const isSelected =
                   selectedShiftChoice?.start_time === sch.start_time &&
                   selectedShiftChoice?.end_time === sch.end_time;
+                const isFlex9 = sch.start_time === 'FLEXIBLE' || sch.name?.includes('Fleksibel 9');
                 return (
                   <button
                     key={sch.id || `${sch.name || sch.shift_name}-${sch.start_time}-${sch.end_time}`}
@@ -1287,17 +1289,20 @@ export default function KioskPortalScreen({
                     onClick={() => setSelectedShiftChoice(sch)}
                     className={`w-full p-3 rounded-2xl border text-left flex items-center justify-between transition cursor-pointer ${
                       isSelected
-                        ? 'bg-emerald-500/15 border-emerald-400 text-white'
+                        ? (isFlex9 ? 'bg-purple-500/20 border-purple-400 text-white shadow-md' : 'bg-emerald-500/15 border-emerald-400 text-white')
                         : 'bg-[#131720] border-white/10 text-slate-300 hover:border-white/25'
                     }`}
                   >
                     <div>
-                      <div className="text-sm font-bold">{sch.name || sch.shift_name || 'Shift Kerja'}</div>
+                      <div className="text-sm font-bold flex items-center gap-1.5">
+                        {isFlex9 && <Zap className="w-3.5 h-3.5 text-amber-400 fill-amber-400 shrink-0" />}
+                        <span>{sch.name || sch.shift_name || 'Shift Kerja'}</span>
+                      </div>
                       <div className="text-xs text-slate-400 mt-0.5">
-                        {sch.start_time} - {sch.end_time} WITA
+                        {isFlex9 ? '⚡ Bebas Masuk Jam Berapapun (Target 9 Jam Kerja)' : `${sch.start_time} - ${sch.end_time} WITA`}
                       </div>
                     </div>
-                    {isSelected && <CheckCircle2 className="w-5 h-5 text-emerald-400" />}
+                    {isSelected && <CheckCircle2 className={`w-5 h-5 ${isFlex9 ? 'text-purple-400' : 'text-emerald-400'}`} />}
                   </button>
                 );
               })}

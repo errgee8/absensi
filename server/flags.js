@@ -143,8 +143,8 @@ export function evaluateCheckoutFlags({
   }
 
   // Early Check-Out:
-  // Only evaluate if shift is NOT flexible checkout and division is NOT Management
-  if (!isFlexibleCheckout && division !== 'Management') {
+  // Only evaluate if shift is NOT flexible checkout, division is NOT Management, and not a Flexible shift
+  if (!isFlexibleCheckout && division !== 'Management' && scheduledStart !== 'FLEXIBLE') {
     if (scheduledEnd && scheduledEnd.includes(':')) {
       try {
         // 1. Get checkout clock time in WITA

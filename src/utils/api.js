@@ -121,6 +121,24 @@ export async function deleteShiftSchedule(id) {
   return data;
 }
 
+export async function getFlexible9hSettings() {
+  const res = await fetch(`${API_BASE}/shift-schedules/flexible-9h`);
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Gagal memuat template shift fleksibel');
+  return data;
+}
+
+export async function updateFlexible9hEligibleStaff(staffIds) {
+  const res = await fetch(`${API_BASE}/shift-schedules/flexible-9h/eligible-staff`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ staffIds })
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Gagal memperbarui staf shift fleksibel');
+  return data;
+}
+
 export async function verifyStaffPin({ staffId, pin }) {
   const res = await fetch(`${API_BASE}/staff/verify-pin`, {
     method: 'POST',

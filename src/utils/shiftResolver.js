@@ -56,6 +56,26 @@ export function resolveShift(shift, schedules = []) {
 
   const division = (shift.staff_division || shift.division || shift.staff_role || '').trim();
   const venue = (shift.staff_venue || shift.venue || '').trim();
+
+  // Flexible 9-Hour Shift (HOD & Eligible Staff)
+  const isFlex9h = (
+    (shift.shift_name && shift.shift_name.toLowerCase().includes('fleksibel 9')) ||
+    shift.scheduled_start === 'FLEXIBLE' ||
+    shift.shift_number === 99
+  );
+
+  if (isFlex9h) {
+    const endLabel = shift.scheduled_end && shift.scheduled_end !== 'FLEXIBLE' ? `Target ${shift.scheduled_end}` : '9 Jam';
+    return {
+      shiftNumber: 99,
+      shiftName: shift.shift_name || 'Shift Fleksibel 9 Jam (HOD)',
+      badgeLabel: '⚡ Fleksibel 9 Jam',
+      timeRange: `Fleksibel (${endLabel})`,
+      colorScheme: 'purple',
+      badgeClass: 'bg-purple-100 text-purple-950 border-purple-300'
+    };
+  }
+
   const isMgmt = division.toLowerCase().includes('manage') ||
     (shift.scheduled_start === '00:00' && shift.scheduled_end === '23:59');
 

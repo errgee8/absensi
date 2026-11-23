@@ -18,7 +18,8 @@ import {
   History,
   ShieldAlert,
   ChevronRight,
-  FileText
+  FileText,
+  Zap
 } from 'lucide-react';
 import {
   getStaffAttendanceHistory,
@@ -31,8 +32,11 @@ import {
   clearShiftLateness,
   reviewLateCheckin,
   deleteShift,
-  deleteLeaveRequest
+  deleteLeaveRequest,
+  getFlexible9hSettings,
+  updateFlexible9hEligibleStaff
 } from '../../utils/api';
+import { showToast } from '../Common/Toast';
 import PointDeletionLogsModal from './PointDeletionLogsModal';
 import KudosAuditLogsModal from './KudosAuditLogsModal';
 import {
@@ -57,6 +61,58 @@ export default function StaffDetailManagementModal({
   const [monthChoice, setMonthChoice] = useState('CURRENT'); // 'CURRENT' | 'PREVIOUS'
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState(null);
+
+  // Flexible 9H Shift permission state for this staff
+  const [isFlexEligible, setIsFlexEligible] = useState(false);
+  const [togglingFlex, setTogglingFlex] = useState(false);
+
+  useEffect(() => {
+    if (!staff?.id) return;
+    let mounted = true;
+    getFlexible9hSettings()
+      .then((data) => {
+        if (!mounted) return;
+        const ids = data?.eligibleStaffIds || [];
+        setIsFlexEligible(
+          ids.includes(String(staff.id)) ||
+          (staff.legacy_code && ids.includes(String(staff.legacy_code))) ||
+          (staff.uuid && ids.includes(String(staff.uuid))) ||
+          staff.shift_start === 'FLEXIBLE'
+        );
+      })
+      .catch(() => {});
+    return () => {
+      mounted = false;
+    };
+  }, [staff?.id, staff?.uuid, staff?.legacy_code, staff?.shift_start]);
+
+  const handleToggleFlex = async () => {
+    setTogglingFlex(true);
+    try {
+      const data = await getFlexible9hSettings();
+      const currentIds = (data?.eligibleStaffIds || []).map(String);
+      const sId = String(staff.id);
+      let nextIds;
+      if (currentIds.includes(sId)) {
+        nextIds = currentIds.filter((id) => id !== sId);
+      } else {
+        nextIds = [...currentIds, sId];
+      }
+      await updateFlexible9hEligibleStaff(nextIds);
+      setIsFlexEligible(!isFlexEligible);
+      showToast(
+        !isFlexEligible
+          ? `Izin Shift Fleksibel 9 Jam diberikan kepada ${staff.name}!`
+          : `Izin Shift Fleksibel 9 Jam dicabut dari ${staff.name}.`,
+        'success'
+      );
+      if (onUpdate) onUpdate();
+    } catch (e) {
+      showToast('Gagal mengubah izin shift: ' + e.message, 'error');
+    } finally {
+      setTogglingFlex(false);
+    }
+  };
 
   // Loaded data
   const [attendanceData, setAttendanceData] = useState(null);
@@ -343,9 +399,25 @@ export default function StaffDetailManagementModal({
                   {staff.id}
                 </span>
               </div>
-              <p className="text-xs text-slate-400 truncate mt-0.5 font-bold">
-                {staff.venue || staff.staff_venue} &bull; {staff.role || staff.division || staff.staff_role}
-              </p>
+              <div className="flex items-center gap-2 mt-1 flex-wrap">
+                <p className="text-xs text-slate-400 truncate font-bold">
+                  {staff.venue || staff.staff_venue} &bull; {staff.role || staff.division || staff.staff_role}
+                </p>
+                <button
+                  type="button"
+                  disabled={togglingFlex}
+                  onClick={handleToggleFlex}
+                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-black border transition cursor-pointer ${
+                    isFlexEligible
+                      ? 'bg-purple-500/20 text-purple-300 border-purple-400/50 hover:bg-purple-500/30 shadow-xs'
+                      : 'bg-slate-800 text-slate-400 border-slate-700 hover:text-slate-200'
+                  }`}
+                  title="Klik untuk mengaktifkan / menonaktifkan izin Shift Fleksibel 9 Jam (HOD) untuk staf ini"
+                >
+                  <Zap className={`w-3 h-3 ${isFlexEligible ? 'text-amber-400 fill-amber-400' : 'text-slate-500'}`} />
+                  <span>{isFlexEligible ? '⚡ Fleksibel 9 Jam (Aktif)' : '+ Izin Fleksibel 9 Jam'}</span>
+                </button>
+              </div>
             </div>
           </div>
 

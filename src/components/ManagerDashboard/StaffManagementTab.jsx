@@ -26,7 +26,8 @@ import {
   X,
   Edit3,
   Lock,
-  ChevronRight
+  ChevronRight,
+  Zap
 } from 'lucide-react';
 import {
   getAdminStaffList,
@@ -42,7 +43,8 @@ import {
   deleteLeaveRequest,
   deleteShift,
   clearShiftLateness,
-  reviewLateCheckin
+  reviewLateCheckin,
+  getFlexible9hSettings
 } from '../../utils/api';
 import { showToast } from '../Common/Toast';
 import { formatWitaDateTime, formatWitaDateOnly, formatWitaTimeOnly, formatDuration } from '../../utils/time';
@@ -69,6 +71,7 @@ export default function StaffManagementTab({ onStaffUpdated, adminAuth }) {
   const [pinSubmitting, setPinSubmitting] = useState(false);
 
   const [showPins, setShowPins] = useState({});
+  const [flexibleStaffIds, setFlexibleStaffIds] = useState([]);
 
   // Staff Detail & Correction Modal State
   const [detailModalStaff, setDetailModalStaff] = useState(null);
@@ -141,6 +144,15 @@ export default function StaffManagementTab({ onStaffUpdated, adminAuth }) {
         standard_hours: 8
       },
       {
+        role: 'HOD / Fleksibel 9 Jam',
+        division: 'Management',
+        label: '⚡ HOD (Shift Fleksibel 9 Jam - Masuk Bebas)',
+        description: 'Bebas masuk jam berapapun tanpa jam masuk dan jam pulang pasti, target kerja 9 jam.',
+        start_time: 'FLEXIBLE',
+        end_time: 'FLEXIBLE',
+        standard_hours: 9
+      },
+      {
         role: 'Management',
         division: 'Management',
         label: 'Management (General)',
@@ -197,6 +209,15 @@ export default function StaffManagementTab({ onStaffUpdated, adminAuth }) {
         standard_hours: 8
       },
       {
+        role: 'HOD / Fleksibel 9 Jam',
+        division: 'Management',
+        label: '⚡ HOD (Shift Fleksibel 9 Jam - Masuk Bebas)',
+        description: 'Bebas masuk jam berapapun tanpa jam masuk dan jam pulang pasti, target kerja 9 jam.',
+        start_time: 'FLEXIBLE',
+        end_time: 'FLEXIBLE',
+        standard_hours: 9
+      },
+      {
         role: 'Management',
         division: 'Management',
         label: 'Management (General)',
@@ -214,8 +235,14 @@ export default function StaffManagementTab({ onStaffUpdated, adminAuth }) {
   const loadRoster = async () => {
     setLoading(true);
     try {
-      const data = await getAdminStaffList();
+      const [data, flex] = await Promise.all([
+        getAdminStaffList(),
+        getFlexible9hSettings().catch(() => null)
+      ]);
       setStaffRoster(data);
+      if (flex?.eligibleStaffIds) {
+        setFlexibleStaffIds(flex.eligibleStaffIds);
+      }
     } catch (err) {
       console.error('Failed to load admin roster:', err);
     } finally {
@@ -617,9 +644,16 @@ export default function StaffManagementTab({ onStaffUpdated, adminAuth }) {
 
                     {/* Shift Pattern */}
                     <td className="py-3 px-3 text-[11px] font-mono">
-                      <span className="text-blue-950 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-md font-bold">
-                        Auto-Detect Shift
-                      </span>
+                      {(staff.shift_start === 'FLEXIBLE' || flexibleStaffIds.includes(staff.id) || (staff.uuid && flexibleStaffIds.includes(staff.uuid))) ? (
+                        <span className="text-purple-300 bg-purple-500/20 border border-purple-400/40 px-2 py-0.5 rounded-md font-bold text-[10.5px] inline-flex items-center gap-1 shadow-xs">
+                          <Zap className="w-3 h-3 text-amber-400 fill-amber-400" />
+                          <span>Fleksibel 9 Jam</span>
+                        </span>
+                      ) : (
+                        <span className="text-blue-950 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-md font-bold">
+                          Auto-Detect Shift
+                        </span>
+                      )}
                     </td>
 
                     {/* Actions */}
