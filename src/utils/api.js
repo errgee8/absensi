@@ -72,13 +72,24 @@ export async function getAdminStaffList() {
   return res.json();
 }
 
-export async function getShiftSchedules() {
+let schedulesCache = { data: null, expiresAt: 0 };
+export function invalidateSchedulesCache() {
+  schedulesCache = { data: null, expiresAt: 0 };
+}
+
+export async function getShiftSchedules(forceRefresh = false) {
+  if (!forceRefresh && schedulesCache.data && Date.now() < schedulesCache.expiresAt) {
+    return schedulesCache.data;
+  }
   const res = await fetch(`${API_BASE}/schedules`);
   if (!res.ok) throw new Error('Failed to load shift schedules');
-  return res.json();
+  const data = await res.json();
+  schedulesCache = { data, expiresAt: Date.now() + 60000 };
+  return data;
 }
 
 export async function updateShiftSchedule(id, payload) {
+  invalidateSchedulesCache();
   const res = await fetch(`${API_BASE}/schedules/${id}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
@@ -90,6 +101,7 @@ export async function updateShiftSchedule(id, payload) {
 }
 
 export async function createShiftSchedule(payload) {
+  invalidateSchedulesCache();
   const res = await fetch(`${API_BASE}/schedules`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -236,13 +248,24 @@ export async function getStats() {
   return res.json();
 }
 
-export async function getSettings() {
+let settingsCache = { data: null, expiresAt: 0 };
+export function invalidateSettingsCache() {
+  settingsCache = { data: null, expiresAt: 0 };
+}
+
+export async function getSettings(forceRefresh = false) {
+  if (!forceRefresh && settingsCache.data && Date.now() < settingsCache.expiresAt) {
+    return settingsCache.data;
+  }
   const res = await fetch(`${API_BASE}/settings`);
   if (!res.ok) throw new Error('Failed to load settings');
-  return res.json();
+  const data = await res.json();
+  settingsCache = { data, expiresAt: Date.now() + 60000 };
+  return data;
 }
 
 export async function updateSettings(settings) {
+  invalidateSettingsCache();
   const res = await fetch(`${API_BASE}/settings`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },

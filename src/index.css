@@ -8,6 +8,16 @@
     background-color: #0f131a;
     color: #e2e8f0;
   }
+  /* Eliminate 300ms mobile touch delay across all touch devices */
+  button, a, input, select, textarea, [role="button"] {
+    touch-action: manipulation;
+  }
+  /* Instant tactile micro-press feedback on touch and click */
+  button:active:not(:disabled),
+  [role="button"]:active:not([aria-disabled="true"]) {
+    transform: scale(0.97);
+    transition: transform 0.05s ease-out;
+  }
 }
 
 /* Universal crisp typography & clean rendering across all screens */

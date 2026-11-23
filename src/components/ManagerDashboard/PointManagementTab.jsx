@@ -376,15 +376,21 @@ export default function PointManagementTab({ adminAuth, isReadOnly = false, onPo
     }
 
     setDeleting(true);
+    // Optimistic UI: Remove target point immediately from local state
+    const deletedId = deleteTarget.id;
+    setPoints((prev) => prev.filter((p) => p.id !== deletedId));
+    setDeleteTarget(null);
+    setDeleteReason('');
+
     try {
-      await deleteStaffPoint(deleteTarget.id, effectivePin, deleteReason.trim() || 'Dihapus oleh Manajer');
+      await deleteStaffPoint(deletedId, effectivePin, deleteReason.trim() || 'Dihapus oleh Manajer');
       showToast('Catatan poin berhasil dihapus dan dicatat di riwayat log.', 'success');
-      setDeleteTarget(null);
-      setDeleteReason('');
-      await Promise.all([loadData(true), loadDeletionLogs()]);
+      loadData(true);
+      loadDeletionLogs();
       if (onPointsUpdated) onPointsUpdated();
     } catch (err) {
       showToast(err.message || 'Gagal menghapus catatan poin.', 'error');
+      loadData(true);
     } finally {
       setDeleting(false);
     }

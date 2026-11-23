@@ -31,7 +31,17 @@ import { LayoutDashboard, Users, Clock, Radio, Building2, Sparkles, Eye, ShieldA
 export default function ManagerDashboard({ venueSettings, refreshSettings, adminAuth, isReadOnly = false, onOpenLeaderboard }) {
   // Tabs: 'AUDIT' | 'SCHEDULES' | 'STAFF' | 'TOILET'
   const [activeTab, setActiveTab] = useState('AUDIT');
+  const [visitedTabs, setVisitedTabs] = useState(() => new Set(['AUDIT']));
   const [kudosModalOpen, setKudosModalOpen] = useState(false);
+
+  useEffect(() => {
+    setVisitedTabs((prev) => {
+      if (prev.has(activeTab)) return prev;
+      const next = new Set(prev);
+      next.add(activeTab);
+      return next;
+    });
+  }, [activeTab]);
 
   const [shifts, setShifts] = useState([]);
   const [schedules, setSchedules] = useState([]);
@@ -570,9 +580,9 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
           </div>
         </div>
 
-        {activeTab === 'AUDIT' && (
-          <>
-            <DashboardHeader
+        {/* Tab 1: AUDIT (Preserved in DOM for instant 0ms switching) */}
+        <div className={activeTab === 'AUDIT' ? 'space-y-6 block' : 'hidden'}>
+          <DashboardHeader
               stats={stats}
               onPrint={handlePrint}
               onExportCsv={handleExportCsv}
@@ -744,47 +754,78 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
                 setStaffModalInitialTab(initialTab);
               }}
             />
-          </>
+        </div>
+
+        {/* Tab 2: TOILET (Preserved in DOM for instant 0ms switching) */}
+        {visitedTabs.has('TOILET') && (
+          <div className={activeTab === 'TOILET' ? 'block' : 'hidden'}>
+            <ToiletInspectionTab />
+          </div>
         )}
 
-        {activeTab === 'TOILET' && <ToiletInspectionTab />}
-
-        {activeTab === 'LEAVE' && (
-          <LeaveManagementTab
-            adminAuth={adminAuth}
-            onRefreshData={() => {
-              loadData();
-              loadPendingLeaveCount();
-            }}
-          />
+        {/* Tab 3: LEAVE (Preserved in DOM for instant 0ms switching) */}
+        {visitedTabs.has('LEAVE') && (
+          <div className={activeTab === 'LEAVE' ? 'block' : 'hidden'}>
+            <LeaveManagementTab
+              adminAuth={adminAuth}
+              onRefreshData={() => {
+                loadData();
+                loadPendingLeaveCount();
+              }}
+            />
+          </div>
         )}
 
-        {activeTab === 'POINT' && (
-          <PointManagementTab
-            adminAuth={adminAuth}
-            isReadOnly={isReadOnly}
-            onPointsUpdated={loadPendingPointsCount}
-          />
+        {/* Tab 4: POINT (Preserved in DOM for instant 0ms switching) */}
+        {visitedTabs.has('POINT') && (
+          <div className={activeTab === 'POINT' ? 'block' : 'hidden'}>
+            <PointManagementTab
+              adminAuth={adminAuth}
+              isReadOnly={isReadOnly}
+              onPointsUpdated={loadPendingPointsCount}
+            />
+          </div>
         )}
 
-        {activeTab === 'REPORTS' && <StaffReportsTab adminAuth={adminAuth} />}
-
-        {activeTab === 'QUIZ' && <QuizLeaderboardTab adminAuth={adminAuth} />}
-
-        {!isReadOnly && activeTab === 'SCHEDULES' && <ShiftSchedulesTab />}
-
-        {!isReadOnly && activeTab === 'STAFF' && (
-          <StaffManagementTab
-            adminAuth={adminAuth}
-            onStaffUpdated={() => {
-              loadData();
-              refreshSettings();
-            }}
-          />
+        {/* Tab 5: REPORTS (Preserved in DOM for instant 0ms switching) */}
+        {visitedTabs.has('REPORTS') && (
+          <div className={activeTab === 'REPORTS' ? 'block' : 'hidden'}>
+            <StaffReportsTab adminAuth={adminAuth} />
+          </div>
         )}
 
-        {!isReadOnly && activeTab === 'MONITORING' && (
-          <MonitoringAuditTab adminAuth={adminAuth} />
+        {/* Tab 6: QUIZ (Preserved in DOM for instant 0ms switching) */}
+        {visitedTabs.has('QUIZ') && (
+          <div className={activeTab === 'QUIZ' ? 'block' : 'hidden'}>
+            <QuizLeaderboardTab adminAuth={adminAuth} />
+          </div>
+        )}
+
+        {/* Tab 7: SCHEDULES (Preserved in DOM for instant 0ms switching) */}
+        {!isReadOnly && visitedTabs.has('SCHEDULES') && (
+          <div className={activeTab === 'SCHEDULES' ? 'block' : 'hidden'}>
+            <ShiftSchedulesTab />
+          </div>
+        )}
+
+        {/* Tab 8: STAFF (Preserved in DOM for instant 0ms switching) */}
+        {!isReadOnly && visitedTabs.has('STAFF') && (
+          <div className={activeTab === 'STAFF' ? 'block' : 'hidden'}>
+            <StaffManagementTab
+              adminAuth={adminAuth}
+              onStaffUpdated={() => {
+                loadData();
+                refreshSettings();
+              }}
+            />
+          </div>
+        )}
+
+        {/* Tab 9: MONITORING (Preserved in DOM for instant 0ms switching) */}
+        {!isReadOnly && visitedTabs.has('MONITORING') && (
+          <div className={activeTab === 'MONITORING' ? 'block' : 'hidden'}>
+            <MonitoringAuditTab adminAuth={adminAuth} />
+          </div>
         )}
 
         {/* Modal: High-Res Photo & Break Inspection */}

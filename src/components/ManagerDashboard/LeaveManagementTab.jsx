@@ -122,6 +122,17 @@ export default function LeaveManagementTab({ adminAuth, onRefreshData }) {
     setSubmitting(true);
     setActionError(null);
 
+    // Optimistic UI: Update state immediately so manager sees instant feedback
+    const updatedStatus = reviewAction === 'APPROVE' ? 'APPROVED' : reviewAction === 'ADJUST' ? 'ADJUSTED' : 'REJECTED';
+    setRequests((prev) =>
+      prev.map((r) =>
+        r.id === targetRequest.id
+          ? { ...r, status: updatedStatus, manager_notes: managerNotes.trim() }
+          : r
+      )
+    );
+    setReviewModalOpen(false);
+
     try {
       await reviewLeaveRequest(targetRequest.id, {
         pin: pin.trim(),
@@ -132,11 +143,11 @@ export default function LeaveManagementTab({ adminAuth, onRefreshData }) {
         managerNotes: managerNotes.trim()
       });
 
-      setReviewModalOpen(false);
-      await loadRequests();
+      loadRequests();
       if (onRefreshData) onRefreshData();
     } catch (err) {
       setActionError(err.message || 'Gagal menyimpan review.');
+      loadRequests();
     } finally {
       setSubmitting(false);
     }
