@@ -105,12 +105,12 @@ export default function StreakAvatar({
           alt={streakTier.name}
           className="absolute pointer-events-none select-none z-20 max-w-none transition-transform duration-200"
           style={{
-            width: '280%',
-            height: '280%',
+            width: '228%',
+            height: '228%',
             top: '50%',
             left: '50%',
             transform: 'translate(-50%, -50%)',
-            filter: 'drop-shadow(0 4px 10px rgba(0,0,0,0.65))'
+            filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.5))'
           }}
           loading="lazy"
         />

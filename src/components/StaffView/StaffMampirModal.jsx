@@ -197,7 +197,7 @@ export default function StaffMampirModal({
                       : 'bg-[#181d28]/90 hover:bg-[#202636] border-white/5 hover:border-white/15'
                   }`}
                 >
-                  <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="flex items-center gap-3.5 min-w-0">
                     {/* Avatar Thumbnail with Streak Frame */}
                     <StreakAvatar
                       photo={s.profile_photo_url}

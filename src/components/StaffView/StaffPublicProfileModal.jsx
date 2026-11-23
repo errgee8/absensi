@@ -119,7 +119,7 @@ export default function StaffPublicProfileModal({
             {/* 1. Header Profile Banner */}
             <div className="relative pt-2 text-center space-y-2.5">
               {/* Framed Avatar */}
-              <div className="relative inline-block mx-auto">
+              <div className="relative inline-block mx-auto mb-2 sm:mb-3">
                 <StreakAvatar
                   photo={profile.profile_photo_url}
                   name={profile.name}

@@ -127,7 +127,7 @@ function LeaderboardColumn({
                       streak={top2.streak || 0}
                       size="lg"
                     />
-                    <h4 className="text-xs font-black text-white truncate max-w-full mt-2">
+                    <h4 className="text-xs font-black text-white truncate max-w-full mt-3.5 sm:mt-4">
                       {top2.name}
                     </h4>
                     <span className="text-[9px] text-slate-400 font-bold truncate max-w-full">
@@ -160,7 +160,7 @@ function LeaderboardColumn({
                       streak={top1.streak || 0}
                       size="xl"
                     />
-                    <h4 className="text-xs sm:text-sm font-black text-amber-200 truncate max-w-full mt-2">
+                    <h4 className="text-xs sm:text-sm font-black text-amber-200 truncate max-w-full mt-4 sm:mt-5">
                       {top1.name}
                     </h4>
                     <span className="text-[9px] text-amber-300/80 font-bold truncate max-w-full">
@@ -208,7 +208,7 @@ function LeaderboardColumn({
                       streak={top3.streak || 0}
                       size="lg"
                     />
-                    <h4 className="text-xs font-black text-white truncate max-w-full mt-2">
+                    <h4 className="text-xs font-black text-white truncate max-w-full mt-3.5 sm:mt-4">
                       {top3.name}
                     </h4>
                     <span className="text-[9px] text-slate-400 font-bold truncate max-w-full">
@@ -243,7 +243,7 @@ function LeaderboardColumn({
                   className="p-2.5 rounded-2xl bg-slate-900/80 border border-slate-800 hover:border-slate-700 transition flex items-center justify-between gap-2.5 shadow-sm cursor-pointer hover:bg-slate-800/80 active:scale-[0.99]"
                   title="Klik untuk visit dashboard profil staf"
                 >
-                  <div className="flex items-center space-x-2.5 min-w-0">
+                  <div className="flex items-center gap-3.5 min-w-0">
                     <StaffAvatarFrame
                       photo={item.photo_url}
                       name={item.name}

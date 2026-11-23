@@ -502,7 +502,7 @@ export default function KioskPortalScreen({
           </div>
 
           {/* Profile Details: Avatar + Name + Role + Actions */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-4 sm:gap-5">
             {/* Real Profile Photo Avatar with Streak-Unlocked Fantasy Frame or Exclusive VIP Frame */}
             <StreakAvatar
               photo={staff?.profile_photo_url}
