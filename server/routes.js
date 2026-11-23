@@ -7475,12 +7475,22 @@ router.post('/quiz/submit', async (req, res) => {
       const staffAns = (answers[qId] || '').trim();
       const isCorrect = staffAns === qObj.correctAnswer.trim();
       if (isCorrect) correctCount++;
+
+      const opts = qObj.options || [];
+      const sIdx = opts.indexOf(staffAns);
+      const staffLetter = sIdx >= 0 ? String.fromCharCode(65 + sIdx) : '';
+      const cIdx = opts.indexOf(qObj.correctAnswer.trim());
+      const correctLetter = cIdx >= 0 ? String.fromCharCode(65 + cIdx) : 'A';
+
       reviewList.push({
         id: qObj.id,
         category: qObj.category,
         question: qObj.question,
+        options: opts,
         staffAnswer: staffAns,
+        staffAnswerLetter: staffLetter,
         correctAnswer: qObj.correctAnswer,
+        correctAnswerLetter: correctLetter,
         isCorrect,
         explanation: qObj.explanation
       });
@@ -7567,11 +7577,37 @@ router.get('/quiz/leaderboard', async (req, res) => {
       filtered = filtered.filter(c => String(c.staff_venue || c.venue || '').toLowerCase().includes(vq));
     }
 
-    // Enrich each record with automated diagnostics
+    // Enrich each record with automated diagnostics and multiple choice options
     const enriched = filtered.map(item => {
       const diag = item.diagnostic || computeQuizDiagnostic(item);
+      const enrichedResults = (item.results || []).map(r => {
+        const qObj = LUCKYCAT_QUESTION_BANK.find(q => q.id === r.id);
+        const options = r.options && r.options.length > 0 ? r.options : (qObj?.options || []);
+
+        let staffAnswerLetter = r.staffAnswerLetter;
+        if (!staffAnswerLetter && options.length > 0 && r.staffAnswer) {
+          const sIdx = options.indexOf(r.staffAnswer.trim());
+          if (sIdx >= 0) staffAnswerLetter = String.fromCharCode(65 + sIdx);
+        }
+
+        let correctAnswerLetter = r.correctAnswerLetter;
+        if (!correctAnswerLetter && options.length > 0 && (r.correctAnswer || qObj?.correctAnswer)) {
+          const cAns = (r.correctAnswer || qObj?.correctAnswer || '').trim();
+          const cIdx = options.indexOf(cAns);
+          if (cIdx >= 0) correctAnswerLetter = String.fromCharCode(65 + cIdx);
+        }
+
+        return {
+          ...r,
+          options,
+          staffAnswerLetter: staffAnswerLetter || '',
+          correctAnswerLetter: correctAnswerLetter || ''
+        };
+      });
+
       return {
         ...item,
+        results: enrichedResults,
         diagnostic: diag
       };
     });

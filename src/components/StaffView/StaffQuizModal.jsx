@@ -248,66 +248,165 @@ export default function StaffQuizModal({
               </div>
 
               {/* Detail Review of each question */}
-              <div className="space-y-2.5">
-                <h5 className="text-xs font-black text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
-                  <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                  <span>Koreksi &amp; Penjelasan Jawaban:</span>
-                </h5>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h5 className="text-xs font-black text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Koreksi &amp; Evaluasi Jawaban:</span>
+                  </h5>
+                  <span className="text-[10px] text-slate-400 font-mono">Pilihan Ganda A/B/C/D</span>
+                </div>
 
-                {(quizResults.results || []).map((r, i) => (
-                  <div
-                    key={r.id || i}
-                    className={`p-3 rounded-2xl border text-left space-y-2 ${
-                      r.isCorrect
-                        ? 'bg-emerald-950/40 border-emerald-500/40'
-                        : 'bg-rose-950/40 border-rose-500/40'
-                    }`}
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <span className="font-bold text-white text-[11.5px] leading-snug">
-                        {i + 1}. {r.question}
-                      </span>
-                      {r.isCorrect ? (
-                        <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold text-[10px] border border-emerald-400/30 shrink-0">
-                          ✓ Benar (+10)
+                {(quizResults.results || []).map((r, i) => {
+                  const opts = r.options && r.options.length > 0 ? r.options : [];
+                  const sIdx = opts.findIndex(
+                    (o) => o === r.staffAnswer || (r.staffAnswer && o.trim().toLowerCase() === r.staffAnswer.trim().toLowerCase())
+                  );
+                  const staffLetter = r.staffAnswerLetter || (sIdx >= 0 ? ['A', 'B', 'C', 'D'][sIdx] : null);
+                  const cIdx = opts.findIndex(
+                    (o) => o === r.correctAnswer || (r.correctAnswer && o.trim().toLowerCase() === r.correctAnswer.trim().toLowerCase())
+                  );
+                  const correctLetter = r.correctAnswerLetter || (cIdx >= 0 ? ['A', 'B', 'C', 'D'][cIdx] : null);
+
+                  return (
+                    <div
+                      key={r.id || i}
+                      className={`p-3 rounded-2xl border text-left space-y-2.5 ${
+                        r.isCorrect
+                          ? 'bg-emerald-950/30 border-emerald-500/40'
+                          : 'bg-rose-950/30 border-rose-500/40'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <span className="font-bold text-white text-[11.5px] leading-snug">
+                          {i + 1}. {r.question}
                         </span>
-                      ) : (
-                        <span className="px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 font-bold text-[10px] border border-rose-400/30 shrink-0">
-                          ✕ Salah
-                        </span>
+                        {r.isCorrect ? (
+                          <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold text-[10px] border border-emerald-400/30 shrink-0">
+                            ✓ Benar (+10)
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 font-bold text-[10px] border border-rose-400/30 shrink-0">
+                            ✕ Salah
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Tampilkan 4 Opsi Jawaban (A, B, C, D) */}
+                      {opts.length > 0 && (
+                        <div className="space-y-1.5 pt-0.5">
+                          <div className="grid grid-cols-1 gap-1.5">
+                            {opts.map((opt, optIdx) => {
+                              const letter = ['A', 'B', 'C', 'D'][optIdx];
+                              const isStaffChoice =
+                                opt === r.staffAnswer ||
+                                (staffLetter && staffLetter === letter) ||
+                                (r.staffAnswer && opt.trim().toLowerCase() === r.staffAnswer.trim().toLowerCase());
+                              const isCorrectOption =
+                                opt === r.correctAnswer ||
+                                (correctLetter && correctLetter === letter) ||
+                                (r.correctAnswer && opt.trim().toLowerCase() === r.correctAnswer.trim().toLowerCase());
+
+                              let cardStyle = 'bg-slate-900/40 border-slate-800 text-slate-300';
+                              let badge = null;
+
+                              if (isStaffChoice && isCorrectOption) {
+                                cardStyle = 'bg-emerald-950/40 border-emerald-500/50 text-emerald-200 ring-1 ring-emerald-400/30 font-medium';
+                                badge = (
+                                  <span className="ml-auto text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/30 text-emerald-300 font-bold border border-emerald-400/30 shrink-0">
+                                    ✓ Pilihan Anda (Tepat)
+                                  </span>
+                                );
+                              } else if (isStaffChoice && !isCorrectOption) {
+                                cardStyle = 'bg-rose-950/40 border-rose-500/50 text-rose-200 ring-1 ring-rose-400/30 font-medium';
+                                badge = (
+                                  <span className="ml-auto text-[9px] px-1.5 py-0.5 rounded bg-rose-500/30 text-rose-300 font-bold border border-rose-400/30 shrink-0">
+                                    ✕ Pilihan Anda (Salah)
+                                  </span>
+                                );
+                              } else if (isCorrectOption) {
+                                cardStyle = 'bg-emerald-950/20 border-emerald-500/40 text-emerald-300 font-medium';
+                                badge = (
+                                  <span className="ml-auto text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-400/20 shrink-0">
+                                    ★ Kunci Jawaban
+                                  </span>
+                                );
+                              }
+
+                              return (
+                                <div
+                                  key={optIdx}
+                                  className={`p-2 rounded-xl border text-[11px] flex items-center gap-2 transition ${cardStyle}`}
+                                >
+                                  <div
+                                    className={`w-5 h-5 rounded-md flex items-center justify-center font-bold text-[10px] shrink-0 ${
+                                      isStaffChoice && isCorrectOption
+                                        ? 'bg-emerald-500 text-slate-950'
+                                        : isStaffChoice
+                                          ? 'bg-rose-500 text-white'
+                                          : isCorrectOption
+                                            ? 'bg-emerald-600/40 text-emerald-200 border border-emerald-400/30'
+                                            : 'bg-slate-800 text-slate-400'
+                                    }`}
+                                  >
+                                    {letter}
+                                  </div>
+                                  <span className="leading-snug text-left">{opt}</span>
+                                  {badge}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
                       )}
+
+                      {/* Ringkasan Pilihan Anda vs Jawaban Benar */}
+                      <div className="pt-1 border-t border-slate-800/80">
+                        {r.isCorrect ? (
+                          <div className="text-[11px] space-y-0.5 text-slate-200 bg-emerald-950/30 p-2 rounded-xl border border-emerald-500/30">
+                            <div className="text-emerald-300 flex items-center gap-1.5">
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                              <span>
+                                <strong>Jawaban Anda:</strong>{' '}
+                                <span className="font-bold text-amber-300">
+                                  {staffLetter ? `[${staffLetter}] ` : ''}
+                                </span>
+                                {r.staffAnswer}
+                              </span>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="text-[11px] space-y-1 text-slate-300 bg-black/30 p-2 rounded-xl border border-rose-500/20">
+                            <div className="text-rose-300 flex items-start gap-1.5">
+                              <XCircle className="w-3.5 h-3.5 text-rose-400 shrink-0 mt-0.5" />
+                              <div>
+                                <strong>Jawaban Anda (Salah):</strong>{' '}
+                                <span className="font-bold text-rose-300">
+                                  {staffLetter ? `[${staffLetter}] ` : ''}
+                                </span>
+                                {r.staffAnswer || '(Tidak dijawab)'}
+                              </div>
+                            </div>
+                            <div className="text-emerald-300 flex items-start gap-1.5 pt-0.5 border-t border-slate-800">
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
+                              <div>
+                                <strong>Jawaban Benar:</strong>{' '}
+                                <span className="font-bold text-emerald-300">
+                                  {correctLetter ? `[${correctLetter}] ` : ''}
+                                </span>
+                                {r.correctAnswer}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      <p className="text-[10.5px] text-slate-300 leading-relaxed italic bg-[#10141c] p-2 rounded-xl border border-slate-800">
+                        💡 {r.explanation}
+                      </p>
                     </div>
-
-                    {/* Jawaban Staf (Tampil Baik Benar Maupun Salah) */}
-                    {r.isCorrect ? (
-                      <div className="text-[11px] space-y-0.5 text-slate-200 bg-emerald-950/30 p-2 rounded-xl border border-emerald-500/30">
-                        <div className="text-emerald-300 flex items-center gap-1">
-                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                          <span><strong>Jawaban Anda:</strong> {r.staffAnswer}</span>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="text-[11px] space-y-1 text-slate-300 bg-black/30 p-2 rounded-xl border border-rose-500/20">
-                        <div className="text-rose-300 flex items-start gap-1">
-                          <XCircle className="w-3.5 h-3.5 text-rose-400 shrink-0 mt-0.5" />
-                          <div>
-                            <strong>Jawaban Anda (Salah):</strong> {r.staffAnswer || '(Tidak dijawab)'}
-                          </div>
-                        </div>
-                        <div className="text-emerald-300 flex items-start gap-1 pt-0.5 border-t border-slate-800">
-                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
-                          <div>
-                            <strong>Jawaban Benar:</strong> {r.correctAnswer}
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    <p className="text-[10.5px] text-slate-300 leading-relaxed italic bg-[#10141c] p-2 rounded-xl border border-slate-800">
-                      💡 {r.explanation}
-                    </p>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
 
               {/* Close Button to proceed to break */}
@@ -356,12 +455,14 @@ export default function StaffQuizModal({
               </div>
 
               {/* Current Question Card */}
-              <div className="bg-[#12161f] border border-slate-800 rounded-2xl p-4 space-y-2 shadow-inner">
+              <div className="bg-[#12161f] border border-slate-800 rounded-2xl p-4 space-y-2.5 shadow-inner">
                 <div className="flex items-center justify-between text-[10px]">
                   <span className="px-2 py-0.5 rounded-md bg-amber-500/15 text-amber-300 font-bold border border-amber-400/30">
                     {currentQ.category}
                   </span>
-                  <span className="text-slate-400 font-mono">Pilih 1 jawaban tepat</span>
+                  <span className="px-2 py-0.5 rounded-md bg-slate-800 text-amber-400 font-bold border border-amber-500/30 flex items-center gap-1">
+                    🎯 Pilihan Ganda (Pilih A, B, C, atau D)
+                  </span>
                 </div>
                 <h4 className="text-sm font-bold text-white leading-relaxed">
                   {currentQ.question}
