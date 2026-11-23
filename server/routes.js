@@ -1691,6 +1691,7 @@ router.post('/staff', async (req, res) => {
 
     broadcastEvent('STAFF_UPDATE', { action: 'CREATED', staffId: assignedId });
     staffPinCache.clear();
+    cloudDb.syncStaffToToiletDb(db).catch(() => {});
     res.json({
       success: true,
       message: 'Staff member provisioned successfully',
@@ -1729,6 +1730,7 @@ router.put('/staff/:id/pin', async (req, res) => {
   }
 
   broadcastEvent('STAFF_UPDATE', { action: 'PIN_RESET', staffId: id });
+  cloudDb.syncStaffToToiletDb(db).catch(() => {});
   res.json({ success: true, message: 'PIN updated successfully.' });
 });
 
@@ -1754,6 +1756,7 @@ router.put('/staff/:id/status', async (req, res) => {
   }
 
   broadcastEvent('STAFF_UPDATE', { action: 'STATUS_TOGGLED', staffId: id, is_active: statusVal });
+  cloudDb.syncStaffToToiletDb(db).catch(() => {});
   res.json({ success: true, message: `Staff status changed to ${statusVal ? 'Active' : 'Suspended'}.` });
 });
 
@@ -1776,6 +1779,7 @@ router.delete('/staff/:id', async (req, res) => {
   db.prepare('DELETE FROM staff WHERE id = ?').run(id);
 
   broadcastEvent('STAFF_UPDATE', { action: 'DELETED', staffId: id });
+  cloudDb.syncStaffToToiletDb(db).catch(() => {});
   res.json({ success: true, message: 'Karyawan berhasil dihapus dari sistem.' });
 });
 

@@ -1917,6 +1917,8 @@ export const cloudDb = {
           s.id
         );
       }
+      // Keep toilet database in sync automatically
+      this.syncStaffToToiletDb(localDb).catch((e) => console.warn('Background toilet staff sync note:', e.message));
       return true;
     } catch (e) {
       console.warn('syncStaffToSqlite note:', e.message);
@@ -2062,8 +2064,7 @@ export const cloudDb = {
   },
 
   // 17. Sync Staff Roster to Toilet Inspection Database
-  async syncStaffToToiletDb() {
-    if (!supabase) return false;
+  async syncStaffToToiletDb(localDb = null) {
     try {
       const TOILET_SUPABASE_URL = 'https://nrrhkylpgitezjocgune.supabase.co';
       const TOILET_SUPABASE_ANON_KEY = 'sb_publishable_GRzOFx-NzqaaBPCl3Oqr2A_1f8xpUNj';
@@ -2071,12 +2072,24 @@ export const cloudDb = {
         auth: { persistSession: false }
       });
 
-      const { data: mainStaff, error: mainErr } = await supabase
-        .from('staff')
-        .select('*')
-        .order('name', { ascending: true });
+      let mainStaff = [];
+      if (supabase) {
+        const { data, error: mainErr } = await supabase
+          .from('staff')
+          .select('*')
+          .order('name', { ascending: true });
+        if (!mainErr && data && data.length > 0) {
+          mainStaff = data;
+        }
+      }
 
-      if (mainErr || !mainStaff || mainStaff.length === 0) return false;
+      if (mainStaff.length === 0 && localDb) {
+        try {
+          mainStaff = localDb.prepare('SELECT * FROM staff ORDER BY name ASC').all();
+        } catch {}
+      }
+
+      if (mainStaff.length === 0) return false;
 
       const { data: toiletStaff } = await toiletClient
         .from('staff_members')
@@ -2098,11 +2111,11 @@ export const cloudDb = {
           name: ms.name.trim(),
           pin: ms.pin || '1234',
           role: roleStr,
-          is_active: ms.is_active !== false
+          is_active: ms.is_active !== false && ms.is_active !== 0
         });
       }
 
-      await toiletClient.from('staff_members').upsert(upserts);
+      await toiletClient.from('staff_members').upsert(upserts, { onConflict: 'id' });
       return true;
     } catch (err) {
       console.warn('Auto toilet staff sync error:', err.message);
