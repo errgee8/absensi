@@ -103,13 +103,16 @@ export async function computeLeaderboard(targetMonthStr) {
     }
   }
 
-  // Build maps for manager points and manual day adjustments (strictly scoped to target month)
+  // Build maps for manager points and manual day adjustments (strictly scoped to target month and launch date)
   const staffPointsMap = {};
   for (const pt of staffPointsList) {
     if (!pt.staff_id) continue;
     if (pt.created_at) {
       const ptDate = pt.created_at.slice(0, 7);
       if (ptDate !== monthKey) continue;
+      // Launch cutoff: ignore points before 2026-11-23 00:00:00 WITA
+      const ptTime = new Date(pt.created_at);
+      if (ptTime < new Date('2026-11-22T16:00:00.000Z')) continue;
     }
     const isPlus = pt.point_type === 'PLUS' || pt.type === 'PLUS' || (pt.reason && pt.reason.includes('[Apresiasi Whistleblower]'));
     const pts = Math.abs(Number(pt.points) || 0);
@@ -123,6 +126,9 @@ export async function computeLeaderboard(targetMonthStr) {
     if (adj.created_at) {
       const adjDate = adj.created_at.slice(0, 7);
       if (adjDate !== monthKey) continue;
+      // Launch cutoff: ignore day adjustments before 2026-11-23 00:00:00 WITA
+      const adjTime = new Date(adj.created_at);
+      if (adjTime < new Date('2026-11-22T16:00:00.000Z')) continue;
     }
     staffDayAdjMap[adj.staff_id] = (staffDayAdjMap[adj.staff_id] || 0) + (Number(adj.adjustment_days) || 0);
   }
@@ -368,6 +374,8 @@ export async function computeLeaderboard(targetMonthStr) {
   for (const ins of inspections || []) {
     const rawName = (ins.staff_name || '').trim();
     if (!rawName || rawName.toLowerCase() === 'test staff') continue;
+
+    const insTime = new Date(ins.created_at);
 
     // Operational launch cutoff (2026-11-23 00:00:00 WITA)
     const officialLaunchDate = new Date('2026-11-22T16:00:00.000Z');
