@@ -16,6 +16,7 @@ export default function ShiftSuccessModal({ shift, type = 'checkin', onClose }) 
   if (!shift) return null;
 
   const isCheckin = type === 'checkin';
+  const flags = Array.isArray(shift?.flags) ? shift.flags : [];
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in">
@@ -63,13 +64,13 @@ export default function ShiftSuccessModal({ shift, type = 'checkin', onClose }) 
             </span>
           </div>
 
-          {shift.flags && shift.flags.length > 0 && (
+          {flags.length > 0 && (
             <div className="pt-2 border-t border-slate-800">
               <span className="text-[10px] text-amber-400 font-bold block mb-1">
                 Audit Flags Logged:
               </span>
               <div className="flex flex-wrap gap-1">
-                {shift.flags.map((flag, idx) => (
+                {flags.map((flag, idx) => (
                   <span
                     key={idx}
                     className="px-1.5 py-0.5 rounded text-[9px] font-mono bg-amber-500/15 text-amber-300 border border-amber-500/30"

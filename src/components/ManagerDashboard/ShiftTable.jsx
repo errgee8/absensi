@@ -290,7 +290,7 @@ export default function ShiftTable({
 
           <tbody className="divide-y divide-slate-800/70 font-bold">
             {shifts.map((shift) => {
-              const hasFlags = shift.flags && shift.flags.length > 0;
+              const hasFlags = Array.isArray(shift.flags) && shift.flags.length > 0;
               const shiftInfo = resolveShift(shift, schedules);
               const isActive = !shift.checkout_time || shift.status === 'IN_PROGRESS' || shift.status === 'ON_DUTY' || shift.status === 'ON_BREAK';
               const actionItems = getStaffActionItems(shift);
