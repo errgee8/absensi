@@ -3727,9 +3727,10 @@ router.post('/admin/wipe-leaderboard', async (req, res) => {
       if (scope === 'attendance' || scope === 'all') {
         try {
           if (db) {
-            db.prepare('DELETE FROM shifts').run();
+            const todayYmd = new Date().toISOString().slice(0, 10);
+            db.prepare('DELETE FROM shifts WHERE date < ?').run(todayYmd);
             try {
-              db.prepare('DELETE FROM breaks').run();
+              db.prepare('DELETE FROM breaks WHERE created_at < ?').run(todayYmd);
             } catch (e) {}
           }
         } catch (sqliteErr) {

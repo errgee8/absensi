@@ -369,8 +369,11 @@ export async function computeLeaderboard(targetMonthStr) {
     const rawName = (ins.staff_name || '').trim();
     if (!rawName || rawName.toLowerCase() === 'test staff') continue;
 
+    // Operational launch cutoff (2026-11-23 00:00:00 WITA)
+    const officialLaunchDate = new Date('2026-11-22T16:00:00.000Z');
+    if (insTime < officialLaunchDate) continue;
+
     // If leaderboard was reset, only count inspections occurring after reset timestamp
-    const insTime = new Date(ins.created_at);
     if (leaderboardResetAt) {
       if (insTime < leaderboardResetAt) continue;
     }

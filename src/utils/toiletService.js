@@ -69,11 +69,12 @@ export async function getToiletLocations() {
   }
 }
 
-export async function getRecentToiletInspections(limit = 20) {
+export async function getRecentToiletInspections(limit = 25) {
   try {
     const { data, error } = await toiletClient
       .from('inspections')
       .select('*')
+      .gte('created_at', '2026-11-22T16:00:00.000Z')
       .order('created_at', { ascending: false })
       .limit(limit);
     if (error) throw error;

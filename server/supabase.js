@@ -1116,21 +1116,22 @@ export const cloudDb = {
     // 1. Wipe Attendance & Break Logs (Supabase Cloud)
     if (scope === 'attendance' || scope === 'all' || scope === 'master_reset') {
       try {
-        // Delete child break logs first
+        const todayYmd = new Date().toISOString().slice(0, 10);
+        // Delete child break logs first (< today)
         let breakQuery = supabase.from('break_logs').delete();
         if (targetMonth && /^\d{4}-\d{2}$/.test(targetMonth)) {
           breakQuery = breakQuery.gte('created_at', `${targetMonth}-01T00:00:00Z`).lte('created_at', `${targetMonth}-31T23:59:59Z`);
         } else {
-          breakQuery = breakQuery.not('id', 'is', null);
+          breakQuery = breakQuery.lt('created_at', `${todayYmd}T00:00:00Z`);
         }
         await breakQuery;
 
-        // Delete parent attendance logs
+        // Delete parent attendance logs (< today, preserving today's active ongoing shifts)
         let attQuery = supabase.from('attendance_logs').delete();
         if (targetMonth && /^\d{4}-\d{2}$/.test(targetMonth)) {
           attQuery = attQuery.gte('shift_date', `${targetMonth}-01`).lte('shift_date', `${targetMonth}-31`);
         } else {
-          attQuery = attQuery.not('id', 'is', null);
+          attQuery = attQuery.lt('shift_date', todayYmd);
         }
         const { error: attErr } = await attQuery;
         if (attErr) throw attErr;
