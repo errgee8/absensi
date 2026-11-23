@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { getStaffList } from '../../utils/api';
 import { isVipStaff } from '../../utils/streakFrames';
+import StreakAvatar from '../Common/StreakAvatar';
 
 export default function StaffMampirModal({
   isOpen,
@@ -197,24 +198,15 @@ export default function StaffMampirModal({
                   }`}
                 >
                   <div className="flex items-center gap-2.5 min-w-0">
-                    {/* Avatar Thumbnail */}
-                    <div
-                      className={`w-10 h-10 rounded-xl overflow-hidden bg-slate-800 flex items-center justify-center shrink-0 border ${
-                        isVip ? 'border-amber-400/80 shadow-md shadow-amber-500/30' : 'border-white/10'
-                      }`}
-                    >
-                      {s.profile_photo_url ? (
-                        <img
-                          src={s.profile_photo_url}
-                          alt={s.name}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <span className="text-xs font-black text-slate-300">
-                          {s.name ? s.name.slice(0, 2).toUpperCase() : 'ST'}
-                        </span>
-                      )}
-                    </div>
+                    {/* Avatar Thumbnail with Streak Frame */}
+                    <StreakAvatar
+                      photo={s.profile_photo_url}
+                      name={s.name}
+                      streak={s.streak_count || 0}
+                      isVip={isVip}
+                      size="sm"
+                      showBadge={false}
+                    />
 
                     {/* Staff Info */}
                     <div className="min-w-0">

@@ -46,6 +46,7 @@ import StaffBioModal from './StaffBioModal';
 import StaffPublicProfileModal from './StaffPublicProfileModal';
 import StaffMampirModal from './StaffMampirModal';
 import LoungeChatModal from './LoungeChatModal';
+import StreakAvatar from '../Common/StreakAvatar';
 import { getStreakTier, isVipStaff } from '../../utils/streakFrames';
 
 const MOOD_EMOJIS = ['😊', '🔥', '😐', '😴', '😮‍💨', '😢', '😡', '💔'];
@@ -502,43 +503,20 @@ export default function KioskPortalScreen({
 
           {/* Profile Details: Avatar + Name + Role + Actions */}
           <div className="flex items-center gap-3">
-            {/* Real Profile Photo Avatar with Streak-Unlocked Frame or Exclusive VIP Frame */}
-            <button
-              type="button"
+            {/* Real Profile Photo Avatar with Streak-Unlocked Fantasy Frame or Exclusive VIP Frame */}
+            <StreakAvatar
+              photo={staff?.profile_photo_url}
+              name={staff?.name}
+              streak={currentStreak}
+              isVip={isVip}
+              size="md"
+              themeRing={staffTheme?.avatarRing}
               onClick={handleOpenPhotoModal}
-              className="relative group shrink-0 focus:outline-none cursor-pointer"
-              title={isVip ? '👑 Bingkai Eksklusif VIP Founder & Owner' : `Bingkai Avatar: ${streakTier.name} (${currentStreak} Hari Streak)`}
             >
-              {(isVip || streakTier.hasCrown) && (
-                <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 z-20 pointer-events-none animate-bounce">
-                  <Crown className={`w-5 h-5 ${streakTier.crownColor || 'text-yellow-300 fill-amber-300 drop-shadow-[0_0_8px_rgba(234,179,8,1)]'}`} />
-                </div>
-              )}
-              <div className={`w-14 h-14 rounded-2xl bg-[#232938] overflow-hidden flex items-center justify-center shadow-inner transition-all duration-300 ${streakTier.ringClasses} ${staffTheme?.avatarRing || ''}`}>
-                {staff?.profile_photo_url ? (
-                  <img
-                    src={staff.profile_photo_url}
-                    alt={staff?.name || 'Foto Profil'}
-                    className="w-full h-full object-cover rounded-[13px]"
-                  />
-                ) : (
-                  <span className="text-base font-black tracking-tight text-slate-200">
-                    {getInitials(staff?.name)}
-                  </span>
-                )}
-              </div>
-              {streakTier.badge && (
-                <span
-                  className={`absolute -top-1.5 -left-1.5 w-5 h-5 rounded-full text-[10px] flex items-center justify-center shadow-lg z-10 ${streakTier.badgeClasses}`}
-                  title={isVip ? '👑 VIP Executive Owner' : `${streakTier.name} (${currentStreak} Hari Streak)`}
-                >
-                  {streakTier.badge}
-                </span>
-              )}
-              <span className={`absolute -bottom-1 -right-1 w-5 h-5 rounded-full ${isVip ? 'bg-amber-400 text-slate-950 font-black' : 'bg-indigo-500 text-white'} flex items-center justify-center border-2 border-[#181d26] shadow`}>
+              <span className={`absolute -bottom-1 -right-1 w-5 h-5 rounded-full ${isVip ? 'bg-amber-400 text-slate-950 font-black' : 'bg-indigo-500 text-white'} flex items-center justify-center border-2 border-[#181d26] shadow z-30 pointer-events-none`}>
                 <Pencil className="w-2.5 h-2.5" />
               </span>
-            </button>
+            </StreakAvatar>
 
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2 flex-wrap">

@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { getStaffPublicProfile } from '../../utils/api';
 import { getStreakTier, isVipStaff } from '../../utils/streakFrames';
+import StreakAvatar from '../Common/StreakAvatar';
 import { VIP_THEME, STAFF_THEMES } from './StaffThemeModal';
 
 const profileClientCache = new Map();
@@ -31,12 +32,10 @@ export default function StaffPublicProfileModal({
   const [loading, setLoading] = useState(() => !profileClientCache.has(staffId));
   const [error, setError] = useState(null);
   const [profile, setProfile] = useState(() => profileClientCache.get(staffId) || null);
-  const [imgError, setImgError] = useState(false);
 
   useEffect(() => {
     if (!isOpen || !staffId) return;
     let isMounted = true;
-    setImgError(false);
 
     // Instant cache check
     if (profileClientCache.has(staffId)) {
@@ -121,36 +120,14 @@ export default function StaffPublicProfileModal({
             <div className="relative pt-2 text-center space-y-2.5">
               {/* Framed Avatar */}
               <div className="relative inline-block mx-auto">
-                {(isVip || streakTier.hasCrown) && (
-                  <div className="absolute -top-4 left-1/2 -translate-x-1/2 z-20 pointer-events-none animate-bounce">
-                    <Crown className={`w-6 h-6 ${streakTier.crownColor || 'text-yellow-300 fill-amber-300 drop-shadow-[0_0_10px_rgba(234,179,8,1)]'}`} />
-                  </div>
-                )}
-                <div
-                  className={`w-20 h-20 rounded-2xl overflow-hidden bg-slate-800 flex items-center justify-center shadow-xl transition-all ${streakTier.ringClasses} ${visitedTheme.avatarRing || ''}`}
-                >
-                  {profile.profile_photo_url && !imgError ? (
-                    <img
-                      src={profile.profile_photo_url}
-                      alt={profile.name}
-                      onError={() => setImgError(true)}
-                      className="w-full h-full object-cover rounded-[14px]"
-                    />
-                  ) : (
-                    <span className="text-xl font-black text-slate-300">
-                      {profile.name ? profile.name.slice(0, 2).toUpperCase() : 'ST'}
-                    </span>
-                  )}
-                </div>
-
-                {streakTier.badge && (
-                  <span
-                    className={`absolute -top-1.5 -left-1.5 w-6 h-6 rounded-full text-xs flex items-center justify-center shadow-lg z-10 ${streakTier.badgeClasses}`}
-                    title={`${streakTier.name} (${currentStreak} Hari Streak)`}
-                  >
-                    {streakTier.badge}
-                  </span>
-                )}
+                <StreakAvatar
+                  photo={profile.profile_photo_url}
+                  name={profile.name}
+                  streak={currentStreak}
+                  isVip={isVip}
+                  size="xl"
+                  themeRing={visitedTheme.avatarRing}
+                />
               </div>
 
               {/* Name & Badges */}

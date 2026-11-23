@@ -22,89 +22,11 @@ import {
   Coffee
 } from 'lucide-react';
 import { getStreakTier, isVipStaff } from '../../utils/streakFrames';
+import StreakAvatar from '../Common/StreakAvatar';
 
-// Reusable Elegant Framed Avatar Component with Fallback
-function StaffAvatarFrame({ photo, name, rank, streak = 0, size = 'md', isVip = false }) {
-  const [imgError, setImgError] = useState(false);
-  const vipDetected = isVip || isVipStaff({ name });
-  const streakTier = getStreakTier(streak, vipDetected);
-
-  // Frame styles based on rank & streak milestone
-  let ringClasses = streakTier.tier > 0 ? streakTier.ringClasses : 'ring-2 ring-slate-700 border border-slate-600';
-  let badgeColor = 'bg-slate-700 text-slate-200';
-  let crownColor = null;
-
-  if (vipDetected) {
-    ringClasses = streakTier.ringClasses;
-    crownColor = streakTier.crownColor;
-    badgeColor = 'bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-500 text-slate-950 font-black border border-yellow-200 shadow-md';
-  } else if (rank === 1) {
-    ringClasses = streakTier.tier >= 3 ? streakTier.ringClasses : 'ring-4 ring-amber-400 shadow-xl shadow-amber-500/40 border-2 border-yellow-200 bg-gradient-to-br from-amber-400 via-yellow-200 to-amber-600 p-0.5';
-    badgeColor = 'bg-gradient-to-r from-amber-400 to-yellow-300 text-slate-950 font-black border border-white';
-    crownColor = streakTier.hasCrown ? streakTier.crownColor : 'text-amber-300 fill-amber-300';
-  } else if (rank === 2) {
-    ringClasses = streakTier.tier >= 3 ? streakTier.ringClasses : 'ring-3 ring-slate-300 shadow-lg shadow-slate-400/20 border-2 border-white bg-gradient-to-br from-slate-200 via-white to-slate-400 p-0.5';
-    badgeColor = 'bg-slate-300 text-slate-950 font-black border border-white';
-    if (streakTier.hasCrown) crownColor = streakTier.crownColor;
-  } else if (rank === 3) {
-    ringClasses = streakTier.tier >= 3 ? streakTier.ringClasses : 'ring-3 ring-amber-600 shadow-lg shadow-amber-700/25 border-2 border-amber-400 bg-gradient-to-br from-amber-600 via-yellow-700 to-amber-800 p-0.5';
-    badgeColor = 'bg-amber-700 text-white font-black border border-amber-400';
-    if (streakTier.hasCrown) crownColor = streakTier.crownColor;
-  } else if (streakTier.hasCrown) {
-    crownColor = streakTier.crownColor;
-  }
-
-  const dimensions =
-    size === 'xl'
-      ? 'w-18 h-18 sm:w-20 sm:h-20'
-      : size === 'lg'
-      ? 'w-14 h-14 sm:w-16 sm:h-16'
-      : 'w-11 h-11';
-
-  return (
-    <div className="relative inline-block shrink-0">
-      {/* Animated Crown for Rank 1 or 30+ Streak */}
-      {(crownColor || streakTier.hasCrown) && (
-        <div className="absolute -top-4 left-1/2 -translate-x-1/2 z-20 animate-bounce pointer-events-none">
-          <Crown className={`w-6 h-6 sm:w-7 sm:h-7 ${crownColor || streakTier.crownColor || 'text-amber-300 fill-amber-300'} drop-shadow-md`} />
-        </div>
-      )}
-
-      {/* Streak Milestone Badge (🔥, ⚡, 👑) on Top-Left */}
-      {streakTier.badge && (
-        <span
-          className={`absolute -top-1.5 -left-1.5 px-1 py-0.2 rounded-full text-[9px] font-black shadow-lg z-20 flex items-center justify-center border border-white/40 ${streakTier.badgeClasses}`}
-          title={`${streakTier.name} (${streak} Hari Streak)`}
-        >
-          {streakTier.badge} {streak}
-        </span>
-      )}
-
-      {/* Elegant Portrait Frame */}
-      <div className={`${dimensions} rounded-2xl ${ringClasses} overflow-hidden relative flex items-center justify-center bg-slate-950 transition-transform duration-200 hover:scale-105`}>
-        {photo && !imgError ? (
-          <img
-            src={photo}
-            alt={name}
-            onError={() => setImgError(true)}
-            className="w-full h-full object-cover rounded-xl"
-            loading="lazy"
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center font-black text-white text-base sm:text-xl bg-gradient-to-br from-slate-800 to-slate-900">
-            {name?.charAt(0)?.toUpperCase()}
-          </div>
-        )}
-      </div>
-
-      {/* Rank Badge Indicator */}
-      <span
-        className={`absolute -bottom-2 -right-1 px-1.5 sm:px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-black shadow-md z-10 flex items-center justify-center ${badgeColor}`}
-      >
-        #{rank}
-      </span>
-    </div>
-  );
+// Reusable Elegant Framed Avatar Component with Fantasy Streak Frames
+function StaffAvatarFrame(props) {
+  return <StreakAvatar {...props} />;
 }
 
 // Side-by-Side Column Component for either Attendance or Toilet Leaderboard
