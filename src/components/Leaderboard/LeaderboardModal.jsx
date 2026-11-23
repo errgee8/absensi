@@ -36,18 +36,22 @@ function StaffAvatarFrame({ photo, name, rank, streak = 0, size = 'md', isVip = 
 
   if (vipDetected) {
     ringClasses = streakTier.ringClasses;
-    crownColor = 'text-yellow-300 fill-amber-300 drop-shadow-[0_0_10px_rgba(234,179,8,1)]';
+    crownColor = streakTier.crownColor;
     badgeColor = 'bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-500 text-slate-950 font-black border border-yellow-200 shadow-md';
   } else if (rank === 1) {
-    ringClasses = 'ring-4 ring-amber-400 shadow-xl shadow-amber-500/40 border-2 border-yellow-200 bg-gradient-to-br from-amber-400 via-yellow-200 to-amber-600 p-0.5';
+    ringClasses = streakTier.tier >= 3 ? streakTier.ringClasses : 'ring-4 ring-amber-400 shadow-xl shadow-amber-500/40 border-2 border-yellow-200 bg-gradient-to-br from-amber-400 via-yellow-200 to-amber-600 p-0.5';
     badgeColor = 'bg-gradient-to-r from-amber-400 to-yellow-300 text-slate-950 font-black border border-white';
-    crownColor = 'text-amber-300 fill-amber-300';
+    crownColor = streakTier.hasCrown ? streakTier.crownColor : 'text-amber-300 fill-amber-300';
   } else if (rank === 2) {
-    ringClasses = 'ring-3 ring-slate-300 shadow-lg shadow-slate-400/20 border-2 border-white bg-gradient-to-br from-slate-200 via-white to-slate-400 p-0.5';
+    ringClasses = streakTier.tier >= 3 ? streakTier.ringClasses : 'ring-3 ring-slate-300 shadow-lg shadow-slate-400/20 border-2 border-white bg-gradient-to-br from-slate-200 via-white to-slate-400 p-0.5';
     badgeColor = 'bg-slate-300 text-slate-950 font-black border border-white';
+    if (streakTier.hasCrown) crownColor = streakTier.crownColor;
   } else if (rank === 3) {
-    ringClasses = 'ring-3 ring-amber-600 shadow-lg shadow-amber-700/25 border-2 border-amber-400 bg-gradient-to-br from-amber-600 via-yellow-700 to-amber-800 p-0.5';
+    ringClasses = streakTier.tier >= 3 ? streakTier.ringClasses : 'ring-3 ring-amber-600 shadow-lg shadow-amber-700/25 border-2 border-amber-400 bg-gradient-to-br from-amber-600 via-yellow-700 to-amber-800 p-0.5';
     badgeColor = 'bg-amber-700 text-white font-black border border-amber-400';
+    if (streakTier.hasCrown) crownColor = streakTier.crownColor;
+  } else if (streakTier.hasCrown) {
+    crownColor = streakTier.crownColor;
   }
 
   const dimensions =
@@ -59,10 +63,10 @@ function StaffAvatarFrame({ photo, name, rank, streak = 0, size = 'md', isVip = 
 
   return (
     <div className="relative inline-block shrink-0">
-      {/* Animated Crown for Rank 1 */}
-      {crownColor && (
+      {/* Animated Crown for Rank 1 or 30+ Streak */}
+      {(crownColor || streakTier.hasCrown) && (
         <div className="absolute -top-4 left-1/2 -translate-x-1/2 z-20 animate-bounce pointer-events-none">
-          <Crown className={`w-6 h-6 sm:w-7 sm:h-7 ${crownColor} drop-shadow-md`} />
+          <Crown className={`w-6 h-6 sm:w-7 sm:h-7 ${crownColor || streakTier.crownColor || 'text-amber-300 fill-amber-300'} drop-shadow-md`} />
         </div>
       )}
 

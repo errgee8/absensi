@@ -143,7 +143,7 @@ export default function ShiftClearedModal({
               <span>Streak On-Time</span>
             </div>
             <div className={`text-base sm:text-lg font-black mt-1 leading-none flex items-center gap-1 ${streakTier.textGlow}`}>
-              <span>🔥</span>
+              <span>{streakTier.badge || '🔥'}</span>
               <span>{streak} Hari</span>
             </div>
             <div className="text-[9.5px] text-amber-300/80 mt-1 truncate">

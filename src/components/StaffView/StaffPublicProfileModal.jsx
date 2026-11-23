@@ -121,9 +121,9 @@ export default function StaffPublicProfileModal({
             <div className="relative pt-2 text-center space-y-2.5">
               {/* Framed Avatar */}
               <div className="relative inline-block mx-auto">
-                {isVip && (
+                {(isVip || streakTier.hasCrown) && (
                   <div className="absolute -top-4 left-1/2 -translate-x-1/2 z-20 pointer-events-none animate-bounce">
-                    <Crown className="w-6 h-6 text-yellow-300 fill-amber-300 drop-shadow-[0_0_10px_rgba(234,179,8,1)]" />
+                    <Crown className={`w-6 h-6 ${streakTier.crownColor || 'text-yellow-300 fill-amber-300 drop-shadow-[0_0_10px_rgba(234,179,8,1)]'}`} />
                   </div>
                 )}
                 <div
@@ -156,7 +156,7 @@ export default function StaffPublicProfileModal({
               {/* Name & Badges */}
               <div>
                 <div className="flex items-center justify-center gap-1.5 flex-wrap">
-                  <h3 className="text-base sm:text-lg font-black text-white leading-tight">
+                  <h3 className={`text-base sm:text-lg font-black leading-tight ${streakTier.nameGold ? streakTier.nameClass : 'text-white'}`}>
                     {profile.name}
                   </h3>
                   {isVip ? (
@@ -164,14 +164,14 @@ export default function StaffPublicProfileModal({
                       className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10.5px] font-black bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 text-slate-950 shadow-[0_0_15px_rgba(234,179,8,0.7)] border-2 border-yellow-200 tracking-wider animate-pulse"
                       title="👑 Executive VIP Owner"
                     >
-                      <Crown className="w-3 h-3 text-slate-950 fill-slate-950" />
+                      <Crown className="w-3.5 h-3.5 text-slate-950 fill-slate-950" />
                       <span>VIP</span>
                     </span>
                   ) : (
                     <span
                       className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9.5px] font-black border shadow-xs ${streakTier.pillBg}`}
                     >
-                      <span>🔥</span>
+                      <span>{streakTier.badge || '🔥'}</span>
                       <span>{currentStreak}d Streak</span>
                     </span>
                   )}

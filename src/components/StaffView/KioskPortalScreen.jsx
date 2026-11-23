@@ -508,9 +508,9 @@ export default function KioskPortalScreen({
               className="relative group shrink-0 focus:outline-none cursor-pointer"
               title={isVip ? '👑 Bingkai Eksklusif VIP Founder & Owner' : `Bingkai Avatar: ${streakTier.name} (${currentStreak} Hari Streak)`}
             >
-              {isVip && (
+              {(isVip || streakTier.hasCrown) && (
                 <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 z-20 pointer-events-none animate-bounce">
-                  <Crown className="w-5 h-5 text-yellow-300 fill-amber-300 drop-shadow-[0_0_8px_rgba(234,179,8,1)]" />
+                  <Crown className={`w-5 h-5 ${streakTier.crownColor || 'text-yellow-300 fill-amber-300 drop-shadow-[0_0_8px_rgba(234,179,8,1)]'}`} />
                 </div>
               )}
               <div className={`w-14 h-14 rounded-2xl bg-[#232938] overflow-hidden flex items-center justify-center shadow-inner transition-all duration-300 ${streakTier.ringClasses} ${staffTheme?.avatarRing || ''}`}>
@@ -541,7 +541,7 @@ export default function KioskPortalScreen({
 
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2 flex-wrap">
-                <h1 className="text-base sm:text-lg font-black text-white truncate leading-tight">
+                <h1 className={`text-base sm:text-lg font-black truncate leading-tight ${streakTier.nameGold ? streakTier.nameClass : 'text-white'}`}>
                   {staff?.name || 'Staff'}
                 </h1>
                 {/* VIP Logo Badge */}
@@ -559,7 +559,7 @@ export default function KioskPortalScreen({
                   className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black border shadow-sm ${streakTier.pillBg}`}
                   title={isVip ? '👑 Infinite VIP Streak: 888 Hari' : `Streak On-Time: ${currentStreak} hari berturut-turut (${streakTier.name})`}
                 >
-                  <span>🔥</span>
+                  <span>{streakTier.badge || '🔥'}</span>
                   <span>{currentStreak} Hari Streak</span>
                 </span>
               </div>
