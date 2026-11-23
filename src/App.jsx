@@ -4,6 +4,7 @@ import StaffView from './components/StaffView/StaffView';
 import AdminPinModal from './components/ManagerDashboard/AdminPinModal';
 import StaffPublicProfileModal from './components/StaffView/StaffPublicProfileModal';
 import ToastContainer, { showToast } from './components/Common/Toast';
+import ErrorBoundary from './components/Common/ErrorBoundary';
 import { getNetworkStatus, getStaffList, getSettings, getServerTime } from './utils/api';
 import { Smartphone, Download } from 'lucide-react';
 
@@ -142,24 +143,26 @@ export default function App() {
 
       {/* Main Content View */}
       <main className="flex-1">
-        {currentView === 'staff' ? (
-          <StaffView
-            venueSettings={venueSettings}
-            onOpenViewOnly={handleOpenViewOnly}
-            onOpenAdminAuth={() => setAdminModalOpen(true)}
-            onOpenLeaderboard={() => setLeaderboardOpen(true)}
-          />
-        ) : (
-          <Suspense fallback={<div className="min-h-screen bg-[#0e121a] flex items-center justify-center text-slate-400 font-bold">Memuat Dashboard Manager...</div>}>
-            <ManagerDashboard
+        <ErrorBoundary>
+          {currentView === 'staff' ? (
+            <StaffView
               venueSettings={venueSettings}
-              refreshSettings={loadAppData}
-              adminAuth={adminAuth}
-              isReadOnly={adminAuth?.role === 'VIEW_ONLY' || !adminAuth?.canEdit}
+              onOpenViewOnly={handleOpenViewOnly}
+              onOpenAdminAuth={() => setAdminModalOpen(true)}
               onOpenLeaderboard={() => setLeaderboardOpen(true)}
             />
-          </Suspense>
-        )}
+          ) : (
+            <Suspense fallback={<div className="min-h-screen bg-[#0e121a] flex items-center justify-center text-slate-400 font-bold">Memuat Dashboard Manager...</div>}>
+              <ManagerDashboard
+                venueSettings={venueSettings}
+                refreshSettings={loadAppData}
+                adminAuth={adminAuth}
+                isReadOnly={adminAuth?.role === 'VIEW_ONLY' || !adminAuth?.canEdit}
+                onOpenLeaderboard={() => setLeaderboardOpen(true)}
+              />
+            </Suspense>
+          )}
+        </ErrorBoundary>
       </main>
 
       {/* Footer Branding */}

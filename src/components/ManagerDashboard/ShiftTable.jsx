@@ -57,7 +57,7 @@ export default function ShiftTable({
   // Detect actionable follow-ups for each staff/shift
   const getStaffActionItems = (shift) => {
     const actions = [];
-    const flags = shift.flags || [];
+    const flags = Array.isArray(shift?.flags) ? shift.flags : [];
 
     const isLateApproved = shift?.late_status === 'APPROVED' || flags.includes('FLAG_LATE_EXCUSED');
     const isLatePending = shift?.late_status === 'PENDING_REVIEW' || (flags.some(f => String(f).includes('Late Check-In')) && !shift?.late_status);
@@ -201,7 +201,7 @@ export default function ShiftTable({
   };
 
   const renderLateReviewBadge = (shift) => {
-    const flags = shift.flags || [];
+    const flags = Array.isArray(shift?.flags) ? shift.flags : [];
     const isLateApproved = shift?.late_status === 'APPROVED' || flags.includes('FLAG_LATE_EXCUSED');
     const isLatePending = shift?.late_status === 'PENDING_REVIEW' || (flags.some(f => String(f).includes('Late Check-In')) && !shift?.late_status);
     const isLateRejected = shift?.late_status === 'REJECTED';

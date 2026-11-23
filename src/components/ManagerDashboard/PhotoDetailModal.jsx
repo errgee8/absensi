@@ -476,7 +476,7 @@ export default function PhotoDetailModal({ shift, type = 'in', onClose, onShiftU
           )}
 
           {/* Late Check-In Justification & Management Review Section */}
-          {(shift.late_reason || shift.late_status || shift.late_photo_url || shift.flags?.some(f => String(f).includes('Late'))) && (
+          {(shift.late_reason || shift.late_status || shift.late_photo_url || (Array.isArray(shift.flags) && shift.flags.some(f => String(f).includes('Late')))) && (
             <div className="bg-[#12161f] border border-amber-500/30 rounded-2xl p-4 text-xs space-y-3">
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <div className="flex items-center space-x-2 font-black text-amber-300">

@@ -17,7 +17,8 @@ import {
   User,
   Clock,
   Filter,
-  Trash2
+  Trash2,
+  AlertCircle
 } from 'lucide-react';
 import { getLeaveRequests, reviewLeaveRequest, deleteLeaveRequest } from '../../utils/api';
 import { formatWitaDateOnly, formatWitaDateTime } from '../../utils/time';

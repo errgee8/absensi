@@ -26,7 +26,7 @@ import { getShifts, getStats, getShiftSchedules, getStaffList, getLeaveRequests,
 import { getOperationalDateYMD, getOperationalYesterdayYMD, getWitaDateYMD, getAppNow, formatWitaDateTime } from '../../utils/time';
 import { resolveShift } from '../../utils/shiftResolver';
 import { showToast } from '../Common/Toast';
-import { LayoutDashboard, Users, Clock, Radio, Building2, Sparkles, Eye, ShieldAlert, Trophy, FileText, Megaphone, Activity, Award, Unlock, AlertCircle, Star } from 'lucide-react';
+import { LayoutDashboard, Users, Clock, Radio, Building2, Sparkles, Eye, ShieldAlert, Trophy, FileText, Megaphone, Activity, Award, Unlock, AlertCircle, Star, RefreshCw } from 'lucide-react';
 
 export default function ManagerDashboard({ venueSettings, refreshSettings, adminAuth, isReadOnly = false, onOpenLeaderboard }) {
   // Tabs: 'AUDIT' | 'SCHEDULES' | 'STAFF' | 'TOILET'
