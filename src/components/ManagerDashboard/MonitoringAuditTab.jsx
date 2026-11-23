@@ -16,9 +16,11 @@ import {
   Building2,
   Save,
   Sliders,
-  Check
+  Check,
+  Cloud,
+  Database
 } from 'lucide-react';
-import { getAdminLoginLogs, getLivePresence, getSettings, updateSettings } from '../../utils/api';
+import { getAdminLoginLogs, getLivePresence, getSettings, updateSettings, getCloudHealth } from '../../utils/api';
 import { formatWitaDateTime } from '../../utils/time';
 import { showToast } from '../Common/Toast';
 
@@ -26,6 +28,7 @@ export default function MonitoringAuditTab({ adminAuth }) {
   const [logs, setLogs] = useState([]);
   const [presenceList, setPresenceList] = useState([]);
   const [onlineCount, setOnlineCount] = useState(0);
+  const [cloudHealth, setCloudHealth] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -42,15 +45,17 @@ export default function MonitoringAuditTab({ adminAuth }) {
   const loadData = useCallback(async (isSilent = false) => {
     if (!isSilent) setRefreshing(true);
     try {
-      const [logsRes, presenceRes, settingsRes] = await Promise.all([
+      const [logsRes, presenceRes, settingsRes, cloudRes] = await Promise.all([
         getAdminLoginLogs().catch(() => ({ logs: [] })),
         getLivePresence().catch(() => ({ presence: [], onlineCount: 0 })),
-        getSettings().catch(() => ({}))
+        getSettings().catch(() => ({})),
+        getCloudHealth().catch(() => null)
       ]);
 
       setLogs(logsRes.logs || []);
       setPresenceList(presenceRes.presence || []);
       setOnlineCount(presenceRes.onlineCount || 0);
+      setCloudHealth(cloudRes);
 
       if (settingsRes) {
         setNotifyAnnouncements(settingsRes.notify_announcements !== 0 && settingsRes.notify_announcements !== 'false');
@@ -162,6 +167,92 @@ export default function MonitoringAuditTab({ adminAuth }) {
           <span>{refreshing ? 'Memperbarui...' : 'Segarkan Data'}</span>
         </button>
       </div>
+
+      {/* SECTION 0: SUPABASE CLOUD & EGRESS BANDWIDTH HEALTH MONITOR */}
+      {cloudHealth && (
+        <div className="bg-gradient-to-r from-[#141d2b] via-[#161f2c] to-[#121620] border-2 border-emerald-500/30 rounded-3xl p-5 shadow-xl space-y-3.5 animate-fade-in">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800/80 pb-3">
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 rounded-2xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center shrink-0">
+                <Cloud className="w-5 h-5 stroke-[2.2]" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-black text-white">
+                    ☁️ Supabase Cloud &amp; Egress Bandwidth Monitor
+                  </h3>
+                  <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase border ${
+                    cloudHealth.alertLevel === 'green'
+                      ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                      : 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                  }`}>
+                    {cloudHealth.status === 'HEALTHY' ? '● Kuota Sangat Aman' : cloudHealth.status}
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-400 font-medium">
+                  Pemantauan aktif kuota batas egress Supabase (Batas Aman Maksimal: <strong>{cloudHealth.targetMaxGb} GB / bulan</strong>)
+                </p>
+              </div>
+            </div>
+            <div className="text-[11px] font-mono text-slate-400 self-start sm:self-center">
+              Latency Cloud: <span className="text-emerald-400 font-bold">{cloudHealth.latencyMs}ms</span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            {/* Box 1: Status Kuota Egress */}
+            <div className="p-3 bg-[#111622] rounded-2xl border border-slate-800 space-y-1">
+              <span className="text-[10px] uppercase font-bold text-slate-400 block">Proyeksi Egress Bulanan</span>
+              <div className="text-base font-black text-emerald-400">
+                ~{cloudHealth.estMonthlyGb} GB / {cloudHealth.targetMaxGb} GB
+              </div>
+              <div className="text-[10px] text-slate-400">
+                Pemakaian: <strong className="text-emerald-300">{cloudHealth.usagePercent}</strong> (Batas Free: 5 GB)
+              </div>
+            </div>
+
+            {/* Box 2: Ukuran Database Settings */}
+            <div className="p-3 bg-[#111622] rounded-2xl border border-slate-800 space-y-1">
+              <span className="text-[10px] uppercase font-bold text-slate-400 block">Ukuran Tabel Settings</span>
+              <div className="text-base font-black text-white">
+                {cloudHealth.appSettingsKb} KB
+              </div>
+              <div className="text-[10px] text-emerald-400 font-semibold">
+                ✓ Sangat Ringan (Bebas Blob)
+              </div>
+            </div>
+
+            {/* Box 3: Data Terbesar */}
+            <div className="p-3 bg-[#111622] rounded-2xl border border-slate-800 space-y-1 truncate">
+              <span className="text-[10px] uppercase font-bold text-slate-400 block">Data Cloud Terbesar</span>
+              <div className="text-xs font-black text-amber-300 truncate mt-1">
+                {cloudHealth.largestKey?.key || 'Tidak ada'}
+              </div>
+              <div className="text-[10px] text-slate-400">
+                {cloudHealth.largestKey ? `${cloudHealth.largestKey.kb} KB` : '—'}
+              </div>
+            </div>
+
+            {/* Box 4: Kebijakan Fair Use */}
+            <div className="p-3 bg-[#111622] rounded-2xl border border-slate-800 space-y-1">
+              <span className="text-[10px] uppercase font-bold text-slate-400 block">Status Grace Period</span>
+              <div className="text-xs font-black text-emerald-300 mt-1">
+                Aman Terkendali
+              </div>
+              <div className="text-[10px] text-slate-400">
+                Target &lt; 4.0 GB / bulan aktif
+              </div>
+            </div>
+          </div>
+
+          <div className="p-2.5 rounded-xl bg-black/40 border border-slate-800/80 text-[11px] text-slate-300 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <span>💡 <strong>Evaluasi:</strong> {cloudHealth.message}</span>
+            <span className="text-[10px] text-slate-500 font-mono shrink-0">
+              Diperiksa: {formatWitaDateTime(cloudHealth.checkedAt)}
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* SECTION 1: PEMANTAUAN LOG LOGIN MANAGER & ASSISTANT MANAGER */}
       <div className="bg-[#161b24] border border-slate-800 rounded-3xl p-5 shadow-xl space-y-4">

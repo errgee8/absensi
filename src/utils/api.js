@@ -1076,3 +1076,11 @@ export async function unmuteLoungeChatStaff({ staffId, staffName, managerPin, ma
   return data;
 }
 
+// 18. Cloud Health & Supabase Egress Bandwidth Monitor
+export async function getCloudHealth() {
+  const res = await fetch(`${API_BASE}/system/cloud-health`);
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Gagal memuat status cloud health');
+  return data;
+}
+

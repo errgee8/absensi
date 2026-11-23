@@ -5,7 +5,7 @@ import { db, getSetting, setSetting, uploadsDir } from './db.js';
 import { calculateDistanceMeters, isWithinGeofence } from './geofence.js';
 import { getClientIp, validateClientNetwork } from './network.js';
 import { evaluateCheckinFlags, evaluateCheckoutFlags, evaluateBreakFlags, auditOpenShifts, FLAG_TYPES } from './flags.js';
-import { isSupabaseConfigured, uploadPhotoToSupabase, resolveAttendancePhotoUrls, cloudDb, supabase, findStaffInSupabase, autoPurgeOldAttendancePhotos } from './supabase.js';
+import { isSupabaseConfigured, uploadPhotoToSupabase, resolveAttendancePhotoUrls, cloudDb, supabase, findStaffInSupabase, autoPurgeOldAttendancePhotos, getCloudEgressHealth } from './supabase.js';
 import { detectShiftSchedule, getBreakCutoff, isBreakAllowedNow, getWitaTimeString, getWitaDateYMD, getOperationalDateYMD, getOperationalYesterdayYMD, getPointCycleInfo, getPointCycleFromKey, getRecentPointCycles } from './shifts.js';
 import { computeLeaderboard } from './leaderboard.js';
 import { getVapidPublicKey, savePushSubscription, sendPushNotification } from './push.js';
@@ -782,6 +782,16 @@ router.get('/presence', async (req, res) => {
     });
   } catch (err) {
     return res.status(500).json({ error: 'Gagal memuat status presence: ' + err.message });
+  }
+});
+
+// Daily Egress Bandwidth & Cloud Health Check Endpoint
+router.get('/system/cloud-health', async (req, res) => {
+  try {
+    const health = await getCloudEgressHealth();
+    return res.json(health);
+  } catch (err) {
+    return res.status(500).json({ error: 'Gagal memeriksa status cloud health: ' + err.message });
   }
 });
 
