@@ -278,13 +278,27 @@ export default function StaffQuizModal({
                       )}
                     </div>
 
-                    {!r.isCorrect && (
-                      <div className="text-[11px] space-y-0.5 text-slate-300 bg-black/30 p-2 rounded-xl">
-                        <div className="text-rose-300">
-                          <strong>Jawaban Anda:</strong> {r.staffAnswer || '(Tidak dijawab)'}
+                    {/* Jawaban Staf (Tampil Baik Benar Maupun Salah) */}
+                    {r.isCorrect ? (
+                      <div className="text-[11px] space-y-0.5 text-slate-200 bg-emerald-950/30 p-2 rounded-xl border border-emerald-500/30">
+                        <div className="text-emerald-300 flex items-center gap-1">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                          <span><strong>Jawaban Anda:</strong> {r.staffAnswer}</span>
                         </div>
-                        <div className="text-emerald-300">
-                          <strong>Jawaban Benar:</strong> {r.correctAnswer}
+                      </div>
+                    ) : (
+                      <div className="text-[11px] space-y-1 text-slate-300 bg-black/30 p-2 rounded-xl border border-rose-500/20">
+                        <div className="text-rose-300 flex items-start gap-1">
+                          <XCircle className="w-3.5 h-3.5 text-rose-400 shrink-0 mt-0.5" />
+                          <div>
+                            <strong>Jawaban Anda (Salah):</strong> {r.staffAnswer || '(Tidak dijawab)'}
+                          </div>
+                        </div>
+                        <div className="text-emerald-300 flex items-start gap-1 pt-0.5 border-t border-slate-800">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
+                          <div>
+                            <strong>Jawaban Benar:</strong> {r.correctAnswer}
+                          </div>
                         </div>
                       </div>
                     )}

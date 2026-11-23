@@ -590,13 +590,30 @@ export default function QuizLeaderboardTab({ adminAuth }) {
                       )}
                     </div>
 
-                    {!r.isCorrect && (
-                      <div className="text-[11px] space-y-1 bg-black/40 p-2.5 rounded-xl text-slate-300 border border-rose-500/20">
-                        <div className="text-rose-300">
-                          <strong>Jawaban Staf:</strong> {r.staffAnswer || '(Tidak dijawab)'}
+                    {/* Jawaban Staf (Tampil Baik Benar Maupun Salah) */}
+                    {r.isCorrect ? (
+                      <div className="text-[11px] space-y-1 bg-emerald-950/40 p-2.5 rounded-xl text-slate-200 border border-emerald-500/30">
+                        <div className="text-emerald-300 flex items-center gap-1.5">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                          <span><strong>Jawaban Staf:</strong> {r.staffAnswer}</span>
+                          <span className="text-[10px] px-1.5 py-0.2 rounded bg-emerald-500/30 text-emerald-200 font-bold ml-auto shrink-0">
+                            ✓ Tepat
+                          </span>
                         </div>
-                        <div className="text-emerald-300">
-                          <strong>Kunci Jawaban Seharusnya:</strong> {r.correctAnswer}
+                      </div>
+                    ) : (
+                      <div className="text-[11px] space-y-1.5 bg-black/40 p-2.5 rounded-xl text-slate-300 border border-rose-500/25">
+                        <div className="text-rose-300 flex items-start gap-1.5">
+                          <XCircle className="w-3.5 h-3.5 text-rose-400 shrink-0 mt-0.5" />
+                          <div>
+                            <strong>Jawaban Staf (Salah):</strong> {r.staffAnswer || '(Tidak dijawab / Kosong)'}
+                          </div>
+                        </div>
+                        <div className="text-emerald-300 flex items-start gap-1.5 pt-0.5 border-t border-slate-800/80">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
+                          <div>
+                            <strong>Kunci Jawaban Seharusnya:</strong> {r.correctAnswer}
+                          </div>
                         </div>
                       </div>
                     )}
