@@ -43,7 +43,7 @@ export default function StaffQuizModal({
   useEffect(() => { staffIdRef.current = staff?.legacy_code || staff?.id; }, [staff]);
   useEffect(() => { weekKeyRef.current = weekKey; }, [weekKey]);
 
-  const getSessionKey = (sId, wKey) => `lc_quiz_session_${sId || 'staff'}_${wKey || 'cur'}`;
+  const getSessionKey = (sId, wKey) => `lc_quiz_v2_session_${sId || 'staff'}_${wKey || 'cur'}`;
 
   // Load questions or check previous completion
   useEffect(() => {

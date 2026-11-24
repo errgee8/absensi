@@ -7727,6 +7727,21 @@ router.post('/quiz/submit', async (req, res) => {
   }
 });
 
+// 16d. Reset Staff Quiz Completions (Manager / Admin Action)
+router.post('/quiz/reset', async (req, res) => {
+  try {
+    if (isSupabaseConfigured) {
+      await cloudDb.saveSetting('staff_quiz_completions', [], 'Admin reset all staff quiz completions');
+    }
+    setSetting('staff_quiz_completions', []);
+    broadcastEvent('QUIZ_RESET', { message: 'Semua riwayat kuis telah di-reset.' });
+    return res.json({ success: true, message: 'Seluruh riwayat kuis staf berhasil di-reset ke 0.' });
+  } catch (err) {
+    console.error('Error resetting quiz:', err);
+    return res.status(500).json({ error: 'Gagal mereset kuis: ' + err.message });
+  }
+});
+
 // 16c. Quiz Leaderboard
 router.get('/quiz/leaderboard', async (req, res) => {
   const currentWeek = getWitaWeekKey();
