@@ -405,6 +405,8 @@ export default function ToiletInspectionTab() {
                             <img
                               src={ins.task_results?.find((t) => t.photo_url)?.photo_url || ins.photo_url}
                               alt="Toilet inspection"
+                              loading="lazy"
+                              decoding="async"
                               className="w-full h-full object-cover group-hover:scale-105 transition"
                             />
                             <div className="absolute inset-0 bg-blue-950/30 group-hover:bg-transparent flex items-center justify-center">

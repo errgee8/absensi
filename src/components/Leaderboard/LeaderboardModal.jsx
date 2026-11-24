@@ -362,6 +362,8 @@ function NeedsImprovementSpotlight({ staff }) {
                 <img
                   src={staff.photo_url}
                   alt={staff.name}
+                  loading="lazy"
+                  decoding="async"
                   onError={() => setImgError(true)}
                   className="w-full h-full object-cover filter contrast-110"
                 />
