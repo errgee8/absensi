@@ -356,6 +356,8 @@ export default function ShiftTable({
                           <img
                             src={shift.staff_profile_photo_url}
                             alt={shift.staff_name}
+                            loading="lazy"
+                            decoding="async"
                             onClick={() => onVisitStaffProfile?.(shift.staff_id || shift.staff_uuid || shift.staff_name)}
                             className="w-8 h-8 rounded-xl object-cover border border-slate-700 shrink-0 shadow-xs cursor-pointer hover:border-amber-400 hover:scale-105 transition"
                             title="Klik untuk visit dashboard profil staf"
@@ -445,6 +447,8 @@ export default function ShiftTable({
                             <img
                               src={shift.checkin_photo}
                               alt="Check-in"
+                              loading="lazy"
+                              decoding="async"
                               onError={(e) => { e.currentTarget.style.display = 'none'; }}
                               className="w-8 h-8 object-cover group-hover:scale-110 transition duration-200"
                             />
@@ -505,6 +509,8 @@ export default function ShiftTable({
                                   <img
                                     src={shift.break_start_photo}
                                     alt="Before"
+                                    loading="lazy"
+                                    decoding="async"
                                     className="w-6 h-6 object-cover"
                                     onError={(e) => { e.currentTarget.style.display = 'none'; }}
                                   />
@@ -520,6 +526,8 @@ export default function ShiftTable({
                                   <img
                                     src={shift.break_end_photo}
                                     alt="After"
+                                    loading="lazy"
+                                    decoding="async"
                                     className="w-6 h-6 object-cover"
                                     onError={(e) => { e.currentTarget.style.display = 'none'; }}
                                   />
@@ -544,6 +552,8 @@ export default function ShiftTable({
                             <img
                               src={shift.checkout_photo}
                               alt="Checkout"
+                              loading="lazy"
+                              decoding="async"
                               onError={(e) => { e.currentTarget.style.display = 'none'; }}
                               className="w-8 h-8 object-cover group-hover:scale-110 transition duration-200"
                             />
