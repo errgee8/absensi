@@ -247,8 +247,49 @@ export function computeCheckoutLockState({ activeShift, staff, now = getAppNow()
     flags.includes('FLAG_EARLY_CHECKOUT_AUTHORIZED')
   );
 
-  if (isManagement || hasApprovedEarlyLeave || isEarlyAuthorized) {
+  if (hasApprovedEarlyLeave || isEarlyAuthorized) {
     return { locked: false, unlockLabel: 'Foto →', reason: null, isEarlyAuthorized };
+  }
+
+  // Flexible 9-Hour Shift Lock:
+  // Staff can check in anytime, but clock-out is locked until 30 minutes before 9 hours of work are completed (8.5 hours).
+  const isFlex9h = (
+    activeShift.shift_number === 99 ||
+    activeShift.scheduled_start === 'FLEXIBLE' ||
+    staff?.shift_start === 'FLEXIBLE' ||
+    String(activeShift.name || '').toLowerCase().includes('fleksibel 9') ||
+    String(activeShift.shift_name || '').toLowerCase().includes('fleksibel 9') ||
+    String(activeShift.scheduled_end || '').toLowerCase().includes('9 jam')
+  );
+
+  if (isFlex9h && activeShift.checkin_time) {
+    const cinMs = new Date(activeShift.checkin_time).getTime();
+    if (!isNaN(cinMs)) {
+      // 8.5 hours = 8 hours 30 mins (30 mins before 9 hours)
+      const unlockMs = cinMs + (8.5 * 60 * 60 * 1000);
+      const unlockTimeStr = new Intl.DateTimeFormat('en-GB', {
+        timeZone: 'Asia/Makassar',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      }).format(new Date(unlockMs));
+
+      const appNowMs = (now instanceof Date ? now : getAppNow()).getTime();
+      if (appNowMs >= unlockMs) {
+        return { locked: false, unlockLabel: 'Foto →', unlockTimeStr, reason: null };
+      }
+
+      return {
+        locked: true,
+        unlockTimeStr,
+        unlockLabel: `🔒 ${unlockTimeStr}`,
+        reason: `Terkunci hingga 30 menit sebelum 9 jam kerja selesai (Pukul ${unlockTimeStr} WITA).`
+      };
+    }
+  }
+
+  if (isManagement) {
+    return { locked: false, unlockLabel: 'Foto →', reason: null, isEarlyAuthorized: false };
   }
 
   const shiftStartStr = activeShift.scheduled_start || staff?.shift_start || '13:00';

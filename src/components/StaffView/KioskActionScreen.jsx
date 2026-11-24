@@ -365,10 +365,16 @@ export default function KioskActionScreen({
         <div className="mt-6 pt-4 border-t border-slate-800 text-xs text-slate-300 flex flex-col sm:flex-row sm:items-center justify-between gap-1 font-bold">
           <span className="flex items-center space-x-1.5">
             <span className="inline-block w-2.5 h-2.5 rounded-full bg-blue-500"></span>
-            <span>Jadwal: <strong className="text-slate-100 font-black">{isManagement ? 'Fleksibel Penuh (Management)' : `${currentShiftName} (${shiftStart} - ${shiftEnd})`}</strong></span>
+            <span>Jadwal: <strong className="text-slate-100 font-black">
+              {isManagement
+                ? 'Fleksibel Penuh (Management)'
+                : selectedShift?.start_time === 'FLEXIBLE'
+                ? 'Shift Fleksibel 9 Jam (HOD)'
+                : `${currentShiftName} (${shiftStart} - ${shiftEnd})`}
+            </strong></span>
           </span>
-          <span className={isManagement ? "text-blue-400 font-black" : "text-emerald-400 font-black"}>
-            {isManagement ? "Jam Kerja Fleksibel" : "Toleransi Grace Period: 10 Menit"}
+          <span className={isManagement || selectedShift?.start_time === 'FLEXIBLE' ? "text-blue-400 font-black" : "text-emerald-400 font-black"}>
+            {isManagement ? "Jam Kerja Fleksibel" : selectedShift?.start_time === 'FLEXIBLE' ? "Target 9 Jam Kerja" : "Toleransi Grace Period: 10 Menit"}
           </span>
         </div>
       </div>
@@ -395,10 +401,16 @@ export default function KioskActionScreen({
                 {selectedShift?.name || 'Shift Standar'}
               </span>
               <span className="text-2xl font-black text-slate-100 font-mono block mt-1">
-                {selectedShift?.start_time || '13:00'} - {selectedShift?.end_time || '22:00'} WITA
+                {selectedShift?.start_time === 'FLEXIBLE'
+                  ? 'Jam Fleksibel (9 Jam Kerja)'
+                  : `${selectedShift?.start_time || '13:00'} - ${selectedShift?.end_time || '22:00'} WITA`}
               </span>
 
-              {selectedShift?.autoDetected ? (
+              {selectedShift?.start_time === 'FLEXIBLE' ? (
+                <span className="inline-block mt-2 text-[11px] font-black text-blue-300 bg-blue-500/15 px-3 py-1 rounded-full border border-blue-500/30">
+                  ⚡ Bebas Masuk Jam Berapapun (Target 9 Jam)
+                </span>
+              ) : selectedShift?.autoDetected ? (
                 <span className="inline-block mt-2 text-[11px] font-black text-emerald-300 bg-emerald-500/15 px-3 py-1 rounded-full border border-emerald-500/30">
                   ✓ Otomatis Terdeteksi (±30 Menit dari Jam Shift)
                 </span>
@@ -430,7 +442,9 @@ export default function KioskActionScreen({
                         }`}
                       >
                         <span className="block text-[11px] opacity-90">{s.name}</span>
-                        <span className="block font-mono text-xs mt-0.5">{s.start_time} - {s.end_time}</span>
+                        <span className="block font-mono text-xs mt-0.5">
+                          {s.start_time === 'FLEXIBLE' ? 'Bebas Masuk (9 Jam)' : `${s.start_time} - ${s.end_time}`}
+                        </span>
                       </button>
                     );
                   })}

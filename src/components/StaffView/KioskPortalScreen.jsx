@@ -557,7 +557,7 @@ export default function KioskPortalScreen({
                     <span>{staff?.role || 'Staff'}</span>
                     <span className="text-slate-600">•</span>
                     <span className="text-slate-300 font-mono text-[11px]">
-                      {shiftStartLabel} - {shiftEndLabel}
+                      {shiftStartLabel === 'FLEXIBLE' ? 'Fleksibel (9 Jam Kerja)' : `${shiftStartLabel} - ${shiftEndLabel}`}
                     </span>
                   </>
                 )}

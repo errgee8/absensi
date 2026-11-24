@@ -1582,11 +1582,9 @@ router.post('/staff/verify-pin', async (req, res) => {
   };
 
   if (isEligibleFlexible) {
-    if (staff.shift_start === 'FLEXIBLE') {
-      schedules = [flex9hSchedule, ...schedules];
-    } else {
-      schedules = [...schedules, flex9hSchedule];
-    }
+    // If staff is eligible for flexible 9h (e.g. HOD in flexible_9h_staff_ids),
+    // always put flex9hSchedule at the front as primary schedule
+    schedules = [flex9hSchedule, ...schedules.filter(s => s.id !== 'sched_flex_9h')];
   }
 
   let detectedShift = null;
@@ -1621,7 +1619,7 @@ router.post('/staff/verify-pin', async (req, res) => {
 
     breakAllowed = shiftAllowsBreak && !isOnBreak && breakCount === 0 && !isCompletedBreak;
   } else {
-    if (staff.shift_start === 'FLEXIBLE') {
+    if (isEligibleFlexible || staff.shift_start === 'FLEXIBLE') {
       detectedShift = flex9hSchedule;
     } else {
       detectedShift = detectShiftSchedule(schedules, new Date());
@@ -2626,10 +2624,19 @@ router.post('/checkin', async (req, res) => {
   let shiftNumber = confirmedShift?.shift_number;
   let shiftName = confirmedShift?.name;
 
+  const eligibleFlexibleStaff = await getEligibleFlexible9hStaff();
+  const isEligibleFlexible = (
+    eligibleFlexibleStaff.includes(String(staff.id)) ||
+    (staff.legacy_code && eligibleFlexibleStaff.includes(String(staff.legacy_code))) ||
+    (staff.uuid && eligibleFlexibleStaff.includes(String(staff.uuid))) ||
+    staff.shift_start === 'FLEXIBLE'
+  );
+
   const isFlex9h = (
     scheduledStart === 'FLEXIBLE' ||
     (shiftName && shiftName.toLowerCase().includes('fleksibel 9')) ||
-    staff.shift_start === 'FLEXIBLE'
+    staff.shift_start === 'FLEXIBLE' ||
+    (isEligibleFlexible && (!confirmedShift || confirmedShift.shift_number === 99 || confirmedShift.start_time === 'FLEXIBLE' || confirmedShift.name?.toLowerCase().includes('fleksibel')))
   );
 
   if (isFlex9h) {
@@ -3376,6 +3383,44 @@ router.post('/checkout', async (req, res) => {
 
   if (scheduledEnd === '03:00' || scheduledEnd === '03:30' || shift.division === 'Management') {
     isFlexible = 1;
+  }
+
+  // 9-Hour Flexible Shift Lock Protection (Clock-out locked until 30 minutes before 9 hours)
+  const isShiftFlex9h = (
+    shift.shift_number === 99 ||
+    shift.scheduled_start === 'FLEXIBLE' ||
+    String(shift.name || '').toLowerCase().includes('fleksibel 9') ||
+    String(shift.shift_name || '').toLowerCase().includes('fleksibel 9') ||
+    String(shift.scheduled_end || '').toLowerCase().includes('9 jam')
+  );
+
+  let parsedShiftNotes = {};
+  try { parsedShiftNotes = JSON.parse(shift.notes || '{}'); } catch {}
+
+  const isEarlyAuthorized = Boolean(
+    shift.early_checkout_authorized ||
+    parsedShiftNotes.early_checkout_authorized ||
+    existingFlags.includes('FLAG_EARLY_CHECKOUT_AUTHORIZED') ||
+    existingFlags.includes('FLAG_EARLY_CHECKOUT_APPROVED')
+  );
+
+  if (isShiftFlex9h && !isEarlyAuthorized && shift.checkin_time) {
+    const cinMs = new Date(shift.checkin_time).getTime();
+    if (!isNaN(cinMs)) {
+      // 8.5 hours = 510 minutes (30 minutes before 9 hours completed)
+      const unlockMs = cinMs + (8.5 * 60 * 60 * 1000);
+      if (Date.now() < (unlockMs - 2 * 60 * 1000)) {
+        const unlockTimeStr = new Intl.DateTimeFormat('en-GB', {
+          timeZone: 'Asia/Makassar',
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: false
+        }).format(new Date(unlockMs));
+        return res.status(403).json({
+          error: `Check-Out masih terkunci hingga 30 menit sebelum 9 jam kerja selesai (Pukul ${unlockTimeStr} WITA). Hubungi Manager untuk membuka kunci jika ada izin darurat.`
+        });
+      }
+    }
   }
 
   const finalFlags = evaluateCheckoutFlags({
