@@ -18,6 +18,7 @@ import PointManagementTab from './PointManagementTab';
 import StaffDetailManagementModal from './StaffDetailManagementModal';
 import StaffReportsTab from './StaffReportsTab';
 import QuizLeaderboardTab from './QuizLeaderboardTab';
+import SendMessageTab from './SendMessageTab';
 import StaffPublicProfileModal from '../StaffView/StaffPublicProfileModal';
 import LoungeChatModal from '../StaffView/LoungeChatModal';
 import KudosAuditLogsModal from './KudosAuditLogsModal';
@@ -26,7 +27,7 @@ import { getShifts, getStats, getShiftSchedules, getStaffList, getLeaveRequests,
 import { getOperationalDateYMD, getOperationalYesterdayYMD, getWitaDateYMD, getAppNow, formatWitaDateTime } from '../../utils/time';
 import { resolveShift } from '../../utils/shiftResolver';
 import { showToast } from '../Common/Toast';
-import { LayoutDashboard, Users, Clock, Radio, Building2, Sparkles, Eye, ShieldAlert, Trophy, FileText, Megaphone, Activity, Award, Unlock, AlertCircle, Star, RefreshCw } from 'lucide-react';
+import { LayoutDashboard, Users, Clock, Radio, Building2, Sparkles, Eye, ShieldAlert, Trophy, FileText, Megaphone, Activity, Award, Unlock, AlertCircle, Star, RefreshCw, Mail } from 'lucide-react';
 
 export default function ManagerDashboard({ venueSettings, refreshSettings, adminAuth, isReadOnly = false, onOpenLeaderboard }) {
   // Tabs: 'AUDIT' | 'SCHEDULES' | 'STAFF' | 'TOILET'
@@ -544,6 +545,19 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
                   <Activity className="w-4 h-4 stroke-[2.2]" />
                   <span>Monitoring &amp; Log Akses</span>
                 </button>
+
+                <button
+                  onClick={() => setActiveTab('SEND_MESSAGE')}
+                  className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                    activeTab === 'SEND_MESSAGE'
+                      ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
+                      : 'text-indigo-300 hover:text-white hover:bg-indigo-950/40 border border-indigo-500/20'
+                  }`}
+                  title="Kirim pesan langsung ke satu atau beberapa karyawan (muncul saat staff login)"
+                >
+                  <Mail className="w-4 h-4 stroke-[2.2]" />
+                  <span>Kirim Pesan</span>
+                </button>
               </>
             )}
           </div>
@@ -825,6 +839,13 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
         {!isReadOnly && visitedTabs.has('MONITORING') && (
           <div className={activeTab === 'MONITORING' ? 'block' : 'hidden'}>
             <MonitoringAuditTab adminAuth={adminAuth} />
+          </div>
+        )}
+
+        {/* Tab 10: SEND_MESSAGE (Kirim Pesan Langsung ke Karyawan) */}
+        {!isReadOnly && visitedTabs.has('SEND_MESSAGE') && (
+          <div className={activeTab === 'SEND_MESSAGE' ? 'block' : 'hidden'}>
+            <SendMessageTab adminAuth={adminAuth} />
           </div>
         )}
 

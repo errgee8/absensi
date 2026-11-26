@@ -1662,9 +1662,18 @@ router.post('/staff/verify-pin', async (req, res) => {
 
   const staffStreak = staffStreaksCache.get(staff.uuid) || staffStreaksCache.get(staff.id) || (isVip ? 888 : 0);
 
+  let staffDirectMessages = [];
+  try {
+    const allDm = await getAllDirectMessages();
+    staffDirectMessages = filterDirectMessagesForStaff(allDm, [staff.id, staff.legacy_code, staff.uuid]);
+  } catch (e) {
+    console.warn('Direct messages login fetch note:', e.message);
+  }
+
   const staffPayload = {
     id: staff.id,
     uuid: staff.uuid || null,
+    legacy_code: staff.legacy_code || staff.id,
     name: staff.name,
     venue: staff.venue,
     division: staff.division,
@@ -1690,7 +1699,8 @@ router.post('/staff/verify-pin', async (req, res) => {
     streak: isVip ? 888 : staffStreak,
     longestStreak: isVip ? 888 : staffStreak,
     bio: staffBio,
-    monthlyStats
+    monthlyStats,
+    directMessages: staffDirectMessages
   };
 
   if (isSupabaseConfigured) {
@@ -1706,7 +1716,8 @@ router.post('/staff/verify-pin', async (req, res) => {
   res.json({
     success: true,
     staff: staffPayload,
-    activeShift: activeShift || null
+    activeShift: activeShift || null,
+    directMessages: staffDirectMessages
   });
 });
 
@@ -7895,6 +7906,213 @@ router.get('/quiz/leaderboard', async (req, res) => {
   } catch (err) {
     console.error('Error fetching quiz leaderboard:', err);
     return res.status(500).json({ error: 'Gagal memuat leaderboard kuis: ' + err.message });
+  }
+});
+
+// ============================================================================
+// 17. DIRECT MESSAGES (Manager -> Specific Staff IDs, Shown on Staff Login)
+// ============================================================================
+async function getAllDirectMessages({ bypassCache = false } = {}) {
+  let list = [];
+  if (isSupabaseConfigured && supabase) {
+    try {
+      if (bypassCache) {
+        const { data, error } = await supabase
+          .from('app_settings')
+          .select('value')
+          .eq('key', 'staff_direct_messages')
+          .maybeSingle();
+        if (!error && Array.isArray(data?.value)) {
+          list = data.value;
+        }
+      } else {
+        const cloudList = await cloudDb.getSetting('staff_direct_messages');
+        if (Array.isArray(cloudList)) list = cloudList;
+      }
+    } catch (e) {
+      console.warn('getAllDirectMessages supabase note:', e.message);
+    }
+  }
+  if (!Array.isArray(list) || list.length === 0) {
+    const localList = getSetting('staff_direct_messages');
+    if (Array.isArray(localList) && localList.length > 0) {
+      list = localList;
+    }
+  }
+  return Array.isArray(list) ? list : [];
+}
+
+async function saveAllDirectMessages(messages) {
+  const safeList = Array.isArray(messages) ? messages.slice(0, 500) : [];
+  setSetting('staff_direct_messages', safeList);
+  if (isSupabaseConfigured) {
+    await cloudDb.saveSetting('staff_direct_messages', safeList, 'Manager Direct Messages to Specific Staff IDs');
+  }
+  return safeList;
+}
+
+function filterDirectMessagesForStaff(allMessages, staffKeys = []) {
+  const keySet = new Set(staffKeys.filter(Boolean).map((k) => String(k).trim().toUpperCase()));
+  if (keySet.size === 0) return [];
+  return (Array.isArray(allMessages) ? allMessages : [])
+    .filter((m) => {
+      const candidates = [m.staff_id, m.staff_uuid, m.legacy_code].filter(Boolean).map((k) => String(k).trim().toUpperCase());
+      return candidates.some((c) => keySet.has(c));
+    })
+    .sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
+}
+
+// 17a. Manager: List all direct messages
+router.get('/manager/direct-messages', async (req, res) => {
+  try {
+    const messages = await getAllDirectMessages({ bypassCache: true });
+    const sorted = [...messages].sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
+    return res.json({ success: true, messages: sorted });
+  } catch (err) {
+    console.error('Error fetching manager direct messages:', err);
+    return res.status(500).json({ error: 'Gagal memuat riwayat pesan: ' + err.message });
+  }
+});
+
+// 17b. Manager: Send direct message to one or more staff IDs
+router.post('/manager/direct-messages', async (req, res) => {
+  const { staffIds, title, message, senderName } = req.body;
+  if (!Array.isArray(staffIds) || staffIds.length === 0) {
+    return res.status(400).json({ error: 'Pilih minimal 1 nama karyawan penerima pesan.' });
+  }
+  const cleanMessage = String(message || '').trim();
+  if (!cleanMessage) {
+    return res.status(400).json({ error: 'Isi pesan tidak boleh kosong.' });
+  }
+  const cleanTitle = String(title || '').trim() || 'Pesan dari Manager';
+  const cleanSender = String(senderName || '').trim() || 'Management';
+
+  try {
+    // Load staff directory from Supabase & local SQLite to resolve names/UUIDs/venues cleanly
+    let staffDirectory = [];
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const { data } = await supabase.from('staff').select('id, legacy_code, name, venue, division, role');
+        if (Array.isArray(data)) staffDirectory = data;
+      } catch {}
+    }
+    if (staffDirectory.length === 0) {
+      staffDirectory = db.prepare('SELECT id, name, venue, division, role FROM staff').all();
+    }
+
+    const existing = await getAllDirectMessages({ bypassCache: true });
+    const nowIso = new Date().toISOString();
+    const batchId = `batch_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    const newEntries = [];
+
+    for (const rawId of staffIds) {
+      const idStr = String(rawId || '').trim();
+      if (!idStr) continue;
+      const matchedStaff = staffDirectory.find(
+        (s) => String(s.id) === idStr || (s.legacy_code && String(s.legacy_code) === idStr)
+      );
+
+      newEntries.push({
+        id: `dm_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+        batch_id: batchId,
+        staff_id: matchedStaff?.legacy_code || matchedStaff?.id || idStr,
+        staff_uuid: matchedStaff?.id && matchedStaff.id !== matchedStaff?.legacy_code ? matchedStaff.id : null,
+        staff_name: matchedStaff?.name || idStr,
+        staff_venue: matchedStaff?.venue || '',
+        staff_division: matchedStaff?.division || '',
+        staff_role: matchedStaff?.role || '',
+        title: cleanTitle,
+        message: cleanMessage,
+        sender_name: cleanSender,
+        created_at: nowIso,
+        read_at: null
+      });
+    }
+
+    if (newEntries.length === 0) {
+      return res.status(400).json({ error: 'Tidak ada ID karyawan yang valid.' });
+    }
+
+    const updated = await saveAllDirectMessages([...newEntries, ...existing]);
+    broadcastEvent('DIRECT_MESSAGE_UPDATE', { batchId, count: newEntries.length });
+
+    return res.json({
+      success: true,
+      sentCount: newEntries.length,
+      batchId,
+      created: newEntries,
+      messages: updated
+    });
+  } catch (err) {
+    console.error('Error sending direct messages:', err);
+    return res.status(500).json({ error: 'Gagal mengirim pesan langsung: ' + err.message });
+  }
+});
+
+// 17c. Manager: Delete a direct message (single ID or entire batch)
+router.delete('/manager/direct-messages/:id', async (req, res) => {
+  const targetId = String(req.params.id || '').trim();
+  const deleteBatch = req.query.batch === '1' || req.query.batch === 'true';
+
+  try {
+    const existing = await getAllDirectMessages({ bypassCache: true });
+    const filtered = deleteBatch
+      ? existing.filter((m) => String(m.batch_id) !== targetId && String(m.id) !== targetId)
+      : existing.filter((m) => String(m.id) !== targetId);
+
+    await saveAllDirectMessages(filtered);
+    broadcastEvent('DIRECT_MESSAGE_UPDATE', { deletedId: targetId });
+    return res.json({ success: true, messages: filtered });
+  } catch (err) {
+    console.error('Error deleting direct message:', err);
+    return res.status(500).json({ error: 'Gagal menghapus pesan: ' + err.message });
+  }
+});
+
+// 17d. Staff: Fetch direct messages for a specific staff
+router.get('/staff/direct-messages', async (req, res) => {
+  const { staffId, staffUuid, legacyCode } = req.query;
+  try {
+    const allMessages = await getAllDirectMessages({ bypassCache: true });
+    const list = filterDirectMessagesForStaff(allMessages, [staffId, staffUuid, legacyCode]);
+    return res.json({ success: true, messages: list });
+  } catch (err) {
+    console.error('Error fetching staff direct messages:', err);
+    return res.status(500).json({ error: 'Gagal memuat pesan staff: ' + err.message });
+  }
+});
+
+// 17e. Staff: Mark direct messages as read
+router.post('/staff/direct-messages/read', async (req, res) => {
+  const { staffId, staffUuid, legacyCode, messageIds } = req.body;
+  try {
+    const allMessages = await getAllDirectMessages({ bypassCache: true });
+    const keySet = new Set([staffId, staffUuid, legacyCode].filter(Boolean).map((k) => String(k).trim().toUpperCase()));
+    const targetIds = Array.isArray(messageIds) && messageIds.length > 0 ? new Set(messageIds.map(String)) : null;
+    const nowIso = new Date().toISOString();
+
+    let changed = false;
+    const updated = allMessages.map((m) => {
+      const candidates = [m.staff_id, m.staff_uuid, m.legacy_code].filter(Boolean).map((k) => String(k).trim().toUpperCase());
+      const matchesStaff = keySet.size === 0 || candidates.some((c) => keySet.has(c));
+      const matchesMsg = !targetIds || targetIds.has(String(m.id));
+      if (matchesStaff && matchesMsg && !m.read_at) {
+        changed = true;
+        return { ...m, read_at: nowIso };
+      }
+      return m;
+    });
+
+    if (changed) {
+      await saveAllDirectMessages(updated);
+      broadcastEvent('DIRECT_MESSAGE_UPDATE', { staffId: staffId || staffUuid });
+    }
+
+    const staffMessages = filterDirectMessagesForStaff(updated, [staffId, staffUuid, legacyCode]);
+    return res.json({ success: true, messages: staffMessages });
+  } catch (err) {
+    console.error('Error marking direct messages read:', err);
+    return res.status(500).json({ error: 'Gagal memperbarui status baca pesan: ' + err.message });
   }
 });
 

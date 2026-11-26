@@ -26,7 +26,8 @@ import {
   Crown,
   Quote,
   Palette,
-  Zap
+  Zap,
+  Mail
 } from 'lucide-react';
 import {
   getAppNow,
@@ -113,7 +114,9 @@ export default function KioskPortalScreen({
   onMoodUpdated,
   onOpenFaceRegistration,
   onOpenStaffReportModal,
-  onOpenStaffQuizModal
+  onOpenStaffQuizModal,
+  directMessages = [],
+  onOpenDirectMessages
 }) {
   const [now, setNow] = useState(() => getAppNow());
   const [moodDropdownOpen, setMoodDropdownOpen] = useState(false);
@@ -808,6 +811,55 @@ export default function KioskPortalScreen({
               </span>
             </button>
           )}
+
+          {/* Direct Message from Manager Strip */}
+          {Array.isArray(directMessages) && directMessages.length > 0 && (() => {
+            const unreadDmCount = directMessages.filter((m) => !m.read_at).length;
+            const latestDm = directMessages[0];
+            return unreadDmCount > 0 ? (
+              <button
+                type="button"
+                onClick={onOpenDirectMessages}
+                className="w-full mt-2 bg-gradient-to-r from-indigo-600/30 via-indigo-500/20 to-blue-600/30 hover:from-indigo-600/40 hover:to-blue-600/40 border-2 border-indigo-400/70 rounded-2xl px-3 py-2.5 flex items-center justify-between gap-2.5 text-left transition-all shadow-lg shadow-indigo-500/15 cursor-pointer animate-pulse"
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-7 h-7 rounded-xl bg-indigo-500 text-white flex items-center justify-center shrink-0 font-black shadow">
+                    <Mail className="w-4 h-4 stroke-[2.5]" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[11.5px] font-black text-indigo-200">PESAN DARI MANAGER</span>
+                      <span className="px-1.5 py-0.2 rounded-full bg-indigo-400 text-slate-950 text-[9px] font-black">
+                        {unreadDmCount} Baru
+                      </span>
+                    </div>
+                    <div className="text-[10.5px] font-medium text-slate-200 truncate mt-0.5">
+                      {latestDm?.title ? `${latestDm.title}: ` : ''}{latestDm?.message}
+                    </div>
+                  </div>
+                </div>
+                <span className="px-2.5 py-1 rounded-xl bg-indigo-400 hover:bg-indigo-300 text-slate-950 text-[10.5px] font-black shrink-0 transition">
+                  Baca →
+                </span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={onOpenDirectMessages}
+                className="w-full mt-2 bg-[#141822] hover:bg-[#1a202c] border border-indigo-500/25 rounded-2xl px-3 py-1.5 flex items-center justify-between gap-2 text-left transition cursor-pointer"
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className="w-5 h-5 rounded-lg bg-indigo-500/20 text-indigo-300 flex items-center justify-center shrink-0">
+                    <Mail className="w-3 h-3" />
+                  </div>
+                  <span className="text-[10.5px] font-bold text-slate-300 truncate">
+                    Pesan dari Manager ({directMessages.length})
+                  </span>
+                </div>
+                <span className="text-[10px] font-bold text-indigo-300 shrink-0">Lihat →</span>
+              </button>
+            );
+          })()}
 
           {/* Top Priority Announcement Strip */}
           {unreadAnnouncementsCount > 0 ? (

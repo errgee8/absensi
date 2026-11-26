@@ -34,6 +34,7 @@ export const APP_SETTINGS_KEYS = {
   STAFF_WHISTLEBLOWER_REPORTS: 'staff_whistleblower_reports',
   STAFF_DAY_ADJUSTMENTS: 'staff_day_adjustments',
   STAFF_AUDIT_LOGS: 'staff_audit_logs',
+  STAFF_DIRECT_MESSAGES: 'staff_direct_messages',
 
   // System Security, Geofence & Network
   VENUE_NAME: 'venue_name',

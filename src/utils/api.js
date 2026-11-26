@@ -1125,3 +1125,54 @@ export async function getCloudHealth() {
   return data;
 }
 
+// 19. Direct Messages from Manager to Specific Staff IDs
+export async function getManagerDirectMessages() {
+  const res = await fetch(`${API_BASE}/manager/direct-messages`);
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Gagal memuat riwayat pesan langsung');
+  return data;
+}
+
+export async function sendManagerDirectMessages({ staffIds, title, message, senderName }) {
+  const res = await fetch(`${API_BASE}/manager/direct-messages`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ staffIds, title, message, senderName })
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Gagal mengirim pesan ke staff');
+  return data;
+}
+
+export async function deleteManagerDirectMessage(id, { batch = false } = {}) {
+  const qs = batch ? '?batch=1' : '';
+  const res = await fetch(`${API_BASE}/manager/direct-messages/${encodeURIComponent(id)}${qs}`, {
+    method: 'DELETE'
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Gagal menghapus pesan');
+  return data;
+}
+
+export async function getStaffDirectMessages({ staffId, staffUuid = '', legacyCode = '' }) {
+  const params = new URLSearchParams();
+  if (staffId) params.append('staffId', staffId);
+  if (staffUuid) params.append('staffUuid', staffUuid);
+  if (legacyCode) params.append('legacyCode', legacyCode);
+  const res = await fetch(`${API_BASE}/staff/direct-messages?${params.toString()}`);
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Gagal memuat pesan dari manager');
+  return data;
+}
+
+export async function markStaffDirectMessagesRead({ staffId, staffUuid = '', legacyCode = '', messageIds = [] }) {
+  const res = await fetch(`${API_BASE}/staff/direct-messages/read`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ staffId, staffUuid, legacyCode, messageIds })
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Gagal menandai pesan sudah dibaca');
+  return data;
+}
+

@@ -14,9 +14,10 @@ import StaffAttendanceHistoryModal from './StaffAttendanceHistoryModal';
 import FaceRegistrationModal from './FaceRegistrationModal';
 import StaffReportModal from './StaffReportModal';
 import StaffQuizModal from './StaffQuizModal';
+import StaffDirectMessageModal from './StaffDirectMessageModal';
 import ShiftClearedModal from './ShiftClearedModal';
 import { getNotificationPermission } from '../../utils/pushNotifications';
-import { verifyStaffPin, getAnnouncements, acknowledgeAnnouncement, getLeaveRequests, getPoints, acknowledgeStaffPoint, subscribeRealtimeEvents, sendPresenceHeartbeat, getWeeklyQuiz } from '../../utils/api';
+import { verifyStaffPin, getAnnouncements, acknowledgeAnnouncement, getLeaveRequests, getPoints, acknowledgeStaffPoint, subscribeRealtimeEvents, sendPresenceHeartbeat, getWeeklyQuiz, getStaffDirectMessages, markStaffDirectMessagesRead } from '../../utils/api';
 import { getOperationalDateYMD } from '../../utils/time';
 import { RESTROOM_LOCATIONS } from '../../utils/toiletService';
 import { CheckCircle2 } from 'lucide-react';
@@ -73,6 +74,8 @@ export default function StaffView({
   const [staffReportModalOpen, setStaffReportModalOpen] = useState(false);
   const [staffQuizModalOpen, setStaffQuizModalOpen] = useState(false);
   const [reportSuccessAlert, setReportSuccessAlert] = useState(null);
+  const [directMessages, setDirectMessages] = useState([]);
+  const [directMessageModalOpen, setDirectMessageModalOpen] = useState(false);
 
   // Live Presence Heartbeat for active logged-in staff (direct WebSocket via Supabase Presence)
   useEffect(() => {
@@ -128,7 +131,7 @@ export default function StaffView({
   const loadStaffNotifications = async (staff) => {
     if (!staff?.id) return;
     try {
-      const [annData, leaveData, pointsRes] = await Promise.all([
+      const [annData, leaveData, pointsRes, dmRes] = await Promise.all([
         getAnnouncements({
           staffId: staff.id,
           staffUuid: staff.uuid || staff.id,
@@ -138,8 +141,20 @@ export default function StaffView({
           activeOnly: true
         }),
         getLeaveRequests({ staffId: staff.id }),
-        getPoints({ staffId: staff.id, staffUuid: staff.uuid || '', cycleKey: 'CURRENT' }).catch(() => null)
+        getPoints({ staffId: staff.id, staffUuid: staff.uuid || '', cycleKey: 'CURRENT' }).catch(() => null),
+        getStaffDirectMessages({
+          staffId: staff.id,
+          staffUuid: staff.uuid || '',
+          legacyCode: staff.legacy_code || ''
+        }).catch(() => null)
       ]);
+
+      if (dmRes && Array.isArray(dmRes.messages)) {
+        setDirectMessages(dmRes.messages);
+        if (dmRes.messages.some((m) => !m.read_at)) {
+          setDirectMessageModalOpen(true);
+        }
+      }
 
       const annList = Array.isArray(annData) ? annData : (annData?.announcements || []);
       setAnnouncements(annList);
@@ -215,7 +230,7 @@ export default function StaffView({
       if (eventType === 'ANNOUNCEMENT_UPDATE') {
         loadPublicAnnouncements();
       }
-      if ((eventType === 'ANNOUNCEMENT_UPDATE' || eventType === 'ANNOUNCEMENT_READ' || eventType === 'LEAVE_UPDATE' || eventType === 'POINT_UPDATE') && loggedInStaff) {
+      if ((eventType === 'ANNOUNCEMENT_UPDATE' || eventType === 'ANNOUNCEMENT_READ' || eventType === 'LEAVE_UPDATE' || eventType === 'POINT_UPDATE' || eventType === 'DIRECT_MESSAGE_UPDATE') && loggedInStaff) {
         loadStaffNotifications(loggedInStaff);
       }
     });
@@ -270,6 +285,13 @@ export default function StaffView({
 
       setLoggedInStaff(data.staff);
       setActiveShift(data.activeShift);
+      const initialDms = Array.isArray(data.directMessages)
+        ? data.directMessages
+        : (Array.isArray(data.staff?.directMessages) ? data.staff.directMessages : []);
+      setDirectMessages(initialDms);
+      if (initialDms.some((m) => !m.read_at)) {
+        setDirectMessageModalOpen(true);
+      }
 
       // Check Mandatory Notification Permission
       const perm = getNotificationPermission();
@@ -373,6 +395,8 @@ export default function StaffView({
     setPendingPoints([]);
     setStaffPointTotal(0);
     setStaffPointCycleLabel('');
+    setDirectMessages([]);
+    setDirectMessageModalOpen(false);
     setPointNoticeModalOpen(false);
     setPointHistoryModalOpen(false);
     setHasApprovedEarlyLeaveToday(false);
@@ -480,6 +504,8 @@ export default function StaffView({
           }
           onOpenStaffReportModal={() => setStaffReportModalOpen(true)}
           onOpenStaffQuizModal={() => setStaffQuizModalOpen(true)}
+          directMessages={directMessages}
+          onOpenDirectMessages={() => setDirectMessageModalOpen(true)}
         />
       )}
 
@@ -687,6 +713,35 @@ export default function StaffView({
           isOpen={staffQuizModalOpen}
           onClose={() => setStaffQuizModalOpen(false)}
           onQuizCompleted={handleQuizCompleted}
+        />
+      )}
+
+      {/* Direct Message from Manager Modal (Auto-opens on login if unread) */}
+      {directMessageModalOpen && loggedInStaff && (
+        <StaffDirectMessageModal
+          isOpen={directMessageModalOpen}
+          messages={directMessages}
+          onClose={() => setDirectMessageModalOpen(false)}
+          onMarkAsRead={async (messageIds) => {
+            try {
+              const res = await markStaffDirectMessagesRead({
+                staffId: loggedInStaff.id,
+                staffUuid: loggedInStaff.uuid || '',
+                legacyCode: loggedInStaff.legacy_code || '',
+                messageIds
+              });
+              if (res && Array.isArray(res.messages)) {
+                setDirectMessages(res.messages);
+              } else {
+                const nowIso = new Date().toISOString();
+                setDirectMessages((prev) =>
+                  prev.map((m) => (messageIds.includes(m.id) ? { ...m, read_at: nowIso } : m))
+                );
+              }
+            } catch (err) {
+              console.warn('markStaffDirectMessagesRead error:', err);
+            }
+          }}
         />
       )}
     </div>
