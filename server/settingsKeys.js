@@ -33,6 +33,7 @@ export const APP_SETTINGS_KEYS = {
   STAFF_DAY_ADJUSTMENTS: 'staff_day_adjustments',
   STAFF_AUDIT_LOGS: 'staff_audit_logs',
   STAFF_DIRECT_MESSAGES: 'staff_direct_messages',
+  STAFF_OVERTIME_LOGS: 'staff_overtime_logs',
 
   // System Security, Geofence & Network
   VENUE_NAME: 'venue_name',

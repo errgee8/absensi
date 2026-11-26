@@ -15,9 +15,10 @@ import FaceRegistrationModal from './FaceRegistrationModal';
 import StaffReportModal from './StaffReportModal';
 import StaffQuizModal from './StaffQuizModal';
 import StaffDirectMessageModal from './StaffDirectMessageModal';
+import StaffOvertimeModal from './StaffOvertimeModal';
 import ShiftClearedModal from './ShiftClearedModal';
 import { getNotificationPermission } from '../../utils/pushNotifications';
-import { verifyStaffPin, getAnnouncements, acknowledgeAnnouncement, getLeaveRequests, getPoints, acknowledgeStaffPoint, subscribeRealtimeEvents, sendPresenceHeartbeat, getWeeklyQuiz, getStaffDirectMessages, markStaffDirectMessagesRead } from '../../utils/api';
+import { verifyStaffPin, getAnnouncements, acknowledgeAnnouncement, getLeaveRequests, getPoints, acknowledgeStaffPoint, subscribeRealtimeEvents, sendPresenceHeartbeat, getWeeklyQuiz, getStaffDirectMessages, markStaffDirectMessagesRead, getStaffOvertimeLogs } from '../../utils/api';
 import { getOperationalDateYMD } from '../../utils/time';
 import { RESTROOM_LOCATIONS } from '../../utils/toiletService';
 import { CheckCircle2 } from 'lucide-react';
@@ -76,6 +77,8 @@ export default function StaffView({
   const [reportSuccessAlert, setReportSuccessAlert] = useState(null);
   const [directMessages, setDirectMessages] = useState([]);
   const [directMessageModalOpen, setDirectMessageModalOpen] = useState(false);
+  const [overtimeModalOpen, setOvertimeModalOpen] = useState(false);
+  const [activeOvertime, setActiveOvertime] = useState(null);
 
   // Live Presence Heartbeat for active logged-in staff (direct WebSocket via Supabase Presence)
   useEffect(() => {
@@ -131,7 +134,7 @@ export default function StaffView({
   const loadStaffNotifications = async (staff) => {
     if (!staff?.id) return;
     try {
-      const [annData, leaveData, pointsRes, dmRes] = await Promise.all([
+      const [annData, leaveData, pointsRes, dmRes, otRes] = await Promise.all([
         getAnnouncements({
           staffId: staff.id,
           staffUuid: staff.uuid || staff.id,
@@ -146,6 +149,11 @@ export default function StaffView({
           staffId: staff.id,
           staffUuid: staff.uuid || '',
           legacyCode: staff.legacy_code || ''
+        }).catch(() => null),
+        getStaffOvertimeLogs({
+          staffId: staff.id,
+          staffUuid: staff.uuid || '',
+          legacyCode: staff.legacy_code || ''
         }).catch(() => null)
       ]);
 
@@ -154,6 +162,9 @@ export default function StaffView({
         if (dmRes.messages.some((m) => !m.read_at)) {
           setDirectMessageModalOpen(true);
         }
+      }
+      if (otRes) {
+        setActiveOvertime(otRes.activeOvertime || null);
       }
 
       const annList = Array.isArray(annData) ? annData : (annData?.announcements || []);
@@ -230,7 +241,7 @@ export default function StaffView({
       if (eventType === 'ANNOUNCEMENT_UPDATE') {
         loadPublicAnnouncements();
       }
-      if ((eventType === 'ANNOUNCEMENT_UPDATE' || eventType === 'ANNOUNCEMENT_READ' || eventType === 'LEAVE_UPDATE' || eventType === 'POINT_UPDATE' || eventType === 'DIRECT_MESSAGE_UPDATE') && loggedInStaff) {
+      if ((eventType === 'ANNOUNCEMENT_UPDATE' || eventType === 'ANNOUNCEMENT_READ' || eventType === 'LEAVE_UPDATE' || eventType === 'POINT_UPDATE' || eventType === 'DIRECT_MESSAGE_UPDATE' || eventType === 'OVERTIME_UPDATE') && loggedInStaff) {
         loadStaffNotifications(loggedInStaff);
       }
     });
@@ -397,6 +408,8 @@ export default function StaffView({
     setStaffPointCycleLabel('');
     setDirectMessages([]);
     setDirectMessageModalOpen(false);
+    setOvertimeModalOpen(false);
+    setActiveOvertime(null);
     setPointNoticeModalOpen(false);
     setPointHistoryModalOpen(false);
     setHasApprovedEarlyLeaveToday(false);
@@ -506,6 +519,8 @@ export default function StaffView({
           onOpenStaffQuizModal={() => setStaffQuizModalOpen(true)}
           directMessages={directMessages}
           onOpenDirectMessages={() => setDirectMessageModalOpen(true)}
+          activeOvertime={activeOvertime}
+          onOpenOvertimeModal={() => setOvertimeModalOpen(true)}
         />
       )}
 
@@ -742,6 +757,16 @@ export default function StaffView({
               console.warn('markStaffDirectMessagesRead error:', err);
             }
           }}
+        />
+      )}
+
+      {/* Staff Overtime (Lembur) Modal */}
+      {overtimeModalOpen && loggedInStaff && (
+        <StaffOvertimeModal
+          isOpen={overtimeModalOpen}
+          onClose={() => setOvertimeModalOpen(false)}
+          staff={loggedInStaff}
+          onOvertimeUpdated={(nextActive) => setActiveOvertime(nextActive)}
         />
       )}
     </div>

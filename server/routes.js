@@ -8116,4 +8116,434 @@ router.post('/staff/direct-messages/read', async (req, res) => {
   }
 });
 
+// ============================================================================
+// 18. STAFF OVERTIME (LEMBUR) SYSTEM & DEDICATED LOG
+// ============================================================================
+async function getAllOvertimeLogs({ bypassCache = false } = {}) {
+  let list = [];
+  if (isSupabaseConfigured && supabase) {
+    try {
+      if (bypassCache) {
+        const { data, error } = await supabase
+          .from('app_settings')
+          .select('value')
+          .eq('key', 'staff_overtime_logs')
+          .maybeSingle();
+        if (!error && Array.isArray(data?.value)) {
+          list = data.value;
+        }
+      } else {
+        const cloudList = await cloudDb.getSetting('staff_overtime_logs');
+        if (Array.isArray(cloudList)) list = cloudList;
+      }
+    } catch (e) {
+      console.warn('getAllOvertimeLogs supabase note:', e.message);
+    }
+  }
+  if (!Array.isArray(list) || list.length === 0) {
+    const localList = getSetting('staff_overtime_logs');
+    if (Array.isArray(localList) && localList.length > 0) {
+      list = localList;
+    }
+  }
+  return Array.isArray(list) ? list : [];
+}
+
+async function saveAllOvertimeLogs(logs) {
+  const safeList = Array.isArray(logs) ? logs.slice(0, 1000) : [];
+  setSetting('staff_overtime_logs', safeList);
+  if (isSupabaseConfigured) {
+    await cloudDb.saveSetting('staff_overtime_logs', safeList, 'Staff Overtime Requests & Approved Logs');
+  }
+  return safeList;
+}
+
+function filterOvertimeForStaff(allLogs, staffKeys = []) {
+  const keySet = new Set(staffKeys.filter(Boolean).map((k) => String(k).trim().toUpperCase()));
+  if (keySet.size === 0) return [];
+  return (Array.isArray(allLogs) ? allLogs : [])
+    .filter((item) => {
+      const candidates = [item.staff_id, item.staff_uuid, item.legacy_code].filter(Boolean).map((k) => String(k).trim().toUpperCase());
+      return candidates.some((c) => keySet.has(c));
+    })
+    .sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
+}
+
+async function resolveStaffRecordForOvertime(staffId, staffUuid, legacyCode) {
+  let staff = null;
+  const lookupIds = [staffId, staffUuid, legacyCode].filter(Boolean);
+  for (const id of lookupIds) {
+    if (isSupabaseConfigured) {
+      const supaStaff = await findStaffInSupabase(id);
+      if (supaStaff) {
+        staff = {
+          ...supaStaff,
+          id: supaStaff.legacy_code || supaStaff.id,
+          uuid: supaStaff.id,
+          legacy_code: supaStaff.legacy_code || supaStaff.id
+        };
+        break;
+      }
+    }
+    const local = db.prepare('SELECT * FROM staff WHERE id = ?').get(String(id));
+    if (local) {
+      staff = local;
+      break;
+    }
+  }
+  return staff;
+}
+
+// 18a. Staff: Get own overtime logs + active IN_PROGRESS overtime
+router.get('/staff/overtime', async (req, res) => {
+  const { staffId, staffUuid, legacyCode } = req.query;
+  try {
+    const allLogs = await getAllOvertimeLogs({ bypassCache: true });
+    const logs = filterOvertimeForStaff(allLogs, [staffId, staffUuid, legacyCode]);
+    if (isSupabaseConfigured && logs.length > 0) {
+      try {
+        await resolveAttendancePhotoUrls(logs, ['start_photo_url', 'end_photo_url']);
+      } catch {}
+    }
+    const activeOvertime = logs.find((l) => l.status === 'IN_PROGRESS') || null;
+    return res.json({
+      success: true,
+      todayWitaYmd: getWitaDateYMD(new Date()),
+      activeOvertime,
+      logs
+    });
+  } catch (err) {
+    console.error('Error fetching staff overtime logs:', err);
+    return res.status(500).json({ error: 'Gagal memuat riwayat lembur: ' + err.message });
+  }
+});
+
+// 18b. Staff: Start Live Overtime (Same Day - Mandatory Start Photo)
+router.post('/staff/overtime/start', async (req, res) => {
+  const { staffId, staffUuid, legacyCode, reason, photoBase64 } = req.body;
+  if (!photoBase64 || !String(photoBase64).startsWith('data:image')) {
+    return res.status(400).json({ error: 'Foto datang lembur wajib diambil untuk pengajuan lembur hari ini.' });
+  }
+  const cleanReason = String(reason || '').trim();
+  if (!cleanReason) {
+    return res.status(400).json({ error: 'Alasan / tugas lembur wajib diisi.' });
+  }
+
+  try {
+    const staff = await resolveStaffRecordForOvertime(staffId, staffUuid, legacyCode);
+    if (!staff) {
+      return res.status(404).json({ error: 'Data karyawan tidak ditemukan.' });
+    }
+
+    const allLogs = await getAllOvertimeLogs({ bypassCache: true });
+    const staffKeys = [staff.id, staff.uuid, staff.legacy_code, staffId, staffUuid, legacyCode];
+    const existingActive = filterOvertimeForStaff(allLogs, staffKeys).find((l) => l.status === 'IN_PROGRESS');
+    if (existingActive) {
+      return res.status(400).json({ error: 'Anda masih memiliki sesi lembur yang sedang berjalan. Selesaikan & foto pulang terlebih dahulu.' });
+    }
+
+    const now = new Date();
+    const nowIso = now.toISOString();
+    const todayWitaYmd = getWitaDateYMD(now);
+    const startHm = getWitaTimeString(now);
+    const photoUrl = await savePhoto(photoBase64, `overtime_in_${staff.legacy_code || staff.id}`);
+
+    const entry = {
+      id: `ot_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      staff_id: staff.legacy_code || staff.id,
+      staff_uuid: staff.uuid || null,
+      staff_name: staff.name,
+      staff_venue: staff.venue || 'LuckyCat',
+      staff_division: staff.division || '',
+      staff_role: staff.role || 'Staff',
+      mode: 'LIVE',
+      overtime_date: todayWitaYmd,
+      start_time: nowIso,
+      end_time: null,
+      start_time_hm: startHm,
+      end_time_hm: null,
+      start_photo_url: photoUrl,
+      end_photo_url: null,
+      reason: cleanReason,
+      requested_minutes: 0,
+      approved_minutes: null,
+      status: 'IN_PROGRESS',
+      manager_note: '',
+      reviewed_by: null,
+      reviewed_at: null,
+      created_at: nowIso,
+      updated_at: nowIso
+    };
+
+    const updated = await saveAllOvertimeLogs([entry, ...allLogs]);
+    broadcastEvent('OVERTIME_UPDATE', { action: 'START', overtimeId: entry.id, staffId: entry.staff_id });
+
+    const staffLogs = filterOvertimeForStaff(updated, staffKeys);
+    if (isSupabaseConfigured) {
+      try { await resolveAttendancePhotoUrls(staffLogs, ['start_photo_url', 'end_photo_url']); } catch {}
+    }
+    return res.json({ success: true, overtime: entry, activeOvertime: entry, logs: staffLogs });
+  } catch (err) {
+    console.error('Error starting live overtime:', err);
+    return res.status(500).json({ error: 'Gagal memulai lembur: ' + err.message });
+  }
+});
+
+// 18c. Staff: End Live Overtime (Same Day - Mandatory End Photo -> Sends to Manager as PENDING)
+router.post('/staff/overtime/end', async (req, res) => {
+  const { overtimeId, staffId, staffUuid, legacyCode, photoBase64, notes } = req.body;
+  if (!photoBase64 || !String(photoBase64).startsWith('data:image')) {
+    return res.status(400).json({ error: 'Foto pulang lembur wajib diambil untuk menyelesaikan lembur hari ini.' });
+  }
+
+  try {
+    const allLogs = await getAllOvertimeLogs({ bypassCache: true });
+    const keySet = new Set([staffId, staffUuid, legacyCode].filter(Boolean).map((k) => String(k).trim().toUpperCase()));
+
+    const targetIndex = allLogs.findIndex((item) => {
+      if (overtimeId && String(item.id) === String(overtimeId)) return item.status === 'IN_PROGRESS';
+      const candidates = [item.staff_id, item.staff_uuid, item.legacy_code].filter(Boolean).map((k) => String(k).trim().toUpperCase());
+      return item.status === 'IN_PROGRESS' && candidates.some((c) => keySet.has(c));
+    });
+
+    if (targetIndex === -1) {
+      return res.status(404).json({ error: 'Sesi lembur aktif tidak ditemukan.' });
+    }
+
+    const target = allLogs[targetIndex];
+    const now = new Date();
+    const nowIso = now.toISOString();
+    const endHm = getWitaTimeString(now);
+    const startMs = new Date(target.start_time).getTime();
+    const durationMinutes = Math.max(1, Math.round((now.getTime() - startMs) / 60000));
+    const endPhotoUrl = await savePhoto(photoBase64, `overtime_out_${target.staff_id}`);
+
+    const cleanExtraNote = String(notes || '').trim();
+    const updatedItem = {
+      ...target,
+      end_time: nowIso,
+      end_time_hm: endHm,
+      end_photo_url: endPhotoUrl,
+      requested_minutes: durationMinutes,
+      reason: cleanExtraNote ? `${target.reason} (${cleanExtraNote})` : target.reason,
+      status: 'PENDING',
+      updated_at: nowIso
+    };
+
+    const nextLogs = [...allLogs];
+    nextLogs[targetIndex] = updatedItem;
+    await saveAllOvertimeLogs(nextLogs);
+    broadcastEvent('OVERTIME_UPDATE', { action: 'END', overtimeId: updatedItem.id, staffId: updatedItem.staff_id });
+
+    const staffLogs = filterOvertimeForStaff(nextLogs, [staffId, staffUuid, legacyCode, target.staff_id, target.staff_uuid]);
+    if (isSupabaseConfigured) {
+      try { await resolveAttendancePhotoUrls(staffLogs, ['start_photo_url', 'end_photo_url']); } catch {}
+    }
+    return res.json({ success: true, overtime: updatedItem, activeOvertime: null, logs: staffLogs });
+  } catch (err) {
+    console.error('Error ending live overtime:', err);
+    return res.status(500).json({ error: 'Gagal menyelesaikan lembur: ' + err.message });
+  }
+});
+
+// 18d. Staff: Retroactive Overtime Submission (Past Date Only - No Mandatory Photo, Required Date + Start/End Time)
+router.post('/staff/overtime/retroactive', async (req, res) => {
+  const { staffId, staffUuid, legacyCode, overtimeDate, startTime, endTime, reason, photoBase64 } = req.body;
+
+  const cleanDate = String(overtimeDate || '').trim();
+  const cleanStart = String(startTime || '').trim();
+  const cleanEnd = String(endTime || '').trim();
+  const cleanReason = String(reason || '').trim();
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(cleanDate)) {
+    return res.status(400).json({ error: 'Tanggal lembur wajib diisi dengan format yang valid.' });
+  }
+  if (!/^\d{2}:\d{2}$/.test(cleanStart) || !/^\d{2}:\d{2}$/.test(cleanEnd)) {
+    return res.status(400).json({ error: 'Jam mulai dan jam selesai lembur wajib diisi (format HH:MM).' });
+  }
+  if (!cleanReason) {
+    return res.status(400).json({ error: 'Alasan / keterangan lembur wajib diisi.' });
+  }
+
+  const todayWitaYmd = getWitaDateYMD(new Date());
+  if (cleanDate >= todayWitaYmd) {
+    return res.status(400).json({
+      error: 'Pengajuan lembur di hari yang sama wajib menggunakan mode Live (Foto Datang & Foto Pulang). Pengajuan tanpa foto hanya untuk tanggal yang telah terlewat.'
+    });
+  }
+
+  try {
+    const staff = await resolveStaffRecordForOvertime(staffId, staffUuid, legacyCode);
+    if (!staff) {
+      return res.status(404).json({ error: 'Data karyawan tidak ditemukan.' });
+    }
+
+    const [sH, sM] = cleanStart.split(':').map(Number);
+    const [eH, eM] = cleanEnd.split(':').map(Number);
+    if (sH > 23 || sM > 59 || eH > 23 || eM > 59) {
+      return res.status(400).json({ error: 'Format jam tidak valid.' });
+    }
+
+    const startIsoWita = `${cleanDate}T${cleanStart}:00+08:00`;
+    const startMs = new Date(startIsoWita).getTime();
+
+    // Handle overnight overtime (e.g., 21:00 -> 01:30 next calendar day)
+    let endDateStr = cleanDate;
+    if (eH * 60 + eM <= sH * 60 + sM) {
+      const [y, m, d] = cleanDate.split('-').map(Number);
+      const nextDay = new Date(Date.UTC(y, m - 1, d + 1, 12, 0, 0));
+      endDateStr = `${nextDay.getUTCFullYear()}-${String(nextDay.getUTCMonth() + 1).padStart(2, '0')}-${String(nextDay.getUTCDate()).padStart(2, '0')}`;
+    }
+    const endIsoWita = `${endDateStr}T${cleanEnd}:00+08:00`;
+    const endMs = new Date(endIsoWita).getTime();
+    const durationMinutes = Math.round((endMs - startMs) / 60000);
+
+    if (isNaN(durationMinutes) || durationMinutes <= 0 || durationMinutes > 24 * 60) {
+      return res.status(400).json({ error: 'Durasi jam lembur tidak valid.' });
+    }
+
+    let optionalPhotoUrl = null;
+    if (photoBase64 && String(photoBase64).startsWith('data:image')) {
+      optionalPhotoUrl = await savePhoto(photoBase64, `overtime_retro_${staff.legacy_code || staff.id}`);
+    }
+
+    const nowIso = new Date().toISOString();
+    const entry = {
+      id: `ot_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      staff_id: staff.legacy_code || staff.id,
+      staff_uuid: staff.uuid || null,
+      staff_name: staff.name,
+      staff_venue: staff.venue || 'LuckyCat',
+      staff_division: staff.division || '',
+      staff_role: staff.role || 'Staff',
+      mode: 'RETROACTIVE',
+      overtime_date: cleanDate,
+      start_time: new Date(startMs).toISOString(),
+      end_time: new Date(endMs).toISOString(),
+      start_time_hm: cleanStart,
+      end_time_hm: cleanEnd,
+      start_photo_url: optionalPhotoUrl,
+      end_photo_url: null,
+      reason: cleanReason,
+      requested_minutes: durationMinutes,
+      approved_minutes: null,
+      status: 'PENDING',
+      manager_note: '',
+      reviewed_by: null,
+      reviewed_at: null,
+      created_at: nowIso,
+      updated_at: nowIso
+    };
+
+    const allLogs = await getAllOvertimeLogs({ bypassCache: true });
+    const updated = await saveAllOvertimeLogs([entry, ...allLogs]);
+    broadcastEvent('OVERTIME_UPDATE', { action: 'RETROACTIVE', overtimeId: entry.id, staffId: entry.staff_id });
+
+    const staffLogs = filterOvertimeForStaff(updated, [staff.id, staff.uuid, staff.legacy_code, staffId, staffUuid, legacyCode]);
+    if (isSupabaseConfigured) {
+      try { await resolveAttendancePhotoUrls(staffLogs, ['start_photo_url', 'end_photo_url']); } catch {}
+    }
+    return res.json({ success: true, overtime: entry, logs: staffLogs });
+  } catch (err) {
+    console.error('Error submitting retroactive overtime:', err);
+    return res.status(500).json({ error: 'Gagal mengirim pengajuan lembur susulan: ' + err.message });
+  }
+});
+
+// 18e. Manager: Get all overtime logs
+router.get('/manager/overtime', async (req, res) => {
+  try {
+    const allLogs = await getAllOvertimeLogs({ bypassCache: true });
+    const sorted = [...allLogs].sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
+    if (isSupabaseConfigured && sorted.length > 0) {
+      try {
+        await resolveAttendancePhotoUrls(sorted, ['start_photo_url', 'end_photo_url']);
+      } catch {}
+    }
+    return res.json({ success: true, logs: sorted });
+  } catch (err) {
+    console.error('Error fetching manager overtime logs:', err);
+    return res.status(500).json({ error: 'Gagal memuat log lembur: ' + err.message });
+  }
+});
+
+// 18f. Manager: Review overtime request (APPROVE_FULL | APPROVE_PARTIAL | REJECT)
+router.post('/manager/overtime/:id/review', async (req, res) => {
+  const targetId = String(req.params.id || '').trim();
+  const { action, approvedMinutes, managerNote, reviewedBy } = req.body;
+
+  if (!['APPROVE_FULL', 'APPROVE_PARTIAL', 'REJECT'].includes(action)) {
+    return res.status(400).json({ error: 'Aksi review lembur tidak valid.' });
+  }
+
+  try {
+    const allLogs = await getAllOvertimeLogs({ bypassCache: true });
+    const idx = allLogs.findIndex((item) => String(item.id) === targetId);
+    if (idx === -1) {
+      return res.status(404).json({ error: 'Data pengajuan lembur tidak ditemukan.' });
+    }
+
+    const item = allLogs[idx];
+    const reqMins = Number(item.requested_minutes || 0);
+    let nextStatus = item.status;
+    let nextApprovedMins = item.approved_minutes;
+
+    if (action === 'APPROVE_FULL') {
+      nextStatus = 'APPROVED';
+      nextApprovedMins = reqMins;
+    } else if (action === 'APPROVE_PARTIAL') {
+      const mins = Math.round(Number(approvedMinutes));
+      if (!Number.isFinite(mins) || mins <= 0 || mins > reqMins) {
+        return res.status(400).json({
+          error: `Menit ACC partial harus antara 1 hingga ${reqMins} menit.`
+        });
+      }
+      nextStatus = mins === reqMins ? 'APPROVED' : 'PARTIAL';
+      nextApprovedMins = mins;
+    } else if (action === 'REJECT') {
+      nextStatus = 'REJECTED';
+      nextApprovedMins = 0;
+    }
+
+    const nowIso = new Date().toISOString();
+    const updatedItem = {
+      ...item,
+      status: nextStatus,
+      approved_minutes: nextApprovedMins,
+      manager_note: String(managerNote || '').trim(),
+      reviewed_by: String(reviewedBy || '').trim() || 'Management',
+      reviewed_at: nowIso,
+      updated_at: nowIso
+    };
+
+    const nextLogs = [...allLogs];
+    nextLogs[idx] = updatedItem;
+    await saveAllOvertimeLogs(nextLogs);
+    broadcastEvent('OVERTIME_UPDATE', { action: 'REVIEW', overtimeId: updatedItem.id, status: nextStatus });
+
+    if (isSupabaseConfigured) {
+      try { await resolveAttendancePhotoUrls([updatedItem], ['start_photo_url', 'end_photo_url']); } catch {}
+    }
+    return res.json({ success: true, overtime: updatedItem });
+  } catch (err) {
+    console.error('Error reviewing overtime:', err);
+    return res.status(500).json({ error: 'Gagal memproses persetujuan lembur: ' + err.message });
+  }
+});
+
+// 18g. Manager: Delete an overtime log entry
+router.delete('/manager/overtime/:id', async (req, res) => {
+  const targetId = String(req.params.id || '').trim();
+  try {
+    const allLogs = await getAllOvertimeLogs({ bypassCache: true });
+    const filtered = allLogs.filter((item) => String(item.id) !== targetId);
+    await saveAllOvertimeLogs(filtered);
+    broadcastEvent('OVERTIME_UPDATE', { action: 'DELETE', overtimeId: targetId });
+    return res.json({ success: true, logs: filtered });
+  } catch (err) {
+    console.error('Error deleting overtime log:', err);
+    return res.status(500).json({ error: 'Gagal menghapus log lembur: ' + err.message });
+  }
+});
+
 export default router;

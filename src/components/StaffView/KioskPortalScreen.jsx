@@ -116,7 +116,9 @@ export default function KioskPortalScreen({
   onOpenStaffReportModal,
   onOpenStaffQuizModal,
   directMessages = [],
-  onOpenDirectMessages
+  onOpenDirectMessages,
+  activeOvertime = null,
+  onOpenOvertimeModal
 }) {
   const [now, setNow] = useState(() => getAppNow());
   const [moodDropdownOpen, setMoodDropdownOpen] = useState(false);
@@ -1181,6 +1183,45 @@ export default function KioskPortalScreen({
                 Scan checklist per 2 jam
               </div>
             </div>
+          </button>
+
+          {/* E. PENGAJUAN & ABSEN LEMBUR */}
+          <button
+            type="button"
+            onClick={onOpenOvertimeModal}
+            className={`col-span-2 rounded-2xl p-3 flex items-center justify-between gap-3 text-left shadow-lg transition active:scale-[0.99] cursor-pointer border ${
+              activeOvertime
+                ? 'bg-gradient-to-r from-violet-950/90 via-[#1f1b38] to-[#171625] border-violet-400/70 shadow-violet-900/30 animate-pulse'
+                : `${staffTheme?.bentoCard || 'bg-[#181d26] hover:bg-[#202734] border-violet-400/30'}`
+            }`}
+          >
+            <div className="flex items-center gap-3 min-w-0">
+              <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
+                activeOvertime
+                  ? 'bg-violet-500 text-white shadow-md shadow-violet-500/40'
+                  : 'bg-violet-500/20 text-violet-300 border border-violet-400/30'
+              }`}>
+                <Clock className="w-4 h-4" />
+              </div>
+              <div className="min-w-0">
+                <div className="text-xs font-black text-white flex items-center gap-1.5">
+                  <span>{activeOvertime ? 'Lembur Sedang Berjalan' : 'Pengajuan Lembur'}</span>
+                  {activeOvertime && (
+                    <span className="px-2 py-0.5 rounded-full bg-violet-400 text-slate-950 text-[9px] font-black">
+                      LIVE
+                    </span>
+                  )}
+                </div>
+                <div className="text-[10.5px] text-slate-300/80 mt-0.5 truncate">
+                  {activeOvertime
+                    ? `Mulai ${activeOvertime.start_time_hm} WITA • Ketuk untuk Foto Pulang Lembur`
+                    : 'Lembur hari ini (foto datang & pulang) atau susulan hari terlewat'}
+                </div>
+              </div>
+            </div>
+            <span className="px-2.5 py-1 rounded-xl bg-violet-500/20 text-violet-200 border border-violet-400/30 text-[10.5px] font-black shrink-0">
+              {activeOvertime ? 'Selesai →' : 'Buka →'}
+            </span>
           </button>
         </div>
 

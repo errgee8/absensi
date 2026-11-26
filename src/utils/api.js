@@ -1176,3 +1176,75 @@ export async function markStaffDirectMessagesRead({ staffId, staffUuid = '', leg
   return data;
 }
 
+// 20. Staff Overtime (Lembur) System
+export async function getStaffOvertimeLogs({ staffId, staffUuid = '', legacyCode = '' }) {
+  const params = new URLSearchParams();
+  if (staffId) params.append('staffId', staffId);
+  if (staffUuid) params.append('staffUuid', staffUuid);
+  if (legacyCode) params.append('legacyCode', legacyCode);
+  const res = await fetch(`${API_BASE}/staff/overtime?${params.toString()}`);
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Gagal memuat riwayat lembur');
+  return data;
+}
+
+export async function startLiveOvertime({ staffId, staffUuid, legacyCode, reason, photoBase64 }) {
+  const res = await fetch(`${API_BASE}/staff/overtime/start`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ staffId, staffUuid, legacyCode, reason, photoBase64 })
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Gagal memulai lembur');
+  return data;
+}
+
+export async function endLiveOvertime({ overtimeId, staffId, staffUuid, legacyCode, photoBase64, notes }) {
+  const res = await fetch(`${API_BASE}/staff/overtime/end`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ overtimeId, staffId, staffUuid, legacyCode, photoBase64, notes })
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Gagal menyelesaikan lembur');
+  return data;
+}
+
+export async function submitRetroactiveOvertime({ staffId, staffUuid, legacyCode, overtimeDate, startTime, endTime, reason, photoBase64 = null }) {
+  const res = await fetch(`${API_BASE}/staff/overtime/retroactive`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ staffId, staffUuid, legacyCode, overtimeDate, startTime, endTime, reason, photoBase64 })
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Gagal mengirim pengajuan lembur susulan');
+  return data;
+}
+
+export async function getManagerOvertimeLogs() {
+  const res = await fetch(`${API_BASE}/manager/overtime`);
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Gagal memuat log lembur');
+  return data;
+}
+
+export async function reviewManagerOvertime(id, { action, approvedMinutes, managerNote, reviewedBy }) {
+  const res = await fetch(`${API_BASE}/manager/overtime/${encodeURIComponent(id)}/review`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action, approvedMinutes, managerNote, reviewedBy })
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Gagal memproses persetujuan lembur');
+  return data;
+}
+
+export async function deleteManagerOvertime(id) {
+  const res = await fetch(`${API_BASE}/manager/overtime/${encodeURIComponent(id)}`, {
+    method: 'DELETE'
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Gagal menghapus log lembur');
+  return data;
+}
+

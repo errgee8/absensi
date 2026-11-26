@@ -19,15 +19,16 @@ import StaffDetailManagementModal from './StaffDetailManagementModal';
 import StaffReportsTab from './StaffReportsTab';
 import QuizLeaderboardTab from './QuizLeaderboardTab';
 import SendMessageTab from './SendMessageTab';
+import OvertimeManagementTab from './OvertimeManagementTab';
 import StaffPublicProfileModal from '../StaffView/StaffPublicProfileModal';
 import LoungeChatModal from '../StaffView/LoungeChatModal';
 import KudosAuditLogsModal from './KudosAuditLogsModal';
 import { exportMonthlyPayrollReport, exportTimesheetToExcel } from '../../utils/excelExport';
-import { getShifts, getStats, getShiftSchedules, getStaffList, getLeaveRequests, getAnnouncements, getAnnouncementReaders, getPoints, getStaffDayAdjustments, subscribeRealtimeEvents, sendPresenceHeartbeat, authorizeEarlyCheckout } from '../../utils/api';
+import { getShifts, getStats, getShiftSchedules, getStaffList, getLeaveRequests, getAnnouncements, getAnnouncementReaders, getPoints, getStaffDayAdjustments, subscribeRealtimeEvents, sendPresenceHeartbeat, authorizeEarlyCheckout, getManagerOvertimeLogs } from '../../utils/api';
 import { getOperationalDateYMD, getOperationalYesterdayYMD, getWitaDateYMD, getAppNow, formatWitaDateTime } from '../../utils/time';
 import { resolveShift } from '../../utils/shiftResolver';
 import { showToast } from '../Common/Toast';
-import { LayoutDashboard, Users, Clock, Radio, Building2, Sparkles, Eye, ShieldAlert, Trophy, FileText, Megaphone, Activity, Award, Unlock, AlertCircle, Star, RefreshCw, Mail } from 'lucide-react';
+import { LayoutDashboard, Users, Clock, Radio, Building2, Sparkles, Eye, ShieldAlert, Trophy, FileText, Megaphone, Activity, Award, Unlock, AlertCircle, Star, RefreshCw, Mail, Timer } from 'lucide-react';
 
 export default function ManagerDashboard({ venueSettings, refreshSettings, adminAuth, isReadOnly = false, onOpenLeaderboard }) {
   // Tabs: 'AUDIT' | 'SCHEDULES' | 'STAFF' | 'TOILET'
@@ -51,6 +52,7 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
   const [isExporting, setIsExporting] = useState(false);
   const [pendingLeaveCount, setPendingLeaveCount] = useState(0);
   const [pendingPointsCount, setPendingPointsCount] = useState(0);
+  const [pendingOvertimeCount, setPendingOvertimeCount] = useState(0);
 
   // Filters - Default to TODAY's operational shift cycle (07:00 AM cutoff)
   const [dateRange, setDateRange] = useState('TODAY');
@@ -264,6 +266,18 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
     loadData();
   }, [dateRange, specificDate, venue, department, flagFilter, search]);
 
+  const loadPendingOvertimeCount = async () => {
+    try {
+      const res = await getManagerOvertimeLogs();
+      const pending = (res?.logs || []).filter((l) => l.status === 'PENDING').length;
+      setPendingOvertimeCount(pending);
+    } catch {}
+  };
+
+  useEffect(() => {
+    loadPendingOvertimeCount();
+  }, []);
+
   useEffect(() => {
     const unsubscribe = subscribeRealtimeEvents((eventType) => {
       if (eventType === 'SHIFT_UPDATE') {
@@ -271,6 +285,8 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
         loadPendingLeaveCount();
       } else if (eventType === 'LEAVE_UPDATE') {
         loadPendingLeaveCount();
+      } else if (eventType === 'OVERTIME_UPDATE') {
+        loadPendingOvertimeCount();
       } else if (eventType === 'ANNOUNCEMENT_UPDATE' || eventType === 'ANNOUNCEMENT_READ') {
         loadActiveAnnouncement();
       } else if (eventType === 'POINT_UPDATE') {
@@ -446,6 +462,24 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
               {pendingLeaveCount > 0 && (
                 <span className="ml-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-600 text-white animate-pulse">
                   {pendingLeaveCount}
+                </span>
+              )}
+            </button>
+
+            <button
+              onClick={() => setActiveTab('OVERTIME')}
+              className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-bold transition relative cursor-pointer ${
+                activeTab === 'OVERTIME'
+                  ? 'bg-violet-600 text-white shadow-md shadow-violet-600/30'
+                  : 'text-violet-300 hover:text-white hover:bg-violet-950/40 border border-violet-500/20'
+              }`}
+              title="Persetujuan Pengajuan Lembur (ACC Penuh / Partial) & Log Khusus Lembur"
+            >
+              <Timer className="w-4 h-4 stroke-[2.2]" />
+              <span>Lembur</span>
+              {pendingOvertimeCount > 0 && (
+                <span className="ml-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-400 text-slate-950 animate-pulse">
+                  {pendingOvertimeCount}
                 </span>
               )}
             </button>
@@ -846,6 +880,16 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
         {!isReadOnly && visitedTabs.has('SEND_MESSAGE') && (
           <div className={activeTab === 'SEND_MESSAGE' ? 'block' : 'hidden'}>
             <SendMessageTab adminAuth={adminAuth} />
+          </div>
+        )}
+
+        {/* Tab 11: OVERTIME (Persetujuan & Log Khusus Lembur) */}
+        {visitedTabs.has('OVERTIME') && (
+          <div className={activeTab === 'OVERTIME' ? 'block' : 'hidden'}>
+            <OvertimeManagementTab
+              adminAuth={adminAuth}
+              onOvertimeChanged={(pendingCount) => setPendingOvertimeCount(pendingCount)}
+            />
           </div>
         )}
 
