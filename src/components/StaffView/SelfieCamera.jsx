@@ -37,7 +37,11 @@ export default function SelfieCamera({
       streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        videoRef.current.play();
+        try {
+          await videoRef.current.play();
+        } catch (playErr) {
+          console.warn('Video play note:', playErr);
+        }
       }
       setCameraActive(true);
     } catch (err) {
@@ -71,7 +75,10 @@ export default function SelfieCamera({
 
   // Snap photo & burn watermark
   const handleSnap = async () => {
-    if (!videoRef.current) return;
+    if (!videoRef.current || !videoRef.current.videoWidth || !videoRef.current.videoHeight) {
+      showToast('Kamera sedang memuat tampilan. Tunggu 1 detik lalu coba lagi.', 'error');
+      return;
+    }
     setProcessing(true);
     try {
       const watermarkedJpeg = await captureAndWatermark({
@@ -80,8 +87,8 @@ export default function SelfieCamera({
         lat,
         lng,
         status,
-        maxWidth: 1080,
-        quality: 0.7
+        maxWidth: 720,
+        quality: 0.65
       });
 
       setCapturedPhoto(watermarkedJpeg);
@@ -123,9 +130,20 @@ export default function SelfieCamera({
 
       {/* Camera Viewfinder or Captured Preview */}
       <div className="relative aspect-[4/3] w-full bg-slate-950 rounded-xl overflow-hidden border border-slate-800 flex items-center justify-center">
+        {/* Always mounted video element for immediate srcObject binding */}
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          muted
+          className={`absolute inset-0 w-full h-full object-cover transform scale-x-[-1] transition-opacity duration-200 ${
+            !capturedPhoto && cameraActive ? 'opacity-100' : 'opacity-0 pointer-events-none'
+          }`}
+        />
+
         {capturedPhoto ? (
           // Captured and Watermarked Review
-          <div className="relative w-full h-full">
+          <div className="relative w-full h-full z-10">
             <img
               src={capturedPhoto}
               alt="Live Staff Check-in Capture"
@@ -137,17 +155,10 @@ export default function SelfieCamera({
             </div>
           </div>
         ) : cameraActive ? (
-          // Live Video Stream
-          <div className="relative w-full h-full">
-            <video
-              ref={videoRef}
-              playsInline
-              muted
-              className="w-full h-full object-cover transform scale-x-[-1]" // Mirror for intuitive selfie
-            />
-
+          // Live Video Overlay Guides
+          <div className="relative w-full h-full z-10 pointer-events-none">
             {/* Target Face Guide Box */}
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <div className="absolute inset-0 flex items-center justify-center">
               <div className="w-48 h-56 border-2 border-dashed border-emerald-400/50 rounded-3xl flex flex-col items-center justify-end pb-3">
                 <span className="text-[10px] bg-slate-900/70 text-emerald-400 px-2 py-0.5 rounded font-medium">
                   Center Face & Uniform
@@ -162,7 +173,7 @@ export default function SelfieCamera({
           </div>
         ) : (
           // Camera Inactive / Permission Prompt
-          <div className="text-center p-6 flex flex-col items-center">
+          <div className="relative z-10 text-center p-6 flex flex-col items-center">
             {cameraError ? (
               <>
                 <ShieldAlert className="w-10 h-10 text-rose-400 mb-2" />
