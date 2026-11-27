@@ -349,12 +349,14 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
       const startOfMonth = `${curYear}-${curMonth}-01`;
       const exportTimestamp = formatWitaDateTime(nowApp.toISOString());
 
-      // Fetch month-to-date data in parallel: shifts, staff roster, approved leave, and manager day adjustments
-      const [monthShifts, allStaffList, allLeaveRequests, dayAdjustmentsData] = await Promise.all([
+      // Fetch month-to-date data in parallel: shifts, staff roster, approved leave, manager day adjustments, overtime logs, and points
+      const [monthShifts, allStaffList, allLeaveRequests, dayAdjustmentsData, overtimeData, pointsData] = await Promise.all([
         getShifts({ startDate: startOfMonth, endDate: todayYmd }),
         getStaffList('ALL'),
         getLeaveRequests({ year: curYear }).catch(() => []),
-        getStaffDayAdjustments(curYear + '-' + curMonth).catch(() => ({ adjustments: [] }))
+        getStaffDayAdjustments(curYear + '-' + curMonth).catch(() => ({ adjustments: [] })),
+        getManagerOvertimeLogs().catch(() => ({ logs: [] })),
+        getPoints({ cycleKey: 'CURRENT' }).catch(() => null)
       ]);
 
       // Strictly filter completed shifts only (strictly exclude ON_DUTY / IN_PROGRESS)
@@ -369,6 +371,8 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
         allStaff: allStaffList || [],
         leaveRequests: allLeaveRequests || [],
         dayAdjustments: dayAdjustmentsData?.adjustments || [],
+        overtimeLogs: overtimeData?.logs || [],
+        staffPointTotals: pointsData?.staffTotals || [],
         periodStart: startOfMonth,
         periodEnd: todayYmd,
         exportTimestamp

@@ -81,9 +81,18 @@ function formatKpiCard(worksheet, cellRef, label, value, bgArgb, textArgb) {
   };
 }
 
+function formatMinutesShort(mins) {
+  const m = Math.max(0, Math.round(Number(mins) || 0));
+  const h = Math.floor(m / 60);
+  const rem = m % 60;
+  if (h > 0 && rem > 0) return `${h}j ${rem}m`;
+  if (h > 0) return `${h}j`;
+  return `${rem}m`;
+}
+
 /**
  * Builds a dedicated Payroll Recap sheet for a venue (JP Karaoke or LuckyCat),
- * grouped by division, displaying all staff month-to-date with late & early checkout logs.
+ * grouped by division, displaying all staff month-to-date with late, leave, overtime (with reason), and points.
  */
 function buildVenuePayrollSheet({
   workbook,
@@ -94,34 +103,53 @@ function buildVenuePayrollSheet({
   shifts = [],
   leaveRequests = [],
   dayAdjustments = [],
+  overtimeLogs = [],
+  staffPointTotals = [],
   periodStart = '',
   periodEnd = '',
   exportTimestamp = ''
 }) {
   const worksheet = workbook.addWorksheet(sheetName, {
-    views: [{ showGridLines: true }],
+    views: [{ state: 'frozen', ySplit: 6, showGridLines: true }],
     pageSetup: { orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0 }
   });
 
+  const monthPrefix = periodStart ? periodStart.substring(0, 7) : '';
+
   // Calculate staff metrics
   const staffMetrics = staffList.map((staff) => {
-    // 1. Completed shifts only (strictly exclude IN_PROGRESS or open shifts)
+    const staffKeys = new Set(
+      [staff.id, staff.uuid, staff.legacy_code]
+        .filter(Boolean)
+        .map((k) => String(k).trim().toUpperCase())
+    );
+    const staffNameLower = (staff.name || '').trim().toLowerCase();
+
+    const matchesStaff = (record) => {
+      const candidates = [record.staff_id, record.staff_uuid, record.legacy_code]
+        .filter(Boolean)
+        .map((k) => String(k).trim().toUpperCase());
+      if (candidates.some((c) => staffKeys.has(c))) return true;
+      return staffNameLower && (record.staff_name || '').trim().toLowerCase() === staffNameLower;
+    };
+
+    // 1. Completed shifts only
     const staffShifts = shifts.filter((s) => {
-      const matchId = String(s.staff_id) === String(staff.id) || (staff.uuid && String(s.staff_id) === String(staff.uuid));
-      const matchName = (s.staff_name || '').trim().toLowerCase() === (staff.name || '').trim().toLowerCase();
       const isCompleted = s.status === 'COMPLETED' || (s.checkout_time && s.status !== 'IN_PROGRESS' && s.status !== 'ON_DUTY');
-      return (matchId || matchName) && isCompleted && s.checkin_time;
+      return matchesStaff(s) && isCompleted && s.checkin_time;
     });
 
     const actualWorkDays = staffShifts.length;
     const manualAdjSum = (dayAdjustments || [])
-      .filter((a) => String(a.staff_id) === String(staff.id) || (staff.uuid && String(a.staff_id) === String(staff.uuid)))
+      .filter((a) => matchesStaff(a))
       .reduce((acc, a) => acc + Number(a.adjustment_days || 0), 0);
-    const totalHariKerja = Math.min(26, Math.max(0, actualWorkDays + manualAdjSum));
+    const totalHariKerja = Math.min(31, Math.max(0, actualWorkDays + manualAdjSum));
     const isMgmt = (staff.division || '').toLowerCase().includes('management');
 
-    // 2. Late check-in occurrences
+    // 2. Late check-in occurrences & total late minutes
     const lateOccurrences = [];
+    let totalLateMinutes = 0;
+
     staffShifts.forEach((s) => {
       const inWita = getWitaComponents(s.checkin_time);
       if (!inWita) return;
@@ -163,145 +191,116 @@ function buildVenuePayrollSheet({
         isLate = false;
       }
 
-      if (isLate) {
+      if (isLate && lateMinutes > 0) {
+        totalLateMinutes += lateMinutes;
         lateOccurrences.push({
           date: inWita.dateStr,
+          minutes: lateMinutes,
           text: isPartial
-            ? `• ${inWita.dayName}, ${inWita.dateStr} jam ${inWita.timeStr} (Telat sisa ${lateMinutes}m - Toleransi ${s.late_excused_minutes || 0}m)`
-            : `• ${inWita.dayName}, ${inWita.dateStr} jam ${inWita.timeStr} (Telat ${lateMinutes}m)`
+            ? `• ${inWita.dayName}, ${inWita.dateStr}: ${lateMinutes}m (Sisa Partial, Toleransi ${s.late_excused_minutes || 0}m)`
+            : `• ${inWita.dayName}, ${inWita.dateStr}: ${lateMinutes}m (Masuk ${inWita.timeStr})`
         });
       }
     });
 
-    // 3. Early checkout occurrences
-    const earlyOccurrences = [];
-    staffShifts.forEach((s) => {
-      if (!s.checkout_time) return;
-      const outWita = getWitaComponents(s.checkout_time);
-      if (!outWita) return;
-
-      const schedStart = s.scheduled_start || staff.shift_start || '13:00';
-      const schedEnd = s.scheduled_end || staff.shift_end;
-      let isEarly = false;
-      let earlyMinutes = 0;
-
-      if (!isMgmt && schedEnd && schedEnd.includes(':') && !s.is_flexible_checkout) {
-        const [eh, em] = schedEnd.split(':').map(Number);
-        const schedEndM = eh * 60 + em;
-        const [sh, sm] = schedStart.split(':').map(Number);
-        const isOvernight = schedEndM < (sh * 60 + sm);
-
-        let diff = 0;
-        if (!isOvernight) {
-          const effectiveOut = outWita.totalMinutes < (sh * 60 + sm) ? outWita.totalMinutes + 1440 : outWita.totalMinutes;
-          diff = schedEndM - effectiveOut;
-        } else {
-          const adjOut = outWita.totalMinutes >= 720 ? outWita.totalMinutes - 1440 : outWita.totalMinutes;
-          diff = schedEndM - adjOut;
-        }
-
-        if (diff > 10) {
-          isEarly = true;
-          earlyMinutes = diff;
-        }
-      }
-
-      let flagsArr = [];
-      try {
-        flagsArr = Array.isArray(s.flags) ? s.flags : JSON.parse(s.flags || '[]');
-      } catch {
-        flagsArr = [];
-      }
-
-      const hasEarlyFlag = flagsArr.some((f) => String(f).includes('EARLY_CHECKOUT'));
-      const isEarlyAcc =
-        flagsArr.some((f) => String(f).includes('EARLY_CHECKOUT_APPROVED')) ||
-        (s.notes && String(s.notes).toLowerCase().includes('approved'));
-
-      if (hasEarlyFlag) {
-        isEarly = true;
-        if (earlyMinutes === 0) earlyMinutes = 30;
-      }
-
-      if (isEarly) {
-        const h = Math.floor(earlyMinutes / 60);
-        const m = earlyMinutes % 60;
-        const durStr = h > 0 ? (m > 0 ? `${h}j ${m}m` : `${h}j`) : `${m}m`;
-        const statusStr = isEarlyAcc ? 'Di-ACC' : 'Tanpa Izin/Menunggu ACC';
-        earlyOccurrences.push({
-          date: outWita.dateStr,
-          text: `• ${outWita.dayName}, ${outWita.dateStr} jam ${outWita.timeStr} (Kurang ${durStr} - ${statusStr})`
-        });
-      }
-    });
-
-    // 4. Approved Leave / Sakit / Cuti
-    let totalIzinAcc = 0;
-    let totalSakitAcc = 0;
-    let totalCutiAcc = 0;
-    const leaveNotes = [];
-
-    const monthPrefix = periodStart ? periodStart.substring(0, 7) : '';
+    // 3. Approved Leave / Sakit / Cuti
+    let totalIzinDays = 0;
+    const leaveDetails = [];
 
     (leaveRequests || []).forEach((req) => {
-      const matchStaff =
-        String(req.staff_id) === String(staff.id) ||
-        (staff.uuid && String(req.staff_id) === String(staff.uuid)) ||
-        (req.staff_name || '').trim().toLowerCase() === (staff.name || '').trim().toLowerCase();
-
-      if (!matchStaff) return;
+      if (!matchesStaff(req)) return;
       if (req.status !== 'APPROVED') return;
 
-      // Check if dates overlap with current month
-      const startInMonth = (req.start_date || '').startsWith(monthPrefix);
-      const endInMonth = (req.end_date || '').startsWith(monthPrefix);
+      const startInMonth = !monthPrefix || (req.start_date || '').startsWith(monthPrefix);
+      const endInMonth = !monthPrefix || (req.end_date || '').startsWith(monthPrefix);
       if (!startInMonth && !endInMonth) return;
 
       const days = Number(req.requested_days || req.days || 1);
+      const kind = req.category === 'SAKIT' ? 'Sakit' : req.type === 'CUTI' ? 'Cuti' : (req.category === 'IZIN_PULANG_AWAL' ? 'Pulang Awal' : 'Izin');
+      if (req.category === 'EARLY_DEPARTURE') return;
 
-      if (req.category === 'SAKIT') {
-        totalSakitAcc += days;
-        leaveNotes.push(`Sakit (${days} hr): ${req.start_date}`);
-      } else if (req.type === 'CUTI') {
-        totalCutiAcc += days;
-        leaveNotes.push(`Cuti (${days} hr): ${req.start_date}`);
-      } else if (req.type === 'IZIN' && req.category !== 'EARLY_DEPARTURE') {
-        totalIzinAcc += days;
-        leaveNotes.push(`Izin (${days} hr): ${req.start_date}`);
-      }
+      totalIzinDays += days;
+      const dateLabel = req.end_date && req.end_date !== req.start_date
+        ? `${formatWitaDateOnly(req.start_date)}–${formatWitaDateOnly(req.end_date)}`
+        : formatWitaDateOnly(req.start_date);
+      leaveDetails.push(`• ${dateLabel}: ${kind} (${days} hr)`);
     });
 
-    const totalTidakMasuk = totalIzinAcc + totalSakitAcc + totalCutiAcc;
+    // 4. Approved / Partial Overtime Logs (including staff's written reason!)
+    let totalOvertimeMinutes = 0;
+    const overtimeDetails = [];
+
+    (overtimeLogs || []).forEach((ot) => {
+      if (!matchesStaff(ot)) return;
+      if (ot.status !== 'APPROVED' && ot.status !== 'PARTIAL') return;
+      if (monthPrefix && !String(ot.overtime_date || '').startsWith(monthPrefix)) return;
+
+      const mins = Number(ot.approved_minutes || 0);
+      if (mins <= 0) return;
+
+      totalOvertimeMinutes += mins;
+      const dParts = String(ot.overtime_date || '').split('-');
+      const shortDate = dParts.length === 3 ? `${dParts[2]}/${dParts[1]}` : ot.overtime_date;
+      const timeRange = `${ot.start_time_hm || ''}${ot.end_time_hm ? `–${ot.end_time_hm}` : ''}`;
+      const accLabel = ot.status === 'PARTIAL' ? `ACC Partial ${formatMinutesShort(mins)}` : `ACC Penuh ${formatMinutesShort(mins)}`;
+      const reasonTxt = ot.reason ? ` — "${ot.reason}"` : '';
+      overtimeDetails.push(`• ${shortDate} (${timeRange}) [${accLabel}]${reasonTxt}`);
+    });
+
+    // 5. Total Points (0 if none)
+    const ptEntry = (staffPointTotals || []).find((p) => matchesStaff(p));
+    const totalPoints = Number(ptEntry?.total_points ?? 0);
+
+    // Status Payroll indicator
+    let statusLabel = '🟢 BERSIH';
+    let statusBg = 'FFDCFCE7';
+    let statusText = 'FF166534';
+    if (totalPoints >= 50 || totalLateMinutes > 30) {
+      statusLabel = totalPoints >= 50 ? '🔴 PERLU CEK POIN' : '🔴 TELAT TINGGI';
+      statusBg = 'FFFEE2E2';
+      statusText = 'FF991B1B';
+    } else if (totalLateMinutes > 0 || totalPoints > 0) {
+      statusLabel = totalPoints > 0 && totalLateMinutes > 0
+        ? '🟡 TELAT & POIN'
+        : totalPoints > 0
+        ? '🟠 ADA POIN'
+        : '🟡 TELAT RINGAN';
+      statusBg = 'FFFEF3C7';
+      statusText = 'FF92400E';
+    }
 
     return {
       staff,
+      staffCode: staff.legacy_code || staff.id || '-',
       division: staff.division || 'Umum',
+      role: staff.role || staff.division || '-',
       actualWorkDays,
       manualAdjSum,
       totalHariKerja,
-      lateCount: lateOccurrences.length,
+      totalLateMinutes,
       lateOccurrences,
-      earlyCount: earlyOccurrences.length,
-      earlyOccurrences,
-      totalIzinAcc,
-      totalSakitAcc,
-      totalCutiAcc,
-      totalTidakMasuk,
-      leaveNotes
+      totalIzinDays,
+      leaveDetails,
+      totalOvertimeMinutes,
+      overtimeDetails,
+      totalPoints,
+      statusLabel,
+      statusBg,
+      statusText
     };
   });
 
   // Calculate Overall Venue Stats for KPI Cards
   const totalStaffCount = staffMetrics.length;
   const venueTotalHariKerja = staffMetrics.reduce((sum, s) => sum + s.totalHariKerja, 0);
-  const venueTotalTelat = staffMetrics.reduce((sum, s) => sum + s.lateCount, 0);
-  const venueTotalPulangCepat = staffMetrics.reduce((sum, s) => sum + s.earlyCount, 0);
-  const venueTotalTidakMasuk = staffMetrics.reduce((sum, s) => sum + s.totalTidakMasuk, 0);
+  const venueTotalLateMinutes = staffMetrics.reduce((sum, s) => sum + s.totalLateMinutes, 0);
+  const venueTotalOvertimeMinutes = staffMetrics.reduce((sum, s) => sum + s.totalOvertimeMinutes, 0);
+  const venueTotalIzin = staffMetrics.reduce((sum, s) => sum + s.totalIzinDays, 0);
 
   // 1. BANNER TITLE ROW (Row 1)
   worksheet.mergeCells('A1:M1');
   const titleCell = worksheet.getCell('A1');
-  titleCell.value = `${venueTitle} — REKAPITULASI ABSENSI & PENGHITUNGAN GAJI`;
+  titleCell.value = `${venueTitle} — REKAPITULASI ABSENSI & PERHITUNGAN GAJI`;
   titleCell.font = { name: 'Segoe UI', size: 14, bold: true, color: { argb: 'FFFFFFFF' } };
   titleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: theme.primaryArgb } };
   titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
@@ -313,62 +312,62 @@ function buildVenuePayrollSheet({
   const startFmt = periodStart ? formatWitaDateOnly(periodStart) : '-';
   const endFmt = periodEnd ? formatWitaDateOnly(periodEnd) : '-';
   const cleanExportTime = String(exportTimestamp || '').replace(/\s*WITA\s*$/i, '') + ' WITA';
-  subCell.value = `Periode: ${startFmt} s/d ${endFmt} (S.d Saat Export)  |  Exported: ${cleanExportTime}  |  Status Data: Shift Selesai Saja (On-Process Dikecualikan)`;
+  subCell.value = `Periode: ${startFmt} s/d ${endFmt}  |  Exported: ${cleanExportTime}  |  Termasuk: Hari Kerja, Menit Telat, Izin, Lembur ACC (+Alasan), & Total Poin`;
   subCell.font = { name: 'Segoe UI', size: 10, italic: true, color: { argb: 'FFCBD5E1' } };
   subCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: theme.secondaryArgb } };
   subCell.alignment = { horizontal: 'center', vertical: 'middle' };
   worksheet.getRow(2).height = 22;
 
   // 3. STATS SUMMARY KPI CARDS (Row 4)
-  worksheet.getRow(3).height = 10; // spacing
+  worksheet.getRow(3).height = 10;
 
   worksheet.mergeCells('A4:B4');
   formatKpiCard(worksheet, 'A4', 'TOTAL KARYAWAN', `${totalStaffCount} Orang`, 'FFF1F5F9', 'FF0F172A');
 
-  worksheet.mergeCells('C4:D4');
-  formatKpiCard(worksheet, 'C4', 'TOTAL HARI KERJA', `${venueTotalHariKerja} Shift`, 'FFD1FAE5', 'FF065F46');
+  worksheet.mergeCells('C4:E4');
+  formatKpiCard(worksheet, 'C4', 'TOTAL HARI KERJA', `${venueTotalHariKerja} Hari`, 'FFD1FAE5', 'FF065F46');
 
-  worksheet.mergeCells('E4:F4');
+  worksheet.mergeCells('F4:G4');
   formatKpiCard(
     worksheet,
-    'E4',
-    'TOTAL TERLAMBAT',
-    `${venueTotalTelat}x Kejadian`,
-    venueTotalTelat > 0 ? 'FFFFE4E6' : 'FFDCFCE7',
-    venueTotalTelat > 0 ? 'FF9F1239' : 'FF166534'
+    'F4',
+    'TOTAL MENIT TELAT',
+    `${venueTotalLateMinutes} mnt`,
+    venueTotalLateMinutes > 0 ? 'FFFEE2E2' : 'FFDCFCE7',
+    venueTotalLateMinutes > 0 ? 'FF991B1B' : 'FF166534'
   );
 
-  worksheet.mergeCells('G4:H4');
+  worksheet.mergeCells('H4:I4');
+  formatKpiCard(worksheet, 'H4', 'TOTAL IZIN / CUTI', `${venueTotalIzin} Hari`, 'FFE0F2FE', 'FF075985');
+
+  worksheet.mergeCells('J4:M4');
   formatKpiCard(
     worksheet,
-    'G4',
-    'PULANG CEPAT',
-    `${venueTotalPulangCepat}x Kejadian`,
-    venueTotalPulangCepat > 0 ? 'FFFEF3C7' : 'FFDCFCE7',
-    venueTotalPulangCepat > 0 ? 'FF92400E' : 'FF166534'
+    'J4',
+    'TOTAL LEMBUR (ACC)',
+    `${formatMinutesShort(venueTotalOvertimeMinutes)} (${venueTotalOvertimeMinutes} mnt)`,
+    'FFEDE9FE',
+    'FF5B21B6'
   );
-
-  worksheet.mergeCells('I4:M4');
-  formatKpiCard(worksheet, 'I4', 'TOTAL TIDAK MASUK (IZIN/SAKIT/CUTI ACC)', `${venueTotalTidakMasuk} Hari`, 'FFF3E8FF', 'FF6B21A8');
   worksheet.getRow(4).height = 26;
 
-  worksheet.getRow(5).height = 12; // spacing
+  worksheet.getRow(5).height = 12;
 
   // 4. TABLE COLUMNS HEADER (Row 6)
   const columns = [
     { key: 'no', header: 'No.', width: 6 },
-    { key: 'name', header: 'Nama Karyawan', width: 28 },
-    { key: 'division', header: 'Divisi / Bagian', width: 22 },
-    { key: 'work_days', header: 'Total Hari Kerja (Target 26)', width: 22 },
-    { key: 'late_count', header: 'Frekuensi Telat', width: 17 },
-    { key: 'late_detail', header: 'Rincian Keterlambatan (Hari & Jam)', width: 44 },
-    { key: 'early_count', header: 'Frekuensi Pulang Cepat', width: 20 },
-    { key: 'early_detail', header: 'Rincian Pulang Cepat (Hari & Jam)', width: 44 },
-    { key: 'izin_count', header: 'Total Izin (ACC)', width: 15 },
-    { key: 'sakit_count', header: 'Total Sakit (ACC)', width: 15 },
-    { key: 'cuti_count', header: 'Total Cuti (ACC)', width: 15 },
-    { key: 'absent_count', header: 'Total Tidak Masuk', width: 18 },
-    { key: 'notes', header: 'Catatan & Keterangan', width: 34 }
+    { key: 'staff_id', header: 'ID Staff', width: 14 },
+    { key: 'name', header: 'Nama Staff', width: 24 },
+    { key: 'role', header: 'Jabatan / Divisi', width: 22 },
+    { key: 'work_days', header: 'Hari Kerja', width: 15 },
+    { key: 'late_mins', header: 'Total Telat (Menit)', width: 17 },
+    { key: 'late_detail', header: 'Detail Tanggal & Menit Telat', width: 42 },
+    { key: 'izin_count', header: 'Jml Izin / Cuti', width: 15 },
+    { key: 'izin_detail', header: 'Detail Tanggal Izin', width: 36 },
+    { key: 'ot_total', header: 'Total Lembur (ACC)', width: 19 },
+    { key: 'ot_detail', header: 'Detail Lembur & Alasan Staff', width: 48 },
+    { key: 'points', header: 'Total Poin', width: 13 },
+    { key: 'status', header: 'Status Payroll', width: 18 }
   ];
 
   const headerRow = worksheet.getRow(6);
@@ -392,9 +391,7 @@ function buildVenuePayrollSheet({
   const divisionMap = new Map();
   staffMetrics.forEach((item) => {
     const div = item.division || 'Lainnya';
-    if (!divisionMap.has(div)) {
-      divisionMap.set(div, []);
-    }
+    if (!divisionMap.has(div)) divisionMap.set(div, []);
     divisionMap.get(div).push(item);
   });
 
@@ -405,7 +402,7 @@ function buildVenuePayrollSheet({
     // 5. DIVISION GROUP BANNER ROW
     worksheet.mergeCells(`A${currentRowIdx}:M${currentRowIdx}`);
     const divBanner = worksheet.getCell(`A${currentRowIdx}`);
-    divBanner.value = `📁 DIVISI: ${divisionName.toUpperCase()} (${divStaffList.length} Karyawan Terdaftar)`;
+    divBanner.value = `📁 DIVISI: ${divisionName.toUpperCase()} (${divStaffList.length} Karyawan)`;
     divBanner.font = { name: 'Segoe UI', size: 10.5, bold: true, color: { argb: 'FFFFFFFF' } };
     divBanner.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: theme.divisionBannerArgb } };
     divBanner.alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
@@ -413,73 +410,66 @@ function buildVenuePayrollSheet({
     currentRowIdx++;
 
     let divTotalHariKerja = 0;
-    let divTotalTelat = 0;
-    let divTotalPulangCepat = 0;
+    let divTotalLateMins = 0;
     let divTotalIzin = 0;
-    let divTotalSakit = 0;
-    let divTotalCuti = 0;
-    let divTotalTidakMasuk = 0;
+    let divTotalOvertimeMins = 0;
+    let divTotalPoints = 0;
 
-    // Staff Data Rows
     divStaffList.forEach((metric, sIdx) => {
       const row = worksheet.getRow(currentRowIdx);
       const isEven = sIdx % 2 === 0;
       const baseBgColor = isEven ? 'FFFFFFFF' : 'FFF8FAFC';
 
       divTotalHariKerja += metric.totalHariKerja;
-      divTotalTelat += metric.lateCount;
-      divTotalPulangCepat += metric.earlyCount;
-      divTotalIzin += metric.totalIzinAcc;
-      divTotalSakit += metric.totalSakitAcc;
-      divTotalCuti += metric.totalCutiAcc;
-      divTotalTidakMasuk += metric.totalTidakMasuk;
+      divTotalLateMins += metric.totalLateMinutes;
+      divTotalIzin += metric.totalIzinDays;
+      divTotalOvertimeMins += metric.totalOvertimeMinutes;
+      divTotalPoints += metric.totalPoints;
 
-      // Late text formatting
-      const lateText =
-        metric.lateOccurrences.length > 0
-          ? metric.lateOccurrences.map((o) => o.text).join('\n')
-          : '✓ Tepat Waktu';
+      const lateText = metric.lateOccurrences.length > 0
+        ? metric.lateOccurrences.map((o) => o.text).join('\n')
+        : '✓ Tepat Waktu';
 
-      // Early checkout text formatting
-      const earlyText =
-        metric.earlyOccurrences.length > 0
-          ? metric.earlyOccurrences.map((o) => o.text).join('\n')
-          : '✓ Normal';
+      const izinText = metric.leaveDetails.length > 0
+        ? metric.leaveDetails.join('\n')
+        : '-';
 
-      // Notes text
-      const allNotes = [...metric.leaveNotes];
-      if (metric.manualAdjSum !== 0) {
-        allNotes.push(`Koreksi Manajer: ${metric.manualAdjSum > 0 ? '+' : ''}${metric.manualAdjSum} Hari`);
-      }
-      const notesText = allNotes.length > 0 ? allNotes.join('; ') : '-';
+      const otText = metric.overtimeDetails.length > 0
+        ? metric.overtimeDetails.join('\n')
+        : '-';
 
-      // Dynamic row height based on line count in late/early details
-      const lineCount = Math.max(metric.lateOccurrences.length, metric.earlyOccurrences.length, 1);
+      const lineCount = Math.max(
+        metric.lateOccurrences.length,
+        metric.leaveDetails.length,
+        metric.overtimeDetails.length,
+        1
+      );
       row.height = Math.max(26, lineCount * 17 + 8);
 
-      const workDaysText = metric.totalHariKerja > 0
-        ? (metric.manualAdjSum !== 0
-          ? `${metric.totalHariKerja} Hari (${metric.actualWorkDays}${metric.manualAdjSum > 0 ? '+' : ''}${metric.manualAdjSum})`
-          : `${metric.totalHariKerja} Hari`)
+      const workDaysText = metric.manualAdjSum !== 0
+        ? `${metric.totalHariKerja} Hari (${metric.actualWorkDays}${metric.manualAdjSum > 0 ? '+' : ''}${metric.manualAdjSum})`
+        : `${metric.totalHariKerja} Hari`;
+
+      const otTotalText = metric.totalOvertimeMinutes > 0
+        ? `${formatMinutesShort(metric.totalOvertimeMinutes)} (${metric.totalOvertimeMinutes}m)`
         : '0';
 
       row.values = [
         globalStaffNumber++,
+        metric.staffCode,
         metric.staff.name || '-',
-        metric.division,
+        metric.role,
         workDaysText,
-        metric.lateCount > 0 ? `${metric.lateCount}x` : '0',
+        `${metric.totalLateMinutes} mnt`,
         lateText,
-        metric.earlyCount > 0 ? `${metric.earlyCount}x` : '0',
-        earlyText,
-        metric.totalIzinAcc > 0 ? `${metric.totalIzinAcc} Hari` : '0',
-        metric.totalSakitAcc > 0 ? `${metric.totalSakitAcc} Hari` : '0',
-        metric.totalCutiAcc > 0 ? `${metric.totalCutiAcc} Hari` : '0',
-        metric.totalTidakMasuk > 0 ? `${metric.totalTidakMasuk} Hari` : '0',
-        notesText
+        metric.totalIzinDays > 0 ? `${metric.totalIzinDays} Hari` : '0',
+        izinText,
+        otTotalText,
+        otText,
+        metric.totalPoints,
+        metric.statusLabel
       ];
 
-      // Styling each cell in the row
       for (let c = 1; c <= 13; c++) {
         const cell = row.getCell(c);
         cell.font = { name: 'Segoe UI', size: 9.5, color: { argb: 'FF1E293B' } };
@@ -492,64 +482,77 @@ function buildVenuePayrollSheet({
         };
         cell.alignment = { vertical: 'middle', horizontal: 'center' };
 
-        // Column 2: Nama Karyawan
         if (c === 2) {
+          cell.font = { name: 'Consolas', size: 9, color: { argb: 'FF475569' } };
+        }
+        if (c === 3) {
           cell.alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
           cell.font = { name: 'Segoe UI', size: 9.5, bold: true, color: { argb: 'FF0F172A' } };
         }
-
-        // Column 4: Total Hari Kerja (Soft green / blue highlight)
-        if (c === 4 && metric.totalHariKerja > 0) {
-          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0F2FE' } };
-          cell.font = { name: 'Segoe UI', size: 9.5, bold: true, color: { argb: 'FF0369A1' } };
+        if (c === 4) {
+          cell.alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
         }
-
-        // Column 5: Frekuensi Telat (Soft red highlight if > 0)
-        if (c === 5) {
-          if (metric.lateCount > 0) {
-            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFE4E6' } };
-            cell.font = { name: 'Segoe UI', size: 9.5, bold: true, color: { argb: 'FF9F1239' } };
-          }
+        // Col 5: Hari Kerja
+        if (c === 5 && metric.totalHariKerja > 0) {
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDCFCE7' } };
+          cell.font = { name: 'Segoe UI', size: 9.5, bold: true, color: { argb: 'FF166534' } };
         }
-
-        // Column 6: Rincian Telat (Wrap text)
+        // Col 6: Total Telat (Menit) Color Code
         if (c === 6) {
-          cell.alignment = { vertical: 'middle', horizontal: 'left', wrapText: true, indent: 1 };
-          if (metric.lateCount > 0) {
-            cell.font = { name: 'Segoe UI', size: 9, color: { argb: 'FF9F1239' } };
-          } else {
-            cell.font = { name: 'Segoe UI', size: 9, color: { argb: 'FF166534' } };
-          }
-        }
-
-        // Column 7: Frekuensi Pulang Cepat (Soft amber highlight if > 0)
-        if (c === 7) {
-          if (metric.earlyCount > 0) {
+          if (metric.totalLateMinutes === 0) {
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDCFCE7' } };
+            cell.font = { name: 'Segoe UI', size: 9.5, bold: true, color: { argb: 'FF166534' } };
+          } else if (metric.totalLateMinutes <= 30) {
             cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEF3C7' } };
             cell.font = { name: 'Segoe UI', size: 9.5, bold: true, color: { argb: 'FF92400E' } };
-          }
-        }
-
-        // Column 8: Rincian Pulang Cepat (Wrap text)
-        if (c === 8) {
-          cell.alignment = { vertical: 'middle', horizontal: 'left', wrapText: true, indent: 1 };
-          if (metric.earlyCount > 0) {
-            cell.font = { name: 'Segoe UI', size: 9, color: { argb: 'FF92400E' } };
           } else {
-            cell.font = { name: 'Segoe UI', size: 9, color: { argb: 'FF166534' } };
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEE2E2' } };
+            cell.font = { name: 'Segoe UI', size: 9.5, bold: true, color: { argb: 'FF991B1B' } };
           }
         }
-
-        // Column 12: Total Tidak Masuk (Soft purple highlight if > 0)
-        if (c === 12 && metric.totalTidakMasuk > 0) {
-          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF3E8FF' } };
-          cell.font = { name: 'Segoe UI', size: 9.5, bold: true, color: { argb: 'FF6B21A8' } };
+        // Col 7: Detail Telat
+        if (c === 7) {
+          cell.alignment = { vertical: 'middle', horizontal: metric.lateOccurrences.length > 0 ? 'left' : 'center', wrapText: true, indent: metric.lateOccurrences.length > 0 ? 1 : 0 };
+          cell.font = { name: 'Segoe UI', size: 9, color: { argb: metric.lateOccurrences.length > 0 ? 'FF991B1B' : 'FF166534' } };
         }
-
-        // Column 13: Notes
+        // Col 8: Jml Izin Color Code
+        if (c === 8 && metric.totalIzinDays > 0) {
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0F2FE' } };
+          cell.font = { name: 'Segoe UI', size: 9.5, bold: true, color: { argb: 'FF075985' } };
+        }
+        // Col 9: Detail Izin
+        if (c === 9) {
+          cell.alignment = { vertical: 'middle', horizontal: metric.leaveDetails.length > 0 ? 'left' : 'center', wrapText: true, indent: metric.leaveDetails.length > 0 ? 1 : 0 };
+        }
+        // Col 10: Total Lembur ACC Color Code
+        if (c === 10 && metric.totalOvertimeMinutes > 0) {
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEDE9FE' } };
+          cell.font = { name: 'Segoe UI', size: 9.5, bold: true, color: { argb: 'FF5B21B6' } };
+        }
+        // Col 11: Detail Lembur & Alasan Staff
+        if (c === 11) {
+          cell.alignment = { vertical: 'middle', horizontal: metric.overtimeDetails.length > 0 ? 'left' : 'center', wrapText: true, indent: metric.overtimeDetails.length > 0 ? 1 : 0 };
+          if (metric.overtimeDetails.length > 0) {
+            cell.font = { name: 'Segoe UI', size: 9, color: { argb: 'FF4C1D95' } };
+          }
+        }
+        // Col 12: Total Poin Color Code (0 = Green, 1-49 = Orange, >=50 = Red)
+        if (c === 12) {
+          if (metric.totalPoints === 0) {
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDCFCE7' } };
+            cell.font = { name: 'Segoe UI', size: 9.5, bold: true, color: { argb: 'FF166534' } };
+          } else if (metric.totalPoints < 50) {
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFEDD5' } };
+            cell.font = { name: 'Segoe UI', size: 9.5, bold: true, color: { argb: 'FF9A3412' } };
+          } else {
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEE2E2' } };
+            cell.font = { name: 'Segoe UI', size: 9.5, bold: true, color: { argb: 'FF991B1B' } };
+          }
+        }
+        // Col 13: Status Payroll
         if (c === 13) {
-          cell.alignment = { vertical: 'middle', horizontal: 'left', wrapText: true, indent: 1 };
-          cell.font = { name: 'Segoe UI', size: 9, italic: true, color: { argb: 'FF475569' } };
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: metric.statusBg } };
+          cell.font = { name: 'Segoe UI', size: 9, bold: true, color: { argb: metric.statusText } };
         }
       }
 
@@ -557,7 +560,7 @@ function buildVenuePayrollSheet({
     });
 
     // 6. DIVISION SUBTOTAL ROW
-    worksheet.mergeCells(`A${currentRowIdx}:C${currentRowIdx}`);
+    worksheet.mergeCells(`A${currentRowIdx}:D${currentRowIdx}`);
     const subtotalLabel = worksheet.getCell(`A${currentRowIdx}`);
     subtotalLabel.value = `SUBTOTAL ${divisionName.toUpperCase()} (${divStaffList.length} Orang)`;
     subtotalLabel.font = { name: 'Segoe UI', size: 9.5, bold: true, color: { argb: 'FF0F172A' } };
@@ -567,21 +570,20 @@ function buildVenuePayrollSheet({
     subtotalRow.height = 24;
 
     const subtotalValues = {
-      4: `${divTotalHariKerja} Hari`,
-      5: `${divTotalTelat}x`,
-      6: '-',
-      7: `${divTotalPulangCepat}x`,
-      8: '-',
-      9: `${divTotalIzin} Hari`,
-      10: `${divTotalSakit} Hari`,
-      11: `${divTotalCuti} Hari`,
-      12: `${divTotalTidakMasuk} Hari`,
+      5: `${divTotalHariKerja} Hari`,
+      6: `${divTotalLateMins} mnt`,
+      7: '-',
+      8: `${divTotalIzin} Hari`,
+      9: '-',
+      10: divTotalOvertimeMins > 0 ? formatMinutesShort(divTotalOvertimeMins) : '0',
+      11: '-',
+      12: divTotalPoints,
       13: '-'
     };
 
     for (let c = 1; c <= 13; c++) {
       const cell = subtotalRow.getCell(c);
-      if (c >= 4 && subtotalValues[c]) {
+      if (c >= 5 && subtotalValues[c] !== undefined) {
         cell.value = subtotalValues[c];
         cell.alignment = { horizontal: 'center', vertical: 'middle' };
         cell.font = { name: 'Segoe UI', size: 9.5, bold: true, color: { argb: 'FF0F172A' } };
@@ -599,31 +601,31 @@ function buildVenuePayrollSheet({
   }
 
   // 7. VENUE GRAND TOTAL ROW
-  worksheet.mergeCells(`A${currentRowIdx}:C${currentRowIdx}`);
+  worksheet.mergeCells(`A${currentRowIdx}:D${currentRowIdx}`);
   const grandLabel = worksheet.getCell(`A${currentRowIdx}`);
-  grandLabel.value = `GRAND TOTAL REKAPITULASI ${venueTitle} (${totalStaffCount} Orang)`;
+  grandLabel.value = `GRAND TOTAL ${venueTitle} (${totalStaffCount} Orang)`;
   grandLabel.font = { name: 'Segoe UI', size: 10, bold: true, color: { argb: 'FFFFFFFF' } };
   grandLabel.alignment = { horizontal: 'right', vertical: 'middle', indent: 1 };
 
   const grandRow = worksheet.getRow(currentRowIdx);
   grandRow.height = 28;
 
+  const venueTotalPoints = staffMetrics.reduce((s, m) => s + m.totalPoints, 0);
   const grandValues = {
-    4: `${venueTotalHariKerja} Hari`,
-    5: `${venueTotalTelat}x`,
-    6: '-',
-    7: `${venueTotalPulangCepat}x`,
-    8: '-',
-    9: `${staffMetrics.reduce((s, m) => s + m.totalIzinAcc, 0)} Hari`,
-    10: `${staffMetrics.reduce((s, m) => s + m.totalSakitAcc, 0)} Hari`,
-    11: `${staffMetrics.reduce((s, m) => s + m.totalCutiAcc, 0)} Hari`,
-    12: `${venueTotalTidakMasuk} Hari`,
+    5: `${venueTotalHariKerja} Hari`,
+    6: `${venueTotalLateMinutes} mnt`,
+    7: '-',
+    8: `${venueTotalIzin} Hari`,
+    9: '-',
+    10: venueTotalOvertimeMinutes > 0 ? formatMinutesShort(venueTotalOvertimeMinutes) : '0',
+    11: '-',
+    12: venueTotalPoints,
     13: '-'
   };
 
   for (let c = 1; c <= 13; c++) {
     const cell = grandRow.getCell(c);
-    if (c >= 4 && grandValues[c]) {
+    if (c >= 5 && grandValues[c] !== undefined) {
       cell.value = grandValues[c];
       cell.alignment = { horizontal: 'center', vertical: 'middle' };
       cell.font = { name: 'Segoe UI', size: 10, bold: true, color: { argb: 'FFFFFFFF' } };
@@ -637,7 +639,6 @@ function buildVenuePayrollSheet({
     };
   }
 
-  // Apply explicit column widths
   columns.forEach((col, idx) => {
     worksheet.getColumn(idx + 1).width = col.width;
   });
@@ -1195,6 +1196,8 @@ export async function exportMonthlyPayrollReport({
   allStaff = [],
   leaveRequests = [],
   dayAdjustments = [],
+  overtimeLogs = [],
+  staffPointTotals = [],
   periodStart = '',
   periodEnd = '',
   exportTimestamp = ''
@@ -1218,7 +1221,7 @@ export async function exportMonthlyPayrollReport({
 
   // Sort staff within division
   const divisionOrderJP = ['Server and Cashier', 'Cleaning Service', 'Storage Staff', 'Management'];
-  const divisionOrderLC = ['Bar, Cashier, and Server', 'Kitchen', 'Management'];
+  const divisionOrderLC = ['Bar, Cashier, and Server', 'Kitchen', 'Cleaning Service', 'Management'];
 
   const sortStaffByDivision = (staffList, orderList) => {
     return [...staffList].sort((a, b) => {
@@ -1249,6 +1252,8 @@ export async function exportMonthlyPayrollReport({
     shifts: completedShifts,
     leaveRequests,
     dayAdjustments,
+    overtimeLogs,
+    staffPointTotals,
     periodStart,
     periodEnd,
     exportTimestamp
@@ -1260,39 +1265,19 @@ export async function exportMonthlyPayrollReport({
     sheetName: 'Rekap Gaji LuckyCat',
     venueTitle: 'LUCKYCAT',
     theme: {
-      primaryArgb: 'FF064E3B', // Emerald 900
-      secondaryArgb: 'FF065F46', // Emerald 800
-      headerArgb: 'FF047857', // Forest Emerald
-      divisionBannerArgb: 'FF059669' // Vibrant Emerald
+      primaryArgb: 'FF78350F', // Warm Amber 900
+      secondaryArgb: 'FF451A03', // Dark Amber 950
+      headerArgb: 'FFB45309', // Amber 700
+      divisionBannerArgb: 'FF1E293B' // Slate 800
     },
     staffList: sortedLcStaff,
     shifts: completedShifts,
     leaveRequests,
     dayAdjustments,
+    overtimeLogs,
+    staffPointTotals,
     periodStart,
     periodEnd,
-    exportTimestamp
-  });
-
-  // Sheet 3: Rincian Log Keterlambatan
-  buildLatenessDetailSheet({
-    workbook,
-    shifts: completedShifts,
-    allStaff,
-    exportTimestamp
-  });
-
-  // Sheet 4: Rincian Izin & Cuti
-  buildLeaveRequestsDetailSheet({
-    workbook,
-    leaveRequests,
-    exportTimestamp
-  });
-
-  // Sheet 5: Rincian Shift Selesai
-  buildCompletedShiftsDetailSheet({
-    workbook,
-    shifts: completedShifts,
     exportTimestamp
   });
 
