@@ -13,7 +13,8 @@ import {
   Calendar,
   X,
   Clock,
-  Plus
+  Plus,
+  EyeOff
 } from 'lucide-react';
 import {
   getManagerOvertimeLogs,
@@ -109,7 +110,30 @@ export default function OvertimeManagementTab({ adminAuth, onOvertimeChanged }) 
     } catch (err) {
       showToast(err.message || 'Gagal mencatat lembur manual', 'error');
     } finally {
-      setManualSaving(false);
+    setManualSaving(false);
+    }
+  };
+
+  const handleSilentCancel = async (item) => {
+    if (
+      !window.confirm(
+        `Batalkan ACC lembur ${item.staff_name} (${item.overtime_date}) secara diam-diam?\n\nStaff tidak akan menerima notifikasi dan di portal staff statusnya tetap terlihat seperti sebelumnya, tetapi di Payroll & Export Excel jam lemburnya menjadi 0.`
+      )
+    ) {
+      return;
+    }
+    setProcessingId(item.id);
+    try {
+      await reviewManagerOvertime(item.id, {
+        action: 'SILENT_CANCEL',
+        reviewedBy: reviewerName
+      });
+      showToast(`ACC lembur ${item.staff_name} dibatalkan secara silent (payroll = 0).`, 'info');
+      await loadOvertime(true);
+    } catch (err) {
+      showToast(err.message || 'Gagal membatalkan ACC secara silent', 'error');
+    } finally {
+      setProcessingId(null);
     }
   };
 
@@ -374,6 +398,7 @@ export default function OvertimeManagementTab({ adminAuth, onOvertimeChanged }) 
           <option value="APPROVED">✓ ACC Penuh</option>
           <option value="PARTIAL">⚡ ACC Partial</option>
           <option value="REJECTED">✕ Ditolak</option>
+          <option value="CANCELLED_SILENT">🔇 ACC Dibatalkan (Silent)</option>
         </select>
         <select
           value={venueFilter}
@@ -412,6 +437,8 @@ export default function OvertimeManagementTab({ adminAuth, onOvertimeChanged }) 
                   ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
                   : item.status === 'PARTIAL'
                   ? 'bg-amber-500/15 text-amber-300 border-amber-500/30'
+                  : item.status === 'CANCELLED_SILENT'
+                  ? 'bg-slate-700/60 text-slate-300 border-slate-500/40'
                   : item.status === 'REJECTED'
                   ? 'bg-rose-500/15 text-rose-300 border-rose-500/30'
                   : item.status === 'IN_PROGRESS'
@@ -423,6 +450,8 @@ export default function OvertimeManagementTab({ adminAuth, onOvertimeChanged }) 
                   ? `✓ ACC Penuh (${formatMinutesLabel(item.approved_minutes)})`
                   : item.status === 'PARTIAL'
                   ? `⚡ ACC Partial (${formatMinutesLabel(item.approved_minutes)} / ${formatMinutesLabel(item.requested_minutes)})`
+                  : item.status === 'CANCELLED_SILENT'
+                  ? '🔇 ACC Dibatalkan (Silent • Payroll 0m)'
                   : item.status === 'REJECTED'
                   ? '✕ Ditolak'
                   : item.status === 'IN_PROGRESS'
@@ -576,6 +605,22 @@ export default function OvertimeManagementTab({ adminAuth, onOvertimeChanged }) 
                       >
                         <XCircle className="w-3.5 h-3.5" />
                         <span>Tolak</span>
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Silent Cancel Button for Manager on already-APPROVED or PARTIAL items */}
+                  {(item.status === 'APPROVED' || item.status === 'PARTIAL') && (
+                    <div className="flex flex-wrap items-center gap-2 pt-1">
+                      <button
+                        type="button"
+                        disabled={isBusy}
+                        onClick={() => handleSilentCancel(item)}
+                        className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-rose-950/60 text-slate-300 hover:text-rose-200 border border-slate-700 hover:border-rose-500/40 text-[11px] font-bold flex items-center gap-1.5 transition cursor-pointer disabled:opacity-50"
+                        title="Batalkan ACC lembur ini tanpa sepengetahuan/notifikasi ke staff (khusus Manager, otomatis menjadi 0 di payroll)"
+                      >
+                        <EyeOff className="w-3.5 h-3.5" />
+                        <span>Batalkan ACC (Tanpa Sepengetahuan Staff)</span>
                       </button>
                     </div>
                   )}

@@ -25,6 +25,22 @@ export const RESTROOM_LOCATIONS = [
     qr_token: 'QR-LC-WOMEN'
   },
   {
+    id: 'lc-lt3-men',
+    name: 'Men Toilet LC Lt. 3',
+    building: 'LuckyCat Billiard',
+    floor: 'Lantai 3',
+    gender: 'male',
+    qr_token: 'QR-LC-LT3-MEN'
+  },
+  {
+    id: 'lc-lt3-women',
+    name: 'Woman Toilet LC Lt. 3',
+    building: 'LuckyCat Billiard',
+    floor: 'Lantai 3',
+    gender: 'female',
+    qr_token: 'QR-LC-LT3-WOMEN'
+  },
+  {
     id: 'jp-men',
     name: 'Men Toilet JP',
     building: 'JPE KTV',

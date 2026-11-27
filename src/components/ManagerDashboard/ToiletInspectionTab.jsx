@@ -15,8 +15,12 @@ import {
   ChevronLeft,
   ChevronRight,
   Maximize2,
-  Image as ImageIcon
+  Image as ImageIcon,
+  QrCode,
+  Download,
+  Printer
 } from 'lucide-react';
+import QRCode from 'qrcode';
 import { getToiletLocations, getRecentToiletInspections } from '../../utils/toiletService';
 import ZoomableImage from '../Common/ZoomableImage';
 
@@ -28,6 +32,97 @@ export default function ToiletInspectionTab() {
   const [selectedTaskIndex, setSelectedTaskIndex] = useState(0);
   const [fullscreenPhoto, setFullscreenPhoto] = useState(null);
   const [currentTime, setCurrentTime] = useState(Date.now());
+  const [qrModalData, setQrModalData] = useState(null);
+
+  const handleGenerateQr = async (loc) => {
+    const token = loc?.qr_token || loc?.id || '';
+    if (!token) return;
+    try {
+      const qrDataUrl = await QRCode.toDataURL(token, {
+        width: 520,
+        margin: 2,
+        errorCorrectionLevel: 'H',
+        color: { dark: '#0f172a', light: '#ffffff' }
+      });
+
+      // Compose a clean labeled sticker PNG on canvas so download/print includes venue & toilet name
+      const canvas = document.createElement('canvas');
+      canvas.width = 640;
+      canvas.height = 800;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Top header bar
+        ctx.fillStyle = loc.gender === 'female' ? '#be185d' : '#1d4ed8';
+        ctx.fillRect(0, 0, canvas.width, 120);
+
+        ctx.fillStyle = '#ffffff';
+        ctx.textAlign = 'center';
+        ctx.font = 'bold 24px sans-serif';
+        ctx.fillText(String(loc.building || 'LUCKYCAT / JP').toUpperCase(), canvas.width / 2, 48);
+        ctx.font = 'bold 34px sans-serif';
+        ctx.fillText(String(loc.name || 'TOILET').toUpperCase(), canvas.width / 2, 92);
+
+        // Floor subtitle
+        ctx.fillStyle = '#334155';
+        ctx.font = 'bold 22px sans-serif';
+        ctx.fillText(`INSPEKSI TOILET • ${String(loc.floor || '').toUpperCase()}`, canvas.width / 2, 162);
+
+        // Draw QR image
+        const img = new Image();
+        await new Promise((resolve) => {
+          img.onload = resolve;
+          img.onerror = resolve;
+          img.src = qrDataUrl;
+        });
+        ctx.drawImage(img, 80, 190, 480, 480);
+
+        // Token footer
+        ctx.fillStyle = '#0f172a';
+        ctx.font = 'bold 26px monospace';
+        ctx.fillText(token, canvas.width / 2, 720);
+
+        ctx.fillStyle = '#64748b';
+        ctx.font = '18px sans-serif';
+        ctx.fillText('Scan QR ini melalui Aplikasi Absensi (Menu Cek Restroom)', canvas.width / 2, 762);
+
+        setQrModalData({
+          loc,
+          token,
+          stickerUrl: canvas.toDataURL('image/png')
+        });
+      } else {
+        setQrModalData({ loc, token, stickerUrl: qrDataUrl });
+      }
+    } catch (err) {
+      console.error('Failed to generate QR:', err);
+    }
+  };
+
+  const handleDownloadQr = () => {
+    if (!qrModalData?.stickerUrl) return;
+    const a = document.createElement('a');
+    a.href = qrModalData.stickerUrl;
+    a.download = `QR_${qrModalData.token || 'TOILET'}.png`;
+    a.click();
+  };
+
+  const handlePrintQr = () => {
+    if (!qrModalData?.stickerUrl) return;
+    const w = window.open('', '_blank', 'width=600,height=800');
+    if (!w) return;
+    w.document.write(`
+      <html>
+        <head><title>Print QR - ${qrModalData.loc?.name || ''}</title></head>
+        <body style="margin:0;display:flex;justify-content:center;align-items:center;min-height:100vh;background:#fff;">
+          <img src="${qrModalData.stickerUrl}" style="max-width:460px;width:100%;height:auto;border:2px solid #cbd5e1;border-radius:16px;" onload="window.print();" />
+        </body>
+      </html>
+    `);
+    w.document.close();
+  };
   const [targetIntervalMinutes, setTargetIntervalMinutes] = useState(() => {
     try {
       const saved = localStorage.getItem('toilet_target_interval_minutes');
@@ -317,6 +412,14 @@ export default function ToiletInspectionTab() {
                     <span>{loc.qr_token}</span>
                   </div>
                 )}
+                <button
+                  type="button"
+                  onClick={() => handleGenerateQr(loc)}
+                  className="w-full mt-2 py-2 px-3 rounded-xl bg-slate-900 hover:bg-blue-700 text-white text-xs font-black flex items-center justify-center space-x-1.5 transition shadow-sm cursor-pointer"
+                >
+                  <QrCode className="w-3.5 h-3.5" />
+                  <span>Generate QR</span>
+                </button>
               </div>
             </div>
           );
@@ -767,6 +870,62 @@ export default function ToiletInspectionTab() {
               maxHeight="max-h-[85vh]"
               className="rounded-2xl border border-white/20 shadow-2xl"
             />
+          </div>
+        </div>
+      )}
+
+      {/* Generate QR Code Sticker Modal */}
+      {qrModalData && (
+        <div
+          onClick={() => setQrModalData(null)}
+          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-[#161b24] border border-slate-700 rounded-3xl max-w-sm w-full p-5 shadow-2xl space-y-4 text-center"
+          >
+            <div className="flex items-center justify-between">
+              <div className="text-left">
+                <h4 className="text-sm font-black text-white">{qrModalData.loc?.name}</h4>
+                <p className="text-[11px] text-slate-400 font-bold">
+                  {qrModalData.loc?.building} • {qrModalData.loc?.floor}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setQrModalData(null)}
+                className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="bg-white rounded-2xl p-3 border border-slate-300 shadow-inner">
+              <img
+                src={qrModalData.stickerUrl}
+                alt={`QR ${qrModalData.token}`}
+                className="w-full h-auto rounded-xl"
+              />
+            </div>
+
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={handleDownloadQr}
+                className="flex-1 py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black flex items-center justify-center gap-1.5 transition cursor-pointer"
+              >
+                <Download className="w-4 h-4" />
+                <span>Download PNG</span>
+              </button>
+              <button
+                type="button"
+                onClick={handlePrintQr}
+                className="flex-1 py-2.5 px-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-black flex items-center justify-center gap-1.5 transition cursor-pointer"
+              >
+                <Printer className="w-4 h-4" />
+                <span>Print Stiker</span>
+              </button>
+            </div>
           </div>
         </div>
       )}

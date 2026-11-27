@@ -8199,12 +8199,26 @@ router.get('/staff/overtime', async (req, res) => {
   const { staffId, staffUuid, legacyCode } = req.query;
   try {
     const allLogs = await getAllOvertimeLogs({ bypassCache: true });
-    const logs = filterOvertimeForStaff(allLogs, [staffId, staffUuid, legacyCode]);
-    if (isSupabaseConfigured && logs.length > 0) {
+    const rawLogs = filterOvertimeForStaff(allLogs, [staffId, staffUuid, legacyCode]);
+    if (isSupabaseConfigured && rawLogs.length > 0) {
       try {
-        await resolveAttendancePhotoUrls(logs, ['start_photo_url', 'end_photo_url']);
+        await resolveAttendancePhotoUrls(rawLogs, ['start_photo_url', 'end_photo_url']);
       } catch {}
     }
+    // Mask silently cancelled overtime so staff does not see manager's silent cancellation
+    const logs = rawLogs.map((l) => {
+      if (l.silent_revoked || l.status === 'CANCELLED_SILENT') {
+        return {
+          ...l,
+          status: l.previous_status || 'APPROVED',
+          approved_minutes: l.previous_approved_minutes ?? l.requested_minutes,
+          silent_revoked: undefined,
+          previous_status: undefined,
+          previous_approved_minutes: undefined
+        };
+      }
+      return l;
+    });
     const activeOvertime = logs.find((l) => l.status === 'IN_PROGRESS') || null;
     return res.json({
       success: true,
@@ -8467,12 +8481,12 @@ router.get('/manager/overtime', async (req, res) => {
   }
 });
 
-// 18f. Manager: Review overtime request (APPROVE_FULL | APPROVE_PARTIAL | REJECT)
+// 18f. Manager: Review overtime request (APPROVE_FULL | APPROVE_PARTIAL | REJECT | SILENT_CANCEL)
 router.post('/manager/overtime/:id/review', async (req, res) => {
   const targetId = String(req.params.id || '').trim();
   const { action, approvedMinutes, managerNote, reviewedBy } = req.body;
 
-  if (!['APPROVE_FULL', 'APPROVE_PARTIAL', 'REJECT'].includes(action)) {
+  if (!['APPROVE_FULL', 'APPROVE_PARTIAL', 'REJECT', 'SILENT_CANCEL'].includes(action)) {
     return res.status(400).json({ error: 'Aksi review lembur tidak valid.' });
   }
 
@@ -8487,10 +8501,12 @@ router.post('/manager/overtime/:id/review', async (req, res) => {
     const reqMins = Number(item.requested_minutes || 0);
     let nextStatus = item.status;
     let nextApprovedMins = item.approved_minutes;
+    let silentMeta = {};
 
     if (action === 'APPROVE_FULL') {
       nextStatus = 'APPROVED';
       nextApprovedMins = reqMins;
+      silentMeta = { silent_revoked: false };
     } else if (action === 'APPROVE_PARTIAL') {
       const mins = Math.round(Number(approvedMinutes));
       if (!Number.isFinite(mins) || mins <= 0 || mins > reqMins) {
@@ -8500,26 +8516,41 @@ router.post('/manager/overtime/:id/review', async (req, res) => {
       }
       nextStatus = mins === reqMins ? 'APPROVED' : 'PARTIAL';
       nextApprovedMins = mins;
+      silentMeta = { silent_revoked: false };
     } else if (action === 'REJECT') {
       nextStatus = 'REJECTED';
       nextApprovedMins = 0;
+      silentMeta = { silent_revoked: false };
+    } else if (action === 'SILENT_CANCEL') {
+      nextStatus = 'CANCELLED_SILENT';
+      nextApprovedMins = 0;
+      silentMeta = {
+        silent_revoked: true,
+        previous_status: item.status,
+        previous_approved_minutes: item.approved_minutes,
+        silent_revoked_at: new Date().toISOString(),
+        silent_revoked_by: String(reviewedBy || '').trim() || 'Management'
+      };
     }
 
     const nowIso = new Date().toISOString();
     const updatedItem = {
       ...item,
+      ...silentMeta,
       status: nextStatus,
       approved_minutes: nextApprovedMins,
-      manager_note: String(managerNote || '').trim(),
-      reviewed_by: String(reviewedBy || '').trim() || 'Management',
-      reviewed_at: nowIso,
+      manager_note: action === 'SILENT_CANCEL' ? (item.manager_note || '') : String(managerNote || '').trim(),
+      reviewed_by: action === 'SILENT_CANCEL' ? (item.reviewed_by || 'Management') : (String(reviewedBy || '').trim() || 'Management'),
+      reviewed_at: action === 'SILENT_CANCEL' ? (item.reviewed_at || nowIso) : nowIso,
       updated_at: nowIso
     };
 
     const nextLogs = [...allLogs];
     nextLogs[idx] = updatedItem;
     await saveAllOvertimeLogs(nextLogs);
-    broadcastEvent('OVERTIME_UPDATE', { action: 'REVIEW', overtimeId: updatedItem.id, status: nextStatus });
+    if (action !== 'SILENT_CANCEL') {
+      broadcastEvent('OVERTIME_UPDATE', { action: 'REVIEW', overtimeId: updatedItem.id, status: nextStatus });
+    }
 
     if (isSupabaseConfigured) {
       try { await resolveAttendancePhotoUrls([updatedItem], ['start_photo_url', 'end_photo_url']); } catch {}
