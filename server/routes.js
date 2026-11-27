@@ -8531,7 +8531,88 @@ router.post('/manager/overtime/:id/review', async (req, res) => {
   }
 });
 
-// 18g. Manager: Delete an overtime log entry
+// 18g. Manager: Manual Overtime Entry (for verbal approvals / emergency bypass)
+router.post('/manager/overtime/manual', async (req, res) => {
+  const { staffId, overtimeDate, startTime, endTime, reason, approvedMinutes, managerNote, reviewedBy } = req.body;
+  const cleanDate = String(overtimeDate || '').trim();
+  const cleanStart = String(startTime || '').trim();
+  const cleanEnd = String(endTime || '').trim();
+  const cleanReason = String(reason || '').trim();
+
+  if (!staffId) return res.status(400).json({ error: 'Pilih karyawan terlebih dahulu.' });
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(cleanDate)) return res.status(400).json({ error: 'Tanggal lembur wajib diisi.' });
+  if (!/^\d{2}:\d{2}$/.test(cleanStart) || !/^\d{2}:\d{2}$/.test(cleanEnd)) {
+    return res.status(400).json({ error: 'Jam mulai dan jam selesai wajib diisi (HH:MM).' });
+  }
+  if (!cleanReason) return res.status(400).json({ error: 'Alasan lembur wajib diisi.' });
+
+  try {
+    const staff = await resolveStaffRecordForOvertime(staffId, null, staffId);
+    if (!staff) return res.status(404).json({ error: 'Data karyawan tidak ditemukan.' });
+
+    const [sH, sM] = cleanStart.split(':').map(Number);
+    const [eH, eM] = cleanEnd.split(':').map(Number);
+    const startIsoWita = `${cleanDate}T${cleanStart}:00+08:00`;
+    const startMs = new Date(startIsoWita).getTime();
+
+    let endDateStr = cleanDate;
+    if (eH * 60 + eM <= sH * 60 + sM) {
+      const [y, m, d] = cleanDate.split('-').map(Number);
+      const nextDay = new Date(Date.UTC(y, m - 1, d + 1, 12, 0, 0));
+      endDateStr = `${nextDay.getUTCFullYear()}-${String(nextDay.getUTCMonth() + 1).padStart(2, '0')}-${String(nextDay.getUTCDate()).padStart(2, '0')}`;
+    }
+    const endIsoWita = `${endDateStr}T${cleanEnd}:00+08:00`;
+    const endMs = new Date(endIsoWita).getTime();
+    const durationMinutes = Math.round((endMs - startMs) / 60000);
+
+    if (isNaN(durationMinutes) || durationMinutes <= 0 || durationMinutes > 24 * 60) {
+      return res.status(400).json({ error: 'Durasi jam lembur tidak valid.' });
+    }
+
+    const customApproved = approvedMinutes != null && approvedMinutes !== '' ? Math.round(Number(approvedMinutes)) : durationMinutes;
+    const finalApproved = Math.min(durationMinutes, Math.max(1, customApproved));
+    const finalStatus = finalApproved < durationMinutes ? 'PARTIAL' : 'APPROVED';
+    const nowIso = new Date().toISOString();
+
+    const entry = {
+      id: `ot_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      staff_id: staff.legacy_code || staff.id,
+      staff_uuid: staff.uuid || null,
+      staff_name: staff.name,
+      staff_venue: staff.venue || 'LuckyCat',
+      staff_division: staff.division || '',
+      staff_role: staff.role || 'Staff',
+      mode: 'RETROACTIVE',
+      overtime_date: cleanDate,
+      start_time: new Date(startMs).toISOString(),
+      end_time: new Date(endMs).toISOString(),
+      start_time_hm: cleanStart,
+      end_time_hm: cleanEnd,
+      start_photo_url: null,
+      end_photo_url: null,
+      reason: cleanReason,
+      requested_minutes: durationMinutes,
+      approved_minutes: finalApproved,
+      status: finalStatus,
+      manager_note: String(managerNote || '').trim() || 'Dicatat & disetujui langsung oleh Manager',
+      reviewed_by: String(reviewedBy || '').trim() || 'Management',
+      reviewed_at: nowIso,
+      created_at: nowIso,
+      updated_at: nowIso
+    };
+
+    const allLogs = await getAllOvertimeLogs({ bypassCache: true });
+    await saveAllOvertimeLogs([entry, ...allLogs]);
+    broadcastEvent('OVERTIME_UPDATE', { action: 'MANUAL', overtimeId: entry.id, staffId: entry.staff_id });
+
+    return res.json({ success: true, overtime: entry });
+  } catch (err) {
+    console.error('Error creating manual overtime:', err);
+    return res.status(500).json({ error: 'Gagal mencatat lembur manual: ' + err.message });
+  }
+});
+
+// 18h. Manager: Delete an overtime log entry
 router.delete('/manager/overtime/:id', async (req, res) => {
   const targetId = String(req.params.id || '').trim();
   try {

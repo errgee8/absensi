@@ -12,15 +12,18 @@ import {
   Camera,
   Calendar,
   X,
-  Clock
+  Clock,
+  Plus
 } from 'lucide-react';
 import {
   getManagerOvertimeLogs,
   reviewManagerOvertime,
   deleteManagerOvertime,
+  createManagerOvertimeLog,
+  getStaffList,
   subscribeRealtimeEvents
 } from '../../utils/api';
-import { formatWitaDateTime } from '../../utils/time';
+import { formatWitaDateTime, getWitaDateYMD } from '../../utils/time';
 import { showToast } from '../Common/Toast';
 
 function formatMinutesLabel(mins) {
@@ -51,6 +54,64 @@ export default function OvertimeManagementTab({ adminAuth, onOvertimeChanged }) 
 
   // Photo Preview Modal
   const [photoPreview, setPhotoPreview] = useState(null);
+
+  // Manual Entry Modal (for verbal approvals / emergency bypass)
+  const [manualOpen, setManualOpen] = useState(false);
+  const [staffDirectory, setStaffDirectory] = useState([]);
+  const [manualStaffId, setManualStaffId] = useState('');
+  const [manualDate, setManualDate] = useState(() => getWitaDateYMD());
+  const [manualStart, setManualStart] = useState('12:00');
+  const [manualEnd, setManualEnd] = useState('15:00');
+  const [manualReason, setManualReason] = useState('');
+  const [manualApprovedMins, setManualApprovedMins] = useState('');
+  const [manualNote, setManualNote] = useState('');
+  const [manualSaving, setManualSaving] = useState(false);
+
+  const openManualModal = async () => {
+    setManualOpen(true);
+    if (staffDirectory.length === 0) {
+      try {
+        const res = await getStaffList({ includeInactive: false });
+        const raw = Array.isArray(res) ? res : (res?.staff || []);
+        setStaffDirectory(
+          raw
+            .filter((s) => s.is_active !== 0 && s.is_active !== false)
+            .sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')))
+        );
+      } catch {}
+    }
+  };
+
+  const handleSubmitManual = async (e) => {
+    e.preventDefault();
+    if (!manualStaffId || !manualReason.trim()) {
+      showToast('Pilih karyawan dan isi alasan lembur.', 'error');
+      return;
+    }
+    setManualSaving(true);
+    try {
+      await createManagerOvertimeLog({
+        staffId: manualStaffId,
+        overtimeDate: manualDate,
+        startTime: manualStart,
+        endTime: manualEnd,
+        reason: manualReason.trim(),
+        approvedMinutes: manualApprovedMins !== '' ? Number(manualApprovedMins) : undefined,
+        managerNote: manualNote.trim(),
+        reviewedBy: reviewerName
+      });
+      showToast('Lembur staff berhasil dicatat & disetujui!', 'success');
+      setManualOpen(false);
+      setManualReason('');
+      setManualApprovedMins('');
+      setManualNote('');
+      await loadOvertime(true);
+    } catch (err) {
+      showToast(err.message || 'Gagal mencatat lembur manual', 'error');
+    } finally {
+      setManualSaving(false);
+    }
+  };
 
   const loadOvertime = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
@@ -241,7 +302,15 @@ export default function OvertimeManagementTab({ adminAuth, onOvertimeChanged }) 
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2 self-start md:self-auto">
+        <div className="flex flex-wrap items-center gap-2 self-start md:self-auto">
+          <button
+            type="button"
+            onClick={openManualModal}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-xs font-black transition shadow-md shadow-violet-600/25 cursor-pointer"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span>Catat Lembur Staff</span>
+          </button>
           <button
             type="button"
             onClick={handleExportCsv}
@@ -614,6 +683,131 @@ export default function OvertimeManagementTab({ adminAuth, onOvertimeChanged }) 
             </div>
             <img src={photoPreview.url} alt={photoPreview.title} className="w-full max-h-[75vh] object-contain bg-black" />
           </div>
+        </div>
+      )}
+
+      {/* Manual Overtime Entry Modal (for verbal approvals) */}
+      {manualOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <form
+            onSubmit={handleSubmitManual}
+            className="bg-[#161b24] border border-violet-500/40 rounded-3xl max-w-md w-full p-5 shadow-2xl space-y-3.5"
+          >
+            <div className="flex items-center justify-between">
+              <h3 className="text-base font-black text-white">Catat Lembur Staff (ACC Manager)</h3>
+              <button type="button" onClick={() => setManualOpen(false)} className="text-slate-400 hover:text-white cursor-pointer">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-300 mb-1">Pilih Karyawan *</label>
+              <select
+                value={manualStaffId}
+                onChange={(e) => setManualStaffId(e.target.value)}
+                required
+                className="w-full px-3 py-2.5 bg-[#12161f] border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-violet-500"
+              >
+                <option value="">-- Pilih Nama Karyawan --</option>
+                {staffDirectory.map((s) => {
+                  const sid = s.legacy_code || s.id;
+                  return (
+                    <option key={sid} value={sid}>
+                      {s.name} ({sid} • {s.venue})
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-300 mb-1">Tanggal Lembur *</label>
+              <input
+                type="date"
+                value={manualDate}
+                onChange={(e) => setManualDate(e.target.value)}
+                required
+                className="w-full px-3 py-2 bg-[#12161f] border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-violet-500"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-bold text-slate-300 mb-1">Dari Jam (WITA) *</label>
+                <input
+                  type="time"
+                  value={manualStart}
+                  onChange={(e) => setManualStart(e.target.value)}
+                  required
+                  className="w-full px-3 py-2 bg-[#12161f] border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-violet-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-300 mb-1">Sampai Jam (WITA) *</label>
+                <input
+                  type="time"
+                  value={manualEnd}
+                  onChange={(e) => setManualEnd(e.target.value)}
+                  required
+                  className="w-full px-3 py-2 bg-[#12161f] border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-violet-500"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-300 mb-1">Alasan / Pekerjaan Lembur *</label>
+              <textarea
+                rows={2}
+                value={manualReason}
+                onChange={(e) => setManualReason(e.target.value)}
+                placeholder="Contoh: Bersih-bersih lantai 3 (ACC lisan Manager)"
+                required
+                className="w-full px-3 py-2 bg-[#12161f] border border-slate-700 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-violet-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-300 mb-1">
+                ACC Menit Khusus (Opsional — kosongkan untuk ACC Penuh)
+              </label>
+              <input
+                type="number"
+                min={1}
+                value={manualApprovedMins}
+                onChange={(e) => setManualApprovedMins(e.target.value)}
+                placeholder="Kosongkan = ACC 100% sesuai jam"
+                className="w-full px-3 py-2 bg-[#12161f] border border-slate-700 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-violet-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-300 mb-1">Catatan Manager (Opsional)</label>
+              <input
+                type="text"
+                value={manualNote}
+                onChange={(e) => setManualNote(e.target.value)}
+                placeholder="Contoh: ACC lisan karena kendala kamera HP"
+                className="w-full px-3 py-2 bg-[#12161f] border border-slate-700 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-violet-500"
+              />
+            </div>
+
+            <div className="flex gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setManualOpen(false)}
+                className="flex-1 py-2.5 rounded-xl bg-slate-800 text-slate-300 text-xs font-bold cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="submit"
+                disabled={manualSaving}
+                className="flex-1 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-xs font-black cursor-pointer"
+              >
+                {manualSaving ? 'Menyimpan...' : 'Simpan & ACC Lembur'}
+              </button>
+            </div>
+          </form>
         </div>
       )}
     </div>

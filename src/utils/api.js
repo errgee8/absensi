@@ -1248,3 +1248,14 @@ export async function deleteManagerOvertime(id) {
   return data;
 }
 
+export async function createManagerOvertimeLog({ staffId, overtimeDate, startTime, endTime, reason, approvedMinutes, managerNote, reviewedBy }) {
+  const res = await fetch(`${API_BASE}/manager/overtime/manual`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ staffId, overtimeDate, startTime, endTime, reason, approvedMinutes, managerNote, reviewedBy })
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Gagal mencatat lembur manual');
+  return data;
+}
+
