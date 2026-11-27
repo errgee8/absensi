@@ -512,8 +512,12 @@ export async function getAnnouncementReaders(id) {
     try {
       const [readsData, staffData] = await Promise.all([
         fetchSettingFromSupabase('management_announcement_reads'),
-        supabase.from('staff').select('id, uuid, legacy_code, name, venue, division, is_active')
+        supabase.from('staff').select('id, legacy_code, name, venue, division, is_active')
       ]);
+
+      if (staffData?.error) {
+        throw staffData.error;
+      }
 
       const allReads = Array.isArray(readsData) ? readsData : [];
       const thisReads = allReads.filter((r) => String(r.announcement_id) === String(id));
