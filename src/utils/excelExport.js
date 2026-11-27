@@ -155,9 +155,19 @@ function buildVenuePayrollSheet({
       const inWita = getWitaComponents(s.checkin_time);
       if (!inWita) return;
 
+      let parsedNotes = {};
+      try {
+        parsedNotes = typeof s.notes === 'string' ? JSON.parse(s.notes || '{}') : (s.notes || {});
+      } catch {
+        parsedNotes = {};
+      }
+      const explicitSchedStart = parsedNotes?.scheduled_start || null;
+
       const resolved = resolveShift(
         {
           ...s,
+          scheduled_start: explicitSchedStart || undefined,
+          scheduled_end: parsedNotes?.scheduled_end || undefined,
           staff_venue: s.staff_venue || staff.venue,
           staff_division: s.staff_division || staff.division,
           staff_role: s.staff_role || staff.role
@@ -165,8 +175,9 @@ function buildVenuePayrollSheet({
         schedules
       );
       const schedStart =
-        s.scheduled_start ||
+        explicitSchedStart ||
         (resolved?.startTime && resolved.startTime !== '-' ? resolved.startTime : null) ||
+        s.scheduled_start ||
         staff.shift_start ||
         '13:00';
       let isLate = false;
