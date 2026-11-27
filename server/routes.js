@@ -4348,10 +4348,10 @@ router.delete('/shifts/:id', async (req, res) => {
 
     if (isSupabaseConfigured) {
       try {
-        const { data: sData } = await supabase.from('attendance_logs').select('staff_id, date').eq('id', id).maybeSingle();
+        const { data: sData } = await supabase.from('attendance_logs').select('staff_id, shift_date').eq('id', id).maybeSingle();
         if (sData) {
           if (!targetStaffId) targetStaffId = sData.staff_id;
-          if (shiftDate === '-') shiftDate = sData.date || '-';
+          if (shiftDate === '-') shiftDate = sData.shift_date || '-';
         }
         await cloudDb.deleteShift(id);
       } catch (e) {

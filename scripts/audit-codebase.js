@@ -88,6 +88,20 @@ function checkFile(filePath) {
   }
 }
 
+function checkSupabaseSchema(filePath) {
+  const content = fs.readFileSync(filePath, 'utf8');
+  const staffUuidSelect = /\.from\(\s*['"]staff['"]\s*\)[\s\S]{0,80}\.select\(\s*['"][^'"]*\buuid\b[^'"]*['"]\s*\)/g;
+  if (staffUuidSelect.test(content)) {
+    totalErrors++;
+    errors.push({ file: filePath, missing: ['Invalid Supabase column: staff.uuid does not exist (use id)'] });
+  }
+  const attDateSelect = /\.from\(\s*['"]attendance_logs['"]\s*\)[\s\S]{0,80}\.select\(\s*['"][^'"]*\bdate\b[^'"]*['"]\s*\)/g;
+  if (attDateSelect.test(content)) {
+    totalErrors++;
+    errors.push({ file: filePath, missing: ['Invalid Supabase column: attendance_logs.date does not exist (use shift_date)'] });
+  }
+}
+
 function walk(dir) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     const full = path.join(dir, entry.name);
@@ -95,13 +109,17 @@ function walk(dir) {
       walk(full);
     } else if (entry.name.endsWith('.jsx')) {
       checkFile(full);
+      checkSupabaseSchema(full);
+    } else if (entry.name.endsWith('.js')) {
+      checkSupabaseSchema(full);
     }
   }
 }
 
 console.log('--- RUNNING AUTOMATED CODEBASE & JSX AUDIT ---');
 walk('src');
-console.log(`Audited ${totalFiles} JSX component files.`);
+if (fs.existsSync('server')) walk('server');
+console.log(`Audited ${totalFiles} JSX component files + Supabase schema queries.`);
 
 if (errors.length > 0) {
   console.error('\n❌ AUDIT FAILED: The following issues must be resolved before building:');
