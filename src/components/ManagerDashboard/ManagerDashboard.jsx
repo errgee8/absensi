@@ -373,6 +373,7 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
         dayAdjustments: dayAdjustmentsData?.adjustments || [],
         overtimeLogs: overtimeData?.logs || [],
         staffPointTotals: pointsData?.staffTotals || [],
+        schedules: schedules || [],
         periodStart: startOfMonth,
         periodEnd: todayYmd,
         exportTimestamp

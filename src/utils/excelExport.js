@@ -105,6 +105,7 @@ function buildVenuePayrollSheet({
   dayAdjustments = [],
   overtimeLogs = [],
   staffPointTotals = [],
+  schedules = [],
   periodStart = '',
   periodEnd = '',
   exportTimestamp = ''
@@ -154,11 +155,24 @@ function buildVenuePayrollSheet({
       const inWita = getWitaComponents(s.checkin_time);
       if (!inWita) return;
 
-      const schedStart = s.scheduled_start || staff.shift_start || '13:00';
+      const resolved = resolveShift(
+        {
+          ...s,
+          staff_venue: s.staff_venue || staff.venue,
+          staff_division: s.staff_division || staff.division,
+          staff_role: s.staff_role || staff.role
+        },
+        schedules
+      );
+      const schedStart =
+        s.scheduled_start ||
+        (resolved?.startTime && resolved.startTime !== '-' ? resolved.startTime : null) ||
+        staff.shift_start ||
+        '13:00';
       let isLate = false;
       let lateMinutes = 0;
 
-      if (!isMgmt && schedStart && schedStart.includes(':') && schedStart !== '00:00' && schedStart !== 'FLEXIBLE') {
+      if (!isMgmt && schedStart && schedStart.includes(':') && schedStart !== '00:00' && schedStart !== 'FLEXIBLE' && resolved?.shiftNumber !== 99) {
         const [sh, sm] = schedStart.split(':').map(Number);
         const schedM = sh * 60 + sm;
         let diff = inWita.totalMinutes - schedM;
@@ -1198,6 +1212,7 @@ export async function exportMonthlyPayrollReport({
   dayAdjustments = [],
   overtimeLogs = [],
   staffPointTotals = [],
+  schedules = [],
   periodStart = '',
   periodEnd = '',
   exportTimestamp = ''
@@ -1254,6 +1269,7 @@ export async function exportMonthlyPayrollReport({
     dayAdjustments,
     overtimeLogs,
     staffPointTotals,
+    schedules,
     periodStart,
     periodEnd,
     exportTimestamp
@@ -1276,6 +1292,7 @@ export async function exportMonthlyPayrollReport({
     dayAdjustments,
     overtimeLogs,
     staffPointTotals,
+    schedules,
     periodStart,
     periodEnd,
     exportTimestamp

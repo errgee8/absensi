@@ -32,6 +32,10 @@ export const DEFAULT_SHIFT_SCHEDULES = [
   { venue: 'LuckyCat', division: 'Kitchen', shift_number: 3, name: 'Middle 1', start_time: '12:00', end_time: '22:00' },
   { venue: 'LuckyCat', division: 'Kitchen', shift_number: 4, name: 'Middle 2', start_time: '14:00', end_time: '00:00' },
 
+  // LuckyCat - Cleaning Service
+  { venue: 'LuckyCat', division: 'Cleaning Service', shift_number: 1, name: 'Shift 1', start_time: '10:00', end_time: '19:00' },
+  { venue: 'LuckyCat', division: 'Cleaning Service', shift_number: 2, name: 'Shift 2', start_time: '18:30', end_time: '03:00' },
+
   // LuckyCat - Management
   { venue: 'LuckyCat', division: 'Management', shift_number: 1, name: 'Fleksibel (Management)', start_time: '00:00', end_time: '23:59' }
 ];
@@ -176,6 +180,8 @@ export function resolveShift(shift, schedules = []) {
     shiftNumber: shiftNum,
     shiftName,
     badgeLabel,
+    startTime,
+    endTime,
     timeRange,
     colorScheme: selectedColor.scheme,
     badgeClass: selectedColor.badgeClass
