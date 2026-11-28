@@ -24,11 +24,11 @@ import StaffPublicProfileModal from '../StaffView/StaffPublicProfileModal';
 import LoungeChatModal from '../StaffView/LoungeChatModal';
 import KudosAuditLogsModal from './KudosAuditLogsModal';
 import { exportMonthlyPayrollReport, exportTimesheetToExcel } from '../../utils/excelExport';
-import { getShifts, getStats, getShiftSchedules, getStaffList, getLeaveRequests, getAnnouncements, getAnnouncementReaders, getPoints, getStaffDayAdjustments, subscribeRealtimeEvents, sendPresenceHeartbeat, authorizeEarlyCheckout, getManagerOvertimeLogs } from '../../utils/api';
-import { getOperationalDateYMD, getOperationalYesterdayYMD, getWitaDateYMD, getAppNow, formatWitaDateTime } from '../../utils/time';
+import { getShifts, getStats, getShiftSchedules, getStaffList, getLeaveRequests, getAnnouncements, getAnnouncementReaders, getPoints, getStaffDayAdjustments, subscribeRealtimeEvents, sendPresenceHeartbeat, authorizeEarlyCheckout, getManagerOvertimeLogs, createManagerOvertimeLog } from '../../utils/api';
+import { getOperationalDateYMD, getOperationalYesterdayYMD, getWitaDateYMD, getAppNow, formatWitaDateTime, formatWitaTimeOnly } from '../../utils/time';
 import { resolveShift } from '../../utils/shiftResolver';
 import { showToast } from '../Common/Toast';
-import { LayoutDashboard, Users, Clock, Radio, Building2, Sparkles, Eye, ShieldAlert, Trophy, FileText, Megaphone, Activity, Award, Unlock, AlertCircle, Star, RefreshCw, Mail, Timer } from 'lucide-react';
+import { LayoutDashboard, Users, Clock, Radio, Building2, Sparkles, Eye, ShieldAlert, Trophy, FileText, Megaphone, Activity, Award, Unlock, AlertCircle, Star, RefreshCw, Mail, Timer, FileSpreadsheet, X, Calendar } from 'lucide-react';
 
 export default function ManagerDashboard({ venueSettings, refreshSettings, adminAuth, isReadOnly = false, onOpenLeaderboard }) {
   // Tabs: 'AUDIT' | 'SCHEDULES' | 'STAFF' | 'TOILET'
@@ -84,6 +84,18 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
   const [earlyReason, setEarlyReason] = useState('Diizinkan pulang lebih awal oleh Manajer');
   const [earlySubmitting, setEarlySubmitting] = useState(false);
   const [earlyError, setEarlyError] = useState(null);
+
+  // Grant Overtime ("Memberi Lembur") modal state from ShiftTable
+  const [giveOvertimeShift, setGiveOvertimeShift] = useState(null);
+  const [giveOvertimeMins, setGiveOvertimeMins] = useState(60);
+  const [giveOvertimeReason, setGiveOvertimeReason] = useState('');
+  const [giveOvertimeSaving, setGiveOvertimeSaving] = useState(false);
+
+  // Export Excel Date Range Picker modal state (clamped to 60-day app storage retention)
+  const EXPORT_RETENTION_DAYS = 60;
+  const [exportModalOpen, setExportModalOpen] = useState(false);
+  const [exportStartDate, setExportStartDate] = useState('');
+  const [exportEndDate, setExportEndDate] = useState('');
 
   useEffect(() => {
     if (adminAuth?.pin) setEarlyPin(adminAuth.pin);
@@ -340,24 +352,70 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
   const jpOnDuty = React.useMemo(() => onDutyShifts.filter((s) => s.staff_venue === 'JP Karaoke'), [onDutyShifts]);
   const lcOnDuty = React.useMemo(() => onDutyShifts.filter((s) => s.staff_venue !== 'JP Karaoke'), [onDutyShifts]);
 
-  const handleExportCsv = async () => {
+  const getExportDateBounds = () => {
+    const nowApp = getAppNow();
+    const todayYmd = getOperationalDateYMD(nowApp);
+    const [y, m, d] = todayYmd.split('-').map(Number);
+    const minDt = new Date(Date.UTC(y, m - 1, d - EXPORT_RETENTION_DAYS, 12, 0, 0));
+    const minYmd = `${minDt.getUTCFullYear()}-${String(minDt.getUTCMonth() + 1).padStart(2, '0')}-${String(minDt.getUTCDate()).padStart(2, '0')}`;
+    const monthStart = `${String(y)}-${String(m).padStart(2, '0')}-01`;
+    const defaultStart = monthStart < minYmd ? minYmd : monthStart;
+    return { todayYmd, minYmd, defaultStart };
+  };
+
+  const handleOpenExportModal = () => {
+    const { todayYmd, defaultStart } = getExportDateBounds();
+    setExportStartDate(defaultStart);
+    setExportEndDate(todayYmd);
+    setExportModalOpen(true);
+  };
+
+  const handleExportCsv = async (customStart, customEnd) => {
+    const { todayYmd, minYmd, defaultStart } = getExportDateBounds();
+    const startDate = customStart || defaultStart;
+    const endDate = customEnd || todayYmd;
+
+    if (startDate < minYmd) {
+      showToast(`Rentang data maksimal ${EXPORT_RETENTION_DAYS} hari terakhir (sejak ${minYmd}) sesuai kapasitas penyimpanan aplikasi.`, 'error');
+      return;
+    }
+    if (startDate > endDate || endDate > todayYmd) {
+      showToast('Rentang tanggal tidak valid.', 'error');
+      return;
+    }
+
+    setExportModalOpen(false);
     setIsExporting(true);
     try {
       const nowApp = getAppNow();
-      const todayYmd = getOperationalDateYMD(nowApp);
-      const [curYear, curMonth] = todayYmd.split('-');
-      const startOfMonth = `${curYear}-${curMonth}-01`;
       const exportTimestamp = formatWitaDateTime(nowApp.toISOString());
 
-      // Fetch month-to-date data in parallel: shifts, staff roster, approved leave, manager day adjustments, overtime logs, and points
-      const [monthShifts, allStaffList, allLeaveRequests, dayAdjustmentsData, overtimeData, pointsData] = await Promise.all([
-        getShifts({ startDate: startOfMonth, endDate: todayYmd }),
+      // Determine all months & years covered by [startDate..endDate]
+      const monthKeys = [];
+      const yearKeys = new Set();
+      let cursor = new Date(`${startDate}T12:00:00Z`);
+      const endCursor = new Date(`${endDate}T12:00:00Z`);
+      while (cursor <= endCursor) {
+        const ym = `${cursor.getUTCFullYear()}-${String(cursor.getUTCMonth() + 1).padStart(2, '0')}`;
+        if (!monthKeys.includes(ym)) monthKeys.push(ym);
+        yearKeys.add(String(cursor.getUTCFullYear()));
+        cursor.setUTCDate(cursor.getUTCDate() + 15);
+      }
+      const endYm = endDate.slice(0, 7);
+      if (!monthKeys.includes(endYm)) monthKeys.push(endYm);
+      yearKeys.add(endDate.slice(0, 4));
+
+      const [monthShifts, allStaffList, leaveResults, adjResults, overtimeData, pointsData] = await Promise.all([
+        getShifts({ startDate, endDate }),
         getStaffList('ALL'),
-        getLeaveRequests({ year: curYear }).catch(() => []),
-        getStaffDayAdjustments(curYear + '-' + curMonth).catch(() => ({ adjustments: [] })),
+        Promise.all(Array.from(yearKeys).map((yr) => getLeaveRequests({ year: yr }).catch(() => []))),
+        Promise.all(monthKeys.map((ym) => getStaffDayAdjustments(ym).catch(() => ({ adjustments: [] })))),
         getManagerOvertimeLogs().catch(() => ({ logs: [] })),
         getPoints({ cycleKey: 'CURRENT' }).catch(() => null)
       ]);
+
+      const allLeaveRequests = leaveResults.flat();
+      const mergedAdjustments = adjResults.flatMap((r) => r?.adjustments || []);
 
       // Strictly filter completed shifts only (strictly exclude ON_DUTY / IN_PROGRESS)
       const completedShifts = (monthShifts || []).filter(
@@ -370,12 +428,12 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
         shifts: completedShifts,
         allStaff: allStaffList || [],
         leaveRequests: allLeaveRequests || [],
-        dayAdjustments: dayAdjustmentsData?.adjustments || [],
+        dayAdjustments: mergedAdjustments,
         overtimeLogs: overtimeData?.logs || [],
         staffPointTotals: pointsData?.staffTotals || [],
         schedules: schedules || [],
-        periodStart: startOfMonth,
-        periodEnd: todayYmd,
+        periodStart: startDate,
+        periodEnd: endDate,
         exportTimestamp
       });
     } catch (err) {
@@ -383,6 +441,50 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
       showToast('Gagal mengekspor Rekap Gaji Excel: ' + (err.message || 'Terjadi kesalahan sistem'), 'error');
     } finally {
       setIsExporting(false);
+    }
+  };
+
+  const handleOpenGiveOvertimeModal = (shift) => {
+    setGiveOvertimeShift(shift);
+    setGiveOvertimeMins(60);
+    setGiveOvertimeReason('Datang lebih awal / tambahan jam operasional');
+  };
+
+  const handleSubmitGiveOvertime = async (e) => {
+    e.preventDefault();
+    if (!giveOvertimeShift) return;
+    const mins = Math.round(Number(giveOvertimeMins));
+    if (!Number.isFinite(mins) || mins < 15 || mins > 720) {
+      showToast('Durasi lembur harus antara 15 hingga 720 menit.', 'error');
+      return;
+    }
+    if (!giveOvertimeReason.trim()) {
+      showToast('Alasan pemberian lembur wajib diisi.', 'error');
+      return;
+    }
+    setGiveOvertimeSaving(true);
+    try {
+      const checkinHm = giveOvertimeShift.checkin_time
+        ? formatWitaTimeOnly(giveOvertimeShift.checkin_time).slice(0, 5)
+        : '09:00';
+      const shiftDate = giveOvertimeShift.date || getOperationalDateYMD(giveOvertimeShift.checkin_time);
+      await createManagerOvertimeLog({
+        staffId: giveOvertimeShift.staff_id || giveOvertimeShift.staff_uuid || giveOvertimeShift.staff_name,
+        overtimeDate: shiftDate,
+        startTime: /^\d{2}:\d{2}$/.test(checkinHm) ? checkinHm : '09:00',
+        durationMinutes: mins,
+        reason: giveOvertimeReason.trim(),
+        approvedMinutes: mins,
+        managerNote: `Diberikan langsung oleh Manager (+${mins} menit)`,
+        reviewedBy: adminAuth?.staffName || adminAuth?.role || 'Management'
+      });
+      showToast(`Berhasil memberi lembur +${mins} menit untuk ${giveOvertimeShift.staff_name}!`, 'success');
+      setGiveOvertimeShift(null);
+      loadPendingOvertimeCount();
+    } catch (err) {
+      showToast(err.message || 'Gagal memberi lembur', 'error');
+    } finally {
+      setGiveOvertimeSaving(false);
     }
   };
 
@@ -638,7 +740,7 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
           <DashboardHeader
               stats={stats}
               onPrint={handlePrint}
-              onExportCsv={handleExportCsv}
+              onExportCsv={handleOpenExportModal}
               isExporting={isExporting}
               onOpenSettings={() => setSettingsOpen(true)}
               onOpenResetLeaderboard={() => setWipeModalOpen(true)}
@@ -793,6 +895,7 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
               onInspectPhoto={(shift, type) => setInspectData({ shift, type })}
               onReviewLate={(shift) => setLateReviewShift(shift)}
               onAuthorizeEarlyCheckout={handleOpenEarlyCheckoutModal}
+              onGiveOvertime={handleOpenGiveOvertimeModal}
               onVisitStaffProfile={(staffId) => setVisitedStaffId(staffId)}
               onInspectStaff={(shift, initialTab = 'POINTS') => {
                 setSelectedStaffHistory({
@@ -1115,6 +1218,226 @@ export default function ManagerDashboard({ venueSettings, refreshSettings, admin
           isOpen={kudosModalOpen}
           onClose={() => setKudosModalOpen(false)}
         />
+
+        {/* Grant Overtime ("Memberi Lembur") Modal */}
+        {giveOvertimeShift && (
+          <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
+            <form
+              onSubmit={handleSubmitGiveOvertime}
+              className="bg-[#161b24] border border-violet-500/40 rounded-3xl max-w-md w-full p-5 shadow-2xl space-y-4"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-violet-500/20 border border-violet-400/40 text-violet-300 flex items-center justify-center">
+                    <Timer className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-black text-white">Beri Tambahan Lembur</h3>
+                    <p className="text-[11px] text-slate-400 font-bold">
+                      {giveOvertimeShift.staff_name} • {giveOvertimeShift.date || '-'}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setGiveOvertimeShift(null)}
+                  className="text-slate-400 hover:text-white cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="p-3 bg-[#12161f] border border-slate-800 rounded-xl text-xs text-slate-300 flex items-center justify-between">
+                <span>Jam Masuk Tercatat:</span>
+                <strong className="text-emerald-400 font-mono">
+                  {giveOvertimeShift.checkin_time ? formatWitaTimeOnly(giveOvertimeShift.checkin_time) : '-'}
+                </strong>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-300 mb-1.5">
+                  Pilih Tambahan Durasi Lembur (Otomatis ACC ke Gaji):
+                </label>
+                <div className="grid grid-cols-5 gap-1.5 mb-2">
+                  {[
+                    { label: '+30m', mins: 30 },
+                    { label: '+1 Jam', mins: 60 },
+                    { label: '+1,5 Jam', mins: 90 },
+                    { label: '+2 Jam', mins: 120 },
+                    { label: '+3 Jam', mins: 180 }
+                  ].map((preset) => (
+                    <button
+                      key={preset.mins}
+                      type="button"
+                      onClick={() => setGiveOvertimeMins(preset.mins)}
+                      className={`py-2 rounded-xl text-[11px] font-black border transition cursor-pointer ${
+                        Number(giveOvertimeMins) === preset.mins
+                          ? 'bg-violet-600 border-violet-400 text-white shadow-md'
+                          : 'bg-[#12161f] border-slate-700 text-slate-300 hover:border-slate-500'
+                      }`}
+                    >
+                      {preset.label}
+                    </button>
+                  ))}
+                </div>
+                <input
+                  type="number"
+                  min={15}
+                  max={720}
+                  value={giveOvertimeMins}
+                  onChange={(e) => setGiveOvertimeMins(e.target.value)}
+                  className="w-full px-3 py-2 bg-[#12161f] border border-slate-700 rounded-xl text-xs font-mono font-bold text-white focus:outline-none focus:border-violet-500"
+                  placeholder="Atau ketik jumlah menit..."
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-300 mb-1">Alasan Pemberian Lembur *</label>
+                <textarea
+                  rows={2}
+                  value={giveOvertimeReason}
+                  onChange={(e) => setGiveOvertimeReason(e.target.value)}
+                  required
+                  placeholder="Contoh: Datang jam 09:00 lebih awal sebelum buka jam 10:00"
+                  className="w-full px-3 py-2 bg-[#12161f] border border-slate-700 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-violet-500"
+                />
+              </div>
+
+              <div className="flex gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setGiveOvertimeShift(null)}
+                  className="flex-1 py-2.5 rounded-xl bg-slate-800 text-slate-300 text-xs font-bold cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={giveOvertimeSaving}
+                  className="flex-1 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-xs font-black shadow-lg shadow-violet-600/30 cursor-pointer"
+                >
+                  {giveOvertimeSaving ? 'Menyimpan...' : `Simpan (+${giveOvertimeMins} mnt)`}
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+
+        {/* Export Excel Date Range Picker Modal (Clamped to 60-Day App Storage) */}
+        {exportModalOpen && (() => {
+          const { todayYmd, minYmd } = getExportDateBounds();
+          const setPresetDays = (days) => {
+            const [y, m, d] = todayYmd.split('-').map(Number);
+            const dt = new Date(Date.UTC(y, m - 1, d - (days - 1), 12, 0, 0));
+            const sYmd = `${dt.getUTCFullYear()}-${String(dt.getUTCMonth() + 1).padStart(2, '0')}-${String(dt.getUTCDate()).padStart(2, '0')}`;
+            setExportStartDate(sYmd < minYmd ? minYmd : sYmd);
+            setExportEndDate(todayYmd);
+          };
+          const setThisMonth = () => {
+            const [y, m] = todayYmd.split('-');
+            const mStart = `${y}-${m}-01`;
+            setExportStartDate(mStart < minYmd ? minYmd : mStart);
+            setExportEndDate(todayYmd);
+          };
+          return (
+            <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
+              <div className="bg-[#161b24] border border-emerald-500/40 rounded-3xl max-w-md w-full p-5 shadow-2xl space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-9 h-9 rounded-xl bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 flex items-center justify-center">
+                      <FileSpreadsheet className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-black text-white">Export Rekap Gaji Excel</h3>
+                      <p className="text-[11px] text-slate-400 font-bold">Pilih rentang tanggal laporan</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setExportModalOpen(false)}
+                    className="text-slate-400 hover:text-white cursor-pointer"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <div className="p-2.5 bg-amber-500/10 border border-amber-500/30 rounded-xl text-[11px] text-amber-200 flex items-start gap-2">
+                  <Calendar className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                  <span>
+                    Sesuai kapasitas penyimpanan aplikasi (<strong>maksimal {EXPORT_RETENTION_DAYS} hari terakhir</strong>), data tersedia dari <strong>{minYmd}</strong> s/d <strong>{todayYmd}</strong>.
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-3 gap-1.5">
+                  <button
+                    type="button"
+                    onClick={setThisMonth}
+                    className="py-1.5 px-2 rounded-lg bg-[#12161f] hover:bg-emerald-600/20 border border-slate-700 hover:border-emerald-500/40 text-[11px] font-bold text-slate-200 cursor-pointer"
+                  >
+                    Bulan Ini
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPresetDays(7)}
+                    className="py-1.5 px-2 rounded-lg bg-[#12161f] hover:bg-emerald-600/20 border border-slate-700 hover:border-emerald-500/40 text-[11px] font-bold text-slate-200 cursor-pointer"
+                  >
+                    7 Hari Terakhir
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPresetDays(30)}
+                    className="py-1.5 px-2 rounded-lg bg-[#12161f] hover:bg-emerald-600/20 border border-slate-700 hover:border-emerald-500/40 text-[11px] font-bold text-slate-200 cursor-pointer"
+                  >
+                    30 Hari Terakhir
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 mb-1">Dari Tanggal</label>
+                    <input
+                      type="date"
+                      value={exportStartDate}
+                      min={minYmd}
+                      max={exportEndDate || todayYmd}
+                      onChange={(e) => setExportStartDate(e.target.value)}
+                      className="w-full px-3 py-2 bg-[#12161f] border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 mb-1">Sampai Tanggal</label>
+                    <input
+                      type="date"
+                      value={exportEndDate}
+                      min={exportStartDate || minYmd}
+                      max={todayYmd}
+                      onChange={(e) => setExportEndDate(e.target.value)}
+                      className="w-full px-3 py-2 bg-[#12161f] border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setExportModalOpen(false)}
+                    className="flex-1 py-2.5 rounded-xl bg-slate-800 text-slate-300 text-xs font-bold cursor-pointer"
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleExportCsv(exportStartDate, exportEndDate)}
+                    className="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <FileSpreadsheet className="w-4 h-4" />
+                    <span>Download Excel</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
       </div>
 
       {/* Printable Timesheet Layout (Active only on Print) */}

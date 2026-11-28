@@ -31,6 +31,7 @@ export default function ShiftTable({
   onReviewLate,
   onInspectStaff,
   onAuthorizeEarlyCheckout,
+  onGiveOvertime,
   onVisitStaffProfile,
   readersSet,
   hasActiveAnnouncement,
@@ -831,6 +832,18 @@ export default function ShiftTable({
                                   <Calendar className="w-2.5 h-2.5" />
                                   <span>Riwayat ➔</span>
                                 </button>
+
+                                {onGiveOvertime && (
+                                  <button
+                                    type="button"
+                                    onClick={() => onGiveOvertime(shift)}
+                                    className="px-2 py-1 rounded-lg bg-violet-600 hover:bg-violet-500 text-white font-black text-[9px] uppercase tracking-wider transition cursor-pointer shadow-xs flex items-center space-x-1"
+                                    title="Beri tambahan jam lembur untuk staff pada shift ini (otomatis masuk gaji)"
+                                  >
+                                    <Zap className="w-2.5 h-2.5" />
+                                    <span>Beri Lembur</span>
+                                  </button>
+                                )}
                               </div>
                             </div>
                           </div>

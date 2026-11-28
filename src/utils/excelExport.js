@@ -115,7 +115,13 @@ function buildVenuePayrollSheet({
     pageSetup: { orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0 }
   });
 
-  const monthPrefix = periodStart ? periodStart.substring(0, 7) : '';
+  const inDateRange = (ymd) => {
+    if (!ymd) return false;
+    const d = String(ymd).slice(0, 10);
+    if (periodStart && d < periodStart) return false;
+    if (periodEnd && d > periodEnd) return false;
+    return true;
+  };
 
   // Calculate staff metrics
   const staffMetrics = staffList.map((staff) => {
@@ -236,9 +242,10 @@ function buildVenuePayrollSheet({
       if (!matchesStaff(req)) return;
       if (req.status !== 'APPROVED') return;
 
-      const startInMonth = !monthPrefix || (req.start_date || '').startsWith(monthPrefix);
-      const endInMonth = !monthPrefix || (req.end_date || '').startsWith(monthPrefix);
-      if (!startInMonth && !endInMonth) return;
+      const sYmd = String(req.start_date || '').slice(0, 10);
+      const eYmd = String(req.end_date || sYmd).slice(0, 10);
+      const overlapsRange = (!periodStart || eYmd >= periodStart) && (!periodEnd || sYmd <= periodEnd);
+      if (!overlapsRange) return;
 
       const days = Number(req.requested_days || req.days || 1);
       const kind = req.category === 'SAKIT' ? 'Sakit' : req.type === 'CUTI' ? 'Cuti' : (req.category === 'IZIN_PULANG_AWAL' ? 'Pulang Awal' : 'Izin');
@@ -258,7 +265,7 @@ function buildVenuePayrollSheet({
     (overtimeLogs || []).forEach((ot) => {
       if (!matchesStaff(ot)) return;
       if (ot.status !== 'APPROVED' && ot.status !== 'PARTIAL') return;
-      if (monthPrefix && !String(ot.overtime_date || '').startsWith(monthPrefix)) return;
+      if (!inDateRange(ot.overtime_date)) return;
 
       const mins = Number(ot.approved_minutes || 0);
       if (mins <= 0) return;

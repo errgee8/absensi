@@ -8562,20 +8562,29 @@ router.post('/manager/overtime/:id/review', async (req, res) => {
   }
 });
 
-// 18g. Manager: Manual Overtime Entry (for verbal approvals / emergency bypass)
+// 18g. Manager: Manual Overtime Entry / Grant Overtime (for early arrival, verbal approvals, etc.)
 router.post('/manager/overtime/manual', async (req, res) => {
-  const { staffId, overtimeDate, startTime, endTime, reason, approvedMinutes, managerNote, reviewedBy } = req.body;
+  const { staffId, overtimeDate, startTime, endTime, durationMinutes: rawDurationMins, reason, approvedMinutes, managerNote, reviewedBy } = req.body;
   const cleanDate = String(overtimeDate || '').trim();
-  const cleanStart = String(startTime || '').trim();
-  const cleanEnd = String(endTime || '').trim();
+  let cleanStart = String(startTime || '').trim();
+  let cleanEnd = String(endTime || '').trim();
   const cleanReason = String(reason || '').trim();
+  const directMins = rawDurationMins != null && rawDurationMins !== '' ? Math.round(Number(rawDurationMins)) : null;
 
   if (!staffId) return res.status(400).json({ error: 'Pilih karyawan terlebih dahulu.' });
   if (!/^\d{4}-\d{2}-\d{2}$/.test(cleanDate)) return res.status(400).json({ error: 'Tanggal lembur wajib diisi.' });
-  if (!/^\d{2}:\d{2}$/.test(cleanStart) || !/^\d{2}:\d{2}$/.test(cleanEnd)) {
-    return res.status(400).json({ error: 'Jam mulai dan jam selesai wajib diisi (HH:MM).' });
-  }
   if (!cleanReason) return res.status(400).json({ error: 'Alasan lembur wajib diisi.' });
+
+  if (directMins != null && Number.isFinite(directMins) && directMins > 0 && directMins <= 24 * 60) {
+    if (!/^\d{2}:\d{2}$/.test(cleanStart)) cleanStart = '09:00';
+    if (!/^\d{2}:\d{2}$/.test(cleanEnd)) {
+      const [sH, sM] = cleanStart.split(':').map(Number);
+      const totalEndM = (sH * 60 + sM + directMins) % (24 * 60);
+      cleanEnd = `${String(Math.floor(totalEndM / 60)).padStart(2, '0')}:${String(totalEndM % 60).padStart(2, '0')}`;
+    }
+  } else if (!/^\d{2}:\d{2}$/.test(cleanStart) || !/^\d{2}:\d{2}$/.test(cleanEnd)) {
+    return res.status(400).json({ error: 'Jam mulai dan jam selesai (atau durasi menit) wajib diisi.' });
+  }
 
   try {
     const staff = await resolveStaffRecordForOvertime(staffId, null, staffId);
@@ -8594,7 +8603,7 @@ router.post('/manager/overtime/manual', async (req, res) => {
     }
     const endIsoWita = `${endDateStr}T${cleanEnd}:00+08:00`;
     const endMs = new Date(endIsoWita).getTime();
-    const durationMinutes = Math.round((endMs - startMs) / 60000);
+    const durationMinutes = directMins && directMins > 0 ? directMins : Math.round((endMs - startMs) / 60000);
 
     if (isNaN(durationMinutes) || durationMinutes <= 0 || durationMinutes > 24 * 60) {
       return res.status(400).json({ error: 'Durasi jam lembur tidak valid.' });
